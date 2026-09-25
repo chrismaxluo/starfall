@@ -162,3 +162,42 @@ describe('播放控制接口', () => {
     expect((await t.req({ method: 'DELETE', url: '/api/blacklist/10009' })).statusCode).toBe(404);
   });
 });
+
+describe('预览与统计', () => {
+  it('预览：返回播放内容，不入队、不写记录', async () => {
+    const t = await setup();
+    const star = t.ctx.effects.list().find((e) => e.name === '星冕')!.id;
+    const r = (await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: star, viewer: { name: '长夜未央', guard: 1, medalLevel: null } } })).json();
+    expect(r).toMatchObject({ test: true, text: '总督 长夜未央 驾临', effect: { name: '星冕' }, viewer: { name: '长夜未央', guard: 1 } });
+    expect(r.viewer.medal).toBeUndefined();
+    expect(t.ctx.pipeline.snapshot().items).toHaveLength(0);
+    expect(t.ctx.log.query({}).events).toHaveLength(0);
+    expect((await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: 9999 } })).statusCode).toBe(404);
+    // 预览还没保存的修改
+    const d = (await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: star, draft: { texts: { enter: ['改了 {name}'] }, position: 'top', durationMs: 2000 } } })).json();
+    expect(d).toMatchObject({ text: '改了 测试观众', effect: { position: 'top', durationMs: 2000 } });
+    expect(t.ctx.effects.get(star).texts.enter).toEqual(['{guard} {name} 驾临']);
+    expect((await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: star, draft: { name: 'x' } } })).statusCode).toBe(400);
+  });
+
+  it('今日统计：进场去重、播放次数、身份构成（每人取最后一次）', async () => {
+    const t = await setup();
+    t.ctx.settings.set('offlinePolicy', 'play');
+    const v = (uid: number, p: object = {}) => ({ uid, name: `观众${uid}`, guard: 0 as const, isMod: false, mystery: false, ...p });
+    const enter = (viewer: ReturnType<typeof v>) => t.ctx.pipeline.handle({ kind: 'enter', id: `e${Math.random()}`, ts: Date.now(), source: 'interact', viewer });
+    enter(v(1, { guard: 3 }));
+    enter(v(2, { isMod: true }));
+    enter(v(3, { medal: { name: '牌', level: 5, anchorUid: 20000 } }));
+    enter(v(4, { medal: { name: '牌', level: 5, anchorUid: 999 } }));
+    enter(v(5));
+    const s = (await t.req({ method: 'GET', url: '/api/stats/today' })).json();
+    expect(s).toMatchObject({ enterUnique: 5, composition: { gov: 0, adm: 0, cap: 1, mod: 1, fan: 1, nor: 2 } });
+    expect(s.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('按时区算当天 0 点', async () => {
+    const { dayStart } = await import('./playback.ts');
+    expect(dayStart('2026-09-25', 'Asia/Shanghai')).toBe(Date.parse('2026-09-25T00:00:00+08:00'));
+    expect(dayStart('2026-09-25', 'UTC')).toBe(Date.parse('2026-09-25T00:00:00Z'));
+  });
+});

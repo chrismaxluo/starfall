@@ -73,6 +73,18 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
     app.get('/overlay', async (req, reply) => reply.redirect(`/overlay/${req.url.slice('/overlay'.length)}`));
   }
 
+  // 管理后台（构建好的静态文件，页面内用 # 路由，只需要提供 / 和资源文件）
+  if (fs.existsSync(ctx.config.adminDist)) {
+    await app.register(fastifyStatic, {
+      root: ctx.config.adminDist,
+      prefix: '/',
+      decorateReply: false,
+      cacheControl: false,
+      wildcard: false,
+      setHeaders: (reply, file) => reply.header('Cache-Control', file.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'),
+    });
+  }
+
   app.get('/api/health', async () => ({ ok: true, name: APP_NAME, time: Date.now() }));
   authRoutes(app, ctx);
   biliRoutes(app, ctx);

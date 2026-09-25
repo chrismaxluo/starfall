@@ -59,6 +59,8 @@ function onMessage(m: ServerToOverlay): void {
     case 'config':
       config = m.config;
       apply();
+      stage.querySelectorAll('.safe').forEach((el) => el.remove());
+      if (q.get('debug') === '1') showSafeAreas(stage);
       break;
     case 'preload':
       void preload(m.preload);
@@ -72,9 +74,19 @@ function onMessage(m: ServerToOverlay): void {
   }
 }
 
+// 预览模式（管理后台里的 iframe）：只接收同源页面发来的消息，只在本地播放，不连服务端
+const preview = q.get('preview') === '1';
+if (preview) {
+  addEventListener('message', (e: MessageEvent<ServerToOverlay | { type: 'config'; config: OverlayConfig }>) => {
+    if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
+    onMessage(e.data as ServerToOverlay);
+  });
+  parent.postMessage({ type: 'starfall-preview-ready' }, location.origin);
+}
+
 const output = q.get('output');
 const key = q.get('key');
-const offline = q.get('check') === '1' || q.get('loop') === '1' || q.has('demo');
+const offline = preview || q.get('check') === '1' || q.get('loop') === '1' || q.has('demo');
 
 if (output && key) {
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/overlay?output=${encodeURIComponent(output)}&key=${encodeURIComponent(key)}`;

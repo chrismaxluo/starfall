@@ -43,8 +43,8 @@
 | protobuf | protobufjs | 8.8 | 解析 B 站新版 pb 格式消息：**进场 `INTERACT_WORD_V2`、送礼 `SEND_GIFT_V2`**（P0 已确认） | 手写解码：维护成本高 |
 | 日志 | Pino | 10.3 | Fastify 自带；结构化日志，性能好 | — |
 | 管理后台框架 | Vue 3 + Vite | 3.5 / 8.3 | 上手快、生态成熟 | React：同样可行，Vue 的表单和模板写法更贴合后台场景 |
-| 状态管理 / 路由 | Pinia + Vue Router | 4.0 / 5.3 | Vue 官方方案 | — |
-| UI 组件库 | Naive UI | 2.45 | 暗色主题完善，主题可深度定制，能还原设计预览的风格 | Element Plus：暗色和定制能力稍弱 |
+| 状态管理 / 路由 | Vue 自带的 `reactive` + 地址 `#` 路由 | — | 第一期页面少、状态简单，不需要 Pinia 和 Vue Router；以后页面多了再引入 | Pinia + Vue Router |
+| UI 组件 | 直接使用设计预览的样式（`apps/admin/src/styles/app.css`）+ 自己写的少量组件 | — | 设计预览已经把按钮、输入框、开关、弹窗、选择器都做好了，直接移植最能保证和设计一致；组件库的默认样式反而要大量覆盖 | 原计划 Naive UI |
 | 特效动画 | GSAP | 3.15 | 时间轴编排精准，适合横幅、文字类特效 | 纯 CSS 动画：复杂编排难写 |
 | Lottie | lottie-web | 5.13 | 播放 AE 导出的动画 | — |
 | 粒子效果 | PixiJS | 8.21 | GPU 渲染，粒子多时也流畅 | Canvas 手写：工作量大 |
@@ -125,7 +125,7 @@ starfall/
 │   └── core/       纯逻辑：标准事件、规则匹配、冷却、播放队列、欢迎语变量替换
 ├── apps/
 │   ├── server/     Fastify 服务：数据库、REST、WebSocket 中心、素材管理、定时任务
-│   ├── admin/      管理后台（Vue 3 + Naive UI）
+│   ├── admin/      管理后台（Vue 3，样式移植自设计预览）
 │   ├── overlay/    特效页（Vite + GSAP / Lottie / PixiJS / SVGA）
 │   └── desktop/    Windows 客户端（Electron，最后做）
 ├── fixtures/       技术验证时抓到的 B 站真实消息样本（脱敏后），用于测试
@@ -479,10 +479,10 @@ data/
 | 方面 | 做法 |
 |---|---|
 | 页面 | 总览、触发规则、素材库、事件记录、直播软件输出、设置、新手引导，与设计预览一致 |
-| 主题 | 设计预览里的颜色、层级、字体整理成设计变量，映射到 Naive UI 的主题配置；亮暗两套 |
-| 数据 | Pinia 管理状态；修改走 REST，实时数据由 `/ws/admin` 推送 |
+| 主题 | 直接使用设计预览的设计变量（颜色、层级、字体）；亮暗两套，默认跟随系统，切换时圆形扩散 |
+| 数据 | 全局状态用 Vue 的 `reactive`；修改走 REST（大部分设置改完立即保存），实时数据由 `/ws/admin` 推送 |
 | 表单 | 使用 `shared` 里的 Zod 定义做前端校验，和服务端一致 |
-| 预览 | 后台里的预览复用特效页的渲染代码，保证后台看到的和直播画面一致 |
+| 预览 | 后台里的预览是 iframe 里的真实特效页（`/overlay/?preview=1`），由后台用 `postMessage` 发送播放内容；播放内容由 `POST /api/preview` 生成（可带还没保存的修改），只在本地播放，不入队、不上直播 |
 | 其他 | 命令面板（`Ctrl + K`）、暂停快捷键（`Ctrl + Shift + P`）、手机底部导航 |
 | 字体 | 打包进项目，不依赖外部网络 |
 

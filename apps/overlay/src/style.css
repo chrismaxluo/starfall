@@ -3,7 +3,7 @@
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Geist Mono", "Geist Sans", ui-monospace, monospace;
-  color-scheme: dark;
+  /* 不声明 color-scheme：放在管理后台的 iframe 里预览时，和外层不一致会让浏览器画一层不透明底色 */
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }

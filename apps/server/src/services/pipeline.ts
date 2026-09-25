@@ -295,6 +295,12 @@ export class Pipeline {
     return { id: item.id };
   }
 
+  /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
+  preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter'): PlayItem {
+    const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
+    return this.playItem(effect, v, kind, true);
+  }
+
   snapshot(): QueueSnapshot {
     const brief = (q: QueueItem<Queued>) => ({ id: q.id, kind: q.kind, effectName: q.payload.item.effect.name, viewerName: q.payload.item.viewer.name, test: Boolean(q.payload.item.test) });
     const c = this.current;

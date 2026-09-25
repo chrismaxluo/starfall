@@ -91,6 +91,31 @@ export class EventLog {
     return { events: page, nextCursor: rows.length > limit ? page[page.length - 1]!.id : null };
   }
 
+  /** 某个时间之后的统计（总览）：进场人数（去重）、播放次数、身份构成 */
+  statsSince(since: number, anchorUid: number): { enterUnique: number; played: number; guardPlayed: number; composition: Record<'gov' | 'adm' | 'cap' | 'mod' | 'fan' | 'nor', number> } {
+    const db = this.db.$client;
+    const enterUnique = (db.prepare("select count(distinct uid) n from events where kind = 'enter' and ts >= ?").get(since) as { n: number }).n;
+    const played = (db.prepare("select count(*) n from events where status = 'played' and ts >= ?").get(since) as { n: number }).n;
+    const guardPlayed = (db.prepare("select count(*) n from events where status = 'played' and ts >= ? and cast(json_extract(viewer, '$.guard') as integer) > 0").get(since) as { n: number }).n;
+    // 每个人取当天最后一次进场时的身份
+    const rows = db
+      .prepare(
+        `select json_extract(viewer, '$.guard') g, json_extract(viewer, '$.isMod') m, json_extract(viewer, '$.medal.anchorUid') a, json_extract(viewer, '$.medal.level') l
+         from events where id in (select max(id) from events where kind = 'enter' and ts >= ? group by uid)`,
+      )
+      .all(since) as Array<{ g: number | null; m: number | null; a: number | null; l: number | null }>;
+    const composition = { gov: 0, adm: 0, cap: 0, mod: 0, fan: 0, nor: 0 };
+    for (const r of rows) {
+      if (r.g === 1) composition.gov++;
+      else if (r.g === 2) composition.adm++;
+      else if (r.g === 3) composition.cap++;
+      else if (r.m) composition.mod++;
+      else if (r.a === anchorUid && (r.l ?? 0) > 0) composition.fan++;
+      else composition.nor++;
+    }
+    return { enterUnique, played, guardPlayed, composition };
+  }
+
   /** 本场已经播放过进场特效的 UID（服务重启后恢复"每场一次"） */
   playedEnterUids(sessionId: number): number[] {
     return this.db

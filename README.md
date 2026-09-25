@@ -86,6 +86,7 @@ flowchart LR
 ## 开发进度
 
 - [x] 需求整理（[需求文档](docs/requirements.md)）
+- [x] 仓库与开发约定（[分支、提交与回退](docs/development.md)）
 - [x] 界面设计预览
 - [x] OBS 兼容性与声音实测
 - [ ] 方案设计（数据库、接口、模块）
@@ -112,7 +113,7 @@ flowchart LR
 ## 目录结构
 
 ```
-docs/               需求文档、README 截图
+docs/               需求文档、开发约定、README 截图
 design/preview/     界面设计预览（纯静态网页，不是正式代码）
 design/tools/       预览相关的小工具
 ```

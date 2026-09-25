@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 进场特效演示</title>
+
+
+<link rel="stylesheet" href="fonts-32f6c64d.css">
+<style>
+body{margin:0;font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;background:#0B0E1C}
+button{font-family:inherit;cursor:pointer}
+button:hover{filter:brightness(1.15)}
+@keyframes slideLife{0%{transform:translateX(-120%);opacity:0}10%{transform:translateX(6%);opacity:1}15%{transform:translateX(0)}86%{transform:translateX(0);opacity:1}100%{transform:translateX(0);opacity:0}}
+.slide{animation:slideLife var(--life) cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes popLife{0%{transform:scale(.3);opacity:0}10%{transform:scale(1.08);opacity:1}16%{transform:scale(1)}88%{transform:scale(1);opacity:1}100%{transform:scale(1.04);opacity:0}}
+.pop{animation:popLife var(--life) cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes burst{0%{transform:translate(0,0) scale(.2);opacity:0}15%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+.spark{position:absolute;left:50%;top:50%;animation:burst 1.6s ease-out forwards}
+@keyframes rays{to{transform:rotate(360deg)}}
+.rays{animation:rays 12s linear infinite}
+@keyframes shine{0%{transform:translateX(-120%) skewX(-20deg)}60%,100%{transform:translateX(320%) skewX(-20deg)}}
+.shine{position:absolute;top:0;bottom:0;width:30%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0));animation:shine 2.4s ease-in-out infinite}
+@keyframes meteor{0%{transform:translate(0,0);opacity:0}10%{opacity:1}70%,100%{transform:translate(-520px,230px);opacity:0}}
+.meteor{position:absolute;width:180px;height:2px;border-radius:2px;background:linear-gradient(90deg,#fff,rgba(255,255,255,0));animation:meteor 1.8s ease-in forwards}
+@keyframes trail{0%{width:0;opacity:0}30%{width:120px;opacity:1}100%{width:0;opacity:0}}
+.trail{animation:trail 1.2s ease-out forwards}
+</style>
+
+<style>html,body{overflow:hidden}#root{transform-origin:0 0}</style>
+<script src="dc-lite.js"></script>
+</head>
+<body>
+<div id="root" style="width:1280px;height:800px"></div>
+<template id="tpl">
+
+<div style="width: 1280px; height: 800px; display: flex; flex-direction: column; background: #0B0E1C; color: #E7E9F7;">
+  <div style="position: relative; height: 700px; overflow: hidden; background: radial-gradient(700px 400px at 70% 30%, #2b3a5c 0%, rgba(43,58,92,0) 70%), linear-gradient(160deg, #1c2640, #0f1322 75%);">
+    <span style="position: absolute; left: 20px; top: 16px; font-size: 13px; color: #6E7396;">直播画面（模拟 OBS 叠加效果）</span>
+    <span style="position: absolute; right: 20px; top: 16px; font-size: 13px; color: #9DA2C6;">队列：{{queueText}}</span>
+
+    <sc-if value="{{isGov}}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+        <div class="pop" style="--life: 6s; position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px;">
+          <div class="rays" style="position: absolute; left: 50%; top: 50%; width: 640px; height: 640px; margin: -320px 0 0 -320px; border-radius: 50%; background: repeating-conic-gradient(rgba(246,198,110,0.26) 0deg 8deg, rgba(246,198,110,0) 8deg 22deg); mask-image: radial-gradient(circle, #000 18%, transparent 66%); -webkit-mask-image: radial-gradient(circle, #000 18%, transparent 66%);"></div>
+          <sc-for list="{{sparks}}" as="p" hint-placeholder-count="18">
+            <svg class="spark" style="--dx: {{p.dx}}px; --dy: {{p.dy}}px; animation-delay: {{p.d}}s;" width="{{p.r}}" height="{{p.r}}" viewBox="0 0 24 24" fill="#FFE3A3" aria-hidden="true"><path d="M12 1l2.8 8.2L23 12l-8.2 2.8L12 23l-2.8-8.2L1 12l8.2-2.8z"/></svg>
+          </sc-for>
+          <div style="position: relative; width: 120px; height: 120px; border-radius: 50%; padding: 5px; box-sizing: border-box; background: conic-gradient(#FFE7A8, #E0463A, #FFD27A, #E0463A, #FFE7A8); box-shadow: 0 0 50px rgba(246,198,110,0.8);">
+            <span style="width: 100%; height: 100%; border-radius: 50%; background: #3A1D12; color: #FFE3A3; font-size: 46px; font-weight: 900; display: flex; align-items: center; justify-content: center;">长</span>
+            <svg style="position: absolute; left: 50%; top: -36px; transform: translateX(-50%);" width="56" height="42" viewBox="0 0 40 30" fill="#FFD27A" aria-hidden="true"><path d="M2 26L6 6l9 10L20 2l5 14 9-10 4 20z"/></svg>
+          </div>
+          <div style="position: relative; overflow: hidden; padding: 14px 48px; border-radius: 12px; background: linear-gradient(90deg, #7A1E14, #C23A22 30%, #E8A640 50%, #C23A22 70%, #7A1E14); border: 1px solid #FFD98C; box-shadow: 0 8px 40px rgba(224,70,58,0.6);">
+            <span class="shine"></span>
+            <span style="position: relative; font-family: 'ZCOOL XiaoWei', serif; font-size: 38px; letter-spacing: 4px; color: #FFF6DC; text-shadow: 0 2px 8px rgba(80,10,0,0.6);">总督 长夜未央 驾临</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isAdm}}" hint-placeholder-val="{{ false }}">
+      <span class="meteor" style="left: 900px; top: 120px;"></span>
+      <span class="meteor" style="left: 1040px; top: 200px; animation-delay: .5s;"></span>
+      <div class="slide" style="--life: 5s; position: absolute; left: 48px; bottom: 60px; overflow: hidden; display: flex; align-items: center; gap: 16px; padding: 14px 44px 14px 14px; border-radius: 18px; background: linear-gradient(90deg, rgba(123,79,214,0.96), rgba(123,79,214,0.55) 70%, rgba(123,79,214,0)); border-left: 3px solid #E2D0FF; box-shadow: 0 0 50px rgba(155,110,255,0.5);">
+        <span class="shine"></span>
+        <span style="position: relative; width: 72px; height: 72px; border-radius: 50%; background: #EEE4FF; color: #4B2A99; font-size: 30px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #C39BFF;">月</span>
+        <div style="position: relative; display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 13px; letter-spacing: 3px; color: #E2D0FF;">提督 · ADMIRAL</span>
+          <span style="font-size: 28px; font-weight: 700; color: #FFFFFF;">欢迎提督 月下独酌 登船</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isCap}}" hint-placeholder-val="{{ false }}">
+      <div class="slide" style="--life: 4s; position: absolute; left: 48px; bottom: 60px; display: flex; align-items: center;">
+        <span class="trail" style="height: 3px; border-radius: 3px; background: linear-gradient(90deg, rgba(109,184,255,0), #9CD0FF); margin-right: -6px;"></span>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 10px 28px 10px 10px; border-radius: 999px; background: linear-gradient(90deg, rgba(79,168,255,0.95), rgba(79,168,255,0.4)); box-shadow: 0 0 30px rgba(79,168,255,0.6);">
+          <span style="width: 54px; height: 54px; border-radius: 50%; background: #E8F3FF; color: #1D4F8C; font-size: 22px; font-weight: 900; display: flex; align-items: center; justify-content: center;">星</span>
+          <span style="font-size: 22px; color: #04172D; font-weight: 500;">欢迎舰长 <b>星河漫步</b> 登船</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isMod}}" hint-placeholder-val="{{ false }}">
+      <div class="slide" style="--life: 3.5s; position: absolute; left: 48px; bottom: 60px; display: flex; align-items: center; gap: 12px; padding: 10px 24px 10px 12px; border-radius: 14px; background: rgba(14,64,58,0.9); border: 1px solid rgba(95,224,201,0.6); box-shadow: 0 0 24px rgba(95,224,201,0.35);">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#5FE0C9" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+        <span style="font-size: 20px; color: #E6FFF9;">房管 <b>青柠汽水</b> 前来巡场</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isFan}}" hint-placeholder-val="{{ false }}">
+      <div class="slide" style="--life: 3s; position: absolute; left: 48px; bottom: 60px; display: flex; align-items: center; gap: 10px; padding: 8px 20px 8px 8px; border-radius: 999px; background: rgba(20,22,40,0.8);">
+        <span style="display: flex; align-items: center; border-radius: 4px; overflow: hidden; font-size: 14px; border: 1px solid #C2356A;">
+          <span style="padding: 1px 8px; background: #C2356A; color: #FFFFFF;">[牌子]</span>
+          <span style="padding: 1px 8px; color: #C2356A; background: #FFFFFF; font-weight: 700;">21</span>
+        </span>
+        <span style="font-size: 18px; color: #FFFFFF;">晚风与你 来啦</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isNormal}}" hint-placeholder-val="{{ false }}">
+      <div class="slide" style="--life: 2.2s; position: absolute; left: 48px; bottom: 60px; padding: 8px 18px; border-radius: 8px; background: rgba(255,255,255,0.16); font-size: 16px; color: #F1F2FA;">路过的猫 进入直播间</div>
+    </sc-if>
+  </div>
+
+  <div style="height: 100px; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(170,160,255,0.14); background: #0E1226;">
+    <span style="font-size: 14px; color: #A9AED0; margin-right: 8px;">模拟进场：</span>
+    <sc-for list="{{buttons}}" as="b" hint-placeholder-count="6">
+      <button onClick="{{b.fire}}" style="height: 48px; padding: 0 22px; border-radius: 10px; border: 1px solid {{b.color}}; background: rgba(255,255,255,0.04); color: {{b.color}}; font-size: 15px;">{{b.label}}</button>
+    </sc-for>
+    <button onClick="{{burst}}" style="margin-left: auto; height: 48px; padding: 0 20px; border-radius: 10px; border: none; background: #8B7CF6; color: #0B0E1C; font-size: 14px; font-weight: 700;">三人同时进场（演示排队）</button>
+  </div>
+</div>
+</template>
+<script type="text/plain" id="logic">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { current: null, queue: [] };
+    this.timer = null;
+    this.life = { gov: 6000, adm: 5000, cap: 4000, mod: 3500, fan: 3000, normal: 2200 };
+  }
+  componentWillUnmount() { clearTimeout(this.timer); }
+  enqueue(tiers) {
+    var rank = { gov: 0, adm: 1, cap: 2, mod: 3, fan: 4, normal: 5 };
+    var q = this.state.queue.concat(tiers).sort(function (a, b) { return rank[a] - rank[b]; });
+    if (this.state.current) { this.setState({ queue: q }); return; }
+    this.playNext(q);
+  }
+  playNext(q) {
+    var self = this;
+    if (!q.length) { this.setState({ current: null, queue: [] }); return; }
+    var next = q[0];
+    this.setState({ current: null, queue: q.slice(1) });
+    this.timer = setTimeout(function () {
+      self.setState({ current: next });
+      self.timer = setTimeout(function () { self.playNext(self.state.queue); }, self.life[next] + 150);
+    }, 60);
+  }
+  renderVals() {
+    var self = this;
+    var cur = this.state.current;
+    var sparks = [];
+    for (var i = 0; i < 18; i++) {
+      var a = (i / 18) * Math.PI * 2;
+      var dist = 220 + (i % 3) * 70;
+      sparks.push({ dx: Math.round(Math.cos(a) * dist), dy: Math.round(Math.sin(a) * dist * 0.7), r: 12 + (i % 4) * 5, d: ((i % 5) * 0.12).toFixed(2) });
+    }
+    var names = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', fan: '粉丝牌', normal: '普通' };
+    var defs = [
+      { k: 'gov', label: '总督', color: '#F6C66E' }, { k: 'adm', label: '提督', color: '#C39BFF' },
+      { k: 'cap', label: '舰长', color: '#6DB8FF' }, { k: 'mod', label: '房管', color: '#5FE0C9' },
+      { k: 'fan', label: '粉丝牌', color: '#FF9CC4' }, { k: 'normal', label: '普通观众', color: '#C9CCE3' }
+    ];
+    var q = this.state.queue;
+    return {
+      isGov: cur === 'gov', isAdm: cur === 'adm', isCap: cur === 'cap',
+      isMod: cur === 'mod', isFan: cur === 'fan', isNormal: cur === 'normal',
+      sparks: sparks,
+      queueText: q.length ? q.map(function (t) { return names[t]; }).join(' → ') : '空',
+      buttons: defs.map(function (d) { return { label: d.label, color: d.color, fire: function () { self.enqueue([d.k]); } }; }),
+      burst: function () { self.enqueue(['fan', 'cap', 'gov']); }
+    };
+  }
+}
+</script>
+<script>
+mountDC('tpl', 'logic', 'root');
+function fit() {
+  var s = Math.min(window.innerWidth / 1280, window.innerHeight / 800);
+  document.getElementById('root').style.transform = 'scale(' + s + ')';
+}
+window.addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

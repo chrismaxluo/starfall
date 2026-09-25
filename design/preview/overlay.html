@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 特效页（设计预览 v2）</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+@property --ang { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+:root {
+  --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #060609; color: #EDEDF1; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; cursor: pointer; }
+.wrap { height: 100%; display: flex; flex-direction: column; }
+.viewport { flex: 1; min-height: 0; display: grid; place-items: center; }
+
+/* 1920×1080 舞台，等比缩放 */
+.stage { width: var(--W); height: var(--H); position: relative; overflow: hidden; transform-origin: center; flex-shrink: 0; }
+.safe { position: absolute; left: 0; right: 0; z-index: 5; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 22px; letter-spacing: .1em; color: rgba(255,255,255,.45); background: repeating-linear-gradient(45deg, rgba(255,255,255,.06) 0 14px, transparent 14px 28px); }
+.safe.top { top: 0; height: var(--st); border-bottom: 2px dashed rgba(255,255,255,.25); }
+.safe.bot { bottom: 0; height: var(--sb); border-top: 2px dashed rgba(255,255,255,.25); }
+.stage.hide-safe .safe, .stage.land .safe { display: none; }
+.fx { zoom: var(--fxz, 1); }
+.stage.bg-game {
+  background:
+    radial-gradient(900px 520px at 72% 28%, rgba(88, 120, 190, 0.45), transparent 70%),
+    radial-gradient(700px 500px at 20% 90%, rgba(40, 90, 80, 0.45), transparent 70%),
+    linear-gradient(170deg, #1B2233 0%, #10141E 60%, #0A0C12 100%);
+}
+.stage.bg-alpha { background: repeating-conic-gradient(#2A2A30 0% 25%, #202025 0% 50%) 0 0 / 40px 40px; }
+.stage-tag { position: absolute; left: 32px; top: 26px; font-size: 18px; color: rgba(255,255,255,.35); letter-spacing: .06em; }
+.q { position: absolute; right: 32px; top: 24px; font-size: 18px; color: rgba(255,255,255,.55); font-family: var(--font-mono); }
+
+.av { border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; flex-shrink: 0; }
+.medal { display: inline-flex; align-items: stretch; border-radius: 6px; overflow: hidden; color: #fff; border: 1.5px solid var(--mb); background: var(--mc); font-size: 18px; line-height: 26px; }
+.medal span { padding: 0 8px; }
+.medal b { padding: 0 8px; background: var(--ml); font-family: var(--font-mono); font-weight: 600; }
+.lbl { font-family: var(--font-mono); font-size: 15px; letter-spacing: .22em; text-transform: uppercase; opacity: .72; }
+.glass {
+  background: rgba(14, 15, 24, 0.55);
+  backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), 0 20px 60px -20px rgba(0,0,0,.6);
+}
+.fx { position: absolute; }
+.bl { left: 72px; bottom: calc(var(--sb) + 60px); }
+.stage.land .bl { bottom: 96px; }
+
+/* ---- 普通观众：一行字 ---- */
+.fx-nor { display: flex; align-items: center; gap: 12px; font-size: 26px; color: rgba(255,255,255,.92); text-shadow: 0 2px 10px rgba(0,0,0,.5);
+  animation: norLife 2.4s cubic-bezier(.2,.8,.2,1) forwards; }
+.fx-nor i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.7); }
+@keyframes norLife { 0% { opacity: 0; transform: translateY(12px); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }
+
+/* ---- 粉丝牌：霜玻 ---- */
+.fx-fan { display: flex; align-items: center; gap: 16px; padding: 12px 28px 12px 12px; border-radius: 999px;
+  animation: fanLife 3.2s cubic-bezier(.2,.8,.2,1) forwards; }
+.fx-fan .av { width: 52px; height: 52px; font-size: 22px; }
+.fx-fan .name { font-size: 28px; font-weight: 500; }
+.fx-fan .say { font-size: 24px; opacity: .7; }
+@keyframes fanLife { 0% { opacity: 0; transform: translateX(-30px); filter: blur(10px); } 14% { opacity: 1; transform: none; filter: blur(0); } 84% { opacity: 1; filter: blur(0); } 100% { opacity: 0; filter: blur(6px); } }
+
+/* ---- 房管：巡场 ---- */
+.fx-mod { display: flex; align-items: center; gap: 18px; padding: 16px 32px 16px 18px; border-radius: 18px;
+  box-shadow: inset 0 0 0 1px rgba(79,209,188,.35), 0 0 40px -10px rgba(79,209,188,.45), 0 20px 60px -20px rgba(0,0,0,.6);
+  animation: fanLife 3.6s cubic-bezier(.2,.8,.2,1) forwards; }
+.fx-mod svg { width: 48px; height: 48px; color: #4FD1BC; }
+.fx-mod .name { font-size: 32px; font-weight: 600; }
+.fx-mod .lbl { color: #8FE6D6; }
+
+/* ---- 舰长：流光 ---- */
+.fx-cap { display: flex; align-items: center; gap: 22px; padding: 16px 44px 16px 16px; border-radius: 22px; overflow: hidden;
+  animation: capLife 4.2s cubic-bezier(.2,.8,.2,1) forwards; }
+.fx-cap::before { /* 边缘光 */
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: linear-gradient(100deg, rgba(111,168,255,.95), rgba(111,168,255,.15) 45%, rgba(111,168,255,.6));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.fx-cap::after { /* 扫光 */
+  content: ""; position: absolute; top: 0; bottom: 0; width: 34%; left: -40%;
+  background: linear-gradient(90deg, transparent, rgba(180,210,255,.35), transparent); transform: skewX(-18deg);
+  animation: sweep 1.4s .45s cubic-bezier(.3,.6,.3,1) forwards;
+}
+.fx-cap .badge { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; position: relative;
+  background: radial-gradient(circle at 35% 30%, #9CC4FF, #2F63D9 70%); box-shadow: 0 0 30px rgba(111,168,255,.6); }
+.fx-cap .badge svg { width: 38px; height: 38px; color: #fff; }
+.fx-cap .lbl { color: #A9CBFF; }
+.fx-cap .name { font-size: 42px; font-weight: 600; letter-spacing: -0.01em; }
+.fx-cap .say { font-size: 26px; opacity: .75; margin-left: 6px; font-weight: 400; }
+@keyframes capLife { 0% { opacity: 0; transform: translateX(-60px); } 11% { opacity: 1; transform: none; } 86% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(20px); } }
+@keyframes sweep { to { left: 130%; } }
+
+/* ---- 提督：金属描边 + 星芒 ---- */
+.fx-adm { display: flex; align-items: center; gap: 26px; padding: 22px 56px 22px 22px; border-radius: 26px;
+  animation: admLife 5.2s cubic-bezier(.2,.8,.2,1) forwards; }
+.fx-adm::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--ang), #E9DDFF, #8E5CF0, #3D1F8C, #C9A8FF, #F7F1FF, #8E5CF0, #E9DDFF);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: spin 4s linear infinite;
+}
+.fx-adm .badge { width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(from 200deg, #F2EAFF, #9A6BE8, #4B2A99, #C9A8FF, #F2EAFF); box-shadow: 0 0 40px rgba(183,148,255,.55); }
+.fx-adm .badge span { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: #1E1238; }
+.fx-adm .badge svg { width: 42px; height: 42px; color: #E4D4FF; }
+.fx-adm .lbl { color: #D2BCFF; }
+.fx-adm .name { font-size: 50px; font-weight: 700; letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #FFFFFF 20%, #CDB6FF 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.fx-adm .say { font-size: 28px; color: rgba(255,255,255,.75); margin-left: 8px; }
+.twk { position: absolute; color: #F1E8FF; animation: twk 1.8s ease-in-out infinite; }
+.twk svg { width: 100%; height: 100%; }
+@keyframes spin { to { --ang: 360deg; } }
+@keyframes twk { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
+@keyframes admLife { 0% { opacity: 0; transform: translateY(30px) scale(.96); filter: blur(8px); } 10% { opacity: 1; transform: none; filter: blur(0); } 88% { opacity: 1; filter: blur(0); } 100% { opacity: 0; transform: scale(1.02); filter: blur(6px); } }
+
+/* ---- 总督：星冕（居中） ---- */
+.fx-gov { position: absolute; inset: 0; display: grid; place-items: center; animation: govLife 6.8s ease forwards; }
+.fx-gov .vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 100%); }
+.fx-gov .halo { position: absolute; width: 900px; height: 900px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(247,213,139,.28), rgba(247,213,139,0) 60%); animation: halo 6.8s ease-out forwards; }
+.fx-gov .core { position: relative; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.fx-gov .crown { width: 120px; height: 90px; }
+.fx-gov .crown path { fill: none; stroke: url(#goldStroke); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw 1.4s .2s cubic-bezier(.6,.1,.3,1) forwards; }
+.fx-gov .rule { height: 1.5px; width: 0; background: linear-gradient(90deg, transparent, #F7D58B, transparent); animation: rule 1.2s .5s cubic-bezier(.2,.8,.2,1) forwards; }
+.fx-gov .lbl { color: #F3D9A4; opacity: 0; animation: up .8s 1s ease-out forwards; font-size: 18px; letter-spacing: .5em; }
+.fx-gov .name { font-size: 96px; font-weight: 700; line-height: 1.05; letter-spacing: .5em; opacity: 0;
+  background: linear-gradient(180deg, #FFF6DE 10%, #F2C46E 55%, #B8742B 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 4px 24px rgba(240,180,90,.35)); animation: nameIn 1.6s 1.1s cubic-bezier(.2,.8,.2,1) forwards; }
+.fx-gov .say { font-size: 30px; color: rgba(255,244,220,.8); letter-spacing: .3em; opacity: 0; animation: up .8s 1.9s ease-out forwards; }
+.dust { position: absolute; border-radius: 50%; background: #F7D58B; box-shadow: 0 0 8px #F7D58B; opacity: 0; animation: dust linear forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes rule { to { width: 640px; } }
+@keyframes up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes nameIn { from { opacity: 0; letter-spacing: .5em; filter: blur(12px) drop-shadow(0 4px 24px rgba(240,180,90,.35)); } to { opacity: 1; letter-spacing: .06em; filter: blur(0) drop-shadow(0 4px 24px rgba(240,180,90,.35)); } }
+@keyframes halo { 0% { transform: scale(.4); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1.15); opacity: .6; } }
+@keyframes dust { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: .9; } 100% { opacity: 0; transform: translateY(-420px); } }
+@keyframes govLife { 0% { opacity: 0; } 6% { opacity: 1; } 90% { opacity: 1; filter: blur(0); } 100% { opacity: 0; filter: blur(8px); } }
+
+/* ---- 控制栏 ---- */
+.bar { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 20px; background: #0C0C11; border-top: 1px solid rgba(255,255,255,.07); }
+.bar .t { font-size: 13px; color: #80838F; margin-right: 4px; }
+.bar button { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: #15151B; color: #D8D9E0; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
+.bar button:hover { border-color: rgba(255,255,255,.2); background: #1B1B22; }
+.bar button i { width: 7px; height: 7px; border-radius: 50%; }
+.bar .primary { background: #8D8BFF; border-color: transparent; color: #0B0B12; font-weight: 600; }
+.bar .primary:hover { background: #A3A1FF; }
+.bar .sp { flex: 1; }
+.bar a { color: #A6A8B4; font-size: 13px; text-decoration: none; }
+.bar a:hover { color: #EDEDF1; }
+@media (prefers-reduced-motion: reduce) { .dust, .twk { display: none; } }
+/* 兼容降级：不支持毛玻璃时改用更实的底色 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .glass { background: rgba(14, 15, 24, 0.86); } }
+.lite .dust, .lite .twk, .lite .halo { display: none; }
+.lite .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(14, 15, 24, 0.86); }
+/* 兼容性自检面板 */
+.check { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(6, 6, 9, 0.82); }
+.check[hidden] { display: none; }
+.check-card { width: min(88%, 900px); padding: 48px 56px; border-radius: 28px; background: #121218; box-shadow: inset 0 0 0 2px rgba(255,255,255,.08); font-size: 30px; }
+.check-card h2 { margin: 0 0 8px; font-size: 44px; font-weight: 600; }
+.check-card .sub { color: #A6A8B4; font-size: 24px; margin-bottom: 30px; line-height: 1.5; }
+.check-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.check-card li { display: flex; align-items: center; gap: 18px; }
+.check-card li b { font-weight: 500; }
+.check-card li span { margin-left: auto; font-family: var(--font-mono); font-size: 24px; color: #A6A8B4; text-align: right; }
+.check-card .ok, .check-card .bad, .check-card .mid { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; font-weight: 700; flex-shrink: 0; }
+.check-card .ok { background: rgba(61,214,140,.16); color: #3DD68C; }
+.check-card .bad { background: rgba(240,90,90,.16); color: #F07272; }
+.check-card .mid { background: rgba(240,180,90,.16); color: #F0B45A; }
+.check-card .ua { margin-top: 28px; font-family: var(--font-mono); font-size: 18px; color: #80838F; word-break: break-all; line-height: 1.5; }
+.check-card .actions { margin-top: 28px; display: flex; gap: 14px; }
+.check-card button { height: 64px; padding: 0 28px; border-radius: 14px; border: 0; font-size: 24px; background: #8D8BFF; color: #0B0B12; font-weight: 600; }
+.check-card button.sec { background: #22222B; color: #EDEDF1; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs><linearGradient id="goldStroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#F2C46E"/><stop offset="1" stop-color="#B8742B"/></linearGradient></defs>
+  <symbol id="g-gov" viewBox="0 0 24 24"><path d="M3 18.5h18M4 16l-1-9 5.5 4L12 4l3.5 7L21 7l-1 9z"/></symbol>
+  <symbol id="g-adm" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5M5 5l3.5 3.5M15.5 15.5L19 19M19 5l-3.5 3.5M8.5 15.5L5 19"/></g></symbol>
+  <symbol id="g-cap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="5" r="2"/><path d="M12 7v14M8 11h8M4.5 14.5A7.5 7.5 0 0012 21a7.5 7.5 0 007.5-6.5"/></g></symbol>
+  <symbol id="g-mod" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.5l7.5 3v5.8c0 4.6-3.2 8.6-7.5 10.2-4.3-1.6-7.5-5.6-7.5-10.2V5.5z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></g></symbol>
+  <symbol id="spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 0c.8 6.6 3.1 9 12 12-8.9 3-11.2 5.4-12 12-.8-6.6-3.1-9-12-12 8.9-3 11.2-5.4 12-12z"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="viewport" id="vp">
+    <div class="stage bg-game" id="stage">
+      <span class="stage-tag" id="tag"></span>
+      <div class="safe top">顶部信息栏</div><div class="safe bot">弹幕 / 礼物区</div>
+      <span class="q" id="q">队列 · 空</span>
+      <div class="check" id="check" hidden><div class="check-card">
+        <h2>兼容性自检</h2>
+        <div class="sub">在 OBS 或直播姬里用浏览器源打开这个页面，就能看到当前环境支持哪些特效能力。</div>
+        <ul id="checkList"></ul>
+        <div class="ua" id="checkUa"></div>
+        <div class="actions"><button id="checkPlay">播放测试音 + 舰长特效</button><button class="sec" id="checkClose">关闭</button></div>
+      </div></div>
+    </div>
+  </div>
+  <div class="bar">
+    <span class="t">模拟进场</span>
+    <button data-t="gov"><i style="background:#F0B45A"></i>总督</button>
+    <button data-t="adm"><i style="background:#B794FF"></i>提督</button>
+    <button data-t="cap"><i style="background:#6FA8FF"></i>舰长</button>
+    <button data-t="mod"><i style="background:#4FD1BC"></i>房管</button>
+    <button data-t="fan"><i style="background:#3FB4F6"></i>粉丝牌 27</button>
+    <button data-t="fan8"><i style="background:#5762A7"></i>粉丝牌 8</button>
+    <button data-t="nor"><i style="background:#9A9DAA"></i>普通观众</button>
+    <button class="primary" id="burst">四人同时进场 · 看排队</button>
+    <span class="sp"></span>
+    <button id="orient">竖屏 1080×1920</button>
+    <button id="safeBtn">安全区：显示</button>
+    <button id="checkBtn">兼容性自检</button>
+    <button id="bg">背景：游戏画面</button>
+    <a href="./">← 返回管理后台</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var stage = document.getElementById('stage'), vp = document.getElementById('vp');
+  var Q = new URLSearchParams(location.search);
+  var S = { o: Q.get('o') === 'landscape' ? 'landscape' : 'portrait', w: +Q.get('w') || 0, h: +Q.get('h') || 0,
+            st: Q.has('st') ? +Q.get('st') : 12, sb: Q.has('sb') ? +Q.get('sb') : 32, scale: +Q.get('scale') || 100, safe: true };
+  if (!S.w || !S.h) { S.w = S.o === 'portrait' ? 1080 : 1920; S.h = S.o === 'portrait' ? 1920 : 1080; }
+  function applyS() {
+    stage.style.setProperty('--W', S.w + 'px'); stage.style.setProperty('--H', S.h + 'px');
+    stage.style.setProperty('--st', (S.o === 'portrait' ? S.st : 0) + '%'); stage.style.setProperty('--sb', (S.o === 'portrait' ? S.sb : 0) + '%');
+    stage.style.setProperty('--fxz', (S.scale / 100) * Math.min(1, S.w / 1080));
+    stage.classList.toggle('land', S.o === 'landscape'); stage.classList.toggle('hide-safe', !S.safe);
+    document.getElementById('tag').textContent = '直播画面 · ' + S.w + '×' + S.h + '（模拟 OBS 叠加）';
+    document.getElementById('orient').textContent = (S.o === 'portrait' ? '竖屏 ' : '横屏 ') + S.w + '×' + S.h;
+    document.getElementById('safeBtn').textContent = '安全区：' + (S.safe ? '显示' : '隐藏');
+    document.getElementById('safeBtn').style.display = S.o === 'portrait' ? '' : 'none';
+    fit();
+  }
+  function fit() {
+    var s = Math.min(vp.clientWidth / S.w, vp.clientHeight / S.h);
+    stage.style.transform = 'scale(' + s + ')';
+    stage.style.margin = (-(S.h * (1 - s)) / 2) + 'px ' + (-(S.w * (1 - s)) / 2) + 'px';
+  }
+  addEventListener('resize', fit);
+  document.getElementById('orient').addEventListener('click', function () {
+    S.o = S.o === 'portrait' ? 'landscape' : 'portrait';
+    S.w = S.o === 'portrait' ? 1080 : 1920; S.h = S.o === 'portrait' ? 1920 : 1080; applyS();
+  });
+  document.getElementById('safeBtn').addEventListener('click', function () { S.safe = !S.safe; applyS(); });
+  applyS();
+
+  function medal(lv, guard) {
+    var t = lv <= 10 ? ['#5762A7', null] : lv <= 20 ? ['#C770A4', null] : lv <= 30 ? ['#3FB4F6', '#5FC7F4'] :
+            lv <= 40 ? ['#4C7DFF', '#58A1F8'] : lv <= 50 ? ['#A773F1', '#D47AFF'] : ['#EC4F6E', '#F18087'];
+    var b = guard && t[1] ? t[1] : t[0] + '99';
+    return '<span class="medal" style="--mc:' + t[0] + '99;--ml:' + t[0] + 'E6;--mb:' + b + '"><span>[牌子]</span><b>' + lv + '</b></span>';
+  }
+  function av(ch, size, bg) { return '<span class="av" style="width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size * .42) + 'px;background:' + bg + '">' + ch + '</span>'; }
+
+  var LIFE = { gov: 6800, adm: 5200, cap: 4200, mod: 3600, fan: 3200, fan8: 3200, nor: 2400 };
+  var RANK = { gov: 0, adm: 1, cap: 2, mod: 3, fan: 4, fan8: 5, nor: 6 };
+  var NAMES = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', fan: '粉丝牌', fan8: '粉丝牌', nor: '普通' };
+
+  var BUILD = {
+    nor: function () { return '<div class="fx bl fx-nor"><i></i>路过的猫 进入直播间</div>'; },
+    fan: function () { return '<div class="fx bl fx-fan glass">' + av('晚', 52, 'linear-gradient(135deg,#E0689B,#9B3D74)') + medal(27, false) + '<span class="name">晚风与你</span><span class="say">来了</span></div>'; },
+    fan8: function () { return '<div class="fx bl fx-fan glass">' + av('半', 52, 'linear-gradient(135deg,#6E6BF2,#3C39B8)') + medal(8, false) + '<span class="name">半糖主义</span><span class="say">来了</span></div>'; },
+    mod: function () { return '<div class="fx bl fx-mod glass"><svg><use href="#g-mod"/></svg><div><div class="lbl">Moderator · 房管</div><div class="name">青柠汽水 <span style="font-weight:400;font-size:24px;opacity:.7">前来巡场</span></div></div></div>'; },
+    cap: function () {
+      return '<div class="fx bl fx-cap glass"><span class="badge"><svg><use href="#g-cap"/></svg></span><div><div class="lbl">Captain · 舰长</div>' +
+        '<div class="name">星河漫步<span class="say">登船</span></div><div style="margin-top:8px">' + medal(27, true) + '</div></div></div>';
+    },
+    adm: function () {
+      var tw = '';
+      [[-18, -26, 30, 0], [520, -34, 22, .5], [640, 40, 34, .9], [-30, 110, 20, 1.3], [300, -40, 16, .3]].forEach(function (p) {
+        tw += '<span class="twk" style="left:' + p[0] + 'px;top:' + p[1] + 'px;width:' + p[2] + 'px;height:' + p[2] + 'px;animation-delay:' + p[3] + 's"><svg><use href="#spark"/></svg></span>';
+      });
+      return '<div class="fx bl fx-adm glass">' + tw + '<span class="badge"><span><svg><use href="#g-adm"/></svg></span></span><div><div class="lbl">Admiral · 提督</div>' +
+        '<div><span class="name">月下独酌</span><span class="say">登船</span></div><div style="margin-top:10px">' + medal(38, true) + '</div></div></div>';
+    },
+    gov: function () {
+      var d = '';
+      for (var i = 0; i < 34; i++) {
+        var x = S.w / 2 - 400 + Math.random() * 800, y = S.h * 0.55 + Math.random() * 300, s = 2 + Math.random() * 3.5, dl = 0.6 + Math.random() * 3.2, du = 3 + Math.random() * 2.5;
+        d += '<span class="dust" style="left:' + x.toFixed(0) + 'px;top:' + y.toFixed(0) + 'px;width:' + s.toFixed(1) + 'px;height:' + s.toFixed(1) + 'px;animation-duration:' + du.toFixed(2) + 's;animation-delay:' + dl.toFixed(2) + 's"></span>';
+      }
+      return '<div class="fx-gov"><div class="vig"></div><div class="halo"></div>' + d +
+        '<div class="core"><svg class="crown" viewBox="0 0 24 18"><path d="M2 16.5h20M3 14L2 3l6 4.5L12 1l4 6.5L22 3l-1 11z"/></svg>' +
+        '<div class="lbl">Governor · 总督</div><div class="name">长夜未央</div><div class="rule"></div><div class="say">驾 临</div></div></div>';
+    }
+  };
+
+  var queue = [], playing = null, timer = null, qEl = document.getElementById('q');
+  function showQueue() {
+    qEl.textContent = '队列 · ' + (queue.length ? queue.map(function (t) { return NAMES[t]; }).join(' → ') : '空');
+  }
+  function enqueue(list) {
+    queue = queue.concat(list).sort(function (a, b) { return RANK[a] - RANK[b]; });
+    showQueue();
+    if (!playing) next();
+  }
+  function next() {
+    if (playing) { playing.remove(); playing = null; }
+    if (!queue.length) { showQueue(); return; }
+    var t = queue.shift();
+    showQueue();
+    var box = document.createElement('div');
+    box.innerHTML = BUILD[t]();
+    playing = box.firstChild;
+    stage.appendChild(playing);
+    timer = setTimeout(next, LIFE[t] + 200);
+  }
+  document.querySelectorAll('.bar button[data-t]').forEach(function (b) {
+    b.addEventListener('click', function () { enqueue([b.dataset.t]); });
+  });
+  document.getElementById('burst').addEventListener('click', function () { enqueue(['fan8', 'cap', 'gov', 'fan']); });
+  var bgBtn = document.getElementById('bg');
+  bgBtn.addEventListener('click', function () {
+    var alpha = stage.classList.toggle('bg-alpha');
+    stage.classList.toggle('bg-game', !alpha);
+    bgBtn.textContent = alpha ? '背景：透明（OBS 实际效果）' : '背景：游戏画面';
+  });
+  // ---------- 兼容性自检 ----------
+  function detect() {
+    var ua = navigator.userAgent, chrome = (ua.match(/Chrome\/(\d+)/) || [])[1];
+    var host = window.obsstudio ? 'OBS Studio' + (window.obsstudio.pluginVersion ? '（浏览器插件 ' + window.obsstudio.pluginVersion + '）' : '')
+      : /bili|livehime/i.test(ua) ? 'B站直播姬' : '普通浏览器 / 未识别的直播软件';
+    var v = document.createElement('video');
+    var webm = v.canPlayType('video/webm; codecs="vp9"'), webm8 = v.canPlayType('video/webm; codecs="vp8"');
+    var blur = CSS.supports('backdrop-filter', 'blur(1px)') || CSS.supports('-webkit-backdrop-filter', 'blur(1px)');
+    var prop = !!(window.CSS && CSS.registerProperty);
+    var mask = CSS.supports('mask-composite', 'exclude') || CSS.supports('-webkit-mask-composite', 'xor');
+    var audio = !!(window.AudioContext || window.webkitAudioContext);
+    var ws = 'WebSocket' in window;
+    return { host: host, ua: ua, list: [
+      ['运行环境', host, window.obsstudio ? 'ok' : /bili|livehime/i.test(ua) ? 'ok' : 'mid'],
+      ['浏览器内核', chrome ? 'Chromium ' + chrome : '未知', chrome ? (+chrome >= 95 ? 'ok' : 'mid') : 'mid'],
+      ['透明 WebM 视频（VP9）', webm || '不支持', webm ? 'ok' : webm8 ? 'mid' : 'bad'],
+      ['毛玻璃效果', blur ? '支持' : '不支持 · 自动改用实色底', blur ? 'ok' : 'mid'],
+      ['动态描边（提督特效）', prop && mask ? '支持' : '不支持 · 自动改用静态描边', prop && mask ? 'ok' : 'mid'],
+      ['音效播放', audio ? '支持（点下方按钮试听）' : '不支持', audio ? 'ok' : 'bad'],
+      ['实时连接（WebSocket）', ws ? '支持' : '不支持', ws ? 'ok' : 'bad'],
+      ['当前画布', S.w + '×' + S.h + ' · 页面 ' + innerWidth + '×' + innerHeight, 'ok']
+    ] };
+  }
+  function showCheck() {
+    var r = detect(), icon = { ok: '✓', mid: '!', bad: '✕' };
+    document.getElementById('checkList').innerHTML = r.list.map(function (x) {
+      return '<li><i class="' + x[2] + '">' + icon[x[2]] + '</i><b>' + x[0] + '</b><span>' + String(x[1]).replace(/[<>&]/g, '') + '</span></li>';
+    }).join('');
+    document.getElementById('checkUa').textContent = 'UA：' + r.ua;
+    document.getElementById('check').hidden = false;
+    if (!(CSS.supports('backdrop-filter', 'blur(1px)') || CSS.supports('-webkit-backdrop-filter', 'blur(1px)'))) stage.classList.add('lite');
+  }
+  function beep() {
+    try {
+      var C = window.AudioContext || window.webkitAudioContext, c = new C();
+      [1318, 1760].forEach(function (f, i) {
+        var o = c.createOscillator(), g = c.createGain(), t = c.currentTime + i * 0.12;
+        o.frequency.value = f; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.2, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+        o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.7);
+      });
+    } catch (e) {}
+  }
+  document.getElementById('checkBtn').addEventListener('click', showCheck);
+  document.getElementById('checkClose').addEventListener('click', function () { document.getElementById('check').hidden = true; });
+  document.getElementById('checkPlay').addEventListener('click', function () { document.getElementById('check').hidden = true; beep(); enqueue(['cap']); });
+  if (Q.get('check') === '1') showCheck();
+  // 声音测试：每 8 秒自动播放一次测试音和舰长特效，并在画面上显示音频状态
+  if (Q.get('loop') === '1') {
+    var ac = null, badge = document.createElement('div');
+    badge.style.cssText = 'position:absolute;left:50%;top:calc(var(--st) + 40px);transform:translateX(-50%);z-index:30;padding:18px 32px;border-radius:18px;background:rgba(12,12,18,.85);font-size:30px;font-family:var(--font-mono);color:#EDEDF1;box-shadow:inset 0 0 0 2px rgba(255,255,255,.1)';
+    stage.appendChild(badge);
+    var n = 0;
+    var tick = function () {
+      try {
+        var C = window.AudioContext || window.webkitAudioContext; ac = ac || new C();
+        if (ac.state === 'suspended') ac.resume();
+        [1318, 1760].forEach(function (f, i) {
+          var o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + i * 0.12;
+          o.frequency.value = f; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+          o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.7);
+        });
+      } catch (e) {}
+      n++;
+      var st = ac ? ac.state : '不可用';
+      badge.innerHTML = '声音测试 #' + n + ' · 音频状态：<b style="color:' + (st === 'running' ? '#3DD68C' : '#F0B45A') + '">' + (st === 'running' ? '正在播放' : st === 'suspended' ? '被拦截（需要点击）' : st) + '</b>';
+      enqueue(['cap']);
+    };
+    tick(); setInterval(tick, 8000);
+  }
+  if (Q.get('lite') === '1') stage.classList.add('lite');
+  if (Q.get('bar') === '0') document.querySelector('.bar').style.display = 'none';
+  setTimeout(function () { enqueue(['cap']); }, 500);
+})();
+</script>
+</body>
+</html>

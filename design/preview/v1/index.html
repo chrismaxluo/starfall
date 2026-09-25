@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 界面风格预览</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #070A18; color: #E7E9F7;
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 20px;
+    border-bottom: 1px solid rgba(170,160,255,.15); background: #0B0F22; }
+  h1 { margin: 0 12px 0 0; font-size: 18px; font-weight: 600; letter-spacing: 2px; }
+  .group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .group span { font-size: 12px; color: #8E93BA; margin: 0 4px 0 8px; }
+  button { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(170,160,255,.25); background: transparent; color: #C9CCE8; }
+  button:hover { background: rgba(139,124,246,.12); }
+  button[aria-pressed="true"] { background: #8B7CF6; border-color: #8B7CF6; color: #0B0E1C; font-weight: 600; }
+  .tip { margin-left: auto; font-size: 12px; color: #8E93BA; }
+  main { flex: 1; min-height: 0; padding: 16px; }
+  iframe { width: 100%; height: 100%; border: 0; border-radius: 10px; background: #000; }
+</style>
+</head>
+<body>
+<header>
+  <h1>✦ 星临 · 界面风格预览</h1>
+  <div class="group">
+    <span>管理后台</span>
+    <button data-src="a-starnight.html">A · 星夜（推荐）</button>
+    <button data-src="b-bilipink.html">B · B站粉白</button>
+    <button data-src="c-pastel.html">C · 二次元柔和</button>
+  </div>
+  <div class="group">
+    <span>OBS 特效</span>
+    <button data-src="overlay-tiers.html">身份分级</button>
+    <button data-src="overlay-play.html">特效演示（可点击）</button>
+  </div>
+  <div class="tip">示例数据 · 设计稿，非正式程序</div>
+</header>
+<main><iframe id="view" title="预览"></iframe></main>
+<script>
+  var view = document.getElementById('view');
+  var btns = document.querySelectorAll('button[data-src]');
+  function show(src) {
+    view.src = src;
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.src === src ? 'true' : 'false'); });
+    history.replaceState(null, '', '#' + src);
+  }
+  btns.forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.src); }); });
+  var known = Array.prototype.map.call(btns, function (b) { return b.dataset.src; });
+  var h = location.hash.slice(1);
+  show(known.indexOf(h) !== -1 ? h : 'a-starnight.html');
+</script>
+</body>
+</html>

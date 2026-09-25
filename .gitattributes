@@ -1,0 +1,11 @@
+# 统一使用 LF 换行，避免以后在 Windows 上打包时出现换行问题
+* text=auto eol=lf
+
+*.woff2 binary
+*.webm binary
+*.mp4 binary
+*.png binary
+*.gif binary
+*.mp3 binary
+*.wav binary
+*.svga binary

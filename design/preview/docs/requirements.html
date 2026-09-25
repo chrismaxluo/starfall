@@ -1,0 +1,1219 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 需求文档 v1.0</title>
+<link rel="stylesheet" href="../assets/fonts.css">
+<script>(function(){var t=null;try{t=localStorage.getItem('sf-theme')}catch(e){}if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t})();</script>
+<style>
+:root{--bg:#F5F5F7;--card:#FFFFFF;--line:rgba(15,17,30,.09);--t1:#0E1016;--t2:#454A59;--t3:#686D7D;--accent:#5451D6;--soft:rgba(84,81,214,.08);--head:#FAFAFB;color-scheme:light}
+[data-theme="dark"]{--bg:#09090B;--card:#141419;--line:rgba(255,255,255,.08);--t1:#EDEDF1;--t2:#A6A8B4;--t3:#80838F;--accent:#8D8BFF;--soft:rgba(141,139,255,.12);--head:#18181E;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--t1);font-family:"Geist","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{display:grid;grid-template-columns:260px minmax(0,1fr);gap:40px;max-width:1240px;margin:0 auto;padding:40px 24px 80px}
+nav.toc{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto;font-size:13px}
+nav.toc .brand{font-weight:600;font-size:15px;letter-spacing:.04em;margin-bottom:4px}
+nav.toc .sub{color:var(--t3);font-size:12px;margin-bottom:16px}
+nav.toc ul{list-style:none;margin:0;padding:0}
+nav.toc ul ul{padding-left:12px;display:none}
+nav.toc li a{display:block;padding:4px 10px;border-radius:7px;color:var(--t2);text-decoration:none}
+nav.toc li a:hover{background:var(--soft);color:var(--t1)}
+nav.toc .links{margin-top:18px;display:flex;flex-direction:column;gap:6px}
+nav.toc .links a{color:var(--accent);text-decoration:none;font-size:13px}
+main{min-width:0}
+main h1{font-size:30px;letter-spacing:-.02em;margin:0 0 20px}
+main h2{font-size:21px;margin:48px 0 14px;padding-top:8px;letter-spacing:-.01em}
+main h3{font-size:16px;margin:28px 0 10px}
+main h4{font-size:14.5px;margin:22px 0 8px;color:var(--t2)}
+main hr{border:0;border-top:1px solid var(--line);margin:32px 0}
+.tw{overflow-x:auto;margin:12px 0 18px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.6}
+th{text-align:left;font-weight:500;color:var(--t3);background:var(--head);font-size:12.5px}
+th,td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:nowrap;color:var(--t2)}
+code{font-family:"Geist Mono",ui-monospace,monospace;font-size:12.5px;background:var(--soft);padding:1px 6px;border-radius:5px}
+blockquote{margin:12px 0;padding:10px 16px;border-radius:10px;background:var(--soft);color:var(--t2)}
+blockquote p{margin:0}
+.pend{display:inline-block;font-size:11.5px;line-height:18px;padding:0 7px;border-radius:5px;background:rgba(214,131,36,.14);color:#B8661B;margin-left:4px;white-space:nowrap}
+[data-theme="dark"] .pend{color:#F0B45A}
+a{color:var(--accent)}
+.theme{position:fixed;right:18px;top:16px;height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--t2);font:inherit;font-size:13px;cursor:pointer}
+@media (max-width:900px){.wrap{grid-template-columns:1fr;padding:24px 16px 60px} nav.toc{position:static;max-height:none} nav.toc ul ul{display:none}}
+@media print{nav.toc,.theme{display:none} .wrap{display:block}}
+</style></head><body>
+<button class="theme" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('sf-theme',r.dataset.theme)}catch(e){}">切换亮 / 暗</button>
+<div class="wrap">
+<nav class="toc" aria-label="目录"><div class="brand">✦ 星临 Starfall</div><div class="sub">需求文档 v1.0 · 待确认</div><div class="toc">
+<ul>
+<li><a href="#1">1. 项目概述</a></li>
+<li><a href="#2">2. 范围</a><ul>
+<li><a href="#21">2.1 第一期（本次开发）</a></li>
+<li><a href="#22">2.2 第一期不做</a></li>
+<li><a href="#23">2.3 第二期规划（仅记录方向，不在本次范围）</a></li>
+</ul>
+</li>
+<li><a href="#3">3. 使用环境</a></li>
+<li><a href="#4">4. 核心概念</a></li>
+<li><a href="#5">5. 功能需求</a><ul>
+<li><a href="#51-b">5.1 B站连接</a></li>
+<li><a href="#52">5.2 触发规则</a></li>
+<li><a href="#53">5.3 素材库</a></li>
+<li><a href="#54">5.4 播放与队列</a></li>
+<li><a href="#55">5.5 输出（特效页）</a></li>
+<li><a href="#56">5.6 管理后台</a></li>
+<li><a href="#57">5.7 数据</a></li>
+</ul>
+</li>
+<li><a href="#6">6. 界面与视觉</a></li>
+<li><a href="#7">7. 非功能需求</a></li>
+<li><a href="#8">8. 技术方案概要</a></li>
+<li><a href="#9">9. 风险与待验证</a></li>
+<li><a href="#10">10. 开发计划</a></li>
+<li><a href="#11">11. 验收场景</a></li>
+<li><a href="#12">12. 待确认事项</a></li>
+<li><a href="#a">附录 A：事件与欢迎语变量</a></li>
+<li><a href="#b">附录 B：默认规则（首次安装）</a></li>
+</ul>
+</div>
+
+<div class="links"><a href="../">← 设计预览</a><a href="requirements.md" download>下载 Markdown 原文</a></div></nav>
+<main><h1 id="starfall">星临 Starfall · 需求文档</h1>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>版本</td>
+<td>v1.0（待确认）</td>
+</tr>
+<tr>
+<td>日期</td>
+<td>2026-09-25</td>
+</tr>
+<tr>
+<td>状态</td>
+<td>需求确认中，<strong>确认前不开始开发</strong></td>
+</tr>
+<tr>
+<td>设计预览</td>
+<td>http://20.46.163.200:8080/</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="1">1. 项目概述</h2>
+<p><strong>星临（Starfall）</strong> 是一个给主播自己的 B 站直播间使用的<strong>直播互动特效工具</strong>。观众进场、发弹幕、送礼物、上舰时，按主播设定的规则，在直播画面上播放对应的动画、欢迎语和音效。</p>
+<ul>
+<li><strong>使用者</strong>：主播本人，只服务一个直播间。</li>
+<li><strong>参考产品</strong>：花花直播助手的进场特效（同类还有 MoeMaster 直播助手）。</li>
+<li><strong>与参考产品的差异</strong>：花花是装在主播电脑上的 Windows 软件；星临开发期先做成<strong>网页服务</strong>，通过浏览器源接入直播软件，后续再封装成 Windows 客户端。两者共用一套代码。</li>
+<li><strong>产品形态</strong>：
+  1. <strong>开发阶段</strong>：部署在服务器上的网页版（管理后台 + 特效页）。
+  2. <strong>后续</strong>：用 Electron 封装成 Windows 客户端，在其他电脑上打包。封装后界面与网页版一致，直播软件里的地址改为 <code>127.0.0.1</code>。</li>
+</ul>
+<hr />
+<h2 id="2">2. 范围</h2>
+<h3 id="21">2.1 第一期（本次开发）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>模块</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B站连接</td>
+<td>小号扫码登录、连接直播间、断线重连、识别开播 / 下播</td>
+</tr>
+<tr>
+<td>触发规则</td>
+<td><strong>进场</strong>、<strong>弹幕</strong>（关键词）、<strong>礼物</strong>、<strong>上舰</strong> 四种事件</td>
+</tr>
+<tr>
+<td>素材库</td>
+<td>动画素材（上传即可用）、内置素材、音效</td>
+</tr>
+<tr>
+<td>播放</td>
+<td>统一播放队列、优先级、插队、紧急暂停</td>
+</tr>
+<tr>
+<td>输出</td>
+<td>特效页（浏览器源），默认竖屏，适配 <strong>B站直播姬</strong> 和 <strong>OBS</strong></td>
+</tr>
+<tr>
+<td>管理后台</td>
+<td>总览、触发规则、素材库、事件记录、直播软件输出、设置、新手引导</td>
+</tr>
+<tr>
+<td>数据</td>
+<td><strong>所有事件入库</strong>（为第二期统计做准备）、配置导出导入、自动备份</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="22">2.2 第一期不做</h3>
+<ul>
+<li>醒目留言（SC）、关注、点赞触发</li>
+<li>数据统计（礼物收入、直播数据报表）、观众档案</li>
+<li>念欢迎语音（TTS）、弹幕点歌、排队、自动发弹幕</li>
+<li>多直播间 / 多主播</li>
+</ul>
+<h3 id="23">2.3 第二期规划（仅记录方向，不在本次范围）</h3>
+<ul>
+<li>SC、关注、点赞触发</li>
+<li>礼物统计、直播数据、观众档案（首次进场 / 老粉回归 / 来访里程碑）</li>
+<li>画面组件：礼物目标进度条、本场贡献榜、弹幕姬</li>
+<li>欢迎语音</li>
+</ul>
+<hr />
+<h2 id="3">3. 使用环境</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>直播方式</td>
+<td><strong>以竖屏为主</strong>，用电脑直播</td>
+</tr>
+<tr>
+<td>直播软件</td>
+<td><strong>B站直播姬</strong> 和 <strong>OBS Studio</strong> 都要支持</td>
+</tr>
+<tr>
+<td>默认画布</td>
+<td>竖屏 <strong>1080 × 1920</strong>，可切换横屏和其他分辨率</td>
+</tr>
+<tr>
+<td>开发 / 部署服务器</td>
+<td>Azure 东京机房，Debian 12，2 核，857 MB 内存 + 2 GB swap</td>
+</tr>
+<tr>
+<td>项目目录</td>
+<td><code>/opt/projects/starfall</code></td>
+</tr>
+<tr>
+<td>管理后台访问</td>
+<td>浏览器，电脑和手机都能用</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="4">4. 核心概念</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>名称</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>事件</strong></td>
+<td>直播间里发生的事：进场、弹幕、礼物、上舰</td>
+</tr>
+<tr>
+<td><strong>触发规则</strong></td>
+<td>"谁、做了什么 → 播放哪个素材"。按事件分开设置</td>
+</tr>
+<tr>
+<td><strong>素材</strong></td>
+<td>可以直接播放的特效。上传一个动画文件就得到一个素材；另有内置素材</td>
+</tr>
+<tr>
+<td><strong>音效</strong></td>
+<td>单独管理的声音文件，可以被多个素材共用</td>
+</tr>
+<tr>
+<td><strong>身份档位</strong></td>
+<td>进场规则的固定分档：总督、提督、舰长、房管、粉丝牌分档、普通观众</td>
+</tr>
+<tr>
+<td><strong>专属用户</strong></td>
+<td>按 UID 指定某个人的专属素材，<strong>只对进场生效</strong></td>
+</tr>
+<tr>
+<td><strong>分档</strong></td>
+<td>粉丝牌等级、礼物价值按区间分档，<strong>区间自动切分，不会重叠</strong></td>
+</tr>
+<tr>
+<td><strong>冷却</strong></td>
+<td>一段时间内不重复播放，防止刷屏</td>
+</tr>
+<tr>
+<td><strong>播放队列</strong></td>
+<td>所有事件的特效排在同一个队列里，依次播放</td>
+</tr>
+<tr>
+<td><strong>输出</strong></td>
+<td>一个特效页地址 + 一套画布设置，放进直播软件的浏览器源</td>
+</tr>
+<tr>
+<td><strong>安全区</strong></td>
+<td>竖屏时被 B站 App 界面遮挡的区域（顶部信息栏、底部弹幕礼物区），特效自动避开</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="5">5. 功能需求</h2>
+<blockquote>
+<p>编号规则：<code>F-模块-序号</code>。<strong><span class="pend">待验证</span></strong> 表示依赖 B 站协议实测，技术验证阶段确认。</p>
+</blockquote>
+<h3 id="51-b">5.1 B站连接</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-BL-01</td>
+<td>用 B 站 App <strong>扫码登录小号</strong>，保存登录信息（Cookie）。不直接要求用户粘贴 Cookie</td>
+</tr>
+<tr>
+<td>F-BL-02</td>
+<td>显示登录状态、UID、预计有效天数；<strong>快过期或失效时提醒</strong>重新扫码</td>
+</tr>
+<tr>
+<td>F-BL-03</td>
+<td>填写房间号后连接直播间，显示主播昵称和房间信息</td>
+</tr>
+<tr>
+<td>F-BL-04</td>
+<td>通过<strong>非官方 WebSocket</strong> 接收直播间消息：认证、30 秒心跳、解压（brotli / zlib）、解析 JSON 与 protobuf 两种格式</td>
+</tr>
+<tr>
+<td>F-BL-05</td>
+<td><strong>断线自动重连</strong>，后台显示连接状态和延迟</td>
+</tr>
+<tr>
+<td>F-BL-06</td>
+<td>识别观众身份：大航海等级（总督 / 提督 / 舰长）、房管、<strong>本直播间</strong>粉丝牌及等级、神秘人<span class="pend">待验证：房管、神秘人</span></td>
+</tr>
+<tr>
+<td>F-BL-07</td>
+<td>识别<strong>开播 / 下播</strong>状态，顶栏显示直播时长</td>
+</tr>
+<tr>
+<td>F-BL-08</td>
+<td>需要处理的消息：进场（<code>INTERACT_WORD</code> 及新版格式）、大航海进场（<code>ENTRY_EFFECT</code>）、弹幕（<code>DANMU_MSG</code>）、礼物（<code>SEND_GIFT</code> / 连击）、上舰（<code>GUARD_BUY</code> 等）、开播 / 下播<span class="pend">待验证：具体字段与新版格式</span></td>
+</tr>
+<tr>
+<td>F-BL-09</td>
+<td>大航海官方图标、粉丝牌颜色<strong>运行时从 B 站读取</strong>，不打包进软件</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="52">5.2 触发规则</h3>
+<h4 id="521">5.2.1 通用</h4>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-RU-01</td>
+<td>规则页按事件分为 <strong>进场 / 弹幕 / 礼物 / 上舰</strong> 四个标签</td>
+</tr>
+<tr>
+<td>F-RU-02</td>
+<td>每条规则选择一个<strong>素材</strong>播放；素材选择器分"我的素材 / 内置素材"，可在选择器里<strong>直接上传新素材并自动选中</strong></td>
+</tr>
+<tr>
+<td>F-RU-03</td>
+<td>每条规则可单独启用 / 停用</td>
+</tr>
+<tr>
+<td>F-RU-04</td>
+<td>规则行的 ▶ 只在页面内<strong>本地预览</strong>；"发送到直播测试"是独立按钮，<strong>需要点两次确认</strong></td>
+</tr>
+<tr>
+<td>F-RU-05</td>
+<td><strong>模拟一次事件</strong>：输入观众、弹幕内容、礼物和数量、上舰等级和月数，显示"命中哪条规则、播放哪个素材"，并提示黑名单 / 暂停 / 未开播等不播放的原因</td>
+</tr>
+<tr>
+<td>F-RU-06</td>
+<td>事件判断顺序：<strong>黑名单 → 匹配规则 → 是否暂停 → 是否开播 → 冷却</strong>，任一不通过则不播放，但照常记录</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="522">5.2.2 进场</h4>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-EN-01</td>
+<td><strong>固定匹配顺序</strong>：专属用户 → 总督 → 提督 → 舰长 → 房管 → 粉丝牌（高等级档优先）→ 普通观众。命中第一条即停止</td>
+</tr>
+<tr>
+<td>F-EN-02</td>
+<td>身份档位是<strong>固定行</strong>，不能重复添加、不能修改类型；每行直接选素材、设冷却、开关</td>
+</tr>
+<tr>
+<td>F-EN-03</td>
+<td>大航海和粉丝牌<strong>只计算本直播间</strong></td>
+</tr>
+<tr>
+<td>F-EN-04</td>
+<td>粉丝牌分档：输入"从 N 级起"添加，<strong>自动切分区间，不会重叠</strong>；删除某档后并入相邻档；至少保留一档</td>
+</tr>
+<tr>
+<td>F-EN-05</td>
+<td>普通观众规则<strong>默认关闭</strong></td>
+</tr>
+<tr>
+<td>F-EN-06</td>
+<td><strong>专属用户</strong>：按人管理（头像、昵称、UID、身份、素材、冷却、有效期、开关）。添加方式：输入 UID 查询、从事件记录选、从大航海名单选。<strong>同一 UID 只能有一条</strong>，重复添加时直接定位到已有记录</td>
+</tr>
+<tr>
+<td>F-EN-07</td>
+<td>专属用户可设<strong>有效期</strong>（例如生日当天），到期自动失效，改回按身份档位播放</td>
+</tr>
+<tr>
+<td>F-EN-08</td>
+<td>专属<strong>只对进场生效</strong>，礼物、弹幕、上舰按各自规则播放</td>
+</tr>
+<tr>
+<td>F-EN-09</td>
+<td>冷却方式二选一：<strong>按分钟</strong>（每条规则单独设置），或<strong>每场直播每人只播一次</strong>（开播时重新计算）</td>
+</tr>
+<tr>
+<td>F-EN-10</td>
+<td>舰长进场会同时收到 <code>INTERACT_WORD</code> 和 <code>ENTRY_EFFECT</code>，需要<strong>合并去重</strong>，只播一次</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="523">5.2.3 弹幕</h4>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-DM-01</td>
+<td>规则包含：一个或多个<strong>关键词</strong>、匹配方式（包含 / 完全一致）、<strong>发送人条件</strong>（所有人 / 戴本房间粉丝牌 / 粉丝牌 ≥ 10 级 / 大航海 / 房管）、素材</td>
+</tr>
+<tr>
+<td>F-DM-02</td>
+<td>冷却分两种：<strong>全局冷却（秒）</strong> 和 <strong>每人冷却（分钟）</strong></td>
+</tr>
+<tr>
+<td>F-DM-03</td>
+<td>从上到下匹配，命中即停；可用上下箭头<strong>调整顺序</strong></td>
+</tr>
+<tr>
+<td>F-DM-04</td>
+<td>同一关键词出现在多条规则里时<strong>提示</strong>"排在前面的优先"</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="524">5.2.4 礼物</h4>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-GF-01</td>
+<td><strong>指定礼物</strong>优先：某种礼物对应某个素材，每种礼物只能设一条</td>
+</tr>
+<tr>
+<td>F-GF-02</td>
+<td><strong>按单次价值分档</strong>：价值 = 数量 × 单价（元）。分档自动切分、不重叠；<strong>低于最低档不播放</strong></td>
+</tr>
+<tr>
+<td>F-GF-03</td>
+<td><strong>免费礼物不触发</strong></td>
+</tr>
+<tr>
+<td>F-GF-04</td>
+<td><strong>连击合并</strong>：同一人在 N 秒内（默认 3 秒）连续送同一种礼物，合并为一次，用 <code>{count}</code> 显示数量</td>
+</tr>
+<tr>
+<td>F-GF-05</td>
+<td>礼物名称、单价<strong>从 B 站礼物配置接口读取</strong><span class="pend">待验证</span></td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="525">5.2.5 上舰</h4>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-GD-01</td>
+<td>总督 / 提督 / 舰长各一行，<strong>开通和续费分别选素材</strong></td>
+</tr>
+<tr>
+<td>F-GD-02</td>
+<td>欢迎语可用 <code>{months}</code> 显示月数</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="53">5.3 素材库</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-AS-01</td>
+<td>页面分 <strong>动画素材</strong>（我的素材 + 内置素材）和 <strong>音效</strong> 两个标签；支持搜索、排序（最近 / 名称 / 使用次数）</td>
+</tr>
+<tr>
+<td>F-AS-02</td>
+<td><strong>上传即素材</strong>：拖入或选择文件后直接成为可用素材，名称取文件名，自动读取尺寸和时长，默认居中播放</td>
+</tr>
+<tr>
+<td>F-AS-03</td>
+<td>支持格式：动画 <strong>透明 WebM（推荐）</strong>、MP4、SVGA、Lottie（.json）、GIF、PNG、APNG、WebP；音效 MP3、WAV、OGG</td>
+</tr>
+<tr>
+<td>F-AS-04</td>
+<td>上传提醒：<strong>没有透明通道</strong>（会挡住画面）、<strong>超过 10 MB</strong>（加载慢）</td>
+</tr>
+<tr>
+<td>F-AS-05</td>
+<td>素材卡片为竖屏缩略图，<strong>鼠标悬停时播放</strong>，显示格式、尺寸、时长、大小、"用于哪些规则"</td>
+</tr>
+<tr>
+<td>F-AS-06</td>
+<td><strong>素材设置</strong>（编辑器），左侧大尺寸竖屏预览，右侧分四组：①画面 ②头像和欢迎语 ③音效 ④位置与时长</td>
+</tr>
+<tr>
+<td>F-AS-07</td>
+<td>画面：显示当前文件，可<strong>替换文件</strong>，替换后所有用到它的规则自动生效</td>
+</tr>
+<tr>
+<td>F-AS-08</td>
+<td>头像和欢迎语：上传的素材<strong>默认不叠加</strong>（素材可能自带文字），可打开；内置素材自带</td>
+</tr>
+<tr>
+<td>F-AS-09</td>
+<td>欢迎语<strong>按事件分开写</strong>（通用 / 礼物时 / 上舰时 / 弹幕时），没写的事件使用通用；每行一句，<strong>随机选一句</strong></td>
+</tr>
+<tr>
+<td>F-AS-10</td>
+<td>欢迎语变量：<code>{name}</code> 昵称、<code>{guard}</code> 大航海、<code>{medal}</code> 牌子、<code>{level}</code> 等级、<code>{text}</code> 弹幕内容、<code>{gift}</code> 礼物、<code>{count}</code> 数量、<code>{value}</code> 价值、<code>{months}</code> 上舰月数</td>
+</tr>
+<tr>
+<td>F-AS-11</td>
+<td>音效：从音效列表选择，或在下拉中<strong>当场上传</strong>；可试听、调音量</td>
+</tr>
+<tr>
+<td>F-AS-12</td>
+<td>位置：左下 / 右下 / 顶部 / 居中；时长可调；竖屏时自动避开安全区</td>
+</tr>
+<tr>
+<td>F-AS-13</td>
+<td><strong>内置素材</strong>：星冕、流星、流光、巡场、霜玻、礼物感谢、弹幕回应、一行字。<strong>只读</strong>，点"复制并编辑"得到副本，并可勾选"把原来用它的地方换成副本"</td>
+</tr>
+<tr>
+<td>F-AS-14</td>
+<td><strong>删除保护</strong>：正在被规则使用的素材、正在被素材使用的音效<strong>不能删除</strong>，并提示在哪里使用；删除没人用的素材时，文件一并删除</td>
+</tr>
+<tr>
+<td>F-AS-15</td>
+<td>素材名称不能重复</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="54">5.4 播放与队列</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-PL-01</td>
+<td>所有事件共用<strong>一个播放队列</strong>，依次播放，不叠加</td>
+</tr>
+<tr>
+<td>F-PL-02</td>
+<td>优先级：<strong>上舰 &gt; 礼物 &gt; 进场 &gt; 弹幕</strong></td>
+</tr>
+<tr>
+<td>F-PL-03</td>
+<td><strong>高价值插队</strong>（可关闭）：上舰和 ≥ 100 元礼物立即播放</td>
+</tr>
+<tr>
+<td>F-PL-04</td>
+<td><strong>最多排队数</strong>可设（默认 10）；排满后先丢弃优先级最低、最早进入的特效</td>
+</tr>
+<tr>
+<td>F-PL-05</td>
+<td><strong>紧急暂停</strong>：顶栏一键暂停所有特效（快捷键 <code>Ctrl + Shift + P</code>），暂停后显示醒目提示条；事件照常记录</td>
+</tr>
+<tr>
+<td>F-PL-06</td>
+<td><strong>清空队列</strong>：一键清空待播放的特效</td>
+</tr>
+<tr>
+<td>F-PL-07</td>
+<td><strong>未开播时默认不播放</strong>；可改为"照常播放（排练用）"</td>
+</tr>
+<tr>
+<td>F-PL-08</td>
+<td><strong>黑名单</strong>：黑名单里的人不触发任何特效。默认包含小号和主播本人；可在设置、事件记录、实时动态中拉黑</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="55">5.5 输出（特效页）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-OU-01</td>
+<td>特效页是一个透明背景网页，作为<strong>浏览器源</strong>放进直播软件的最上层</td>
+</tr>
+<tr>
+<td>F-OU-02</td>
+<td>画布方向：<strong>竖屏（默认）</strong> / 横屏；分辨率预设（竖屏 1080×1920 推荐、720×1280、1440×2560；横屏同理）或自定义；方向与宽高不一致、分辨率过高时提示</td>
+</tr>
+<tr>
+<td>F-OU-03</td>
+<td><strong>竖屏安全区</strong>：顶部信息栏（默认 12%）、底部弹幕礼物区（默认 32%），可调，特效自动避开<span class="pend">待校准</span></td>
+</tr>
+<tr>
+<td>F-OU-04</td>
+<td>全局外观：整体缩放、左右边距</td>
+</tr>
+<tr>
+<td>F-OU-05</td>
+<td>支持<strong>多个输出</strong>（例如竖屏直播 + 横屏录播），各自独立设置和地址</td>
+</tr>
+<tr>
+<td>F-OU-06</td>
+<td>地址带<strong>访问密钥</strong>，默认隐藏，可复制、可重置（重置需确认，旧地址失效）</td>
+</tr>
+<tr>
+<td>F-OU-07</td>
+<td>选择直播软件（<strong>B站直播姬 / OBS</strong>），显示对应的添加步骤，宽高自动填好</td>
+</tr>
+<tr>
+<td>F-OU-08</td>
+<td><strong>兼容模式</strong>（自动 / 始终开启 / 关闭）：关闭毛玻璃、粒子等较重的效果；不支持的效果<strong>自动降级</strong>，不影响播放</td>
+</tr>
+<tr>
+<td>F-OU-09</td>
+<td><strong>兼容性自检页</strong>：显示运行环境、内核版本、透明视频、毛玻璃、动态描边、声音、WebSocket 是否可用</td>
+</tr>
+<tr>
+<td>F-OU-10</td>
+<td><strong>声音测试页</strong>：循环播放测试音和特效，显示音频是否被拦截</td>
+</tr>
+<tr>
+<td>F-OU-11</td>
+<td>特效页<strong>上报运行环境</strong>，后台显示已连接的特效页（软件、内核、分辨率、延迟、降级情况）</td>
+</tr>
+<tr>
+<td>F-OU-12</td>
+<td>特效页断线自动重连；直播软件没打开时特效不积压，恢复后只处理新事件</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="56">5.6 管理后台</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-UI-01</td>
+<td>页面：<strong>总览、触发规则、素材库、事件记录、直播软件输出、设置</strong>；数据统计显示为"第二期"</td>
+</tr>
+<tr>
+<td>F-UI-02</td>
+<td><strong>总览</strong>：今日进场（去重）、触发特效次数、在线人数（带迷你趋势图）、连接状态、<strong>实时动态</strong>（进场 / 弹幕 / 礼物 / 上舰）、特效预览与测试、身份构成</td>
+</tr>
+<tr>
+<td>F-UI-03</td>
+<td>实时动态、事件记录中点击观众：<strong>设置专属素材</strong>（小窗口完成，不跳页）、复制 UID、加入黑名单</td>
+</tr>
+<tr>
+<td>F-UI-04</td>
+<td><strong>事件记录</strong>：记录所有事件的时间、观众、事件内容、<strong>命中规则</strong>、<strong>播放状态</strong>（已播放 / 未命中规则 / 已暂停 / 未开播 / 本场已播过 / 黑名单）；按事件类型、播放状态筛选，搜索昵称或 UID</td>
+</tr>
+<tr>
+<td>F-UI-05</td>
+<td><strong>设置</strong>：B站账号、直播间、播放方式（未开播时）、黑名单、后台密码、数据备份与导入导出、保留期</td>
+</tr>
+<tr>
+<td>F-UI-06</td>
+<td><strong>新手引导</strong>（首次使用自动弹出，可跳过，可在设置中重新打开）：扫码登录 → 填房间号 → 加到直播软件 → 发送测试特效</td>
+</tr>
+<tr>
+<td>F-UI-07</td>
+<td><strong>命令面板</strong>（<code>Ctrl + K</code>）：搜索并执行常用操作（预览、暂停、清空队列、跳转页面等）</td>
+</tr>
+<tr>
+<td>F-UI-08</td>
+<td><strong>亮色 / 暗色</strong>：默认跟随系统，可手动切换，切换时有从按钮位置扩散的过渡动画</td>
+</tr>
+<tr>
+<td>F-UI-09</td>
+<td><strong>手机可用</strong>：窄屏时显示底部导航（总览 / 规则 / 素材 / 记录 / 更多）</td>
+</tr>
+<tr>
+<td>F-UI-10</td>
+<td>管理后台需要<strong>密码登录</strong>，首次部署生成初始密码</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="57">5.7 数据</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F-DA-01</td>
+<td><strong>所有事件入库</strong>（即使第一期不做统计），字段包括时间、事件类型、观众、身份、原始数据、命中规则、播放状态</td>
+</tr>
+<tr>
+<td>F-DA-02</td>
+<td>事件记录保留期可设（30 / 90 / 180 天 / 永久，默认 90 天）</td>
+</tr>
+<tr>
+<td>F-DA-03</td>
+<td>每天<strong>自动备份</strong>配置和素材清单</td>
+</tr>
+<tr>
+<td>F-DA-04</td>
+<td><strong>导出 / 导入配置</strong>（规则、素材清单、设置），导入前预览变化；导出文件可导入以后的 Windows 版</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="6">6. 界面与视觉</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>规范</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>风格</td>
+<td><strong>高级感、有层次、现代化</strong>，参考 Linear、Vercel、Raycast 等产品：克制、精致、有深度</td>
+</tr>
+<tr>
+<td>品牌色</td>
+<td>单一主色 <strong>星辉靛</strong>：亮色 <code>#5451D6</code>，暗色 <code>#8D8BFF</code>。只用于主按钮、选中状态和关键数据</td>
+</tr>
+<tr>
+<td>层级</td>
+<td>背景 → 侧栏 → 卡片 → 浮层四层。暗色靠亮度区分，亮色靠柔和阴影和 1px 细描边区分；毛玻璃只用于浮层</td>
+</tr>
+<tr>
+<td>字体</td>
+<td>预览使用思源黑体 + Geist（数字用等宽字体，跳动时不抖）；正式版可评估 MiSans / HarmonyOS Sans</td>
+</tr>
+<tr>
+<td>身份色</td>
+<td>总督金、提督紫、舰长蓝、房管青、普通灰，<strong>只用于标签和数据</strong></td>
+</tr>
+<tr>
+<td>粉丝牌配色</td>
+<td>按 B 站新版等级区间（接口实测）：1–10 <code>#5762A7</code>、11–20 <code>#C770A4</code>、21–30 <code>#3FB4F6</code>、31–40 <code>#4C7DFF</code>、41–50 <code>#A773F1</code>、56+ <code>#EC4F6E</code>；大航海成员有亮色描边。<strong>正式版直接使用 B 站下发的颜色值</strong></td>
+</tr>
+<tr>
+<td>大航海图标</td>
+<td>使用 B 站官方图标，<strong>运行时加载</strong>（预览中为临时图标）<span class="pend">待获取</span></td>
+</tr>
+<tr>
+<td>品牌元素</td>
+<td>星空元素只出现在 Logo、空状态、引导等少数地方</td>
+</tr>
+<tr>
+<td>特效风格</td>
+<td>电影感、以文字排版为主；身份越高，材质和动效越华丽（一行字 → 霜玻 → 流光 → 金属描边 + 星芒 → 光线勾勒 + 粒子）</td>
+</tr>
+<tr>
+<td>设计预览</td>
+<td>http://20.46.163.200:8080/（旧版在 <code>/v1/</code>）</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="7">7. 非功能需求</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>类别</th>
+<th>要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N-01</td>
+<td>实时性</td>
+<td>收到 B 站消息到特效页开始播放，目标 <strong>&lt; 300 ms</strong>（不含直播推流本身的延迟）</td>
+</tr>
+<tr>
+<td>N-02</td>
+<td>稳定性</td>
+<td>断线自动重连；服务崩溃自动重启；开机自启</td>
+</tr>
+<tr>
+<td>N-03</td>
+<td>兼容性</td>
+<td>OBS 浏览器源（<strong>已实测通过</strong>）；B站直播姬浏览器素材（<strong>待实测</strong>）；管理后台支持主流桌面和手机浏览器</td>
+</tr>
+<tr>
+<td>N-04</td>
+<td>安全</td>
+<td>管理后台密码登录；特效页地址带密钥；B 站登录信息只保存在本机或本服务器；有域名后启用 HTTPS</td>
+</tr>
+<tr>
+<td>N-05</td>
+<td>性能</td>
+<td>特效页轻量，不影响直播软件和推流；提供兼容模式</td>
+</tr>
+<tr>
+<td>N-06</td>
+<td>可移植</td>
+<td>代码不依赖 Linux 专有能力，便于封装 Windows 版；配置可导出导入</td>
+</tr>
+<tr>
+<td>N-07</td>
+<td>可维护</td>
+<td>TypeScript；关键模块有自动化测试；B 站协议解析集中在独立模块，协议变化时便于修改</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="8">8. 技术方案概要</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>层</th>
+<th>选型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>语言 / 结构</td>
+<td>TypeScript，pnpm monorepo：<code>shared</code>、<code>bili</code>、<code>server</code>、<code>admin</code>、<code>overlay</code>、<code>desktop</code></td>
+</tr>
+<tr>
+<td>后端</td>
+<td>Node.js 24 + Fastify，WebSocket 实时推送（<code>@fastify/websocket</code>），Zod 校验，Pino 日志</td>
+</tr>
+<tr>
+<td>B站协议</td>
+<td>自行实现（WBI 签名、WebSocket 包、brotli 解压），protobufjs 解析新版消息</td>
+</tr>
+<tr>
+<td>数据库</td>
+<td>SQLite（better-sqlite3）+ Drizzle ORM</td>
+</tr>
+<tr>
+<td>管理后台</td>
+<td>Vue 3 + Vite + Pinia + Vue Router + Naive UI（+ ECharts，第二期）</td>
+</tr>
+<tr>
+<td>特效页</td>
+<td>Vite + TypeScript，GSAP、Lottie、PixiJS、透明 WebM，SVGA 可选</td>
+</tr>
+<tr>
+<td>部署</td>
+<td>服务器上用 PM2 运行；端口需在 Azure 网络安全组放行</td>
+</tr>
+<tr>
+<td>Windows 版</td>
+<td>Electron + electron-builder，在 Windows 电脑或 GitHub Actions 上打包</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="9">9. 风险与待验证</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>事项</th>
+<th>当前状态</th>
+<th>处理方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R-01</td>
+<td>OBS 兼容性与声音</td>
+<td>✅ 已实测通过</td>
+<td>—</td>
+</tr>
+<tr>
+<td>R-02</td>
+<td>直播姬：内核版本、声音能否进直播</td>
+<td>⏳ 待实测</td>
+<td>自检页 <code>?check=1&amp;bar=0</code>、声音页 <code>?loop=1&amp;bar=0</code>；不行则改为"电脑本地播放 + 直播姬采集"</td>
+</tr>
+<tr>
+<td>R-03</td>
+<td>B 站消息格式（进场新版 protobuf、弹幕、礼物、上舰）</td>
+<td>⏳ 待抓包</td>
+<td>技术验证阶段用小号连真实直播间确认</td>
+</tr>
+<tr>
+<td>R-04</td>
+<td>房管、神秘人能否识别</td>
+<td>⏳ 待抓包</td>
+<td>房管识别不到时拉取房管列表对照；神秘人按普通观众处理</td>
+</tr>
+<tr>
+<td>R-05</td>
+<td>登录风控、海外服务器 IP</td>
+<td>⚠ 有风险</td>
+<td>用小号；观察连接稳定性；Windows 版改用家庭宽带 IP</td>
+</tr>
+<tr>
+<td>R-06</td>
+<td>竖屏安全区默认比例</td>
+<td>⏳ 待校准</td>
+<td>在真实直播间对照 B 站 App 画面校准</td>
+</tr>
+<tr>
+<td>R-07</td>
+<td>官方大航海图标、礼物价格接口</td>
+<td>⏳ 待获取</td>
+<td>抓包获取地址，运行时加载</td>
+</tr>
+<tr>
+<td>R-08</td>
+<td>协议随时可能变化</td>
+<td>⚠ 长期风险</td>
+<td>协议解析独立成模块，兼容新旧格式，出问题时后台提示</td>
+</tr>
+<tr>
+<td>R-09</td>
+<td>服务器内存较小</td>
+<td>⚠ 低风险</td>
+<td>已加 swap；构建慢可接受</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="10">10. 开发计划</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>内容</th>
+<th>完成标准</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 需求确认</td>
+<td>本文档</td>
+<td><strong>你确认本文档，并明确说"开始开发"</strong></td>
+</tr>
+<tr>
+<td>② 方案设计</td>
+<td>数据库表、接口、模块划分</td>
+<td>你确认方案</td>
+</tr>
+<tr>
+<td>③ 技术验证</td>
+<td>小号登录，连真实直播间抓包，验证 R-02 ~ R-07</td>
+<td>输出验证报告，必要时调整需求</td>
+</tr>
+<tr>
+<td>④ 第一期开发</td>
+<td>① B站连接 → ② 事件入库与规则引擎 → ③ 特效页与队列 → ④ 素材库 → ⑤ 管理后台 → ⑥ 设置与引导</td>
+<td>每个模块完成后提交代码并汇报</td>
+</tr>
+<tr>
+<td>⑤ 联调测试</td>
+<td>模拟事件 + 真实直播间测试，OBS 和直播姬都测</td>
+<td>你认可效果</td>
+</tr>
+<tr>
+<td>⑥ 部署上线</td>
+<td>PM2、开机自启、日志、备份；放行端口，有域名则配 HTTPS</td>
+<td>稳定运行</td>
+</tr>
+<tr>
+<td>⑦ 试用反馈</td>
+<td>真实开播几场，修 bug、调细节</td>
+<td>连续几场无问题</td>
+</tr>
+<tr>
+<td>⑧ 第二期</td>
+<td>按第 2.3 节</td>
+<td>另行确认</td>
+</tr>
+<tr>
+<td>⑨ Windows 版</td>
+<td>Electron 封装，在 Windows 电脑上打包</td>
+<td>本地运行正常</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>约定</strong>：没有你明确同意不写代码；每个阶段结束都要你确认；代码用 git 管理；需求变更先更新本文档。</p>
+<hr />
+<h2 id="11">11. 验收场景</h2>
+<ol>
+<li><strong>舰长进场</strong>：舰长进入直播间，特效页在 1 秒内开始播放舰长素材；同一次进场只播一次（F-EN-10）。</li>
+<li><strong>专属用户</strong>：给某个 UID 设专属素材后 TA 进场，播放专属素材而不是身份档位素材；设了有效期的，过期后恢复身份档位。</li>
+<li><strong>每场一次</strong>：开启"每场只播一次"后，同一人本场再次进场不播放，事件记录显示"本场已播过"；重新开播后恢复。</li>
+<li><strong>弹幕</strong>：粉丝发"生日快乐"，播放对应素材；全局冷却内其他人再发不重复播放。</li>
+<li><strong>礼物</strong>：送出指定礼物，播放指定素材；送出 ≥ 100 元的礼物播放高档素材，并按设置插队；连续连击合并为一次，显示数量。</li>
+<li><strong>上舰</strong>：有人开通或续费，播放对应素材，欢迎语显示月数。</li>
+<li><strong>紧急暂停</strong>：按 <code>Ctrl + Shift + P</code> 后所有特效立即停止，事件照常记录；恢复后正常播放。</li>
+<li><strong>黑名单 / 未开播</strong>：黑名单用户、未开播时的事件都不播放，事件记录里写明原因。</li>
+<li><strong>素材</strong>：上传透明 WebM 后，不需要其他设置，就能在规则里选用并正确播放；替换文件后规则自动使用新文件；在用的素材删不掉。</li>
+<li><strong>竖屏</strong>：1080×1920 竖屏下，特效不进入安全区；在 OBS 和直播姬里显示一致。</li>
+<li><strong>断线</strong>：断网后恢复，自动重连，后台有提示。</li>
+<li><strong>手机</strong>：用手机打开管理后台，可以暂停特效、设置专属用户。</li>
+</ol>
+<hr />
+<h2 id="12">12. 待确认事项</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>事项</th>
+<th>需要你做的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>直播间房间号</td>
+<td>提供</td>
+</tr>
+<tr>
+<td>2</td>
+<td>B 站小号</td>
+<td>技术验证阶段扫码登录</td>
+</tr>
+<tr>
+<td>3</td>
+<td>直播姬兼容性、声音测试</td>
+<td>用自检页和声音页测一次</td>
+</tr>
+<tr>
+<td>4</td>
+<td>服务端口</td>
+<td>在 Azure 放行端口（预览目前用 8080，正式服务另定）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>域名</td>
+<td>有的话提供，用于 HTTPS</td>
+</tr>
+<tr>
+<td>6</td>
+<td>自定义素材</td>
+<td>如有现成的进场动画或音效，可以提供，用于测试</td>
+</tr>
+<tr>
+<td>7</td>
+<td>本文档</td>
+<td>通读并确认，或提出修改</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="a">附录 A：事件与欢迎语变量</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>变量</th>
+<th>含义</th>
+<th style="text-align: center;">进场</th>
+<th style="text-align: center;">弹幕</th>
+<th style="text-align: center;">礼物</th>
+<th style="text-align: center;">上舰</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{name}</code></td>
+<td>观众昵称</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr>
+<td><code>{guard}</code></td>
+<td>大航海身份</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr>
+<td><code>{medal}</code></td>
+<td>粉丝牌名称</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr>
+<td><code>{level}</code></td>
+<td>粉丝牌等级</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr>
+<td><code>{text}</code></td>
+<td>弹幕内容</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td><code>{gift}</code></td>
+<td>礼物名称</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td><code>{count}</code></td>
+<td>礼物数量</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td><code>{value}</code></td>
+<td>礼物价值（元）</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td><code>{months}</code></td>
+<td>上舰月数</td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: center;">✓</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="b">附录 B：默认规则（首次安装）</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>事件</th>
+<th>条件</th>
+<th>默认素材</th>
+<th>冷却</th>
+<th>默认</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>进场</td>
+<td>总督 / 提督 / 舰长</td>
+<td>星冕 / 流星 / 流光</td>
+<td>5 分钟</td>
+<td>开</td>
+</tr>
+<tr>
+<td>进场</td>
+<td>房管</td>
+<td>巡场</td>
+<td>10 分钟</td>
+<td>开</td>
+</tr>
+<tr>
+<td>进场</td>
+<td>粉丝牌 21 级及以上 / 1–20 级</td>
+<td>霜玻</td>
+<td>10 / 15 分钟</td>
+<td>开</td>
+</tr>
+<tr>
+<td>进场</td>
+<td>普通观众</td>
+<td>一行字</td>
+<td>30 分钟</td>
+<td><strong>关</strong></td>
+</tr>
+<tr>
+<td>礼物</td>
+<td>≥ 100 元 / 10–100 元 / 1–10 元</td>
+<td>星冕 / 礼物感谢 / 一行字</td>
+<td>—</td>
+<td>开 / 开 / <strong>关</strong></td>
+</tr>
+<tr>
+<td>上舰</td>
+<td>总督 / 提督 / 舰长，开通与续费</td>
+<td>星冕 / 流星 / 流光（舰长续费：礼物感谢）</td>
+<td>—</td>
+<td>开</td>
+</tr>
+<tr>
+<td>弹幕</td>
+<td>无默认规则</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>预览中出现的弹幕规则、指定礼物、专属用户均为示例数据，正式版首次安装时为空。</p>
+</blockquote></main></div></body></html>

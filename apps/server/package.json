@@ -1,0 +1,19 @@
+{
+  "name": "@starfall/server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "星临服务：数据库、REST、WebSocket、素材管理",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/main.ts",
+    "start": "node src/main.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@starfall/bili": "workspace:*",
+    "@starfall/core": "workspace:*",
+    "@starfall/shared": "workspace:*",
+    "fastify": "^5.12.5"
+  }
+}

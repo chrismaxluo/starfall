@@ -267,6 +267,9 @@ importers:
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
+      protobufjs:
+        specifier: ^8.8.0
+        version: 8.8.0
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4

@@ -1,11 +1,16 @@
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { APP_NAME } from '@starfall/shared';
 import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
 import { biliRoutes } from './routes/bili.ts';
+import { libraryRoutes } from './routes/library.ts';
+import { outputRoutes } from './routes/outputs.ts';
+import { ruleRoutes } from './routes/rules.ts';
 
 export interface AppOptions {
   logger?: boolean;
@@ -18,6 +23,9 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
+  await app.register(multipart, { limits: { fileSize: ctx.assets.maxBytes, files: 1, fields: 10, parts: 11 } });
+  // 素材文件：按内容哈希命名，内容不会变，可以长期缓存；支持断点续传（Range）
+  await app.register(fastifyStatic, { root: ctx.assets.dir, prefix: '/files/', decorateReply: false, index: false, list: false, dotfiles: 'deny', maxAge: '365d', immutable: true });
 
   app.setErrorHandler((error, _req, reply) => {
     if (error instanceof HttpError) return sendError(reply, error);
@@ -43,6 +51,9 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   app.get('/api/health', async () => ({ ok: true, name: APP_NAME, time: Date.now() }));
   authRoutes(app, ctx);
   biliRoutes(app, ctx);
+  libraryRoutes(app, ctx);
+  ruleRoutes(app, ctx);
+  outputRoutes(app, ctx);
 
   return app;
 }

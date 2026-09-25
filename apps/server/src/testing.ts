@@ -7,9 +7,11 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createContext } from './context.ts';
 
-export async function testApp() {
+export const FIXTURES = path.resolve(import.meta.dirname, '../../../fixtures');
+
+export async function testApp(opts: { maxUpload?: number } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starfall-test-'));
-  const ctx = createContext(loadConfig({ STARFALL_DATA: dataDir }), { dbFile: ':memory:' });
+  const ctx = createContext(loadConfig({ STARFALL_DATA: dataDir }), { dbFile: ':memory:', ...opts });
   const app = await buildApp(ctx);
   const password = ctx.initialPassword!;
   /** 登录后返回带 Cookie 的请求函数 */
@@ -20,3 +22,14 @@ export async function testApp() {
   };
   return { app, ctx, dataDir, password, login };
 }
+
+/** 组装上传用的表单（字段名 file） */
+export function formFile(filename: string, content: Buffer | string): Pick<InjectOptions, 'payload' | 'headers'> {
+  const boundary = `----starfall${Math.random().toString(16).slice(2)}`;
+  const head = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`;
+  const payload = Buffer.concat([Buffer.from(head), Buffer.from(content), Buffer.from(`\r\n--${boundary}--\r\n`)]);
+  return { payload, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
+}
+
+/** 测试用的媒体文件 */
+export const media = (name: string) => fs.readFileSync(path.join(FIXTURES, 'media', name));

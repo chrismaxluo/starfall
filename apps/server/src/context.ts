@@ -6,13 +6,18 @@ import type { Db } from './db/index.ts';
 import { seed } from './db/seed.ts';
 import fs from 'node:fs';
 import path from 'node:path';
+import { AssetStore } from './services/assets.ts';
 import { AdminAuth } from './services/auth.ts';
 import { BiliAccount } from './services/bili-account.ts';
+import { EffectStore } from './services/effects.ts';
 import { LiveService } from './services/live.ts';
 import type { LiveDeps } from './services/live.ts';
+import { OutputStore } from './services/outputs.ts';
 import { RoomStore } from './services/room.ts';
+import { EnterRuleStore } from './services/rules.ts';
 import { Secret } from './services/secret.ts';
 import { SettingsStore } from './services/settings.ts';
+import { ViewerStore } from './services/viewers.ts';
 
 export interface AppContext {
   config: Config;
@@ -23,11 +28,16 @@ export interface AppContext {
   account: BiliAccount;
   room: RoomStore;
   live: LiveService;
+  assets: AssetStore;
+  effects: EffectStore;
+  viewers: ViewerStore;
+  enterRules: EnterRuleStore;
+  outputs: OutputStore;
   /** 首次启动生成的初始密码（只在首次启动时有值，用于打印到日志） */
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; maxUpload?: number } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -38,7 +48,12 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const account = new BiliAccount(db, secret);
   const room = new RoomStore(db);
   const live = new LiveService({ db, account, room, settings }, opts.liveDeps);
-  return { config, db, secret, settings, auth, account, room, live, initialPassword };
+  const assets = new AssetStore(db, p, opts.maxUpload);
+  const effects = new EffectStore(db, assets);
+  const viewers = new ViewerStore(db, () => account.anon);
+  const enterRules = new EnterRuleStore(db, settings, viewers);
+  const outputs = new OutputStore(db);
+  return { config, db, secret, settings, auth, account, room, live, assets, effects, viewers, enterRules, outputs, initialPassword };
 }
 
 /**

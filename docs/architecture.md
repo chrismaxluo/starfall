@@ -402,7 +402,7 @@ data/
 | 替换文件 | 素材指向新的文件；旧文件没有其他引用时删除（F-AS-07） |
 | 提醒 | 无透明通道、超过 10 MB 时在界面提示（F-AS-04） |
 | 内置素材 | 定义在代码里（样式、默认文案、默认音效），首次启动写入数据库并标记为只读；升级时可以更新 |
-| 访问 | `/files/<哈希>` 提供文件，支持断点续传和长期缓存；特效页首次连接时预加载本输出会用到的文件 |
+| 访问 | `/files/<哈希>.<扩展名>` 提供文件，支持断点续传和长期缓存；特效页首次连接时预加载本输出会用到的文件。文件名是内容的 SHA-256，猜不出来，所以不需要登录（直播软件的浏览器源没有后台登录状态） |
 
 ---
 
@@ -428,7 +428,7 @@ data/
 | 测试 | `POST /api/playback/test` | 把指定素材发到直播画面（界面上需要二次确认） |
 | 模拟 | `POST /api/simulate` | 模拟一次事件，返回命中结果和不播放的原因；只判断，不入队（F-RU-05） |
 | 素材 | `GET/POST /api/effects`、`GET/PUT/DELETE /api/effects/:id`、`POST /api/effects/:id/copy` | 列表、新建、修改、删除（有引用时返回引用列表）、复制并可选替换引用（F-AS-13） |
-| 文件 | `POST /api/assets`（上传）、`PUT /api/effects/:id/file`（替换文件）、`GET /api/sounds`、`DELETE /api/assets/:id` | |
+| 文件 | `POST /api/assets`（上传，动画文件自动生成素材）、`PUT /api/effects/:id/file`（替换文件）、`GET/POST /api/sounds`（音效列表、只收音频的上传）、`DELETE /api/assets/:id` | 表单上传，字段名 `file` |
 | 进场规则 | `GET/PUT /api/rules/enter`（档位 + 分档 + 冷却方式）、`GET/POST/PUT/DELETE /api/rules/exclusive[/:uid]` | |
 | 弹幕规则 | `GET/POST /api/rules/danmu`、`PUT/DELETE /api/rules/danmu/:id`、`PUT /api/rules/danmu/order` | 含排序 |
 | 礼物规则 | `GET/PUT /api/rules/gift`（指定礼物 + 分档 + 连击）、`GET /api/gifts` | |

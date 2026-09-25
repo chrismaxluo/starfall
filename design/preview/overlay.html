@@ -46,7 +46,7 @@ button { font: inherit; cursor: pointer; }
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), 0 20px 60px -20px rgba(0,0,0,.6);
 }
 .fx { position: absolute; }
-.bl { left: 72px; bottom: calc(var(--sb) + 60px); }
+.bl { left: calc(var(--mx) + 24px); bottom: calc(var(--sb) + 60px); }
 .stage.land .bl { bottom: 96px; }
 
 /* ---- 普通观众：一行字 ---- */
@@ -224,11 +224,12 @@ button { font: inherit; cursor: pointer; }
   var stage = document.getElementById('stage'), vp = document.getElementById('vp');
   var Q = new URLSearchParams(location.search);
   var S = { o: Q.get('o') === 'landscape' ? 'landscape' : 'portrait', w: +Q.get('w') || 0, h: +Q.get('h') || 0,
-            st: Q.has('st') ? +Q.get('st') : 12, sb: Q.has('sb') ? +Q.get('sb') : 32, scale: +Q.get('scale') || 100, safe: true };
+            st: Q.has('st') ? +Q.get('st') : 12, sb: Q.has('sb') ? +Q.get('sb') : 40, mx: Q.has('mx') ? +Q.get('mx') : null, scale: +Q.get('scale') || 100, safe: true };
   if (!S.w || !S.h) { S.w = S.o === 'portrait' ? 1080 : 1920; S.h = S.o === 'portrait' ? 1920 : 1080; }
   function applyS() {
     stage.style.setProperty('--W', S.w + 'px'); stage.style.setProperty('--H', S.h + 'px');
     stage.style.setProperty('--st', (S.o === 'portrait' ? S.st : 0) + '%'); stage.style.setProperty('--sb', (S.o === 'portrait' ? S.sb : 0) + '%');
+    stage.style.setProperty('--mx', (S.mx != null ? S.mx : (S.o === 'portrait' ? 9 : 3)) + '%');
     stage.style.setProperty('--fxz', (S.scale / 100) * Math.min(1, S.w / 1080));
     stage.classList.toggle('land', S.o === 'landscape'); stage.classList.toggle('hide-safe', !S.safe);
     document.getElementById('tag').textContent = '直播画面 · ' + S.w + '×' + S.h + '（模拟 OBS 叠加）';

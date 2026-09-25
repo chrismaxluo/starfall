@@ -49,7 +49,7 @@ export class LiveService {
   private readonly room: RoomStore;
   private readonly settings: SettingsStore;
   private readonly deps: LiveDeps;
-  private readonly eventListeners = new Set<(ev: StdEvent) => void>();
+  private readonly eventListeners = new Set<(ev: StdEvent, raw: unknown) => void>();
   private readonly statusListeners = new Set<(s: LiveStatus) => void>();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private adminTimer: ReturnType<typeof setInterval> | null = null;
@@ -73,7 +73,8 @@ export class LiveService {
     this.deps = deps;
   }
 
-  onEvent(fn: (ev: StdEvent) => void): () => void {
+  /** 收到的事件；raw 是原始消息，写进事件记录用于排查协议问题 */
+  onEvent(fn: (ev: StdEvent, raw: unknown) => void): () => void {
     this.eventListeners.add(fn);
     return () => this.eventListeners.delete(fn);
   }
@@ -225,7 +226,7 @@ export class LiveService {
       void this.reconcile();
       return;
     }
-    for (const fn of this.eventListeners) fn(ev);
+    for (const fn of this.eventListeners) fn(ev, raw);
   }
 
   private emitStatus(): void {

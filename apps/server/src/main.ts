@@ -3,7 +3,7 @@ process.umask(0o077);
 
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
-import { createContext, importSpikeAccount } from './context.ts';
+import { createContext, importSpikeAccount, startBackground } from './context.ts';
 
 const config = loadConfig();
 const ctx = createContext(config);
@@ -14,12 +14,12 @@ if (ctx.initialPassword) {
 }
 
 if (await importSpikeAccount(ctx)) app.log.info('已把技术验证时保存的 B 站登录信息加密导入，并删除了明文文件');
-await ctx.live.start();
+const stopBackground = await startBackground(ctx);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     app.log.info(`收到 ${signal}，正在退出`);
-    ctx.live.stop();
+    stopBackground();
     void app.close().then(() => {
       ctx.db.$client.close();
       process.exit(0);

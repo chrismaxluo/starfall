@@ -2,15 +2,19 @@ import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { APP_NAME } from '@starfall/shared';
 import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
 import { biliRoutes } from './routes/bili.ts';
+import { eventRoutes } from './routes/events.ts';
 import { libraryRoutes } from './routes/library.ts';
 import { outputRoutes } from './routes/outputs.ts';
+import { playbackRoutes } from './routes/playback.ts';
 import { ruleRoutes } from './routes/rules.ts';
+import { wsRoutes } from './routes/ws.ts';
 
 export interface AppOptions {
   logger?: boolean;
@@ -24,6 +28,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
   await app.register(multipart, { limits: { fileSize: ctx.assets.maxBytes, files: 1, fields: 10, parts: 11 } });
+  await app.register(websocket, { options: { maxPayload: 64 * 1024 } });
   // 素材文件：按内容哈希命名，内容不会变，可以长期缓存；支持断点续传（Range）
   await app.register(fastifyStatic, { root: ctx.assets.dir, prefix: '/files/', decorateReply: false, index: false, list: false, dotfiles: 'deny', maxAge: '365d', immutable: true });
 
@@ -54,6 +59,10 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   libraryRoutes(app, ctx);
   ruleRoutes(app, ctx);
   outputRoutes(app, ctx);
+  playbackRoutes(app, ctx);
+  eventRoutes(app, ctx);
+  await app.register(async (scope) => wsRoutes(scope, ctx));
+  app.addHook('onClose', async () => ctx.hub.closeAll());
 
   return app;
 }

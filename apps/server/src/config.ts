@@ -12,6 +12,8 @@ export interface Config {
   /** 构建好的管理后台和特效页 */
   adminDist: string;
   overlayDist: string;
+  /** 主播所在时区，用于"今天"（专属规则有效期、每日统计） */
+  timeZone: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -22,6 +24,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir,
     adminDist: path.join(REPO_ROOT, 'apps/admin/dist'),
     overlayDist: path.join(REPO_ROOT, 'apps/overlay/dist'),
+    timeZone: env.STARFALL_TZ || 'Asia/Shanghai',
   };
 }
 

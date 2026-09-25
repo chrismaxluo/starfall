@@ -10,6 +10,19 @@ const biliError = (e: unknown, what: string): never => {
   throw new HttpError(502, 'bili_unreachable', `${what}失败：连不上 B 站（${(e as Error).message}）`);
 };
 
+/** 总览用的状态：连接、直播、账号、暂停、队列、在线特效页 */
+export function statusSnapshot(ctx: AppContext) {
+  const q = ctx.pipeline.snapshot();
+  return {
+    live: ctx.live.status(),
+    account: ctx.account.status(),
+    room: ctx.room.get(),
+    paused: ctx.settings.get('paused'),
+    queue: { playing: q.playing !== null, size: q.items.length },
+    overlays: ctx.hub.overlayCount(),
+  };
+}
+
 export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/bili/account', async () => ctx.account.status());
 
@@ -43,12 +56,7 @@ export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
   });
 
-  app.get('/api/status', async () => ({
-    live: ctx.live.status(),
-    account: ctx.account.status(),
-    room: ctx.room.get(),
-    paused: ctx.settings.get('paused'),
-  }));
+  app.get('/api/status', async () => statusSnapshot(ctx));
 
   app.get('/api/settings', async () => ctx.settings.all());
 
@@ -60,6 +68,9 @@ export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
         cooldownMode: z.enum(['minutes', 'oncePerLive']).optional(),
         queueMax: z.number().int().min(3).max(30).optional(),
         queueJump: z.boolean().optional(),
+        blockAnchor: z.boolean().optional(),
+        blockAccount: z.boolean().optional(),
+        retentionDays: z.union([z.literal(0), z.literal(30), z.literal(90), z.literal(180)]).optional(),
       }).strict(),
       req.body,
     );

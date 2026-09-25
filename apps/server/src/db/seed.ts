@@ -37,6 +37,12 @@ export const DEFAULT_SETTINGS = {
   cooldownMode: 'minutes' as 'minutes' | 'oncePerLive',
   queueMax: 10,
   queueJump: true,
+  /** 主播本人不触发特效（F-PL-08） */
+  blockAnchor: true,
+  /** 用来连接直播间的账号不触发特效（F-PL-08，通常是小号） */
+  blockAccount: true,
+  /** 事件记录保留天数，0 为永久（F-DA-02） */
+  retentionDays: 90,
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

@@ -4,7 +4,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import protobuf from 'protobufjs';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { FIXTURES } from '../testing.ts';
 import { ALLOWED, probe, sniff } from './probe.ts';
 
@@ -18,8 +18,10 @@ const hasFfprobe = (() => {
 })();
 const file = (n: string) => path.join(FIXTURES, 'media', n);
 const head = (n: string) => fs.readFileSync(file(n)).subarray(0, 64);
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sf-probe-'));
+afterAll(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 const tmp = (name: string, content: Buffer | string) => {
-  const p = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sf-probe-')), name);
+  const p = path.join(tmpDir, name);
   fs.writeFileSync(p, content);
   return p;
 };

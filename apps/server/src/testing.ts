@@ -13,6 +13,7 @@ export async function testApp(opts: { maxUpload?: number } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starfall-test-'));
   const ctx = createContext(loadConfig({ STARFALL_DATA: dataDir }), { dbFile: ':memory:', ...opts });
   const app = await buildApp(ctx);
+  app.addHook('onClose', async () => fs.rmSync(dataDir, { recursive: true, force: true }));
   const password = ctx.initialPassword!;
   /** 登录后返回带 Cookie 的请求函数 */
   const login = async () => {

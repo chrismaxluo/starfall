@@ -17,7 +17,7 @@
   <img src="docs/images/overview-dark.png" alt="管理后台 · 总览（暗色）" width="100%">
 </p>
 
-> **当前阶段**：需求和方案设计已确认，正在进行 P0 技术验证。**还没有可用的正式版本。**
+> **当前阶段**：P0 技术验证已完成，正在进行 **P1 进场特效最小可用**。**还没有可用的正式版本。**
 > 下面的截图来自界面设计预览，数据为示例。
 
 ---
@@ -90,7 +90,7 @@ flowchart LR
 - [x] 界面设计预览
 - [x] OBS 兼容性与声音实测
 - [x] 方案设计（[技术栈、架构、数据模型、接口](docs/architecture.md)）
-- [ ] **P0** 技术验证：B 站协议抓包、B站直播姬实测、竖屏安全区校准
+- [x] **P0** 技术验证（[验证报告](docs/p0-report.md)）
 - [ ] **P1 · v0.1.0** 进场特效最小可用
 - [ ] **P2 · v0.2.0** 弹幕、礼物、上舰
 - [ ] **P3 · v0.3.0** 后台完整体验
@@ -104,7 +104,7 @@ flowchart LR
 
 | 部分 | 选型 |
 |---|---|
-| 语言与结构 | TypeScript，pnpm monorepo |
+| 语言与结构 | TypeScript 6，pnpm monorepo；服务端由 Node 24 直接运行 TS |
 | 后端 | Node.js 24、Fastify、WebSocket、SQLite（better-sqlite3 + Drizzle） |
 | 管理后台 | Vue 3、Vite、Pinia、Naive UI |
 | 特效页 | Vite、GSAP、Lottie、PixiJS、透明 WebM，SVGA 可选 |
@@ -115,9 +115,26 @@ flowchart LR
 ## 目录结构
 
 ```
-docs/               需求文档、开发约定、README 截图
-design/preview/     界面设计预览（纯静态网页，不是正式代码）
-design/tools/       预览相关的小工具
+packages/shared/    公共定义：常量、类型、消息格式
+packages/core/      纯逻辑：规则匹配、冷却、播放队列
+packages/bili/      B 站协议：登录、房间、WebSocket、消息解析
+apps/server/        星临服务（Fastify）
+apps/admin/         管理后台（Vue 3）
+apps/overlay/       特效页（浏览器源）
+docs/               需求文档、方案设计、协议笔记、开发约定
+spike/              技术验证用的脚本（抓包、扫码登录）
+design/             界面设计预览
+```
+
+## 开发
+
+需要 Node.js 24 和 pnpm（`corepack enable` 后自动使用 `package.json` 里指定的版本）。
+
+```bash
+pnpm install        # 安装依赖
+pnpm dev            # 启动服务（默认端口 17520，改完代码自动重启）
+pnpm check          # 类型检查 + 代码检查 + 测试
+pnpm build          # 构建管理后台和特效页
 ```
 
 ## 本地查看设计预览

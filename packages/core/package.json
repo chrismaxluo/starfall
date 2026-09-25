@@ -1,0 +1,15 @@
+{
+  "name": "@starfall/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "纯逻辑：规则匹配、冷却、播放队列（不依赖网络、数据库、文件）",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": { "@starfall/shared": "workspace:*" }
+}

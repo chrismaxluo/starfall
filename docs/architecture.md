@@ -32,7 +32,7 @@
 | 部分 | 选型 | 版本 | 选它的理由 | 考虑过的其他方案 |
 |---|---|---|---|---|
 | 运行环境 | Node.js | 24.x（服务器已装 24.21.0） | 长期支持版；Electron 内置的也是 Node，代码可以直接复用 | Bun、Deno：生态和 Electron 兼容性不如 Node |
-| 语言 | TypeScript | 7.0 | 前后端统一，类型检查减少错误；7.0 是 Go 重写版，编译快 | 纯 JavaScript：项目规模较大，缺少类型不好维护 |
+| 语言 | TypeScript | **6.0** | 前后端统一，类型检查减少错误 | 7.0（Go 重写版）：**typescript-eslint 与 vue-tsc 尚不支持**（P1 搭建时确认），工具链跟上后再升级；纯 JavaScript：缺少类型不好维护 |
 | 包管理 | pnpm（workspaces） | 12.x | 适合 monorepo，安装快、占空间小 | npm workspaces：依赖隔离较弱 |
 | Web 服务 | Fastify | 5.12 | 性能好；插件完善（静态文件、上传、Cookie、限流、WebSocket）；自带 Pino 日志 | Express：较老，性能和类型支持较弱；NestJS：对这个规模太重 |
 | 实时通信 | @fastify/websocket | 11.3 | 和 Fastify 集成；特效页和后台都需要服务端主动推送 | SSE：只能单向，特效页需要回报播放状态；Socket.IO：不需要它的额外功能 |
@@ -54,7 +54,7 @@
 | 测试 | Vitest + Playwright | 5.0 / 1.63 | Vitest 测逻辑；Playwright 测后台和特效页的真实渲染（服务器上已装无头 Chromium） | Jest：和 Vite 配合不如 Vitest |
 | 代码规范 | ESLint + Prettier | 最新版 | 统一格式，减少低级错误 | Biome：可行，但 Vue 支持尚不完整 |
 | 运行守护 | PM2 | 7.0 | 崩溃重启、开机自启、日志切割 | systemd：也可以，PM2 在 Windows 上同样能用，调试更方便 |
-| 开发运行 | tsx | 4.23 | 开发时直接运行 TS，改完自动重启 | — |
+| 运行 TS | **Node 24 原生**（去除类型） | — | 服务端和公共包直接由 Node 运行 `.ts`，**不需要编译**；开发时 `node --watch` 自动重启。限制：只能用可擦除的语法（不能用 enum、namespace），已在 `tsconfig` 中用 `erasableSyntaxOnly` 检查 | tsx：功能重复，已不需要 |
 | Windows 版 | Electron + electron-builder | 44.x / 26.x | 桌面封装最成熟的方案 | Tauri：要用 Rust 重写服务端，成本高 |
 
 ### 2.2 版本策略
@@ -520,7 +520,7 @@ data/
 
 | 项目 | 方案 |
 |---|---|
-| 位置 | `/opt/starfall`，运行 `apps/server` 的构建产物 |
+| 位置 | `/opt/starfall`；服务端直接运行 `apps/server/src/main.ts`，管理后台和特效页运行构建产物 |
 | 端口 | **17520**（可用环境变量 `STARFALL_PORT` 修改）。开发期间设计预览继续使用 8080，两者可以同时运行；第一期上线后预览下线 |
 | 防火墙 | Azure 网络安全组放行 **17520**；预览下线后可以关闭 8080 |
 | HTTPS | 有域名后加 Caddy 反向代理 |

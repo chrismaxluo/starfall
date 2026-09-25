@@ -1,0 +1,22 @@
+{
+  "name": "@starfall/admin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "星临管理后台（Vue 3 + Naive UI）",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "vue-tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@starfall/shared": "workspace:*",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.9",
+    "vite": "^8.3.1",
+    "vue-tsc": "^3.3.11"
+  }
+}

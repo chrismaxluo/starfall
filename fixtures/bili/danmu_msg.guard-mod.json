@@ -1,0 +1,112 @@
+{
+  "cmd": "DANMU_MSG",
+  "dm_v2": "",
+  "info": [
+    [
+      0,
+      1,
+      25,
+      16777215,
+      1790000004000,
+      1790000004,
+      0,
+      "hash",
+      0,
+      0,
+      0,
+      "",
+      0,
+      "{}",
+      "{}",
+      {
+        "mode": 0,
+        "show_player_type": 0,
+        "extra": "{\"content\":\"主播生日快乐！\"}",
+        "user": {
+          "uid": 10005,
+          "base": {
+            "name": "测试提督",
+            "face": "https://example.invalid/face/10005.jpg"
+          },
+          "medal": {
+            "name": "测试牌",
+            "level": 39,
+            "ruid": 20000,
+            "v2_medal_color_start": "#4C7DFF99",
+            "v2_medal_color_end": "#4C7DFF99",
+            "v2_medal_color_border": "#58A1F8",
+            "v2_medal_color_text": "#FFFFFF",
+            "v2_medal_color_level": "#4C7DFFE6"
+          },
+          "guard": {
+            "level": 2
+          },
+          "wealth": {
+            "level": 30
+          },
+          "anon": null
+        }
+      },
+      {
+        "activity_identity": "",
+        "activity_source": 0,
+        "not_show": 0
+      },
+      0
+    ],
+    "主播生日快乐！",
+    [
+      10005,
+      "测试提督",
+      1,
+      0,
+      0,
+      10000,
+      1,
+      ""
+    ],
+    [
+      39,
+      "测试牌",
+      "测试主播",
+      30000,
+      5805790,
+      "",
+      0,
+      5805790,
+      5805790,
+      5805790,
+      0,
+      1,
+      20000
+    ],
+    [
+      30,
+      0,
+      9868950,
+      ">50000",
+      0
+    ],
+    [
+      "",
+      ""
+    ],
+    0,
+    2,
+    null,
+    {
+      "ts": 1790000004,
+      "ct": "X"
+    },
+    0,
+    0,
+    null,
+    null,
+    0,
+    105,
+    [
+      11
+    ],
+    null
+  ]
+}

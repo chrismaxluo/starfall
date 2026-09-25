@@ -1,0 +1,26 @@
+{
+  "cmd": "ENTRY_EFFECT",
+  "data": {
+    "id": 4,
+    "uid": 10001,
+    "target_id": 20000,
+    "mock_effect": 0,
+    "face": "https://example.invalid/face/10001.jpg",
+    "privilege_type": 3,
+    "copy_writing": "欢迎舰长 <%测试舰长%> 进入直播间",
+    "copy_color": "#ffffff",
+    "highlight_color": "#E6FF00",
+    "priority": 1,
+    "basemap_url": "",
+    "show_avatar": 1,
+    "effective_time": 2,
+    "web_basemap_url": "https://example.invalid/basemap.png",
+    "web_effective_time": 4,
+    "business": 1,
+    "identities": 6,
+    "wealthy_info": {
+      "uid": 0,
+      "level": 20
+    }
+  }
+}

@@ -2,17 +2,51 @@ import { describe, expect, it } from 'vitest';
 import { Cooldowns, OncePerLive } from './cooldown.ts';
 import { decide } from './decide.ts';
 import type { DecideInput } from './decide.ts';
-import { EnterDeduper } from './merge.ts';
+import { EnterMerger } from './merge.ts';
+import type { EnterEvent } from '@starfall/shared';
 import { PlayQueue } from './queue.ts';
 import type { QueueItem } from './queue.ts';
 
-describe('进场去重（F-EN-10）', () => {
-  it('同一 UID 3 秒内只处理第一条', () => {
-    const d = new EnterDeduper();
-    expect(d.accept(1, 0)).toBe(true);
-    expect(d.accept(1, 2999)).toBe(false);
-    expect(d.accept(2, 1000)).toBe(true);
-    expect(d.accept(1, 3000)).toBe(true);
+describe('进场合并（F-EN-10）', () => {
+  const ev = (uid: number, source: EnterEvent['source'], p: Partial<EnterEvent['viewer']> = {}): EnterEvent => ({
+    kind: 'enter', id: `${uid}-${source}`, ts: 0, source, viewer: { uid, name: source === 'interact' ? '完整昵称' : '特效昵称', guard: 0, isMod: false, mystery: false, ...p },
+  });
+
+  it('普通进场（只有 INTERACT_WORD_V2）立即输出', () => {
+    const m = new EnterMerger();
+    expect(m.push(ev(1, 'interact'), 0)).toHaveLength(1);
+  });
+
+  it('ENTRY_EFFECT 先到时等待，INTERACT_WORD_V2 到达后合并输出：粉丝牌来自后者，大航海取较高', () => {
+    const m = new EnterMerger();
+    expect(m.push(ev(1, 'entry_effect', { guard: 3 }), 0)).toEqual([]);
+    const out = m.push(ev(1, 'interact', { medal: { name: '牌', level: 25, anchorUid: 9 } }), 1300);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.viewer).toMatchObject({ name: '完整昵称', guard: 3, medal: { level: 25 } });
+    expect(m.flush(5000)).toEqual([]);
+  });
+
+  it('只有 ENTRY_EFFECT 时，等待 1.6 秒后单独输出', () => {
+    const m = new EnterMerger();
+    m.push(ev(1, 'entry_effect', { guard: 2 }), 0);
+    expect(m.flush(1599)).toEqual([]);
+    expect(m.flush(1600).map((e) => e.viewer.guard)).toEqual([2]);
+    expect(m.pendingCount).toBe(0);
+  });
+
+  it('已经输出过的人，窗口内的后续消息都丢弃', () => {
+    const m = new EnterMerger();
+    m.push(ev(1, 'interact'), 0);
+    expect(m.push(ev(1, 'entry_effect'), 500)).toEqual([]);
+    expect(m.flush(3000)).toEqual([]);
+    expect(m.push(ev(1, 'interact'), 2999)).toEqual([]);
+    expect(m.push(ev(1, 'interact'), 3000)).toHaveLength(1);
+  });
+
+  it('大航海等级合并时取较高（总督 1 最高）', () => {
+    const m = new EnterMerger();
+    m.push(ev(1, 'entry_effect', { guard: 1 }), 0);
+    expect(m.push(ev(1, 'interact', { guard: 3 }), 100)[0]!.viewer.guard).toBe(1);
   });
 });
 
@@ -123,12 +157,13 @@ describe('播放队列（F-PL-01 ~ 04）', () => {
 });
 
 describe('长时间运行时自动清理过期记录', () => {
-  it('进场去重记录超过上限时清理已过窗口的', () => {
-    const d = new EnterDeduper(1000);
-    for (let uid = 1; uid <= 5001; uid++) d.accept(uid, 0);
-    expect(d.accept(1, 500)).toBe(false); // 仍在窗口内
-    expect(d.accept(99999, 2000)).toBe(true); // 触发清理
-    expect(d.accept(2, 2000)).toBe(true); // 过期记录已清理
+  it('进场合并的输出记录超过上限时清理已过窗口的', () => {
+    const m = new EnterMerger(1600, 1000);
+    const e = (uid: number): EnterEvent => ({ kind: 'enter', id: String(uid), ts: 0, source: 'interact', viewer: { uid, name: 'x', guard: 0, isMod: false, mystery: false } });
+    for (let uid = 1; uid <= 5001; uid++) m.push(e(uid), 0);
+    expect(m.push(e(1), 500)).toEqual([]);
+    m.flush(2000);
+    expect(m.push(e(2), 2000)).toHaveLength(1);
   });
 
   it('冷却记录超过上限时清理已到期的，未到期的保留', () => {

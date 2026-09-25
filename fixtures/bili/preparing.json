@@ -1,0 +1,13 @@
+{
+  "cmd": "PREPARING",
+  "msg_id": "1:1000:1000",
+  "p_is_ack": true,
+  "p_msg_type": 1,
+  "roomid": "30000",
+  "round": 1,
+  "scatter": {
+    "max": 60,
+    "min": 5
+  },
+  "send_time": 1790000007000
+}

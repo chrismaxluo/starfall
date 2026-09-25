@@ -11,5 +11,12 @@
   "scripts": {
     "typecheck": "tsc -p ."
   },
-  "dependencies": { "@starfall/shared": "workspace:*" }
+  "dependencies": {
+    "@starfall/shared": "workspace:*",
+    "protobufjs": "^8.8.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "ws": "^8.21.3"
+  }
 }

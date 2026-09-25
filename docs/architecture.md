@@ -68,7 +68,7 @@
 | 软件 | 用途 | 安装方式 |
 |---|---|---|
 | pnpm 12 | 包管理 | Node 自带的 corepack 启用 |
-| ffmpeg 5.1 | 读取素材信息 | `apt install ffmpeg` |
+| ffmpeg 5.1 | 读取素材信息 | ✅ 已安装（`apt install ffmpeg`） |
 | Chromium（已装） | 自动化测试 | Playwright 已安装 |
 
 Windows 版会内嵌 ffprobe 程序。ffmpeg 的 GPL 版本与本项目的 GPL-3.0 协议兼容。
@@ -549,7 +549,7 @@ data/
 
 | # | 事项 | 我的建议 |
 |---|---|---|
-| 1 | 在服务器上安装 **ffmpeg**（约 100 MB） | 安装，用来准确识别素材的透明通道和时长 |
+| 1 | 在服务器上安装 **ffmpeg** | ✅ 已安装 5.1.9；已验证能识别 WebM 透明通道、尺寸和时长 |
 | 2 | 正式服务端口 | ✅ 已定：**17520** |
-| 3 | 数据目录 | `/opt/starfall/data`（已在 `.gitignore` 中排除） |
+| 3 | 数据目录 | ✅ 已定：`/opt/starfall/data`（已在 `.gitignore` 中排除） |
 | 4 | 本文档整体 | 确认后开始第 1 步技术验证；技术验证需要你提供房间号和小号 |

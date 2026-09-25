@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLoginQrCode, getDanmuInfo, getRoomAdmins, getRoomGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
+import { createLoginQrCode, logoutRemote, getDanmuInfo, getRoomAdmins, getRoomGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
 import { WbiSigner } from './wbi.ts';
 import { BiliApiError, BiliHttp } from './http.ts';
 
@@ -120,5 +120,20 @@ describe('接口字段转换', () => {
   it('返回非 JSON 时给出明确错误', async () => {
     vi.stubGlobal('fetch', async () => new Response('<html>出错啦</html>', { status: 412 }));
     await expect(getRoomInit(new BiliHttp(), 1)).rejects.toThrow('非 JSON');
+  });
+});
+
+describe('退出登录', () => {
+  it('带 CSRF 调用退出接口；登录已失效（2202）也视为成功', async () => {
+    const calls: Array<{ url: string; body: string }> = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => { calls.push({ url, body: String(init.body) }); return new Response(JSON.stringify({ code: calls.length === 1 ? 0 : 2202 })); });
+    const http = new BiliHttp({ SESSDATA: 's', bili_jct: 'csrf123' });
+    await logoutRemote(http);
+    await logoutRemote(http);
+    expect(calls[0]).toEqual({ url: 'https://passport.bilibili.com/login/exit/v2', body: 'biliCSRF=csrf123' });
+  });
+
+  it('没有 bili_jct 时报错', async () => {
+    await expect(logoutRemote(new BiliHttp({ SESSDATA: 's' }))).rejects.toThrow('bili_jct');
   });
 });

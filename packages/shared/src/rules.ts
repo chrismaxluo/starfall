@@ -101,6 +101,7 @@ export const PLAY_STATUS = {
   once: '本场已播过',
   no_overlay: '特效页不在线',
   dropped: '队列已满，丢弃',
+  cleared: '已清空',
   duplicate: '重复消息',
 } as const;
 export type PlayStatus = keyof typeof PLAY_STATUS;

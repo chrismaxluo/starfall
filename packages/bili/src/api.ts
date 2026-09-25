@@ -164,3 +164,22 @@ export async function pollLoginQrCode(http: BiliHttp, key: string): Promise<QrSt
   if (!cookies.SESSDATA) throw new BiliApiError(-1, '登录成功但没有拿到登录信息');
   return { state: 'success', cookies, refreshToken: json.data.refresh_token ?? '', expiresAt };
 }
+
+/** 退出登录：让这份登录信息在 B 站服务器上失效（不只是删除本地保存的 Cookie） */
+export async function logoutRemote(http: BiliHttp): Promise<void> {
+  const csrf = http.cookies.bili_jct;
+  if (!csrf) throw new BiliApiError(-1, '缺少 bili_jct，无法退出登录');
+  const res = await fetch('https://passport.bilibili.com/login/exit/v2', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: Object.entries(http.cookies).map(([k, v]) => `${k}=${v}`).join('; '),
+      Referer: 'https://www.bilibili.com/',
+    },
+    body: `biliCSRF=${encodeURIComponent(csrf)}`,
+    signal: AbortSignal.timeout(15_000),
+  });
+  const json = (await res.json().catch(() => ({ code: -1 }))) as { code?: number; message?: string };
+  // 2202：登录已失效，视为已经退出
+  if (json.code !== 0 && json.code !== 2202) throw new BiliApiError(json.code ?? -1, json.message || '退出登录失败');
+}

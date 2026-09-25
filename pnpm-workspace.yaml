@@ -1,6 +1,9 @@
 packages:
   - packages/*
   - apps/*
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
 minimumReleaseAgeExclude:
   - '@vitest/mocker@5.0.2'
   - '@vitest/spy@5.0.2'

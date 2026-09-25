@@ -35,3 +35,6 @@ design/preview/docs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# 技术验证抓到的原始消息（含其他观众的信息，不进仓库；脱敏后的样本放 fixtures/）
+spike/captures/

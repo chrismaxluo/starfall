@@ -1,0 +1,117 @@
+/* ============ 登录页 ============ */
+.lg { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(420px, 1fr); background: var(--l1); }
+
+/* 左：星空（始终是暗色） */
+.lg-sky {
+  position: relative; overflow: hidden; color: #EDEDF1; display: flex; flex-direction: column; padding: 32px 40px;
+  background:
+    radial-gradient(70% 55% at 78% 8%, rgba(111, 110, 255, .34), transparent 70%),
+    radial-gradient(55% 45% at 12% 96%, rgba(240, 180, 90, .14), transparent 70%),
+    radial-gradient(40% 35% at 30% 40%, rgba(79, 209, 188, .06), transparent 70%),
+    linear-gradient(165deg, #0C0C22 0%, #07070F 62%, #050509 100%);
+  isolation: isolate;
+}
+.lg-sky::after { /* 地平线的微光 */
+  content: ""; position: absolute; left: -10%; right: -10%; bottom: -30%; height: 55%; border-radius: 50%; z-index: -1;
+  background: radial-gradient(closest-side, rgba(141, 139, 255, .16), transparent); filter: blur(10px);
+}
+.lg-stars { position: absolute; inset: 0; z-index: -1; }
+.lg-stars i { position: absolute; border-radius: 50%; background: #fff; opacity: .15; animation: lgTwinkle ease-in-out infinite; }
+@keyframes lgTwinkle { 0%, 100% { opacity: .12; transform: scale(.8); } 50% { opacity: .9; transform: scale(1); } }
+.lg-meteor { position: absolute; z-index: -1; width: 160px; height: 1.5px; border-radius: 99px; opacity: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .95), rgba(180, 180, 255, .4) 30%, transparent);
+  transform: rotate(155deg); transform-origin: left center; animation: lgMeteor linear infinite; }
+.lg-meteor::before { content: ""; position: absolute; left: -2px; top: -2px; width: 5px; height: 5px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px 3px rgba(190, 190, 255, .8); }
+@keyframes lgMeteor { 0% { opacity: 0; translate: 0 0; } 2% { opacity: 1; } 10% { opacity: 0; translate: -340px 160px; } 100% { opacity: 0; translate: -340px 160px; } }
+
+.lg-brand { display: flex; align-items: center; gap: 10px; }
+.lg-brand .brand-mark { width: 34px; height: 34px; border-radius: 10px; }
+.lg-brand .brand-sub { color: rgba(237, 237, 241, .45); }
+.lg-hero { margin: auto 0; padding: 40px 0; max-width: 460px; }
+.lg-hero h2 { margin: 0; font-size: clamp(30px, 3.3vw, 44px); line-height: 1.22; font-weight: 600; letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #FFFFFF 30%, #C9C7FF 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lg-hero p { margin: 16px 0 0; font-size: 14.5px; line-height: 1.75; color: rgba(237, 237, 241, .6); }
+
+.lg-show { margin-top: 40px; height: 118px; }
+.lg-card { display: inline-flex; align-items: center; gap: 16px; padding: 12px 30px 12px 12px; border-radius: 18px; position: relative; overflow: hidden;
+  background: rgba(14, 15, 30, .55); backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1), 0 24px 60px -24px rgba(0, 0, 0, .8), 0 0 40px -12px var(--k-glow); }
+.lg-card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: linear-gradient(100deg, var(--k-edge), transparent 50%, var(--k-edge));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.lg-card::after { content: ""; position: absolute; top: 0; bottom: 0; width: 36%; left: -40%; transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .22), transparent); animation: lgSweep 1.4s .35s cubic-bezier(.3,.6,.3,1) forwards; }
+@keyframes lgSweep { to { left: 130%; } }
+.lg-badge { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--k-grad); box-shadow: 0 0 24px var(--k-glow); }
+.lg-badge svg.i { width: 26px; height: 26px; color: #fff; stroke-width: 1.6; }
+.lg-card small { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: .2em; color: var(--k-text); opacity: .9; }
+.lg-card b { display: block; margin-top: 3px; font-size: 24px; font-weight: 600; letter-spacing: -0.01em; color: #fff; white-space: nowrap; }
+.lg-card em { font-style: normal; font-size: 15px; font-weight: 400; margin-left: 8px; color: rgba(255, 255, 255, .7); }
+.lg-card.k-gov { --k-grad: radial-gradient(circle at 35% 30%, #FFE2A6, #C8612A 72%); --k-edge: rgba(247, 213, 139, .85); --k-glow: rgba(240, 180, 90, .45); --k-text: #F3D9A4; }
+.lg-card.k-cap { --k-grad: radial-gradient(circle at 35% 30%, #9CC4FF, #2F63D9 72%); --k-edge: rgba(111, 168, 255, .9); --k-glow: rgba(111, 168, 255, .45); --k-text: #A9CBFF; }
+.lg-card.k-adm { --k-grad: conic-gradient(from 200deg, #F2EAFF, #9A6BE8, #4B2A99, #C9A8FF, #F2EAFF); --k-edge: rgba(201, 168, 255, .85); --k-glow: rgba(183, 148, 255, .45); --k-text: #D2BCFF; }
+.lg-card.k-fan { --k-grad: linear-gradient(135deg, #3FB4F6, #2B2F5E); --k-edge: rgba(95, 199, 244, .7); --k-glow: rgba(63, 180, 246, .35); --k-text: #9EDCFB; }
+.lg-card-enter-active { transition: opacity .45s cubic-bezier(.2,.8,.2,1), transform .45s cubic-bezier(.2,.8,.2,1), filter .45s; }
+.lg-card-leave-active { transition: opacity .3s ease-in, transform .3s ease-in, filter .3s; }
+.lg-card-enter-from { opacity: 0; transform: translateX(-28px); filter: blur(8px); }
+.lg-card-leave-to { opacity: 0; transform: translateX(16px); filter: blur(6px); }
+.lg-dots { display: flex; gap: 6px; margin-top: 18px; }
+.lg-dots i { width: 6px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .2); transition: width .3s, background .3s; }
+.lg-dots i.on { width: 18px; background: rgba(201, 199, 255, .9); }
+.lg-foot { font-size: 12px; color: rgba(237, 237, 241, .38); letter-spacing: .02em; }
+
+/* 右：表单 */
+.lg-main { position: relative; display: grid; place-items: center; padding: 48px 32px; border-left: 1px solid var(--line);
+  background: radial-gradient(60% 40% at 50% 0%, var(--accent-soft), transparent 70%), var(--l1); }
+.lg-theme { position: absolute; top: 20px; right: 20px; }
+.lg-form { width: min(360px, 100%); display: flex; flex-direction: column; gap: 20px; }
+.lg-form.shake { animation: lgShake .42s cubic-bezier(.36,.07,.19,.97); }
+@keyframes lgShake { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-5px); } 40%, 60% { transform: translateX(5px); } }
+.lg-brand-sm { display: none; }
+.lg-title h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+.lg-title p { margin: 8px 0 0; font-size: 13.5px; color: var(--t3); }
+.lg-tip { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--r-md); background: var(--accent-soft); border: 1px solid var(--accent-ring); font-size: 12.5px; line-height: 1.7; color: var(--t2); }
+.lg-tip > svg.i { color: var(--accent); margin-top: 3px; }
+.lg-tip b { color: var(--t1); font-weight: 600; margin-right: 4px; }
+.lg-tip code, .lg-cmd code { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--l3); border: 1px solid var(--line); color: var(--t1); white-space: nowrap; }
+.lg-pw { position: relative; display: flex; align-items: center; height: 46px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--l3);
+  box-shadow: var(--shadow-card); transition: border-color .15s, box-shadow .15s; }
+.lg-pw:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-ring); }
+.lg-pw.bad { border-color: #D64545; box-shadow: 0 0 0 4px rgba(214, 69, 69, .14); }
+.lg-pw > svg.i { position: absolute; left: 14px; color: var(--t3); }
+.lg-pw input { flex: 1; min-width: 0; height: 100%; padding: 0 46px 0 42px; border: 0; outline: 0; background: transparent; color: var(--t1); font: inherit; font-size: 15px; letter-spacing: .02em; }
+.lg-pw input::placeholder { color: var(--t3); letter-spacing: 0; }
+.lg-eye { position: absolute; right: 6px; width: 34px; height: 34px; border-radius: 8px; border: 0; background: none; color: var(--t3); display: grid; place-items: center; }
+.lg-eye:hover { background: var(--hover); color: var(--t1); }
+.lg-msg { min-height: 18px; font-size: 12.5px; }
+.lg-caps { color: var(--gov); }
+.lg-submit { height: 46px; justify-content: center; font-size: 14.5px; border-radius: 10px; gap: 8px; }
+.lg-submit svg.i { transition: transform .2s; }
+.lg-submit:hover svg.i { transform: translateX(3px); }
+.lg-submit:disabled { cursor: default; }
+.lg-ok .lg-submit { background: var(--ok); color: #fff; }
+.lg-spin { border-color: rgba(255, 255, 255, .35); border-top-color: currentColor; }
+.lg-forgot { display: flex; flex-direction: column; gap: 10px; margin-top: -4px; }
+.lg-forgot .linkish { align-self: flex-start; }
+.lg-forgot-box { font-size: 12.5px; line-height: 1.7; color: var(--t2); padding: 12px 14px; border-radius: var(--r-md); background: var(--l2); border: 1px solid var(--line); animation: pop .18s ease-out; }
+.lg-cmd { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.lg-cmd code { flex: 1; min-width: 0; overflow-x: auto; padding: 6px 8px; }
+.lg-cmd .btn { height: 30px; padding: 0 10px; font-size: 12px; }
+.lg-note { margin: 0; font-size: 12px; color: var(--t3); text-align: center; }
+
+/* 登录成功：整页淡出进入后台 */
+.lg-ok .lg-main, .lg-ok .lg-sky { transition: opacity .45s ease .1s; opacity: .0; }
+
+@media (max-width: 900px) {
+  .lg { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .lg-sky { padding: 22px 22px 26px; min-height: 0; }
+  .lg-hero { margin: 26px 0 0; padding: 0; }
+  .lg-hero h2 { font-size: 26px; }
+  .lg-hero p, .lg-show, .lg-foot { display: none; }
+  .lg-main { align-items: start; padding: 28px 20px 40px; border-left: 0; }
+  .lg-theme { top: -52px; right: 16px; background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .12); color: #EDEDF1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-stars i, .lg-meteor, .lg-card::after { animation: none; }
+  .lg-meteor { display: none; }
+}

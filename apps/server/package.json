@@ -9,7 +9,8 @@
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
     "typecheck": "tsc -p .",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "reset-password": "node src/cli/reset-password.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

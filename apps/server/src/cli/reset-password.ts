@@ -1,0 +1,17 @@
+// 忘记后台密码时在服务器上运行：pnpm reset-password
+// 生成新的随机密码并显示出来（也写入 data/initial-password.txt），原来的登录全部失效。服务不需要重启。
+process.umask(0o077);
+import { loadConfig } from '../config.ts';
+import { openDb } from '../db/index.ts';
+import { paths } from '../config.ts';
+import { AdminAuth } from '../services/auth.ts';
+import { Secret } from '../services/secret.ts';
+import { SettingsStore } from '../services/settings.ts';
+
+const config = loadConfig();
+const p = paths(config.dataDir);
+const db = openDb(p.db);
+const auth = new AdminAuth(new SettingsStore(db), Secret.load(p.secretKey), config.dataDir);
+const pw = auth.resetPassword();
+db.$client.close();
+process.stdout.write(`已重置星临管理后台密码。\n新密码：${pw}\n（也保存在 ${config.dataDir}/initial-password.txt，登录后请在「设置」里改成自己的密码）\n原来已登录的浏览器需要用新密码重新登录。\n`);

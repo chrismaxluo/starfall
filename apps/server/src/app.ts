@@ -3,6 +3,7 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
+import fs from 'node:fs';
 import Fastify from 'fastify';
 import { APP_NAME } from '@starfall/shared';
 import type { AppContext } from './context.ts';
@@ -52,6 +53,18 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
     if (PUBLIC.has(url)) return;
     if (!ctx.auth.checkSession(req.cookies[SESSION_COOKIE])) throw new HttpError(401, 'unauthorized', '请先登录');
   });
+
+  // 特效页（构建好的静态文件）：带哈希的资源长期缓存，入口页每次都检查更新
+  if (fs.existsSync(ctx.config.overlayDist)) {
+    await app.register(fastifyStatic, {
+      root: ctx.config.overlayDist,
+      prefix: '/overlay/',
+      decorateReply: false,
+      cacheControl: false,
+      setHeaders: (reply, file) => reply.header('Cache-Control', file.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'),
+    });
+    app.get('/overlay', async (req, reply) => reply.redirect(`/overlay/${req.url.slice('/overlay'.length)}`));
+  }
 
   app.get('/api/health', async () => ({ ok: true, name: APP_NAME, time: Date.now() }));
   authRoutes(app, ctx);

@@ -1,0 +1,71 @@
+// 各个特效共用的部件：头像、粉丝牌、身份标签、欢迎语
+import type { PlayItem } from '@starfall/shared';
+import { h } from './dom.ts';
+
+type PlayViewer = PlayItem['viewer'];
+
+const AV_GRADS = [
+  'linear-gradient(135deg,#E0689B,#9B3D74)',
+  'linear-gradient(135deg,#6E6BF2,#3C39B8)',
+  'linear-gradient(135deg,#3FB4F6,#2B5FB0)',
+  'linear-gradient(135deg,#4FD1BC,#23806F)',
+  'linear-gradient(135deg,#F0B45A,#B26A24)',
+];
+
+/** 头像：有头像地址用图片（加载失败时换成首字），否则用昵称首字 */
+export function avatar(v: PlayViewer, size?: number): HTMLElement {
+  const initial = [...(v.name || '?')][0] ?? '?';
+  const grad = AV_GRADS[[...v.name].reduce((s, c) => s + c.charCodeAt(0), 0) % AV_GRADS.length]!;
+  const el = h('span', { class: 'av', style: { background: grad, ...(size ? { width: `${size}px`, height: `${size}px`, 'font-size': `${Math.round(size * 0.42)}px` } : {}) } }, initial);
+  if (v.face) {
+    const img = h('img');
+    img.referrerPolicy = 'no-referrer';
+    img.alt = '';
+    img.onload = () => el.replaceChildren(img);
+    img.src = v.face;
+  }
+  return el;
+}
+
+/** 粉丝牌颜色表（B 站没有下发颜色时使用，与设计预览一致） */
+function fallbackColors(level: number, guard: boolean) {
+  const t = level <= 10 ? ['#5762A7', null] : level <= 20 ? ['#C770A4', null] : level <= 30 ? ['#3FB4F6', '#5FC7F4'] : level <= 40 ? ['#4C7DFF', '#58A1F8'] : level <= 50 ? ['#A773F1', '#D47AFF'] : ['#EC4F6E', '#F18087'];
+  return { bg: `${t[0]}99`, level: `${t[0]}E6`, border: guard && t[1] ? t[1] : `${t[0]}99`, text: '#FFFFFF' };
+}
+
+export function medal(v: PlayViewer): HTMLElement | null {
+  const m = v.medal;
+  if (!m || m.level <= 0) return null;
+  const c = m.colors ?? fallbackColors(m.level, v.guard !== 0);
+  return h('span', { class: 'medal', style: { '--mc': c.bg, '--ml': c.level, '--mb': c.border, '--mt': c.text } }, h('span', {}, m.name), h('b', {}, String(m.level)));
+}
+
+export function identityLabel(v: PlayViewer): string {
+  if (v.guard === 1) return 'Governor · 总督';
+  if (v.guard === 2) return 'Admiral · 提督';
+  if (v.guard === 3) return 'Captain · 舰长';
+  if (v.isMod) return 'Moderator · 房管';
+  if (v.medal) return `Fan · ${v.medal.name}`;
+  return 'Welcome · 欢迎';
+}
+
+/** 把欢迎语按昵称切开：昵称加粗放大，其余部分用小字 */
+export function textLine(text: string, name: string): HTMLElement {
+  const line = h('span', { class: 'line' });
+  const i = name ? text.indexOf(name) : -1;
+  if (i < 0) {
+    line.append(h('span', { class: 'say' }, text));
+    return line;
+  }
+  const before = text.slice(0, i).trim();
+  const after = text.slice(i + name.length).trim();
+  if (before) line.append(h('span', { class: 'say' }, before));
+  line.append(h('span', { class: 'name' }, name));
+  if (after) line.append(h('span', { class: 'say' }, after));
+  return line;
+}
+
+/** 去掉昵称后剩下的文字（星冕把昵称单独放大显示） */
+export function textWithoutName(text: string, name: string): string {
+  return (name ? text.replace(name, ' ') : text).replace(/\s+/g, ' ').trim();
+}

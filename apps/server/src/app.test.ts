@@ -56,3 +56,24 @@ describe('后台登录（F-UI-10）', () => {
     expect(res.statusCode).toBe(415);
   });
 });
+
+describe('特效页静态文件', () => {
+  it('构建后由服务提供；入口页不缓存，带哈希的资源长期缓存', async () => {
+    const fsm = await import('node:fs');
+    const pathm = await import('node:path');
+    const { testApp } = await import('./testing.ts');
+    const t = await testApp();
+    const dist = t.ctx.config.overlayDist;
+    if (!fsm.existsSync(pathm.join(dist, 'index.html'))) return void (await t.app.close());
+    const page = await t.app.inject({ method: 'GET', url: '/overlay/?output=1&key=x' });
+    expect(page.statusCode).toBe(200);
+    expect(page.headers['cache-control']).toBe('no-cache');
+    const js = /src="\/overlay\/(assets\/[^"]+\.js)"/.exec(page.body)![1]!;
+    const asset = await t.app.inject({ method: 'GET', url: `/overlay/${js}` });
+    expect(asset.headers['cache-control']).toContain('immutable');
+    const redirect = await t.app.inject({ method: 'GET', url: '/overlay?output=1&key=x' });
+    expect(redirect.statusCode).toBe(302);
+    expect(redirect.headers.location).toBe('/overlay/?output=1&key=x');
+    await t.app.close();
+  });
+});

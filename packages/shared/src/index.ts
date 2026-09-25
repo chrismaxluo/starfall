@@ -11,3 +11,6 @@ export const GOLD_PER_YUAN = 1000;
 export function goldToYuan(gold: number): number {
   return gold / GOLD_PER_YUAN;
 }
+
+export * from './events.ts';
+export * from './rules.ts';

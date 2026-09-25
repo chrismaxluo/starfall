@@ -5,6 +5,7 @@ import { APP_NAME } from '@starfall/shared';
 import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
+import { biliRoutes } from './routes/bili.ts';
 
 export interface AppOptions {
   logger?: boolean;
@@ -41,6 +42,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
 
   app.get('/api/health', async () => ({ ok: true, name: APP_NAME, time: Date.now() }));
   authRoutes(app, ctx);
+  biliRoutes(app, ctx);
 
   return app;
 }

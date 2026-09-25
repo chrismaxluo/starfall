@@ -177,7 +177,7 @@ interface Viewer {
   name: string
   face?: string               // 头像地址
   guard: 0 | 1 | 2 | 3        // 本直播间大航海：0 无，1 总督，2 提督，3 舰长
-  isMod: boolean              // 本直播间房管：弹幕 info[2][2] 已确认；进场消息中的字段【待验证】
+  isMod: boolean              // 本直播间房管：弹幕 info[2][2]；进场消息没有这个字段，按房管名单判断
   medal?: {                   // 只保留本直播间的粉丝牌
     name: string
     level: number

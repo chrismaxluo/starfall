@@ -44,6 +44,8 @@ interface EventBase {
 export interface EnterEvent extends EventBase {
   kind: 'enter';
   viewer: Viewer;
+  /** 来源消息：interact 为 INTERACT_WORD_V2（信息完整），entry_effect 为 ENTRY_EFFECT（没有粉丝牌） */
+  source: 'interact' | 'entry_effect';
 }
 
 export interface DanmuEvent extends EventBase {

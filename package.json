@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "reset-password": "pnpm --filter @starfall/server reset-password"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

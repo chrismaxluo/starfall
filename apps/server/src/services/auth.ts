@@ -34,8 +34,22 @@ export class AdminAuth {
   /** 没有密码时生成初始密码，写入 data/initial-password.txt 并返回；已有密码返回 null */
   ensurePassword(): string | null {
     if (this.settings.getRaw<PasswordRecord>(KEY)) return null;
+    return this.generate(1);
+  }
+
+  /** 忘记密码：生成新的随机密码（写入 data/initial-password.txt），原来的登录全部失效 */
+  resetPassword(): string {
+    return this.generate((this.settings.getRaw<PasswordRecord>(KEY)?.version ?? 0) + 1);
+  }
+
+  /** 是否还在用初始密码（登录页据此显示"初始密码在哪"） */
+  usingInitialPassword(): boolean {
+    return fs.existsSync(this.initialPasswordFile);
+  }
+
+  private generate(version: number): string {
     const pw = crypto.randomBytes(9).toString('base64url');
-    this.write(pw, 1);
+    this.write(pw, version);
     fs.mkdirSync(path.dirname(this.initialPasswordFile), { recursive: true });
     fs.writeFileSync(this.initialPasswordFile, `星临管理后台初始密码：${pw}\n登录后请在设置里修改，修改后这个文件会自动删除。\n`, { mode: 0o600 });
     return pw;

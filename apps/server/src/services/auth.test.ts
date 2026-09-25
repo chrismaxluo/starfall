@@ -69,3 +69,28 @@ describe('后台登录', () => {
     expect(fs.existsSync(path.join(dir, 'initial-password.txt'))).toBe(false);
   });
 });
+
+describe('忘记密码', () => {
+  it('重置后旧密码和旧登录失效，新密码写入文件；改密码后不再提示初始密码', async () => {
+    const { testApp } = await import('../testing.ts');
+    const t = await testApp();
+    const old = t.password;
+    const session = t.ctx.auth.issueSession().token;
+    expect(t.ctx.auth.usingInitialPassword()).toBe(true);
+    expect((await t.app.inject({ method: 'GET', url: '/api/auth/setup' })).json()).toEqual({ initialPassword: true });
+
+    const pw = t.ctx.auth.resetPassword();
+    expect(pw).not.toBe(old);
+    expect(t.ctx.auth.verify(old)).toBe(false);
+    expect(t.ctx.auth.verify(pw)).toBe(true);
+    expect(t.ctx.auth.checkSession(session)).toBe(false);
+    const fsm = await import('node:fs');
+    const pathm = await import('node:path');
+    expect(fsm.readFileSync(pathm.join(t.dataDir, 'initial-password.txt'), 'utf8')).toContain(pw);
+
+    t.ctx.auth.changePassword(pw, 'my-new-password');
+    expect(t.ctx.auth.usingInitialPassword()).toBe(false);
+    expect((await t.app.inject({ method: 'GET', url: '/api/auth/setup' })).json()).toEqual({ initialPassword: false });
+    await t.app.close();
+  });
+});

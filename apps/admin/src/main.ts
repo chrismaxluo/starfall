@@ -8,6 +8,7 @@ import '@fontsource/noto-sans-sc/500.css';
 import '@fontsource/noto-sans-sc/600.css';
 import './styles/app.css';
 import './styles/extra.css';
+import './styles/login.css';
 import { createApp } from 'vue';
 import App from './App.vue';
 

@@ -9,7 +9,7 @@ import markdown
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "design" / "preview" / "docs"
-DOCS = [("requirements", "需求文档"), ("architecture", "方案设计"), ("development", "开发约定")]
+DOCS = [("requirements", "需求文档"), ("architecture", "方案设计"), ("bili-protocol", "B站协议笔记"), ("p0-report", "P0 验证报告"), ("development", "开发约定")]
 PENDING = re.compile(r"【(待[^】]*)】")
 
 CSS = """

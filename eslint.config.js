@@ -12,6 +12,12 @@ export default tseslint.config(
   {
     files: ['**/*.vue'],
     languageOptions: { parserOptions: { parser: tseslint.parser } },
+    rules: {
+      // 页面组件按路由命名（总览、规则…），不需要多词名称
+      'vue/multi-word-component-names': 'off',
+      // 中文排版里有意使用全角空格
+      'no-irregular-whitespace': 'off',
+    },
   },
   {
     languageOptions: { globals: { ...globals.node, ...globals.browser } },

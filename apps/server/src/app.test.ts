@@ -86,3 +86,20 @@ describe('日志', () => {
     expect(redactUrl('/api/health')).toBe('/api/health');
   });
 });
+
+describe('管理后台静态文件', () => {
+  it('构建后由服务提供首页，入口页不缓存', async () => {
+    const fsm = await import('node:fs');
+    const pathm = await import('node:path');
+    const { testApp } = await import('./testing.ts');
+    const t = await testApp();
+    if (!fsm.existsSync(pathm.join(t.ctx.config.adminDist, 'index.html'))) return void (await t.app.close());
+    const page = await t.app.inject({ method: 'GET', url: '/' });
+    expect(page.statusCode).toBe(200);
+    expect(page.headers['cache-control']).toBe('no-cache');
+    expect(page.body).toContain('星临');
+    // 接口和特效页不受影响
+    expect((await t.app.inject({ method: 'GET', url: '/api/health' })).statusCode).toBe(200);
+    await t.app.close();
+  });
+});

@@ -1,0 +1,54 @@
+/* 设计预览里没有、正式版需要的样式 */
+.prev-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; }
+.stage .stage-label, .pstage .stage-label { z-index: 3; pointer-events: none; }
+.stage.alpha, .pstage.alpha, .ostage.alpha { background: repeating-conic-gradient(#2A2A31 0% 25%, #1F1F25 0% 50%) 0 0 / 14px 14px; }
+
+/* 登录页 */
+.login { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(60% 40% at 50% 0%, var(--accent-soft), transparent 70%), var(--l1); }
+.login-card { width: min(380px, 100%); padding: 28px; border-radius: 18px; background: var(--l3); border: 1px solid var(--line); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 16px; }
+.login-card .brand { padding: 0; }
+.login-card h1 { margin: 6px 0 0; font-size: 18px; font-weight: 600; }
+.login-card p { margin: 0; font-size: 12.5px; color: var(--t3); line-height: 1.6; }
+.login-card code { font-family: var(--font-mono); font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--hover); border: 1px solid var(--line); color: var(--t1); }
+.err { font-size: 12.5px; color: #D64545; }
+
+/* 通用弹窗 */
+.dlg { position: fixed; z-index: 36; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 32px)); border-radius: 16px; background: var(--l3); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop); animation: edIn .25s cubic-bezier(.2,.9,.3,1); display: flex; flex-direction: column; }
+.dlg .qh { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.dlg .qh b { font-size: 14.5px; font-weight: 600; }
+.dlg .qh .icon-btn { margin-left: auto; box-shadow: none; }
+.dlg .qb { padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center; font-size: 13px; color: var(--t2); }
+.qr img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.qr { display: block; }
+
+/* 小提示条（首页引导） */
+.guide { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px; border-radius: var(--r-lg); background: var(--accent-soft); border: 1px solid var(--accent-ring); font-size: 13px; color: var(--t2); }
+.guide b { color: var(--t1); font-weight: 600; }
+.guide ol { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+.guide li { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; background: var(--l3); border: 1px solid var(--line); }
+.guide li.done { color: var(--ok); }
+.guide .btn { margin-left: auto; }
+
+.soon-box { padding: 48px 20px; text-align: center; color: var(--t3); border: 1px dashed var(--line-strong); border-radius: var(--r-lg); background: var(--l2); }
+.soon-box b { display: block; color: var(--t1); font-weight: 500; margin-bottom: 4px; }
+.more-row { display: flex; justify-content: center; padding: 14px; }
+.conn-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+.live.warn { background: var(--gov-soft); color: var(--gov); }
+.live.off { background: var(--hover); color: var(--t3); }
+.live.off i::after, .live.warn i::after { display: none; }
+.nav a.disabled { opacity: .55; pointer-events: none; }
+.nav a .soon { margin-left: auto; font-size: 11px; color: var(--t3); }
+.ecard .thumb-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.ecard .thumb-icon { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255,255,255,.55); }
+.ecard .thumb-icon svg { width: 28px; height: 28px; }
+.ethumb .mpos .mini { animation: none; opacity: 1; }
+.ethumb .mpos .mini::after { animation: none; }
+.acard .del-row { display: flex; gap: 6px; padding: 0 13px 12px; }
+.sel.sm { height: 32px; font-size: 12.5px; width: auto; }
+.inline-hint { font-size: 12px; color: var(--t3); }
+.tag.excl { color: var(--accent); background: var(--accent-soft); }
+/* 数字输入框不显示上下箭头（会盖住右侧的单位） */
+.inp[type="number"], .cdin input { -moz-appearance: textfield; appearance: textfield; }
+.inp[type="number"]::-webkit-inner-spin-button, .inp[type="number"]::-webkit-outer-spin-button,
+.cdin input::-webkit-inner-spin-button, .cdin input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.suffix .inp { padding-right: 40px; }

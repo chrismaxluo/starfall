@@ -1,6 +1,8 @@
 // 素材与规则的数据格式。用 Zod 定义，既做接口校验，也生成 TypeScript 类型，前后端共用。
 import { z } from 'zod';
 
+export * from './labels.ts';
+
 // ---------- 素材 ----------
 
 export const POSITIONS = ['bl', 'br', 'top', 'center'] as const;
@@ -44,10 +46,6 @@ export const TierRuleSchema = z.object({
 });
 export type TierRule = z.infer<typeof TierRuleSchema>;
 
-/** 固定的身份档位 */
-export const TIERS = ['gov', 'adm', 'cap', 'mod', 'nor'] as const;
-export type Tier = (typeof TIERS)[number];
-export const TIER_NAMES: Record<Tier, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '普通观众' };
 
 /** 粉丝牌分档：只存起始等级，区间由相邻两档推出，所以不会重叠 */
 export const MedalBandSchema = z.object({
@@ -86,22 +84,3 @@ export const EnterRulesSchema = z
     if (new Set(uids).size !== uids.length) ctx.addIssue({ code: 'custom', path: ['exclusives'], message: '同一个 UID 只能设一条专属规则' });
   });
 export type EnterRules = z.infer<typeof EnterRulesSchema>;
-
-// ---------- 播放状态 ----------
-
-/** 事件最终的处理结果，写入事件记录 */
-export const PLAY_STATUS = {
-  played: '已播放',
-  queued: '排队中',
-  no_rule: '未命中规则',
-  blacklist: '黑名单',
-  paused: '已暂停',
-  offline: '未开播',
-  cooldown: '冷却中',
-  once: '本场已播过',
-  no_overlay: '特效页不在线',
-  dropped: '队列已满，丢弃',
-  cleared: '已清空',
-  duplicate: '重复消息',
-} as const;
-export type PlayStatus = keyof typeof PLAY_STATUS;

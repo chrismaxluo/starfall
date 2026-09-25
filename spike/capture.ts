@@ -62,8 +62,16 @@ async function pickRoom(): Promise<number> {
 
 async function main() {
   const seconds = Number(process.argv[3] || 120);
+  // 有登录信息（spike/login.ts 保存的）就带上，否则匿名连接
+  const accountFile = path.join(import.meta.dirname, '../data/bili-account.json');
+  let uid = 0;
+  if (fs.existsSync(accountFile)) {
+    Object.assign(jar, JSON.parse(fs.readFileSync(accountFile, 'utf8')).cookies);
+    uid = Number(jar.DedeUserID) || 0;
+    console.log(`使用已登录的账号 UID ${uid}`);
+  } else console.log('未登录，匿名连接（昵称会被打码）');
   const spi = await getJson('https://api.bilibili.com/x/frontend/finger/spi');
-  jar.buvid3 = spi.data.b_3; jar.buvid4 = spi.data.b_4;
+  jar.buvid3 ||= spi.data.b_3; jar.buvid4 ||= spi.data.b_4;
   const input = Number(process.argv[2]) || (await pickRoom());
   const init = await getJson(`https://api.live.bilibili.com/room/v1/Room/room_init?id=${input}`);
   const roomId: number = init.data.room_id;
@@ -85,7 +93,7 @@ async function main() {
   ws.binaryType = 'arraybuffer';
   let hb: NodeJS.Timeout | undefined;
   ws.onopen = () => {
-    ws.send(pack(OP.AUTH, JSON.stringify({ uid: 0, roomid: roomId, protover: 3, buvid: jar.buvid3, platform: 'web', type: 2, key: info.data.token })));
+    ws.send(pack(OP.AUTH, JSON.stringify({ uid, roomid: roomId, protover: 3, buvid: jar.buvid3, platform: 'web', type: 2, key: info.data.token })));
     hb = setInterval(() => ws.send(pack(OP.HEARTBEAT, '[object Object]')), 30_000);
   };
   ws.onmessage = (e) => {

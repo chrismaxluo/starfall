@@ -2,13 +2,13 @@
 
 | 项目 | 内容 |
 |---|---|
-| 版本 | v1.0 |
+| 版本 | v1.1 |
 | 日期 | 2026-09-25 |
-| 状态 | **已确认**（2026-09-25） |
+| 状态 | **已确认**（2026-09-25）；v1.1 按 P0 实测结果更新 |
 | 依据 | [需求文档 v1.0](requirements.md)（已确认） |
 
 > 本文档回答"怎么做"：技术栈、架构、模块、数据、接口和协议。需求编号（如 F-EN-01）对应需求文档。
-> 标记 **【待验证】** 的内容依赖 B 站协议实测，在技术验证阶段确认后更新本文档。
+> P0 技术验证（2026-09-25）后已按实测结果更新，实测细节见 [B站协议笔记](bili-protocol.md)。仍标记 **【待验证】** 的内容（上舰、开播消息等）在 P1 / P2 中长期运行时确认。
 
 ---
 
@@ -40,7 +40,7 @@
 | 数据库 | SQLite + better-sqlite3 | 13.0 | 单文件，不用另装数据库；同步 API，写起来简单；Windows 版可直接内嵌 | PostgreSQL：需要单独部署，对单用户工具过重；Node 自带的 node:sqlite：尚不稳定 |
 | ORM / 迁移 | Drizzle ORM + drizzle-kit | 0.45 / 0.31 | 类型安全、轻量；自动生成数据库迁移 | Prisma：较重，有额外的引擎进程 |
 | 数据校验 | Zod | 4.6 | 接口参数、配置、WebSocket 消息的校验；**同一份定义**生成 TS 类型，前后端共用 | — |
-| protobuf | protobufjs | 8.8 | 解析 B 站新版 pb 格式消息【待验证：哪些消息是 pb】 | 手写解码：维护成本高 |
+| protobuf | protobufjs | 8.8 | 解析 B 站新版 pb 格式消息：**进场 `INTERACT_WORD_V2`、送礼 `SEND_GIFT_V2`**（P0 已确认） | 手写解码：维护成本高 |
 | 日志 | Pino | 10.3 | Fastify 自带；结构化日志，性能好 | — |
 | 管理后台框架 | Vue 3 + Vite | 3.5 / 8.3 | 上手快、生态成熟 | React：同样可行，Vue 的表单和模板写法更贴合后台场景 |
 | 状态管理 / 路由 | Pinia + Vue Router | 4.0 / 5.3 | Vue 官方方案 | — |
@@ -48,7 +48,7 @@
 | 特效动画 | GSAP | 3.15 | 时间轴编排精准，适合横幅、文字类特效 | 纯 CSS 动画：复杂编排难写 |
 | Lottie | lottie-web | 5.13 | 播放 AE 导出的动画 | — |
 | 粒子效果 | PixiJS | 8.21 | GPU 渲染，粒子多时也流畅 | Canvas 手写：工作量大 |
-| SVGA | svga 或 svgaplayerweb | 2.1 / 2.3 | 国内直播常用的动画格式 | **技术验证时在直播姬和 OBS 里实测后二选一** |
+| SVGA | **svgaplayerweb**（复制到项目中固定版本） | 2.3.2 | P0 实测：按显示尺寸绘制，放大后清晰；解析快；不依赖 Worker 等新能力。已停止维护，用自己的接口包一层，便于以后更换 | svga（Lite）：按素材原始尺寸绘制后拉伸，铺满竖屏时明显模糊，且无法配置 |
 | 二维码 | qrcode | 1.5 | 生成扫码登录的二维码 | — |
 | 素材识别 | ffmpeg（ffprobe） | 5.1（Debian 官方源） | 准确读取时长、尺寸、**是否带透明通道** | 浏览器端读取：读不出 WebM 的透明通道 |
 | 测试 | Vitest + Playwright | 5.0 / 1.63 | Vitest 测逻辑；Playwright 测后台和特效页的真实渲染（服务器上已装无头 Chromium） | Jest：和 Vite 配合不如 Vitest |
@@ -177,20 +177,20 @@ interface Viewer {
   name: string
   face?: string               // 头像地址
   guard: 0 | 1 | 2 | 3        // 本直播间大航海：0 无，1 总督，2 提督，3 舰长
-  isMod: boolean              // 本直播间房管【待验证】
+  isMod: boolean              // 本直播间房管：弹幕 info[2][2] 已确认；进场消息中的字段【待验证】
   medal?: {                   // 只保留本直播间的粉丝牌
     name: string
     level: number
     colors: { bg: string; level: string; border: string; text: string }  // B 站下发的颜色
   }
-  mystery: boolean            // 神秘人【待验证】
+  mystery: boolean            // 神秘人（弹幕 user.anon？）【待验证】
 }
 
 type StdEvent =
   | { kind: 'enter';  id: string; ts: number; viewer: Viewer }
   | { kind: 'danmu';  id: string; ts: number; viewer: Viewer; text: string }
   | { kind: 'gift';   id: string; ts: number; viewer: Viewer; giftId: number; giftName: string;
-      unitPrice: number;     // 单价，单位：金瓜子（1 元 = 1000 金瓜子【待验证】）
+      unitPrice: number;     // 单价，单位：金瓜子（1 元 = 1000 金瓜子，已确认）
       count: number; paid: boolean; comboKey?: string }
   | { kind: 'guard';  id: string; ts: number; viewer: Viewer; level: 1 | 2 | 3; months: number;
       op: 'open' | 'renew' }  // 开通 / 续费的区分方式【待验证】
@@ -347,10 +347,10 @@ data/
 |---|---|
 | 扫码登录 | 申请二维码 → 前端显示 → 每 2 秒查询状态（未扫码 / 已扫码待确认 / 成功 / 过期）→ 成功后保存 Cookie（F-BL-01） |
 | 登录信息保存 | `SESSDATA` 等 Cookie 用 AES-256-GCM 加密后存入 `account` 表，密钥在 `data/secret.key` |
-| 过期提醒 | 记录过期时间；每天检查一次登录状态，失效或剩余不足 3 天时在后台提醒（F-BL-02）。自动续期【待验证】 |
+| 过期提醒 | 记录过期时间；每天检查一次登录状态，失效或剩余不足 3 天时在后台提醒（F-BL-02）。实测扫码登录的有效期约 **6 个月**；自动续期【待验证】 |
 | 房间号 | 短号换算长号；获取主播 UID、昵称、开播状态（F-BL-03） |
 | 用户查询 | 添加专属用户、黑名单时按 UID 查昵称和头像，结果缓存到 `viewers`，并限制查询频率 |
-| 礼物配置 | 连接房间时拉取礼物列表和单价，缓存到 `gifts`，每天刷新（F-GF-05）【待验证】 |
+| 礼物配置 | 连接房间时拉取**本直播间礼物面板**（`roomGiftList`），缓存到 `gifts`，每天刷新（F-GF-05）。**同名礼物有多个 ID 和价格，指定礼物一律按礼物 ID 匹配** |
 | 签名 | 需要签名的接口使用 WBI 签名；签名密钥每小时刷新 |
 
 ### 7.2 WebSocket 连接
@@ -364,18 +364,20 @@ data/
 | 重连 | 断线后指数退避：1 → 2 → 4 … 最长 30 秒，加随机抖动；依次尝试地址列表中的不同服务器（F-BL-05） |
 | 风控 | 遇到风控类错误码时退避更久，并在后台提示，不频繁重试 |
 
-### 7.3 需要处理的消息【待验证】
+### 7.3 需要处理的消息
 
 | 消息 | 转成 | 备注 |
 |---|---|---|
-| `INTERACT_WORD`（及新版 pb 格式） | enter | 进场与关注共用，需按类型字段区分，只取进场 |
-| `ENTRY_EFFECT` | enter | 大航海进场，与上一条合并去重 |
-| `DANMU_MSG` | danmu | 字段格式特殊（数组结构），需实测 |
-| `SEND_GIFT`、`COMBO_SEND` | gift | 区分免费 / 付费；连击 |
-| `GUARD_BUY`、`USER_TOAST_MSG` | guard | 用哪条、如何区分开通和续费需实测 |
-| `LIVE`、`PREPARING` | live | 开播 / 下播；另外每分钟查询一次房间状态兜底 |
+| `INTERACT_WORD_V2`（protobuf） | enter | ✅ 旧版 `INTERACT_WORD` 已不再出现；进场与关注共用，按消息类型字段（5）只取进场（1） |
+| `ENTRY_EFFECT` | enter | ✅ 带进场特效的进场，**不只是大航海**（财富等级也会触发）；与上一条按 UID 合并去重 |
+| `DANMU_MSG` | danmu | ✅ 仍为 JSON 数组；优先读取 `info[0][15].user` 中的结构化用户信息 |
+| `SEND_GIFT_V2`（protobuf）、`COMBO_SEND` | gift | ✅ 旧版 `SEND_GIFT` 已不再出现；币种区分免费 / 付费；按连击批次号合并连击 |
+| `GUARD_BUY`、`USER_TOAST_MSG` | guard | 【待验证】P0 期间没有人上舰；P2 前通过长期运行采集样本 |
+| `LIVE`、`PREPARING` | live | ✅ `PREPARING`（下播）；【待验证】`LIVE`；另外每分钟查询一次房间状态兜底 |
 
-技术验证阶段会把每种消息的真实样本（去掉个人信息后）保存到 `fixtures/`，作为解析代码的测试数据；字段说明写进 `docs/bili-protocol.md`。
+每种消息的真实样本（去掉个人信息后）保存到 `fixtures/`，作为解析代码的测试数据；字段说明见 `docs/bili-protocol.md`。
+
+**不需要处理的消息**：`UNIVERSAL_EVENT_GIFT`（名字像礼物，实为多人连麦状态）、`PK_*`、`ONLINE_RANK_*`、`WATCHED_CHANGE`、`LIKE_INFO_*` 等。
 
 ---
 
@@ -455,7 +457,7 @@ data/
 | 渲染 | 按画面类型选择播放器：内置样式（GSAP + CSS）、WebM / MP4（`<video>`）、GIF / PNG / WebP（`<img>`）、Lottie（lottie-web）、SVGA（技术验证选定的库）、粒子（PixiJS）；头像和欢迎语作为一层叠在上面 |
 | 位置 | 按素材的位置和输出的安全区、边距计算；竖屏自动避开安全区（F-OU-03） |
 | B 站资源 | 大航海官方图标、礼物图标从 B 站地址加载，粉丝牌直接使用消息里下发的颜色，都不打包进项目（F-BL-09） |
-| 声音 | 优先用 `<audio>` 播放，由直播软件采集；OBS 需要勾选"通过 OBS 控制音频"【待验证：直播姬】 |
+| 声音 | 用 `<audio>` 播放，由直播软件采集；OBS 需要勾选"通过 OBS 控制音频"；**OBS 与直播姬均已实测通过** |
 | 兼容 | 启动时检测能力（透明视频、毛玻璃、动态描边、音频），按"兼容模式"设置自动降级，并上报给服务端（F-OU-08） |
 | 预加载 | 连接后预加载本输出会用到的文件，避免第一次播放时卡顿 |
 | 自检页 | `?check=1` 兼容性自检、`?loop=1` 声音测试（从设计预览移植，F-OU-09 ~ 10） |

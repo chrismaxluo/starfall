@@ -55,7 +55,7 @@ a{{color:var(--accent)}}
 </style></head><body>
 <button class="theme" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';try{{localStorage.setItem('sf-theme',r.dataset.theme)}}catch(e){{}}">切换亮 / 暗</button>
 <div class="wrap">
-<nav class="toc" aria-label="目录"><div class="brand">✦ 星临 Starfall</div><div class="sub">需求文档 v1.0 · 待确认</div>{toc}
+<nav class="toc" aria-label="目录"><div class="brand">✦ 星临 Starfall</div><div class="sub">需求文档 v1.0 · 已确认</div>{toc}
 <div class="links"><a href="../">← 设计预览</a><a href="requirements.md" download>下载 Markdown 原文</a></div></nav>
 <main>{body}</main></div></body></html>'''
 out = ROOT / 'design/preview/docs/requirements.html'; out.write_text(page, encoding='utf-8')

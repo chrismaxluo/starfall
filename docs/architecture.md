@@ -53,7 +53,7 @@
 | 素材识别 | ffmpeg（ffprobe） | 5.1（Debian 官方源） | 准确读取时长、尺寸、**是否带透明通道** | 浏览器端读取：读不出 WebM 的透明通道 |
 | 测试 | Vitest + Playwright | 5.0 / 1.63 | Vitest 测逻辑；Playwright 测后台和特效页的真实渲染（服务器上已装无头 Chromium） | Jest：和 Vite 配合不如 Vitest |
 | 代码规范 | ESLint + Prettier | 最新版 | 统一格式，减少低级错误 | Biome：可行，但 Vue 支持尚不完整 |
-| 运行守护 | PM2 | 7.0 | 崩溃重启、开机自启、日志切割 | systemd：也可以，PM2 在 Windows 上同样能用，调试更方便 |
+| 运行守护 | systemd（服务器） | 系统自带 | 崩溃重启、开机自启、日志（journald） | 原计划 PM2；服务器上改用系统自带的 systemd，少装一个依赖。Windows 版由 Electron 管理进程，不需要 PM2 |
 | 运行 TS | **Node 24 原生**（去除类型） | — | 服务端和公共包直接由 Node 运行 `.ts`，**不需要编译**；开发时 `node --watch` 自动重启。限制：只能用可擦除的语法（不能用 enum、namespace），已在 `tsconfig` 中用 `erasableSyntaxOnly` 检查 | tsx：功能重复，已不需要 |
 | Windows 版 | Electron + electron-builder | 44.x / 26.x | 桌面封装最成熟的方案 | Tauri：要用 Rust 重写服务端，成本高 |
 
@@ -506,7 +506,7 @@ data/
 
 | 方面 | 做法 |
 |---|---|
-| 进程 | PM2 守护：崩溃自动重启、开机自启 |
+| 进程 | systemd 守护：崩溃自动重启、开机自启 |
 | 日志 | Pino 结构化日志，按天切割，保留 14 天；B 站连接、规则判断、播放各有日志 |
 | 健康检查 | `/api/health` 返回数据库、B 站连接、特效页在线情况 |
 | 备份 | 每天凌晨用 SQLite 的在线备份功能备份数据库，连同文件清单保存到 `data/backups/`，保留 7 份（F-DA-03） |

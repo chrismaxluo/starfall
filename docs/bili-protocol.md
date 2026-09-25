@@ -10,6 +10,7 @@
 |---|---|
 | 服务器 | Azure 东京机房（海外 IP） |
 | 首次实测 | 2026-09-25，未登录，连接当时人气最高的直播间，持续 120 秒 |
+| 第三次实测 | 2026-09-25，已登录，两个热门直播间各约 3 ~ 5 分钟，重点找礼物消息；期间一位主播下播 |
 | 第二次实测 | 2026-09-25，**已登录**，主播本人的直播间（开播中）300 秒，收到 177 条消息；同时对照人气最高的直播间 180 秒 |
 | 抓包脚本 | `spike/capture.ts`：`node spike/capture.ts [房间号] [秒数]` |
 
@@ -125,11 +126,55 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 
 ⚠️ 这个直播间里有账号会自动发"欢迎 xxx 来到直播间"之类的弹幕（疑似欢迎机器人）。**弹幕规则需要能排除这类账号**，可以直接加入黑名单。
 
-### 5.5 其他本次出现的消息
+### 5.5 `SEND_GIFT_V2`（送礼）✅
+
+**旧版 `SEND_GIFT` 已不再出现**，改为 `SEND_GIFT_V2`，外层 JSON `{"cmd":"SEND_GIFT_V2","data":{"dmscore":…,"pb":"<base64>"}}`，`pb` 为 protobuf：
+
+| 字段号 | 含义 |
+|---|---|
+| 1 / 2 / 3 | 送礼人 UID / 昵称 / 头像 |
+| 8 | 粉丝牌（旧结构）：.1 所属主播 UID，.5 等级，.6 名称，.7 ~ .10 颜色 |
+| 10.1 | **礼物 ID** |
+| 10.2 | 礼物名称 |
+| 10.3 | **数量** |
+| 10.5 | 单价（金瓜子） |
+| 10.7 | **本次总价值**（金瓜子）：实测 10 × 100 = 1000 ✅ |
+| 10.8 | 币种：`gold` 付费，`silver` 免费 |
+| 10.10 | 时间（秒） |
+| 10.11 | **连击序号**（第几连击） |
+| 10.12 | **连击批次号**，形如 `batch:gift:combo_id:<送礼人>:<主播>:<礼物ID>:<时间>`，用于合并连击 |
+| 10.14 | **连击累计价值**（金瓜子） |
+| 10.18 | 动作文案（"投喂"） |
+| 10.29 / 10.33 | 收礼人（主播）昵称和 UID / 用户信息 |
+| 10.35 | 礼物图标地址（静态、动态） |
+| 15 | 送礼人用户信息（新结构），与 `INTERACT_WORD_V2` 的 22 相同：.1 UID，.2 昵称头像，.3 粉丝牌和新版颜色 |
+
+另有 `COMBO_SEND`（JSON）：连击汇总，字段 `gift_id`、`gift_name`、`combo_num`、`combo_total_coin`、`batch_combo_id`、`coin_type`、`sender_uinfo` 等。**合并连击时以 `SEND_GIFT_V2` 的批次号为准**，`COMBO_SEND` 作为补充。
+
+### 5.6 礼物配置接口 ✅
+
+| 接口 | 内容 |
+|---|---|
+| `GET /xlive/web-room/v1/giftPanel/roomGiftList?platform=pc&room_id=<长号>` | **本直播间的礼物面板**（实测 96 个），每种礼物一个版本 |
+| `GET /xlive/web-room/v1/giftPanel/giftConfig?platform=pc&room_id=<长号>` | 全站礼物（实测 913 个），同名礼物有多个版本 |
+
+字段：`id`、`name`、`price`（金瓜子）、`coin_type`（gold / silver）、`img_basic`、`gif`、`webp` 等。
+
+- ✅ **1 元 = 1000 金瓜子**：小花花 100、告白花束 19900、小电视飞船 1245000，与售价一致。
+- ✅ **免费礼物**：`coin_type` 为 `silver`，例如辣条、小心心。
+- ⚠️ **同名礼物有多个 ID、价格不同**：例如"小电视飞船"有 1245 元和 2999 元两个版本。**指定礼物必须按礼物 ID 匹配**，界面上应从本直播间的礼物面板中选择。
+
+### 5.7 开播 / 下播
+
+- ✅ `PREPARING`（下播）：`{"cmd":"PREPARING","roomid":"<房间号>","send_time":<毫秒>,…}`，注意 `roomid` 是字符串。
+- ⏳ `LIVE`（开播）：待抓取。
+
+### 5.8 其他本次出现的消息
 
 | 消息 | 说明 |
 |---|---|
-| `UNIVERSAL_EVENT_GIFT` / `UNIVERSAL_EVENT_GIFT_V2` | 各 28 条，结构 `{room_id, anchor_uid, info}`；⏳ 推测是 PK 或活动相关的礼物汇总，**不是普通送礼**，待确认 |
+| `UNIVERSAL_EVENT_GIFT` / `UNIVERSAL_EVENT_GIFT_V2` | ✅ **不是送礼**：是多人连麦的状态（布局、成员列表），与需求无关 |
+| `DM_INTERACTION` | 弹幕互动聚合（例如多人发送相同内容） |
 | `PK_INFO`、`PK_WIDGET` | 主播正在 PK |
 | `ROOM_REAL_TIME_MESSAGE_UPDATE` | 粉丝数等实时数据 |
 
@@ -140,13 +185,13 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 | 1 | 登录后昵称、UID 是否完整 | ✅ 主播自己的直播间完整 |
 | 2 | 进场消息中粉丝牌、房管的字段 | ✅ 粉丝牌已确认；⏳ 进场消息里的房管、大航海字段需要样本 |
 | 3 | 弹幕 `DANMU_MSG` 的格式 | ✅ |
-| 4 | 礼物 `SEND_GIFT`、`COMBO_SEND` 的格式；免费 / 付费区分；单价单位 | ⏳ 本次 5 分钟内没有人送礼 |
+| 4 | 礼物格式；免费 / 付费；单价单位 | ✅ `SEND_GIFT_V2`（protobuf）、`COMBO_SEND`；1 元 = 1000 金瓜子 |
 | 5 | 上舰 `GUARD_BUY` / `USER_TOAST_MSG`；开通与续费的区分 | ⏳ |
-| 6 | 开播 / 下播 `LIVE` / `PREPARING` | ⏳ |
+| 6 | 开播 / 下播 `LIVE` / `PREPARING` | ✅ 下播；⏳ 开播 |
 | 7 | 大航海进场时 `INTERACT_WORD_V2` 与 `ENTRY_EFFECT` 的先后和间隔 | ⏳ |
 | 8 | 扫码登录 | ✅ 接口可用：`passport.bilibili.com/x/passport-login/web/qrcode/generate` 与 `…/poll`；返回 `SESSDATA`、`bili_jct`、`DedeUserID` 等 Cookie 和 `refresh_token`；**SESSDATA 有效期约 6 个月** |
 | 9 | Cookie 续期 | ⏳ |
-| 10 | 礼物配置接口（名称、单价、图标） | ⏳ |
+| 10 | 礼物配置接口（名称、单价、图标） | ✅ |
 | 11 | 神秘人的表现（`anon` 字段？） | ⏳ |
 | 12 | 熄灭粉丝牌的颜色、22.3.12 的含义 | ⏳ |
-| 13 | `UNIVERSAL_EVENT_GIFT` 的含义 | ⏳ |
+| 13 | `UNIVERSAL_EVENT_GIFT` 的含义 | ✅ 连麦状态，与需求无关 |

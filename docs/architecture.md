@@ -438,7 +438,7 @@ data/
 | 事件记录 | `GET /api/events?kind=&status=&q=&cursor=` | |
 | 设置 | `GET/PUT /api/settings` | |
 | 数据 | `GET /api/backup/export`、`POST /api/backup/import`（先返回变化预览，确认后再导入） | F-DA-04 |
-| 健康检查 | `GET /api/health` | 给 PM2 和监控用，不需要登录 |
+| 健康检查 | `GET /api/health` | 给监控用，不需要登录 |
 
 ### 9.3 WebSocket
 
@@ -524,7 +524,9 @@ data/
 | 端口 | **17520**（可用环境变量 `STARFALL_PORT` 修改）。开发期间设计预览继续使用 8080，两者可以同时运行；第一期上线后预览下线 |
 | 防火墙 | Azure 网络安全组放行 **17520**；预览下线后可以关闭 8080 |
 | HTTPS | 有域名后加 Caddy 反向代理 |
-| 部署步骤 | 写入 `docs/deployment.md`（部署前完成） |
+| 进程管理 | systemd 服务 `starfall`（`deploy/starfall.service`）：开机自启、崩溃 3 秒后自动重启、内存上限 450 MB；日志用 `journalctl -u starfall -f` 查看。服务器上没有装 PM2，systemd 自带且足够 |
+| 日志 | 请求日志里的特效页密钥替换为 `***`；不记录 Cookie |
+| 部署步骤 | 写入 `docs/deployment.md`（第一期发布前完成） |
 
 ---
 

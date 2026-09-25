@@ -21,11 +21,18 @@ export interface AppOptions {
   logger?: boolean;
 }
 
+/** 把地址里的密钥换成 *** */
+export const redactUrl = (url: string) => url.replace(/([?&]key=)[^&]*/g, '$1***');
+
 /** 不需要登录的接口 */
 const PUBLIC = new Set(['/api/health', '/api/auth/login']);
 
 export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
-  const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
+  const app = Fastify({
+    // 日志里不记录特效页密钥（地址里的 key 参数）
+    logger: opts.logger ? { serializers: { req: (req) => ({ method: req.method, url: redactUrl(req.url), remoteAddress: req.ip }) } } : false,
+    bodyLimit: 1024 * 1024,
+  });
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
   await app.register(multipart, { limits: { fileSize: ctx.assets.maxBytes, files: 1, fields: 10, parts: 11 } });

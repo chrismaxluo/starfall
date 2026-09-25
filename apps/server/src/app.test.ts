@@ -77,3 +77,12 @@ describe('特效页静态文件', () => {
     await t.app.close();
   });
 });
+
+describe('日志', () => {
+  it('地址里的特效页密钥不写进日志', async () => {
+    const { redactUrl } = await import('./app.ts');
+    expect(redactUrl('/ws/overlay?output=1&key=abcDEF_123')).toBe('/ws/overlay?output=1&key=***');
+    expect(redactUrl('/overlay/?key=x&output=2')).toBe('/overlay/?key=***&output=2');
+    expect(redactUrl('/api/health')).toBe('/api/health');
+  });
+});

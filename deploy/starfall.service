@@ -1,0 +1,25 @@
+# 星临服务（服务器部署）。安装：
+#   cp deploy/starfall.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now starfall
+# 查看日志：journalctl -u starfall -f
+[Unit]
+Description=星临 Starfall 直播特效服务
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/starfall
+ExecStart=/usr/bin/node apps/server/src/main.ts
+Environment=NODE_ENV=production
+Environment=STARFALL_PORT=17520
+Environment=STARFALL_DATA=/opt/starfall/data
+Environment=STARFALL_TZ=Asia/Shanghai
+Restart=always
+RestartSec=3
+# 服务器内存小：限制堆大小，出问题时由 systemd 重启而不是拖垮整台机器
+Environment=NODE_OPTIONS=--max-old-space-size=256
+MemoryMax=450M
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

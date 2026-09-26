@@ -314,3 +314,5 @@
 }
 [data-orient="landscape"] .pv { width: min(460px, 100%); }
 [data-orient="landscape"] .pv-stage { width: min(400px, 86vw); aspect-ratio: 16 / 9; }
+/* 线条图标（✕、上下箭头）：.playmini 默认只给实心的播放图标上色 */
+.playmini svg.i { width: 13px; height: 13px; fill: none; stroke: currentColor; }

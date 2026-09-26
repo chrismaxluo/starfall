@@ -125,24 +125,24 @@ function locateBand(level: number): void {
 
 // ---------- 粉丝牌分档 ----------
 const addLevel = ref<number | null>(null);
-const addMsg = ref<{ text: string; err: boolean }>({ text: '会从所在的档里切出来，沿用原来的素材', err: false });
+const addMsg = ref<{ text: string; err: boolean }>({ text: '分出来的新一段先沿用原来的特效', err: false });
 function addBand(): void {
   const v = Number(addLevel.value);
   if (!rules.value) return;
   if (!(v >= 2 && v <= 60) || !Number.isInteger(v)) return void (addMsg.value = { text: '请输入 2 – 60 之间的等级', err: true });
-  if (rules.value.bands.some((b) => b.fromLevel === v)) return void (addMsg.value = { text: `已经有从 ${v} 级开始的档了`, err: true });
+  if (rules.value.bands.some((b) => b.fromLevel === v)) return void (addMsg.value = { text: `已经在 ${v} 级处分过段了`, err: true });
   const parent = bands.value.find((b) => b.fromLevel < v) ?? bands.value[bands.value.length - 1]!;
   rules.value.bands.push({ fromLevel: v, effectId: parent.effectId, cooldownMin: parent.cooldownMin, enabled: parent.enabled });
   addLevel.value = null;
-  addMsg.value = { text: '会从所在的档里切出来，沿用原来的素材', err: false };
+  addMsg.value = { text: '分出来的新一段先沿用原来的特效', err: false };
   flash(`band${v}`);
-  void save(`已添加分档：${v} 级起`);
+  void save(`已在 ${v} 级处分出一段`);
 }
 function removeBand(b: MedalBand, i: number): void {
   if (!rules.value || rules.value.bands.length <= 1) return;
   const label = bandLabel(i);
   rules.value.bands = rules.value.bands.filter((x) => x.fromLevel !== b.fromLevel);
-  void save(`已删除分档：${label}，这些等级并入相邻档`);
+  void save(`已删除 ${label}这一段，这些等级并入相邻的一段`);
 }
 
 // ---------- 专属用户 ----------

@@ -2,6 +2,7 @@
 // 预览小窗：点任意规则的 ▶ 弹出，用真实的特效页播放（只在这里播放，观众看不到）；可以发送到直播画面测试
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { post } from '../lib/api.ts';
+import { route } from '../lib/route.ts';
 import { effectById, ui } from '../lib/store.ts';
 import { attempt } from '../lib/toast.ts';
 import ConfirmButton from './ConfirmButton.vue';
@@ -15,6 +16,8 @@ function play(): void {
   if (p?.effectId) void stage.value?.play(p.effectId, p.viewer, undefined, p.kind ?? 'enter', p.vars);
 }
 watch(() => ui.preview, () => void nextTick(play));
+// 换了页面就关掉
+watch(() => route.value.page, close);
 function close(): void {
   ui.preview = null;
 }

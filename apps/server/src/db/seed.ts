@@ -23,6 +23,10 @@ export const BUILTIN_EFFECTS: BuiltinEffect[] = [
   { name: '礼物感谢', style: 'gift', position: 'bl', durationMs: 4000, texts: { enter: ['感谢 {name} 送出 {gift} ×{count}'], guard: ['感谢 {name} {op}{guard} {months} 个月'] } },
   { name: '弹幕回应', style: 'bubble', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'] } },
   { name: '一行字', style: 'line', position: 'bl', durationMs: 2400, texts: { enter: ['{name} 进入直播间'], gift: ['{name} 送出 {gift} ×{count}'] } },
+  // 大航海 · 东方宫廷：上面一行小字是欢迎语去掉昵称的部分，昵称单独写大字
+  { name: '金銮', style: 'royal-gov', position: 'center', durationMs: 8000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
+  { name: '亭阁', style: 'royal-adm', position: 'center', durationMs: 6000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
+  { name: '门楼', style: 'royal-cap', position: 'center', durationMs: 4000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
 ];
 
 /** 默认设置 */
@@ -62,9 +66,9 @@ export function seed(db: Db): void {
     }
     const id = (name: string) => tx.select({ id: effects.id }).from(effects).where(eq(effects.name, name)).get()!.id;
     const tiers = [
-      { tier: 'gov', effectId: id('星冕'), cooldownMin: 5, enabled: true },
-      { tier: 'adm', effectId: id('流星'), cooldownMin: 5, enabled: true },
-      { tier: 'cap', effectId: id('流光'), cooldownMin: 5, enabled: true },
+      { tier: 'gov', effectId: id('金銮'), cooldownMin: 5, enabled: true },
+      { tier: 'adm', effectId: id('亭阁'), cooldownMin: 5, enabled: true },
+      { tier: 'cap', effectId: id('门楼'), cooldownMin: 5, enabled: true },
       { tier: 'mod', effectId: id('巡场'), cooldownMin: 10, enabled: true },
       { tier: 'nor', effectId: id('一行字'), cooldownMin: 30, enabled: false },
     ] as const;
@@ -84,9 +88,9 @@ export function seed(db: Db): void {
       ]).run();
     }
     const guards = [
-      { tier: 'gov', openEffectId: id('星冕'), renewEffectId: id('星冕'), enabled: true },
-      { tier: 'adm', openEffectId: id('流星'), renewEffectId: id('流星'), enabled: true },
-      { tier: 'cap', openEffectId: id('流光'), renewEffectId: id('礼物感谢'), enabled: true },
+      { tier: 'gov', openEffectId: id('金銮'), renewEffectId: id('金銮'), enabled: true },
+      { tier: 'adm', openEffectId: id('亭阁'), renewEffectId: id('亭阁'), enabled: true },
+      { tier: 'cap', openEffectId: id('门楼'), renewEffectId: id('门楼'), enabled: true },
     ] as const;
     for (const g of guards) tx.insert(ruleGuard).values(g).onConflictDoNothing().run();
     if (!tx.select().from(outputs).limit(1).get()) {

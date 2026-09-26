@@ -328,6 +328,7 @@ export class Pipeline {
         isMod: viewer.isMod,
         ...(viewer.medal ? { medal: { name: viewer.medal.name, level: viewer.medal.level, ...(viewer.medal.colors ? { colors: viewer.medal.colors } : {}) } } : {}),
       },
+      ...(kind === 'guard' && vars.op ? { guardOp: vars.op } : {}),
       ...(test ? { test: true } : {}),
     };
   }

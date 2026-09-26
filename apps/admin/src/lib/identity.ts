@@ -47,6 +47,9 @@ export function medalColors(level: number, guard = false): { bg: string; level: 
 
 /** 内置样式的名称和色块（素材卡片、素材选择） */
 export const STYLES: Record<string, { name: string; grad: string; edge: string }> = {
+  'royal-gov': { name: '金銮', grad: 'linear-gradient(135deg,#F2C46E,#B3342A)', edge: 'rgba(233,194,122,.8)' },
+  'royal-adm': { name: '亭阁', grad: 'linear-gradient(135deg,#E6BF86,#4A1C54)', edge: 'rgba(230,191,134,.75)' },
+  'royal-cap': { name: '门楼', grad: 'linear-gradient(135deg,#A9DDF0,#1F4F86)', edge: 'rgba(169,221,240,.7)' },
   star: { name: '星冕', grad: IDENTITY.gov.grad, edge: 'rgba(240,180,90,.75)' },
   meteor: { name: '流星', grad: IDENTITY.adm.grad, edge: 'rgba(183,148,255,.7)' },
   flow: { name: '流光', grad: IDENTITY.cap.grad, edge: 'rgba(111,168,255,.7)' },

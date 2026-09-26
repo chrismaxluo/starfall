@@ -45,6 +45,8 @@ export interface PlayItem {
     isMod: boolean;
     medal?: { name: string; level: number; colors?: { bg: string; level: string; border: string; text: string } };
   };
+  /** 上舰事件：开通还是续费（宫廷特效的印章用） */
+  guardOp?: 'open' | 'renew';
   /** 后台"测试播放"发出的 */
   test?: boolean;
 }

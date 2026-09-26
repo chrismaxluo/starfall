@@ -48,7 +48,7 @@ describe('导出配置', () => {
     expect(f).toMatchObject({ format: 'starfall-config', version: 1 });
     expect(f.rules.danmu).toEqual([{ keywords: ['生日快乐', '生快'], mode: 'contains', who: 'all', effect: '生日', globalCdSec: 10, userCdMin: 5, enabled: true }]);
     expect(f.rules.exclusives[0]).toMatchObject({ uid: 10001, effect: '生日', until: '2026-12-31' });
-    expect(f.rules.enter.tiers.gov.effect).toBe('星冕');
+    expect(f.rules.enter.tiers.gov.effect).toBe('金銮');
     expect(f.settings).toMatchObject({ queueMax: 15, cooldownMode: 'oncePerLive' });
     expect(f.settings).not.toHaveProperty('paused');
     expect(f.assets.map((a: { kind: string }) => a.kind).sort()).toEqual(['audio', 'video']);

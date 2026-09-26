@@ -1,11 +1,14 @@
-// 内置样式：星冕、流星、流光、巡场、霜玻、礼物、气泡、一行字（与设计预览一致）
+// 内置样式：星冕、流星、流光、巡场、霜玻、礼物、气泡、一行字，大航海宫廷三级（与设计预览一致）
 import type { PlayItem } from '@starfall/shared';
 import { h, icon, svgPath } from './dom.ts';
 import { avatar, identityLabel, medal, textLine, textWithoutName } from './parts.ts';
+import { ROYAL_STYLES, buildRoyal } from './royal.ts';
 
 export interface StageSize {
   width: number;
   height: number;
+  /** 特效整体缩放（输出设置里的缩放 × 画布大小） */
+  fxz?: number;
 }
 
 type Builder = (item: PlayItem, stage: StageSize) => HTMLElement;
@@ -67,8 +70,10 @@ const BUILDERS: Record<string, Builder> = {
 };
 
 /** 这个样式是否占满整个画面（不按位置摆放） */
-export const isFullStage = (style: string) => style === 'star';
+export const isFullStage = (style: string) => style === 'star' || style in ROYAL_STYLES;
 
 export function buildBuiltin(item: PlayItem, style: string, stage: StageSize): HTMLElement {
+  const royal = ROYAL_STYLES[style];
+  if (royal) return buildRoyal(item, royal, stage);
   return (BUILDERS[style] ?? BUILDERS.line!)(item, stage);
 }

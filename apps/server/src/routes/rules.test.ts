@@ -16,7 +16,7 @@ describe('进场规则', () => {
   it('默认规则：5 个身份档位，粉丝牌分档从高到低，普通观众默认关闭', async () => {
     const { req, effectId } = await setup();
     const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();
-    expect(r.tiers.gov).toEqual({ effectId: await effectId('星冕'), cooldownMin: 5, enabled: true });
+    expect(r.tiers.gov).toEqual({ effectId: await effectId('金銮'), cooldownMin: 5, enabled: true });
     expect(r.tiers.nor.enabled).toBe(false);
     expect(r.bands.map((b: { fromLevel: number }) => b.fromLevel)).toEqual([21, 1]);
     expect(r.cooldownMode).toBe('minutes');

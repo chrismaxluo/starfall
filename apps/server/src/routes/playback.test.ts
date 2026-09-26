@@ -106,7 +106,7 @@ describe('管理后台 WebSocket', () => {
     expect(await a.waitFor('event')).toMatchObject({ event: { uid: 10001, rule: '进场 · 舰长', status: 'queued' } });
     expect(await a.waitFor('event_status')).toMatchObject({ status: 'played' });
     expect(await a.waitFor('queue')).toMatchObject({ queue: { playing: { viewerName: '小星' } } });
-    expect(await o.waitFor('play')).toMatchObject({ item: { text: '欢迎舰长 小星 登船' } });
+    expect(await o.waitFor('play')).toMatchObject({ item: { text: '恭迎舰长 小星' } });
   });
 });
 
@@ -132,7 +132,7 @@ describe('播放控制接口', () => {
   it('模拟：返回命中规则和不播放的原因；没开播、暂停、特效页不在线时也能模拟，只给提醒', async () => {
     const t = await setup();
     const sim = (viewer: object) => t.req({ method: 'POST', url: '/api/simulate', payload: { viewer } }).then((r) => r.json());
-    expect(await sim({ guard: 3 })).toMatchObject({ rule: '进场 · 舰长', effect: { name: '流光' }, status: 'played', notes: ['现在没开播，开播后才会真的播放', '特效页现在不在线，直播画面里看不到'] });
+    expect(await sim({ guard: 3 })).toMatchObject({ rule: '进场 · 舰长', effect: { name: '门楼' }, status: 'played', notes: ['现在没开播，开播后才会真的播放', '特效页现在不在线，直播画面里看不到'] });
     t.ctx.settings.set('paused', true);
     expect((await sim({ guard: 3 })).notes[0]).toBe('现在是暂停状态，恢复播放后才会真的播放');
     t.ctx.settings.set('paused', false);

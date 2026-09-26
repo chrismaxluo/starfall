@@ -24,7 +24,7 @@ describe('数据库', () => {
     db.update(settings).set({ value: true }).where(eq(settings.key, 'paused')).run();
     db.update(ruleEnterTiers).set({ cooldownMin: 99 }).where(eq(ruleEnterTiers.tier, 'cap')).run();
     seed(db);
-    expect(db.select().from(effects).all()).toHaveLength(8);
+    expect(db.select().from(effects).all()).toHaveLength(11);
     expect(db.select().from(settings).where(eq(settings.key, 'paused')).get()?.value).toBe(true);
     expect(db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'cap')).get()?.cooldownMin).toBe(99);
     expect(db.select().from(outputs).all()).toHaveLength(1);

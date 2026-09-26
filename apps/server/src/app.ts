@@ -25,7 +25,7 @@ export interface AppOptions {
 export const redactUrl = (url: string) => url.replace(/([?&]key=)[^&]*/g, '$1***');
 
 /** 不需要登录的接口 */
-const PUBLIC = new Set(['/api/health', '/api/auth/login', '/api/auth/setup']);
+const PUBLIC = new Set(['/api/health', '/api/auth/login']);
 
 export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   const app = Fastify({

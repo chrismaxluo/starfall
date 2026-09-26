@@ -22,9 +22,6 @@ export function authRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/auth/me', async () => ({ ok: true }));
 
-  // 登录页用：是否还在用初始密码（不需要登录）
-  app.get('/api/auth/setup', async () => ({ initialPassword: ctx.auth.usingInitialPassword() }));
-
   app.put('/api/auth/password', async (req, reply) => {
     const b = parseBody(z.object({ current: z.string(), next: z.string().min(8, '新密码至少 8 位').max(200) }), req.body);
     try {

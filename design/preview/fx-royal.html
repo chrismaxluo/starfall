@@ -119,6 +119,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes mist { from { transform: translate(-30px, 10px) scale(1); } to { transform: translate(30px, -16px) scale(1.12); } }
 .lglow { animation: lpulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes lpulse { 0%, 100% { opacity: .7; transform: scale(.95); } 50% { opacity: 1; transform: scale(1.06); } }
+.ringIn { transform-box: fill-box; transform-origin: center; opacity: 0; transform: scale(.9); animation: drop2 1s var(--d) cubic-bezier(.16,1,.3,1) forwards; }
+@keyframes drop2 { to { opacity: 1; transform: none; } }
+.bloom { transform-box: fill-box; transform-origin: 50% 100%; opacity: 0; transform: scale(.2); animation: drop2 .6s var(--d) cubic-bezier(.3,1.4,.5,1) forwards; }
+.gem { opacity: 0; animation: fin .5s var(--d) ease-out forwards; }
 .swp { animation: swp 1.6s var(--d) cubic-bezier(.45,0,.35,1) forwards; }
 @keyframes swp { from { transform: translateX(0); } to { transform: translateX(1900px); } }
 </style>
@@ -146,6 +150,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <radialGradient id="gFlash"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".3" stop-color="#FFF1CC" stop-opacity=".7"/><stop offset="1" stop-color="#F7D58B" stop-opacity="0"/></radialGradient>
     <radialGradient id="fade"><stop offset=".35" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient>
     <linearGradient id="pillar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5E1810"/><stop offset=".35" stop-color="#B3342A"/><stop offset=".55" stop-color="#E06A52"/><stop offset=".7" stop-color="#B3342A"/><stop offset="1" stop-color="#5E1810"/></linearGradient>
+    <radialGradient id="gemCyan" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#E6FFFB"/><stop offset=".45" stop-color="#6FD6CC"/><stop offset="1" stop-color="#1F6F6A"/></radialGradient>
+    <radialGradient id="gemAmethyst" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#F6EAFF"/><stop offset=".45" stop-color="#A874F2"/><stop offset="1" stop-color="#3E1C80"/></radialGradient>
+    <radialGradient id="gemPearl" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#EDE3F2"/><stop offset="1" stop-color="#A89AB6"/></radialGradient>
+    <radialGradient id="gemRuby" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#FFE3E6"/><stop offset=".45" stop-color="#E03A52"/><stop offset="1" stop-color="#6E0E1E"/></radialGradient>
+    <radialGradient id="gemJade" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#E8FFF1"/><stop offset=".45" stop-color="#43B884"/><stop offset="1" stop-color="#11583A"/></radialGradient>
     <linearGradient id="post" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#23103F"/><stop offset=".4" stop-color="#5A32A0"/><stop offset=".6" stop-color="#8A5FD0"/><stop offset=".75" stop-color="#5A32A0"/><stop offset="1" stop-color="#23103F"/></linearGradient>
     <radialGradient id="lantern" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#FBE9FF"/><stop offset=".35" stop-color="#C58AF0"/><stop offset=".8" stop-color="#6E3AB8"/><stop offset="1" stop-color="#3E1F78"/></radialGradient>
     <radialGradient id="lanGlow"><stop offset="0" stop-color="#D9A8FF" stop-opacity=".5"/><stop offset="1" stop-color="#D9A8FF" stop-opacity="0"/></radialGradient>
@@ -244,6 +253,70 @@ function seal(text, size) {
     `<text x="40" y="36" text-anchor="middle" font-family="Noto Serif SC, serif" font-weight="900" font-size="27" fill="#FFEBDD">${a}</text><text x="40" y="66" text-anchor="middle" font-family="Noto Serif SC, serif" font-weight="900" font-size="27" fill="#FFEBDD">${b}</text></g>`;
   return h('div', 'seal', { '--ss': size + 'px' }, s);
 }
+// 头像圆环：珐琅底 + 金丝花纹 + 外沿装饰 + 宝石（舰长回纹青玉、提督缠枝如意紫晶、总督缠枝莲瓣红宝翡翠）
+const RING = {
+  cap: { w: 16, metal: 'mCap', fill: 'fCap', enamel: ['#123A52', '#3F8FB2', '#0E2E42'], pattern: 'huiwen', rim: 'none', gems: [['gemCyan', [0, 90, 180, 270]]] },
+  adm: { w: 22, metal: 'mAdm', fill: 'fAdm', enamel: ['#26124A', '#7A4CC8', '#1C0D38'], pattern: 'vine', rim: 'ruyi', gems: [['gemAmethyst', [0, 90, 180, 270]], ['gemPearl', [45, 135, 225, 315]]] },
+  gov: { w: 26, metal: 'mGov', fill: 'fGov', enamel: ['#5E120C', '#C8392C', '#4A0E09'], pattern: 'lotus', rim: 'petal', gems: [['gemRuby', [0, 90, 180, 270]], ['gemJade', [45, 135, 225, 315]]] },
+};
+const pol = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [r * Math.cos(a), r * Math.sin(a)]; };
+const pp = (deg, r) => pol(deg, r).map(f1).join(' ');
+function royalRing(key, R, d0) {
+  const C = RING[key], rin = R + 3, rout = rin + C.w, mid = (rin + rout) / 2, id = 'rg' + (++uid);
+  let s = `<defs><radialGradient id="${id}" cx="0" cy="0" r="${rout}" gradientUnits="userSpaceOnUse"><stop offset="${(rin / rout).toFixed(3)}" stop-color="${C.enamel[2]}"/><stop offset="${(mid / rout).toFixed(3)}" stop-color="${C.enamel[1]}"/><stop offset="1" stop-color="${C.enamel[0]}"/></radialGradient></defs>`;
+  const ann = (a, b) => `M${b} 0 A${b} ${b} 0 1 0 ${-b} 0 A${b} ${b} 0 1 0 ${b} 0 Z M${a} 0 A${a} ${a} 0 1 1 ${-a} 0 A${a} ${a} 0 1 1 ${a} 0 Z`;
+  s += `<g class="ringIn" style="--d:${d0}s">`;
+  // 珐琅底 + 釉面反光
+  s += `<path d="${ann(rin, rout)}" fill="url(#${id})" fill-rule="evenodd"/>`;
+  s += `<path d="M${pp(-62, mid)} A${mid} ${mid} 0 0 1 ${pp(28, mid)}" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="${f1(C.w * .32)}" stroke-linecap="round"/>`;
+  // 金丝花纹
+  let pat = '';
+  if (C.pattern === 'huiwen') {
+    const N = 40, ua = 360 / N, U = [[0, .18], [0, .82], [.78, .82], [.78, .36], [.3, .36], [.3, .6], [.55, .6]];
+    for (let i = 0; i < N; i++) pat += 'M' + U.map(([u, v]) => pp(i * ua + u * ua + ua * .11, rin + v * C.w)).join(' L');
+  } else {
+    const K = key === 'gov' ? 16 : 12, amp = C.w * .22;
+    let d = '';
+    for (let i = 0; i <= 720; i++) { const a = i / 2, r = mid + amp * Math.sin(a * K * Math.PI / 180); d += (i ? ' L' : 'M') + pp(a, r); }
+    pat += d;
+    for (let j = 0; j < K * 2; j++) {
+      const a = (j + .5) * 180 / K, up = j % 2 === 0, r = mid + (up ? 1 : -1) * amp * .2;
+      const [x, y] = pol(a + 90 / K * .6, r), rot = a + (up ? 0 : 180);
+      const sc = C.w / 22;
+      if (key === 'gov' && j % 2 === 0) pat += ` M${f1(x)} ${f1(y)}`; // 莲花单独画
+      else pat += ` M${f1(x)} ${f1(y)}` + ` m0 0`;
+      s += key === 'gov' && j % 2 === 0
+        ? `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${f1(a)}) scale(${sc.toFixed(2)})" class="f" style="--d:${(d0 + .6 + j * .02).toFixed(2)}s"><path d="M0 4 C-7 0 -7 -6 -3 -9 C-2 -4 -1 -2 0 0 C1 -2 2 -4 3 -9 C7 -6 7 0 0 4Z M0 1 C-2 -4 -1 -9 0 -11 C1 -9 2 -4 0 1Z" fill="url(#${C.fill})" stroke="rgba(255,244,214,.6)" stroke-width=".5"/></g>`
+        : `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${f1(rot + 90)}) scale(${sc.toFixed(2)})"><path d="M0 0 C3 -5 9 -5 9 0 C9 4 4 5 3 2" fill="none" stroke="url(#${C.metal})" stroke-width="1.3" class="draw" pathLength="1" style="--d:${(d0 + .5 + j * .02).toFixed(2)}s;--t:.6s"/><path d="M-2 1 C-6 -3 -10 -1 -10 3 C-7 5 -4 4 -2 1Z" fill="url(#${C.fill})" class="f" style="--d:${(d0 + .8).toFixed(2)}s"/></g>`;
+    }
+  }
+  s += `<path d="${pat}" fill="none" stroke="url(#${C.metal})" stroke-width="${key === 'cap' ? 1.5 : 1.7}" stroke-linejoin="round" stroke-linecap="round" pathLength="1" class="draw" style="--d:${d0 + .2}s;--t:1.4s"/>`;
+  // 内外金边（带一道高光）+ 内圈金珠
+  const half = (rr, side, dd, sw, stroke) => P(`M0 ${-rr} A${rr} ${rr} 0 0 ${side < 0 ? 0 : 1} 0 ${rr}`, dd, 1.1, stroke, sw);
+  for (const [rr, sw] of [[rin, 3], [rout, 3.4]]) s += half(rr, -1, d0, sw, `url(#${C.metal})`) + half(rr, 1, d0, sw, `url(#${C.metal})`);
+  s += half(rout - 1.4, -1, d0 + .05, .8, 'rgba(255,250,235,.6)') + half(rout - 1.4, 1, d0 + .05, .8, 'rgba(255,250,235,.6)');
+  if (key !== 'cap') s += `<circle r="${rin - 5}" fill="none" stroke="url(#${C.metal})" stroke-width="3" stroke-dasharray="0 7.6" stroke-linecap="round" class="f" style="--d:${d0 + .9}s"/>`;
+  // 外沿：提督如意、总督莲瓣
+  if (C.rim === 'ruyi') {
+    s += `<circle r="${rout + 7}" fill="none" stroke="url(#${C.metal})" stroke-width="3.2" stroke-dasharray="0 10" stroke-linecap="round" class="f" style="--d:${d0 + 1}s"/>`;
+    for (let i = 0; i < 8; i++) { const [x, y] = pol(i * 45 + 22.5, rout + 13);
+      s += `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${i * 45 + 22.5}) scale(1.05)" class="bloom" style="--d:${(d0 + .9 + i * .05).toFixed(2)}s"><path d="${RUYI}" fill="url(#${C.fill})" stroke="rgba(255,250,235,.7)" stroke-width=".9"/><circle r="2" cy="-2" fill="rgba(50,24,4,.6)"/></g>`; }
+  }
+  if (C.rim === 'petal') {
+    const N = 28, w = 2 * Math.PI * rout / N;
+    for (const [layer, off, hh, op] of [[0, .5, 14, .75], [1, 0, 20, 1]]) for (let i = 0; i < N; i++) {
+      const a = (i + off) * 360 / N, [x, y] = pol(a, rout + 1), ww = w * (layer ? .92 : .8);
+      s += `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${f1(a)})"><g class="bloom" style="--d:${(d0 + .9 + layer * .15 + (i % N) * .012).toFixed(3)}s"><path d="M${f1(-ww / 2)} 0 C${f1(-ww / 2)} ${f1(-hh * .6)} ${f1(-ww * .16)} ${-hh} 0 ${-hh} C${f1(ww * .16)} ${-hh} ${f1(ww / 2)} ${f1(-hh * .6)} ${f1(ww / 2)} 0 Z" fill="url(#${C.fill})" stroke="rgba(255,244,214,.7)" stroke-width=".8" opacity="${op}"/>${layer ? `<path d="M0 -2 V${f1(-hh * .7)}" stroke="rgba(90,52,8,.55)" stroke-width="1"/>` : ''}</g></g>`;
+    }
+  }
+  // 宝石：金色包边 + 宝石 + 高光
+  for (const [g, angs] of C.gems) for (const [k, a] of angs.entries()) {
+    const [x, y] = pol(a, mid), r = g === 'gemPearl' ? C.w * .3 : C.w * .42;
+    s += `<g class="gem" style="--d:${(d0 + 1.1 + k * .08 + (g === 'gemPearl' || g === 'gemJade' ? .3 : 0)).toFixed(2)}s" transform="translate(${f1(x)} ${f1(y)})"><circle r="${f1(r + 3)}" fill="url(#${C.fill})"/><circle r="${f1(r)}" fill="url(#${g})"/><ellipse cx="${f1(-r * .3)}" cy="${f1(-r * .35)}" rx="${f1(r * .35)}" ry="${f1(r * .2)}" fill="#fff" opacity=".75"/></g>`;
+  }
+  s += `</g>`;
+  return { s, rout };
+}
 // 提督牌坊：紫漆立柱，金柱头、柱础
 function post(side) {
   const x = side < 0 ? -241 : 227, cx = x + 7;
@@ -296,15 +369,15 @@ function cap(name) {
   const T = TIER.cap, root = h('div', 'hero t-cap', { '--dur': T.dur + 's' });
   root.append(h('div', 'dim'));
   const halo = `<circle r="300" fill="url(#haloCap)" class="f" style="--d:.1s"/>`;
-  const gate = moonGate(T, 124, .15, '', true);
+  const gate = royalRing('cap', 114, .15).s;
   const cl1 = cloud(T, -132, 112, .85, -1, .75, 0), cl2 = cloud(T, 132, 112, .85, 1, .85, -1.6);
-  const crest = `<g class="drop" style="--d:.95s"><g transform="translate(0 -146) scale(1.8)"><path d="${RUYI}" fill="url(#fCap)" stroke="rgba(255,255,255,.8)" stroke-width=".6"/><circle r="2.4" cy="-2" fill="#1E4A6A"/></g>` +
-    `<path d="M-52 -146 C-34 -139 -21 -141 -16 -148 M52 -146 C34 -139 21 -141 16 -148" fill="none" stroke="url(#mCap)" stroke-width="3" stroke-linecap="round"/><circle cx="-56" cy="-146" r="3.5" fill="url(#pCap)"/><circle cx="56" cy="-146" r="3.5" fill="url(#pCap)"/></g>`;
+  const crest = `<g class="drop" style="--d:.95s"><g transform="translate(0 -158) scale(1.8)"><path d="${RUYI}" fill="url(#fCap)" stroke="rgba(255,255,255,.8)" stroke-width=".6"/><circle r="2.4" cy="-2" fill="#1E4A6A"/></g>` +
+    `<path d="M-52 -158 C-34 -151 -21 -153 -16 -160 M52 -158 C34 -151 21 -153 16 -160" fill="none" stroke="url(#mCap)" stroke-width="3" stroke-linecap="round"/><circle cx="-56" cy="-158" r="3.5" fill="url(#pCap)"/><circle cx="56" cy="-158" r="3.5" fill="url(#pCap)"/></g>`;
   const gold = gate + crest;
   root.append(lay(`${halo}${cl1}${cl2}${gate}`));
   root.append(avatarEl(name, 228, .55, 2.2));
   root.append(lay(`${crest}${sweep(gold + cl1 + cl2, 2.1)}`));
-  [[0, -180, 22, 2.3], [-210, 110, 16, 2.6], [210, 110, 16, 2.8]].forEach((g) => root.append(glintEl(g)));
+  [[0, -192, 22, 2.3], [-210, 110, 16, 2.6], [210, 110, 16, 2.8]].forEach((g) => root.append(glintEl(g)));
   root.append(...dusts(6, T.dust, 200, .8, 2));
   texts(root, T, 'cap', name, 186, { lab: 1, nm: 1.25, seal: 2.05 });
   return root;
@@ -315,8 +388,7 @@ function adm(name) {
   const T = TIER.adm, root = h('div', 'hero t-adm', { '--dur': T.dur + 's' });
   root.append(h('div', 'dim'));
   const mist = `<ellipse cx="-160" cy="-60" rx="360" ry="240" fill="url(#mistA)" class="mist" style="--d:.1s"/><ellipse cx="190" cy="40" rx="320" ry="220" fill="url(#mistA)" class="mist" style="--d:.3s"/><ellipse cx="0" cy="-200" rx="300" ry="160" fill="url(#mistB)" class="mist" style="--d:.5s"/>`;
-  const band = `<circle r="${146 + 9}" fill="none" stroke="rgba(155,107,232,.5)" stroke-width="10" class="f" style="--d:.9s"/>`;
-  const gate = moonGate(T, 146, .2, band);
+  const gate = royalRing('adm', 126, .2).s;
   // 弧形门楣：两道弧线 + 珠串 + 卷草 + 宝珠
   const lintel = `<g class="drop" style="--d:1.05s">` +
     `<path d="M-238 -196 Q0 -252 238 -196" fill="none" stroke="url(#mAdm)" stroke-width="6" stroke-linecap="round"/>` +
@@ -368,11 +440,11 @@ function gov(name) {
   const queti = `<g class="f" style="--d:1.3s"><path d="M-208 -174 Q-176 -174 -156 -186 L-208 -186Z M208 -174 Q176 -174 156 -186 L208 -186Z" fill="url(#fGov)" stroke="rgba(255,244,214,.6)" stroke-width=".8"/></g>`;
   const lintel = `<g class="grow-x" style="--d:1.05s"><rect x="-250" y="-201" width="500" height="16" fill="url(#huiwen)"/><path d="M-252 -203 H252" stroke="url(#mGov)" stroke-width="2.6"/><path d="M-252 -183 H252" stroke="url(#mGov)" stroke-width="2.2"/></g>`;
   const base = [[232, 262, 2.4], [246, 290, 1.5], [260, 318, 1]].map(([y, w, sw], i) => P(`M0 ${y} H${-w}`, .5 + i * .08, .9, 'url(#mGov)', sw) + P(`M0 ${y} H${w}`, .5 + i * .08, .9, 'url(#mGov)', sw)).join('');
-  const gate = moonGate(T, 150, .6);
+  const gate = royalRing('gov', 130, .6).s;
   const cl = cloud(T, -340, 96, 1.3, -1, 1.5, 0) + cloud(T, 340, 96, 1.3, 1, 1.6, -1.5) + cloud(T, -420, -110, .85, 1, 1.8, -.8) + cloud(T, 420, -110, .85, -1, 1.9, -2.2);
   const backGold = `${pillar(-1)}${pillar(1)}${base}${gate}`;
   root.append(lay(`${bg}${cl}${backGold}`));
-  root.append(avatarEl(name, 270, 1.3, 4.6));
+  root.append(avatarEl(name, 260, 1.3, 4.6));
   const front = `${queti}${lintel}${roof}`;
   root.append(lay(`${front}${star}${tassel(-338, -230, 50, '#C0392B', 2, 'pGov')}${tassel(338, -230, 50, '#C0392B', 2, 'pGov')}${sweep(backGold + front + cl, 4.4)}`));
   [[0, -330, 26, 4.1], [-440, 20, 22, 3.2], [440, 20, 22, 3.5], [-330, 260, 20, 3.8], [330, 260, 20, 4.2]].forEach((g) => root.append(glintEl(g)));

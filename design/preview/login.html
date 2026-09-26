@@ -49,7 +49,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bg { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 .bg > * { position: absolute; inset: 0; }
 .layer { position: absolute; inset: 0; }
-.px { transform: translate3d(calc(var(--mx) * var(--d, 0px)), calc(var(--my) * var(--d, 0px)), 0); transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
 /* 公共：星云（三团柔光） */
 .nebula i { position: absolute; border-radius: 50%; }
 .nebula .n1 { width: 90vmax; height: 90vmax; left: -30vmax; top: -45vmax; background: radial-gradient(closest-side, var(--neb1), transparent); animation: drift1 36s ease-in-out infinite alternate; }
@@ -235,7 +234,7 @@ body[data-bg="stars"] .c-stars, body[data-bg="beams"] .c-beams, body[data-bg="ri
 </main>
 
 <footer class="foot">© 2026 星临 Starfall · v0.1.0</footer>
-<div class="note">设计稿：点顶部切换 4 种背景，右上角切换亮 / 暗色，移动鼠标可以看到视差</div>
+<div class="note">设计稿：点顶部切换 4 种背景，右上角切换亮 / 暗色</div>
 
 <script>
 (function () {
@@ -253,11 +252,6 @@ body[data-bg="stars"] .c-stars, body[data-bg="beams"] .c-beams, body[data-bg="ri
   // 冠环
   var rings = [[36, 60], [52, 90], [70, 130], [90, 170]];
   add('rings', rings.length, function (i) { var r = rings[i]; return '<div class="ring' + (i % 2 ? ' r2' : '') + '" style="width:' + r[0] + 'vmin;height:' + r[0] + 'vmin;left:-' + r[0] / 2 + 'vmin;top:-' + r[0] / 2 + 'vmin;animation-duration:' + r[1] + 's;animation-direction:' + (i % 2 ? 'reverse' : 'normal') + '"></div>'; });
-  // 视差
-  addEventListener('pointermove', function (e) {
-    document.documentElement.style.setProperty('--mx', ((e.clientX / innerWidth) * 2 - 1).toFixed(3));
-    document.documentElement.style.setProperty('--my', ((e.clientY / innerHeight) * 2 - 1).toFixed(3));
-  });
   // 切换
   var q = new URLSearchParams(location.search);
   if (q.get('bg')) document.body.dataset.bg = q.get('bg');

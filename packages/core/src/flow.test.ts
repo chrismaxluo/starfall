@@ -154,6 +154,14 @@ describe('播放队列（F-PL-01 ~ 04）', () => {
     expect(q.clear().map((x) => x.id)).toEqual(['a', 'b']);
     expect(q.size).toBe(0);
   });
+  it('移出其中一项', () => {
+    const q = new PlayQueue();
+    q.enqueue(item('a', 'enter', 1));
+    q.enqueue(item('b', 'enter', 2));
+    expect(q.remove('a')?.id).toBe('a');
+    expect(q.remove('x')).toBeUndefined();
+    expect(q.list().map((x) => x.id)).toEqual(['b']);
+  });
 });
 
 describe('长时间运行时自动清理过期记录', () => {

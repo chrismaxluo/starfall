@@ -26,7 +26,7 @@ const uidOf = (req: FastifyRequest) => parseBody(UidParam, req.params).uid;
 export function eventRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/events', async (req) => {
     const q = parseBody(EventQuery, req.query);
-    return ctx.log.query({ ...(q.kind ? { kind: q.kind } : {}), ...(q.status ? { status: q.status } : {}), ...(q.q ? { q: q.q } : {}), ...(q.cursor ? { cursor: q.cursor } : {}), ...(q.limit ? { limit: q.limit } : {}) });
+    return ctx.log.query({ roomId: ctx.room.get()?.roomId ?? 0, ...(q.kind ? { kind: q.kind } : {}), ...(q.status ? { status: q.status } : {}), ...(q.q ? { q: q.q } : {}), ...(q.cursor ? { cursor: q.cursor } : {}), ...(q.limit ? { limit: q.limit } : {}) });
   });
 
   app.get('/api/blacklist', async () => ({ blacklist: ctx.blacklist.list() }));

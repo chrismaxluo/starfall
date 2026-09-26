@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { describe as describeEvent, statusCls } from './events.ts';
-import { fileSize, gcd, seconds } from './format.ts';
+import { bigNum, fileSize, gcd, hms, seconds, when } from './format.ts';
 import { identityOf, medalColors } from './identity.ts';
 import type { EventDto, Viewer } from './types.ts';
 
@@ -45,5 +45,17 @@ describe('格式化', () => {
     expect(seconds(4200)).toBe('4.2s');
     expect(seconds(null)).toBe('静态');
     expect(gcd(1080, 1920)).toBe(120);
+  });
+
+  it('大数字、时刻、直播时长', () => {
+    expect(bigNum(null)).toBe('—');
+    expect(bigNum(9999)).toBe('9,999');
+    expect(bigNum(13_000)).toBe('1.3万');
+    expect(bigNum(3_671_294)).toBe('367.1万');
+    const now = new Date(2026, 8, 26, 21, 0).getTime();
+    expect(when(new Date(2026, 8, 26, 19, 2).getTime(), now)).toBe('今天 19:02');
+    expect(when(new Date(2026, 8, 25, 23, 40).getTime(), now)).toBe('昨天 23:40');
+    expect(when(new Date(2026, 8, 20, 9, 5).getTime(), now)).toBe('9月20日 09:05');
+    expect(hms((2 * 3600 + 14 * 60 + 37) * 1000)).toBe('2:14:37');
   });
 });

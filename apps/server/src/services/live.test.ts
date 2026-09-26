@@ -131,6 +131,45 @@ describe('只在开播时连接（F-BL-10）', () => {
     expect(active()).toHaveLength(0);
   });
 
+  it('本场的开始时间用 B 站记录的开播时间；旧版本记录的（发现开播的时间）会改过来', async () => {
+    const { svc, db, state } = setup({ live: true });
+    state.liveSince = 900_000;
+    db.insert(liveSessions).values({ roomId: 30000, startedAt: 930_000 }).run();
+    await svc.start(); svc.stop();
+    expect(svc.status()).toMatchObject({ sessionId: 1, liveSince: 900_000 });
+    expect(db.select().from(liveSessions).all()[0]!.startedAt).toBe(900_000);
+    // 新的一场直接用 B 站的时间
+    const b = setup({ live: true });
+    b.state.liveSince = 950_000;
+    await b.svc.start(); b.svc.stop();
+    expect(b.db.select().from(liveSessions).all()).toMatchObject([{ roomId: 30000, startedAt: 950_000, endedAt: null }]);
+  });
+
+  it('换直播间：上一个直播间的这一场结束，新直播间单独一场；可以查到每个直播间的上一场', async () => {
+    const { svc, db, roomStore } = setup({ live: true });
+    await svc.start();
+    expect(svc.lastSession(30000)).toBeNull();
+    roomStore.save({ roomId: 40000, shortId: 0, anchorUid: 20001, anchorName: '' });
+    await svc.poll();
+    svc.stop();
+    const rows = db.select().from(liveSessions).all();
+    expect(rows).toMatchObject([{ id: 1, roomId: 30000 }, { id: 2, roomId: 40000, endedAt: null }]);
+    expect(rows[0]!.endedAt).not.toBeNull();
+    expect(svc.lastSession(30000)).toMatchObject({ id: 1 });
+    expect(svc.lastSession(40000)).toBeNull();
+  });
+
+  it('直播间实时数据（看过人数等）单独转发，不当作观众事件', async () => {
+    const { svc, state, events } = setup({ live: true });
+    const stats: object[] = [];
+    svc.onStats((p) => stats.push(p));
+    await svc.start();
+    state.clients[0]!.opts.onMessage({ cmd: 'WATCHED_CHANGE', data: { num: 366 } });
+    svc.stop();
+    expect(stats).toEqual([{ watched: 366 }]);
+    expect(events).toHaveLength(0);
+  });
+
   it('服务重启时已经下播：把没结束的场次关掉', async () => {
     const { svc, db } = setup({ live: false });
     db.insert(liveSessions).values({ startedAt: 123 }).run();

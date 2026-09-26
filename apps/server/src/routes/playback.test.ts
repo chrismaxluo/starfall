@@ -193,9 +193,27 @@ describe('预览与统计', () => {
     enter(v(3, { medal: { name: '牌', level: 5, anchorUid: 20000 } }));
     enter(v(4, { medal: { name: '牌', level: 5, anchorUid: 999 } }));
     enter(v(5));
-    const s = (await t.req({ method: 'GET', url: '/api/stats/today' })).json();
-    expect(s).toMatchObject({ enterUnique: 5, composition: { gov: 0, adm: 0, cap: 1, mod: 1, fan: 1, nor: 2 } });
-    expect(s.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // 别的直播间的事件不算
+    t.ctx.db.$client.prepare("update events set room_id = 999 where uid = 5").run();
+    enter(v(6, { guard: 1 }));
+    const s = (await t.req({ method: 'GET', url: '/api/stats?scope=today' })).json();
+    expect(s).toMatchObject({ scope: 'today', roomId: 30000, to: null, live: false, enterUnique: 5, guardUnique: 2, composition: { gov: 1, adm: 0, cap: 1, mod: 1, fan: 1, nor: 1 } });
+    expect(s.from).toBeLessThanOrEqual(Date.now());
+    // 本场：没开播、也没有上一场时没有数据
+    expect((await t.req({ method: 'GET', url: '/api/stats?scope=live' })).json()).toMatchObject({ scope: 'live', from: null, lastSession: null, enterUnique: 0 });
+  });
+
+  it('本场统计：没开播时看上一场（只算那一场的时间范围）', async () => {
+    const t = await setup();
+    const { liveSessions } = await import('../db/schema.ts');
+    const now = Date.now();
+    t.ctx.db.insert(liveSessions).values([{ roomId: 30000, startedAt: now - 7200_000, endedAt: now - 3600_000 }, { roomId: 40000, startedAt: now - 600_000, endedAt: now - 60_000 }]).run();
+    t.ctx.settings.set('offlinePolicy', 'play');
+    const enter = (uid: number, ts: number) => t.ctx.pipeline.handle({ kind: 'enter', id: `e${uid}`, ts, source: 'interact', viewer: { uid, name: `观众${uid}`, guard: 0, isMod: false, mystery: false } });
+    enter(1, now - 5000_000);
+    enter(2, now - 100);
+    const s = (await t.req({ method: 'GET', url: '/api/stats?scope=live' })).json();
+    expect(s).toMatchObject({ from: now - 7200_000, to: now - 3600_000, live: false, lastSession: { startedAt: now - 7200_000, endedAt: now - 3600_000 }, enterUnique: 1 });
   });
 
   it('按时区算当天 0 点', async () => {

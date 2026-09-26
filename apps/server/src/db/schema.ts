@@ -159,6 +159,9 @@ export const outputs = sqliteTable('outputs', {
 
 export const liveSessions = sqliteTable('live_sessions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  /** 哪个直播间的直播（换直播间后数据分开算） */
+  roomId: integer('room_id'),
+  /** 开播时间：B 站记录的开播时间（拿不到时用发现开播的时间） */
   startedAt: integer('started_at').notNull(),
   endedAt: integer('ended_at'),
 });
@@ -169,6 +172,8 @@ export const events = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     ts: integer('ts').notNull(),
+    /** 哪个直播间的事件（换直播间后数据分开算） */
+    roomId: integer('room_id'),
     sessionId: integer('session_id'),
     kind: text('kind', { enum: ['enter', 'danmu', 'gift', 'guard'] }).notNull(),
     uid: integer('uid').notNull(),
@@ -180,7 +185,7 @@ export const events = sqliteTable(
     status: text('status').notNull(),
     raw: text('raw', { mode: 'json' }),
   },
-  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId)],
+  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts)],
 );
 
 /** 观众缓存：昵称、头像（专属用户、黑名单显示用） */

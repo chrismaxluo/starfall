@@ -1,8 +1,8 @@
 // 直播连接（需求 F-BL-04 ~ 07、F-BL-10）。
 // 默认"只在开播时连接"：未开播时只用公开接口每分钟查一次状态，账号不在线；开播后才用账号连接直播间。
-import { desc, eq, isNull } from 'drizzle-orm';
-import { LiveClient, WbiSigner, getDanmuInfo, getRoomAdmins, getRoomInit, parseMessage } from '@starfall/bili';
-import type { BiliHttp, ClientState, LiveClientOptions } from '@starfall/bili';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { LiveClient, WbiSigner, getDanmuInfo, getRoomAdmins, getRoomInit, parseMessage, parseRoomStats } from '@starfall/bili';
+import type { BiliHttp, ClientState, LiveClientOptions, RoomStatsPatch } from '@starfall/bili';
 import type { StdEvent } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
 import { liveSessions } from '../db/schema.ts';
@@ -30,7 +30,7 @@ export type LiveReason = 'ok' | 'no_room' | 'not_logged_in' | 'offline';
 
 export interface LiveStatus {
   live: boolean;
-  /** 本场直播的开始时间 */
+  /** 本场直播的开始时间（B 站记录的开播时间；拿不到时是发现开播的时间） */
   liveSince: number | null;
   sessionId: number | null;
   connection: ClientState;
@@ -43,6 +43,8 @@ export interface LiveStatus {
 const POLL_MS = 60_000;
 /** 我们发现开播的时间总比 B 站记录的开播时间晚；早于开播时间这么多以上的记录算上一场 */
 const SESSION_SLACK_MS = 60_000;
+/** 本场记录的开始时间和 B 站的开播时间差得不多时，改成 B 站的时间（旧版本记录的是发现开播的时间） */
+const SINCE_FIX_MS = 12 * 3600_000;
 const ADMIN_REFRESH_MS = 30 * 60_000;
 
 export class LiveService {
@@ -53,6 +55,7 @@ export class LiveService {
   private readonly deps: LiveDeps;
   private readonly eventListeners = new Set<(ev: StdEvent, raw: unknown) => void>();
   private readonly statusListeners = new Set<(s: LiveStatus) => void>();
+  private readonly statsListeners = new Set<(p: RoomStatsPatch) => void>();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private reconciling: Promise<void> = Promise.resolve();
   /** 每次断开加 1：连接过程中断开过就放弃这次连接 */
@@ -64,7 +67,7 @@ export class LiveService {
   private admins = new Set<number>();
   private seq = 0;
   private live = false;
-  private session: { id: number; startedAt: number } | null = null;
+  private session: { id: number; roomId: number | null; startedAt: number } | null = null;
   private connection: ClientState = 'idle';
   private connectionDetail: string | null = null;
   private reason: LiveReason = 'no_room';
@@ -90,6 +93,12 @@ export class LiveService {
     return () => this.statusListeners.delete(fn);
   }
 
+  /** 直播间实时数据（看过人数、高能榜、点赞、粉丝、标题分区变更） */
+  onStats(fn: (p: RoomStatsPatch) => void): () => void {
+    this.statsListeners.add(fn);
+    return () => this.statsListeners.delete(fn);
+  }
+
   status(): LiveStatus {
     return {
       live: this.live,
@@ -109,7 +118,9 @@ export class LiveService {
   async start(): Promise<void> {
     this.account.onChange(() => void this.reconcile());
     this.room.onChange(() => {
+      // 换了直播间：上一个直播间的这一场到此为止，数据分开算
       this.disconnect();
+      this.setLive(false);
       void this.poll();
     });
     await this.poll();
@@ -163,16 +174,24 @@ export class LiveService {
     await this.reconcile();
   }
 
-  /** liveSince：B 站给的这一场开播时间（毫秒），用来判断没关闭的记录是不是同一场 */
+  /** liveSince：B 站给的这一场开播时间（毫秒），用来判断没关闭的记录是不是同一场，也作为本场的开始时间 */
   private setLive(live: boolean, liveSince: number | null = null): void {
     const now = this.deps.now();
+    const roomId = this.room.get()?.roomId ?? null;
     if (live && !this.session) {
       // 服务重启时如果这一场还没结束，继续使用（"本场只播一次"的记录不丢）；
-      // 没关闭的记录早于这一场的开播时间，说明是上一场（例如下播时服务没在运行），先关掉再新建
+      // 没关闭的记录早于这一场的开播时间（或者是别的直播间的），说明是上一场，先关掉再新建
       const open = this.db.select().from(liveSessions).where(isNull(liveSessions.endedAt)).orderBy(desc(liveSessions.id)).get();
-      const sameLive = open !== undefined && (liveSince === null || open.startedAt >= liveSince - SESSION_SLACK_MS);
-      if (open && !sameLive) this.db.update(liveSessions).set({ endedAt: liveSince ?? now }).where(isNull(liveSessions.endedAt)).run();
-      this.session = open && sameLive ? { id: open.id, startedAt: open.startedAt } : this.newSession(now);
+      const sameRoom = open !== undefined && (open.roomId === null || open.roomId === roomId);
+      const sameLive = open !== undefined && sameRoom && (liveSince === null || open.startedAt >= liveSince - SESSION_SLACK_MS);
+      if (open && !sameLive) this.db.update(liveSessions).set({ endedAt: sameRoom ? (liveSince ?? now) : now }).where(isNull(liveSessions.endedAt)).run();
+      this.session = open && sameLive ? { id: open.id, roomId: open.roomId ?? roomId, startedAt: open.startedAt } : this.newSession(roomId, liveSince ?? now);
+    }
+    // 开播时间以 B 站为准（开播消息里没有开播时间，下一次查询时补上）
+    if (live && this.session && liveSince !== null && liveSince !== this.session.startedAt && Math.abs(liveSince - this.session.startedAt) < SINCE_FIX_MS) {
+      this.session.startedAt = liveSince;
+      this.db.update(liveSessions).set({ startedAt: liveSince }).where(eq(liveSessions.id, this.session.id)).run();
+      this.emitStatus();
     }
     if (!live) {
       if (this.session) this.db.update(liveSessions).set({ endedAt: now }).where(eq(liveSessions.id, this.session.id)).run();
@@ -185,9 +204,21 @@ export class LiveService {
     }
   }
 
-  private newSession(now: number): { id: number; startedAt: number } {
-    const r = this.db.insert(liveSessions).values({ startedAt: now }).returning({ id: liveSessions.id }).get();
-    return { id: r.id, startedAt: now };
+  private newSession(roomId: number | null, startedAt: number): { id: number; roomId: number | null; startedAt: number } {
+    const r = this.db.insert(liveSessions).values({ roomId, startedAt }).returning({ id: liveSessions.id }).get();
+    return { id: r.id, roomId, startedAt };
+  }
+
+  /** 这个直播间最近一场已经结束的直播 */
+  lastSession(roomId: number): { id: number; startedAt: number; endedAt: number } | null {
+    const r = this.db
+      .select()
+      .from(liveSessions)
+      .where(and(eq(liveSessions.roomId, roomId), isNotNull(liveSessions.endedAt)))
+      .orderBy(desc(liveSessions.id))
+      .limit(1)
+      .get();
+    return r ? { id: r.id, startedAt: r.startedAt, endedAt: r.endedAt! } : null;
   }
 
   private async connect(roomId: number, http: BiliHttp): Promise<void> {
@@ -234,6 +265,11 @@ export class LiveService {
   }
 
   private handle(raw: { cmd?: string; [k: string]: unknown }): void {
+    const stats = parseRoomStats(raw as Parameters<typeof parseRoomStats>[0]);
+    if (stats) {
+      for (const fn of this.statsListeners) fn(stats);
+      return;
+    }
     let ev: StdEvent | null;
     try {
       ev = parseMessage(raw, { newId: () => `b${this.deps.now()}-${++this.seq}`, now: this.deps.now, isMod: (uid) => this.admins.has(uid) });

@@ -143,9 +143,38 @@ export interface EventDto {
   status: PlayStatus;
 }
 
+export interface QueueBrief {
+  id: string;
+  kind: TriggerKind;
+  effectName: string;
+  viewerName: string;
+  viewerFace: string | null;
+  /** 一句话说明，例如「舰长进场」「告白花束 ×1」 */
+  detail: string;
+  durationMs: number;
+  test: boolean;
+}
+
 export interface QueueSnapshot {
-  playing: { id: string; kind: TriggerKind; effectName: string; viewerName: string; startedAt: number; durationMs: number; test: boolean } | null;
-  items: Array<{ id: string; kind: TriggerKind; effectName: string; viewerName: string; enqueuedAt: number; test: boolean }>;
+  playing: (QueueBrief & { startedAt: number }) | null;
+  items: Array<QueueBrief & { enqueuedAt: number }>;
+}
+
+/** 直播间信息（总览顶部） */
+export interface RoomInfo {
+  roomId: number;
+  title: string;
+  parentAreaName: string;
+  areaName: string;
+  cover: string;
+  anchor: { uid: number; name: string; face: string };
+  followers: number | null;
+  fansClub: number | null;
+  /** 只在直播时有 */
+  watched: number | null;
+  rankCount: number | null;
+  likes: number | null;
+  updatedAt: number;
 }
 
 export interface OverlayInfo {
@@ -155,10 +184,17 @@ export interface OverlayInfo {
   lastError: string | null;
 }
 
-export interface TodayStats {
-  day: string;
-  since: number;
+/** 总览统计：scope=live 本场（没开播时是上一场），today 今天 */
+export interface StatsDto {
+  scope: 'live' | 'today';
+  roomId: number | null;
+  /** 统计的时间范围；from 为 null 表示没有数据（还没直播过） */
+  from: number | null;
+  to: number | null;
+  live: boolean;
+  lastSession: { startedAt: number; endedAt: number } | null;
   enterUnique: number;
+  guardUnique: number;
   played: number;
   guardPlayed: number;
   composition: Record<'gov' | 'adm' | 'cap' | 'mod' | 'fan' | 'nor', number>;

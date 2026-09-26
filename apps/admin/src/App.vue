@@ -7,6 +7,7 @@ import Logo from './components/Logo.vue';
 import EffectEditor from './components/EffectEditor.vue';
 import QuickExclusive from './components/QuickExclusive.vue';
 import Palette from './components/Palette.vue';
+import PreviewModal from './components/PreviewModal.vue';
 import Wizard from './components/Wizard.vue';
 import Login from './pages/Login.vue';
 import Overview from './pages/Overview.vue';
@@ -211,6 +212,7 @@ onBeforeUnmount(() => {
     <QuickExclusive v-if="ui.quick" :key="ui.quick.uid" @close="ui.quick = null" />
     <Wizard v-if="ui.wizard" @close="ui.wizard = false" />
     <Palette v-if="ui.palette" @close="ui.palette = false" />
+    <PreviewModal v-if="ui.preview" />
   </template>
 
   <div class="toasts" aria-live="polite">

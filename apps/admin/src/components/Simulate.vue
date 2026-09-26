@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 模拟一次事件（F-RU-05）：看会命中哪条规则、播放哪个素材、为什么不播放；只判断，不入队、不记录。
-// 没开播也能模拟；命中后在右侧预览里播放（只在本地）
+// 没开播也能模拟；命中后在预览小窗里播放（只在本地）
 import { computed, onMounted, ref, watch } from 'vue';
 import { get, post } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
@@ -22,8 +22,6 @@ const catalog = ref<GiftConfig[]>([]);
 const res = ref<SimulateResult | null>(null);
 watch(() => props.kind, () => (res.value = null));
 
-const TITLES: Record<TriggerKind, string> = { enter: '模拟一次进场', danmu: '模拟一条弹幕', gift: '模拟一次送礼', guard: '模拟一次上舰' };
-const title = computed(() => TITLES[props.kind]);
 const paidGifts = computed(() => catalog.value.filter((g) => g.paid));
 
 async function run(): Promise<void> {
@@ -60,8 +58,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="card" style="margin-top: 16px">
-    <div class="card-h"><h2>{{ title }}</h2><span class="aside">看看会命中哪条规则</span></div>
+  <div class="sim">
     <div id="simBox">
       <template v-if="kind === 'danmu'">
         <input v-model="text" class="inp" placeholder="弹幕内容" aria-label="弹幕内容" maxlength="100" />
@@ -96,9 +93,9 @@ onMounted(async () => {
     </div>
     <div class="simres">
       <template v-if="res">
-        <template v-if="res.rule">命中 <b>{{ res.rule }}</b> → {{ res.effect?.name }}<br /></template>
-        <span v-else class="miss">没有命中任何规则{{ kind === 'gift' ? '（免费礼物、低于最低一档，或落在已停用的档）' : '' }}<br /></span>
-        结果：{{ res.status === 'played' ? '会播放（已在上面的预览里播放）' : `不会播放（${res.statusText}）` }}
+        <template v-if="res.rule">会用 <b>{{ res.rule }}</b> 这条规则，播放 <b>{{ res.effect?.name }}</b><br /></template>
+        <span v-else class="miss">没有符合的规则{{ kind === 'gift' ? '（免费礼物、低于最低一档，或落在已关闭的一段）' : '' }}<br /></span>
+        {{ res.status === 'played' ? '会播放，已经在预览小窗里放给你看了' : `不会播放：${res.statusText}` }}
         <span v-for="n in res.notes" :key="n" class="simnote"><br />提示：{{ n }}</span>
       </template>
     </div>

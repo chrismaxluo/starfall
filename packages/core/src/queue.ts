@@ -56,6 +56,12 @@ export class PlayQueue<T = unknown> {
     return this.items.shift();
   }
 
+  /** 移出一项，返回被移出的项；没有这一项时返回 undefined */
+  remove(id: string): QueueItem<T> | undefined {
+    const i = this.items.findIndex((x) => x.id === id);
+    return i < 0 ? undefined : this.items.splice(i, 1)[0];
+  }
+
   /** 清空队列，返回被清掉的项（用于记录） */
   clear(): Array<QueueItem<T>> {
     const all = this.items;

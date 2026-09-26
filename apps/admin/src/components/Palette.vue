@@ -3,7 +3,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { clearQueue, togglePause } from '../lib/actions.ts';
 import { post } from '../lib/api.ts';
-import { IDENTITY } from '../lib/identity.ts';
+import { IDENTITY, SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { go } from '../lib/route.ts';
 import { state, ui } from '../lib/store.ts';
@@ -24,8 +24,9 @@ interface Cmd {
 }
 
 const preview = (id: Identity) => () => {
-  go('overview');
-  ui.previewTier = id;
+  const r = state.enter!;
+  const effectId = id === 'fan' ? (r.bands.find((b) => b.effectId)?.effectId ?? null) : r.tiers[id].effectId;
+  ui.preview = { effectId, viewer: SAMPLES[id], label: `${IDENTITY[id].name}进场` };
 };
 const cmds = computed<Cmd[]>(() => {
   const paused = state.status?.paused ?? false;

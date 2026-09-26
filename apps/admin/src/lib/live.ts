@@ -1,9 +1,10 @@
 // 管理后台的实时连接：事件、队列、连接状态、特效页上下线
-import { refreshStatus, state } from './store.ts';
-import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, StatusSnapshot } from './types.ts';
+import { refreshFeed, refreshStatus, state } from './store.ts';
+import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
-  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[] }
+  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null }
+  | { type: 'room_info'; info: RoomInfo | null }
   | { type: 'status'; status: { live: LiveStatus; paused: boolean; overlays: number } }
   | { type: 'queue'; queue: QueueSnapshot; paused: boolean }
   | { type: 'overlays'; overlays: OverlayInfo[] }
@@ -34,6 +35,12 @@ function handle(m: Msg): void {
       state.status = m.status;
       state.queue = m.queue;
       state.overlays = m.overlays;
+      state.roomInfo = m.roomInfo;
+      break;
+    case 'room_info':
+      // 换了直播间：实时动态也换成新直播间的
+      if (!m.info || (state.roomInfo && m.info.roomId !== state.roomInfo.roomId)) void refreshFeed();
+      state.roomInfo = m.info;
       break;
     case 'status':
       if (state.status) Object.assign(state.status, { live: m.status.live, paused: m.status.paused, overlays: m.status.overlays });

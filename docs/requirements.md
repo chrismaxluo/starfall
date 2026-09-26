@@ -273,7 +273,7 @@
 | 数据库 | SQLite（better-sqlite3）+ Drizzle ORM |
 | 管理后台 | Vue 3 + Vite + Pinia + Vue Router + Naive UI（+ ECharts，第二期） |
 | 特效页 | Vite + TypeScript，GSAP、Lottie、PixiJS、透明 WebM，SVGA 可选 |
-| 部署 | 服务器上用 PM2 运行；端口需在 Azure 网络安全组放行 |
+| 部署 | 服务器上用 systemd 运行（开机自启、崩溃自动重启）；端口需在 Azure 网络安全组放行 |
 | Windows 版 | Electron + electron-builder，在 Windows 电脑或 GitHub Actions 上打包 |
 
 ---
@@ -303,7 +303,7 @@
 | ③ 技术验证 | 小号登录，连真实直播间抓包，验证 R-02 ~ R-07 | 输出验证报告，必要时调整需求 |
 | ④ 第一期开发 | **按功能分 P**：P1 进场特效最小可用（v0.1.0）→ P2 弹幕、礼物、上舰（v0.2.0）→ P3 后台完整体验（v0.3.0）→ P4 打磨（v1.0.0），详见方案设计第 16 节 | 每个 P 结束都能在直播里使用，经确认后打标签 |
 | ⑤ 联调测试 | 模拟事件 + 真实直播间测试，OBS 和直播姬都测 | 你认可效果 |
-| ⑥ 部署上线 | PM2、开机自启、日志、备份；放行端口，有域名则配 HTTPS | 稳定运行 |
+| ⑥ 部署上线 | systemd、开机自启、日志、备份；放行端口，有域名则配 HTTPS | 稳定运行 |
 | ⑦ 试用反馈 | 真实开播几场，修 bug、调细节 | 连续几场无问题 |
 | ⑧ 第二期 | 按第 2.3 节 | 另行确认 |
 | ⑨ Windows 版 | Electron 封装，在 Windows 电脑上打包 | 本地运行正常 |

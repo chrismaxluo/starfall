@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { encodePb } from './proto.ts';
 import { parseMessage } from './parse.ts';
+import type { ParseContext } from './parse.ts';
 import { FIXTURE_ANCHOR, fixture } from './testing.ts';
 
 let n = 0;
@@ -29,7 +30,7 @@ describe('进场 INTERACT_WORD_V2', () => {
       data: { pb: encodePb('InteractWord', { uid: 10009, uname: '路人', msgType: 1, uinfo: { uid: 10009, base: { name: '路人' }, medal: { name: '别家', level: 20, ruid, guardLevel }, ...(own ? { guard: { level: own } } : {}) } }) },
     });
     const at = { ...ctx, anchorUid: FIXTURE_ANCHOR };
-    const guard = (raw: object, c = at) => { const ev = parseMessage(raw, c); if (ev?.kind !== 'enter') throw new Error(); return ev.viewer.guard; };
+    const guard = (raw: object, c: ParseContext = at) => { const ev = parseMessage(raw, c); if (ev?.kind !== 'enter') throw new Error(); return ev.viewer.guard; };
     expect(guard(enter(99999, 3))).toBe(0);
     expect(guard(enter(FIXTURE_ANCHOR, 3))).toBe(3);
     expect(guard(enter(99999, 3, 2))).toBe(2);

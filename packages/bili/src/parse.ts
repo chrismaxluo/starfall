@@ -94,8 +94,8 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
           : undefined;
         medal = { name: m.name, level: m.level, anchorUid: m.ruid ?? 0, ...(colors ? { colors } : {}) };
       } else if (medalArr && medalArr.length >= 4) {
-        // 旧格式没有主播 UID，只有直播间号，这里无法判断归属，交给调用方按直播间号处理
-        medal = { name: String(medalArr[1]), level: Number(medalArr[0]), anchorUid: 0 };
+        // 旧格式：[等级, 名称, 主播昵称, 直播间号, …, 第 13 项主播 UID]；没有第 13 项时无法判断归属
+        medal = { name: String(medalArr[1]), level: Number(medalArr[0]), anchorUid: Number((medalArr as unknown[])[12]) || 0 };
       }
       const viewer: Viewer = {
         uid,

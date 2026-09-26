@@ -1,7 +1,7 @@
 // 直播连接（需求 F-BL-04 ~ 07、F-BL-10）。
 // 默认"只在开播时连接"：未开播时只用公开接口每分钟查一次状态，账号不在线；开播后才用账号连接直播间。
 import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
-import { LiveClient, WbiSigner, getDanmuInfo, getRoomAdmins, getRoomInit, parseMessage, parseRoomStats } from '@starfall/bili';
+import { BiliApiError, LiveClient, WbiSigner, getDanmuInfo, getRoomAdmins, getRoomInit, parseMessage, parseRoomStats } from '@starfall/bili';
 import type { BiliHttp, ClientState, LiveClientOptions, RoomStatsPatch } from '@starfall/bili';
 import type { StdEvent } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
@@ -242,7 +242,12 @@ export class LiveService {
       roomId,
       uid: http.uid,
       buvid,
-      getDanmuInfo: () => this.deps.getDanmuInfo(http, wbi, roomId),
+      getDanmuInfo: () =>
+        this.deps.getDanmuInfo(http, wbi, roomId).catch((e: unknown) => {
+          // -101：账号未登录（登录已过期或在别处退出）
+          if (e instanceof BiliApiError && e.code === -101) throw new Error('B 站登录已失效，请在「设置」里重新扫码登录');
+          throw e;
+        }),
       onState: (s, detail) => {
         this.connection = s;
         this.connectionDetail = detail ?? null;

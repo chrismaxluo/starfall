@@ -53,8 +53,8 @@ export class BiliAccount {
     const ensure = http.ensureBuvid.bind(http);
     http.ensureBuvid = async () => {
       const b = await ensure();
-      this.anon.cookies.buvid3 ??= http.cookies.buvid3;
-      this.anon.cookies.buvid4 ??= http.cookies.buvid4;
+      if (http.cookies.buvid3) this.anon.cookies.buvid3 ??= http.cookies.buvid3;
+      if (http.cookies.buvid4) this.anon.cookies.buvid4 ??= http.cookies.buvid4;
       return b;
     };
     return http;

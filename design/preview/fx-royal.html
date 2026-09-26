@@ -172,6 +172,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <linearGradient id="tileGrey" x1="0" y1="-206" x2="0" y2="-180" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#C9DAE0"/><stop offset=".5" stop-color="#6F8A95"/><stop offset="1" stop-color="#34474F"/></linearGradient>
     <linearGradient id="tilePurple" x1="0" y1="-318" x2="0" y2="-190" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#D9C0FF"/><stop offset=".35" stop-color="#9A68E6"/><stop offset=".75" stop-color="#5A2FA6"/><stop offset="1" stop-color="#34186A"/></linearGradient>
     <radialGradient id="haloAdm"><stop offset="0" stop-color="#A874F2" stop-opacity=".3"/><stop offset=".5" stop-color="#7A45C8" stop-opacity=".08"/><stop offset="1" stop-color="#7A45C8" stop-opacity="0"/></radialGradient>
+    <linearGradient id="tileBlue" x1="0" y1="-240" x2="0" y2="-186" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#CFE8FF"/><stop offset=".4" stop-color="#5E9BDA"/><stop offset=".8" stop-color="#244F8C"/><stop offset="1" stop-color="#16325C"/></linearGradient>
+    <linearGradient id="pillarBlue" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#081A30"/><stop offset=".4" stop-color="#1F4F86"/><stop offset=".58" stop-color="#3F7BC0"/><stop offset=".72" stop-color="#1F4F86"/><stop offset="1" stop-color="#081A30"/></linearGradient>
     <linearGradient id="post" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#23103F"/><stop offset=".4" stop-color="#5A32A0"/><stop offset=".6" stop-color="#8A5FD0"/><stop offset=".75" stop-color="#5A32A0"/><stop offset="1" stop-color="#23103F"/></linearGradient>
     <radialGradient id="lantern" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#FBE9FF"/><stop offset=".35" stop-color="#C58AF0"/><stop offset=".8" stop-color="#6E3AB8"/><stop offset="1" stop-color="#3E1F78"/></radialGradient>
     <radialGradient id="lanGlow"><stop offset="0" stop-color="#D9A8FF" stop-opacity=".5"/><stop offset="1" stop-color="#D9A8FF" stop-opacity="0"/></radialGradient>
@@ -190,8 +192,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <div class="app">
   <aside class="side">
     <h1><img src="assets/logo.svg" alt="">星临 · 大航海 · 东方宫廷</h1>
-    <div class="sub">舰长「园林」、提督「亭阁」、总督「金銮」，建筑规格一级比一级高。其他特效在 <a href="fx.html">特效设计 v4</a>。</div>
-    <div class="grp"><b>身份</b><div class="seg big" data-k="tier"><button data-v="cap">舰长 · 园林</button><button data-v="adm">提督 · 亭阁</button><button data-v="gov">总督 · 金銮</button></div></div>
+    <div class="sub">舰长「门楼」、提督「亭阁」、总督「金銮」，建筑规格一级比一级高。其他特效在 <a href="fx.html">特效设计 v4</a>。</div>
+    <div class="grp"><b>身份</b><div class="seg big" data-k="tier"><button data-v="cap">舰长 · 门楼</button><button data-v="adm">提督 · 亭阁</button><button data-v="gov">总督 · 金銮</button></div></div>
     <div class="grp"><b>触发方式</b><div class="seg" data-k="event"><button data-v="enter">进场</button><button data-v="open">上舰</button><button data-v="renew">续费</button></div></div>
     <div class="grp"><b>位置</b><div class="seg" data-k="pos"><button data-v="32">偏上</button><button data-v="40">居中</button><button data-v="48">偏下</button></div></div>
     <div class="grp"><b>头像</b><div class="seg" data-k="face"><button data-v="1">有头像</button><button data-v="0">没有头像</button></div></div>
@@ -212,13 +214,13 @@ const $ = (s) => document.querySelector(s);
 const FACE = 'https://i0.hdslb.com/bfs/face/3b1011461e9e74039c9cebae7dab6dfdf8f3711c.jpg';
 const NAMES = { short: '星临', mid: '吃喵放花椒的喵酱', long: '今天也要早点睡觉的超长昵称啊' };
 const TIER = {
-  cap: { zh: '舰长', seal: '光临', dur: 4, m: 'mCap', fl: 'fCap', cl: 'cCap', pe: 'pCap', dust: ['#CDEFFB', '#FFFFFF'], title: '舰长 · 园林' },
+  cap: { zh: '舰长', seal: '光临', dur: 4, m: 'mCap', fl: 'fCap', cl: 'cCap', pe: 'pCap', dust: ['#CDEFFB', '#FFFFFF'], title: '舰长 · 门楼' },
   adm: { zh: '提督', seal: '驾到', dur: 6, m: 'mAdm', fl: 'fAdm', cl: 'cAdm', pe: 'pAdm', dust: ['#E6BF86', '#D9C2F5', '#FFFFFF'], title: '提督 · 亭阁' },
   gov: { zh: '总督', seal: '驾临', dur: 8, m: 'mGov', fl: 'fGov', cl: 'cGov', pe: 'pGov', dust: ['#F6DFA8', '#FFF4D6'], title: '总督 · 金銮' },
 };
 const DESC = {
-  cap: '<b>舰长 · 园林</b>（4 秒）<br>苏州园林的一角：头像外是一块青玉璧（玉纹 + 凸起的谷纹）。上方落下一段<b>青灰瓦墙帽</b>（一片片筒瓦和瓦当，下面一道白粉墙边），两侧是两扇<b>冰裂纹花窗</b>；下方是<b>青绿山水</b>，几层远山从石青到石绿，山脊描金，山间有薄雾。名字写出后盖「光临」印章，一道光从玉璧和墙帽上扫过。',
-  adm: '<b>提督 · 亭阁</b>（6 秒）<br>一座亭子：两根紫漆立柱从地面升起，回纹横梁展开，上方落下<b>攒尖亭顶</b>——紫色琉璃瓦从顶上放射到檐口，檐角上翘，金色屋脊和瓦当，顶上金色宝顶。头像外是紫漆描金圆环（洒金 + 云雷纹）。两朵祥云飘进来，名字写出后盖「驾到」印章，一道光扫过整座亭子。',
+  cap: '<b>舰长 · 门楼</b>（4 秒）<br>和提督、总督同一套做法，规格最低一档：背后一层淡淡的云纹蓝光；两根黛蓝漆立柱（金柱头、柱础）升起，金色回纹横梁展开，上方落下一座<b>门楼屋顶</b>——蓝色琉璃筒瓦、金瓦当、金屋脊，两端起翘，正脊宝珠闪一下光。头像外是<b>蓝色珐琅圆环</b>：金丝回纹、金绳纹、四朵錾金团花。两朵祥云飘进来，名字写出后盖「光临」印章，一道光扫过整座门楼。',
+  adm: '<b>提督 · 亭阁</b>（6 秒）<br>和总督同一套做法，规格低一档：背后一层淡淡的云纹紫光；两根紫漆立柱从地面升起，回纹横梁展开，上方落下<b>攒尖亭顶</b>（紫色琉璃瓦、金色屋脊和瓦当、金色宝顶，宝珠闪一下光），檐角挂紫色流苏；头像外是<b>紫色珐琅圆环</b>——金色缠枝纹、金绳纹、一层莲瓣、四朵錾金团花。四朵祥云飘进来，金粉往上飘，名字写出后盖「驾到」印章，一道光扫过整座亭子。',
   gov: '<b>总督 · 金銮</b>（8 秒）<br>背后一层淡淡的云纹暖光。两根朱红宫柱从地面升起（金色柱头、雀替和柱础），金色月洞门画成，回纹横梁从中间展开；金色屋顶落下，<b>一片片琉璃瓦和圆形瓦当</b>，屋脊宝珠接住从天而降的星星；屋檐两角的红流苏轻轻摆动，四朵祥云飘进来，金粉慢慢往上飘。名字写出后盖「驾临」印章，最后一道光从整座宫门上扫过。',
 };
 const state = { tier: 'gov', event: 'enter', pos: '40', face: '1', name: 'mid', bg: 'alpha', safe: '1', auto: false };
@@ -272,22 +274,20 @@ function seal(text, size) {
 }
 // 头像圆环：珐琅底 + 金丝花纹 + 外沿装饰 + 宝石（舰长回纹青玉、提督缠枝如意紫晶、总督缠枝莲瓣红宝翡翠）
 const RING = {
-  cap: { w: 16, metal: 'mCap', fill: 'fCap', enamel: ['#123A52', '#3F8FB2', '#0E2E42'], pattern: 'huiwen', rim: 'none', gems: [['gemCyan', [0, 90, 180, 270]]] },
-  adm: { w: 22, metal: 'mAdm', fill: 'fAdm', enamel: ['#26124A', '#7A4CC8', '#1C0D38'], pattern: 'vine', rim: 'ruyi', gems: [['gemAmethyst', [0, 90, 180, 270]], ['gemPearl', [45, 135, 225, 315]]] },
-  gov: { w: 26, metal: 'mGov', fill: 'fGov', enamel: ['#5E120C', '#C8392C', '#4A0E09'], pattern: 'lotus', rim: 'petal', gems: [['gemRuby', [0, 90, 180, 270]], ['gemJade', [45, 135, 225, 315]]] },
+  cap: { w: 18, metal: 'mGov', fill: 'fGov', enamel: ['#0B2440', '#3A7FC0', '#081C32'], pattern: 'huiwen', rim: 'none', rope: true, grain: '#D8ECFF' },
+  adm: { w: 22, metal: 'mAdm', fill: 'fAdm', enamel: ['#241046', '#8455D6', '#1A0B34'], pattern: 'vine', rim: 'petal', layers: 1, rope: true, grain: '#E6D6FF' },
+  gov: { w: 26, metal: 'mGov', fill: 'fGov', enamel: ['#5E120C', '#C8392C', '#4A0E09'], pattern: 'lotus', rim: 'petal', layers: 2, rope: true, grain: '#FFD9C8' },
 };
 const pol = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [r * Math.cos(a), r * Math.sin(a)]; };
 const pp = (deg, r) => pol(deg, r).map(f1).join(' ');
 function royalRing(key, R, d0) {
-  if (key === 'cap') return jadeRing(R, d0);
-  if (key === 'adm') return lacquerRing(R, d0);
   const C = RING[key], rin = R + 3, rout = rin + C.w, mid = (rin + rout) / 2, id = 'rg' + (++uid);
   let s = `<defs><radialGradient id="${id}" cx="0" cy="0" r="${rout}" gradientUnits="userSpaceOnUse"><stop offset="${(rin / rout).toFixed(3)}" stop-color="${C.enamel[2]}"/><stop offset="${(mid / rout).toFixed(3)}" stop-color="${C.enamel[1]}"/><stop offset="1" stop-color="${C.enamel[0]}"/></radialGradient></defs>`;
   const ann = (a, b) => `M${b} 0 A${b} ${b} 0 1 0 ${-b} 0 A${b} ${b} 0 1 0 ${b} 0 Z M${a} 0 A${a} ${a} 0 1 1 ${-a} 0 A${a} ${a} 0 1 1 ${a} 0 Z`;
   s += `<g class="ringIn" style="--d:${d0}s">`;
   // 珐琅底 + 釉面反光
   s += `<path d="${ann(rin, rout)}" fill="url(#${id})" fill-rule="evenodd"/>`;
-  if (key === 'gov') s += `<path d="${ann(rin, rout)}" fill="#FFD9C8" fill-rule="evenodd" filter="url(#enamelGrain)" opacity=".5"/>`;
+  if (C.grain) s += `<path d="${ann(rin, rout)}" fill="${C.grain}" fill-rule="evenodd" filter="url(#enamelGrain)" opacity=".5"/>`;
   s += `<path d="M${pp(-62, mid)} A${mid} ${mid} 0 0 1 ${pp(28, mid)}" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="${f1(C.w * .32)}" stroke-linecap="round"/>`;
   // 金丝花纹
   let pat = '';
@@ -324,13 +324,13 @@ function royalRing(key, R, d0) {
   }
   if (C.rim === 'petal') {
     const N = 28, w = 2 * Math.PI * rout / N;
-    for (const [layer, off, hh, op] of [[0, .5, 14, .75], [1, 0, 20, 1]]) for (let i = 0; i < N; i++) {
+    for (const [layer, off, hh, op] of (C.layers === 2 ? [[0, .5, 14, .75], [1, 0, 20, 1]] : [[1, 0, 16, 1]])) for (let i = 0; i < N; i++) {
       const a = (i + off) * 360 / N, [x, y] = pol(a, rout + 1), ww = w * (layer ? .92 : .8);
       s += `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${f1(a)})"><g class="bloom" style="--d:${(d0 + .9 + layer * .15 + (i % N) * .012).toFixed(3)}s"><path d="M${f1(-ww / 2)} 0 C${f1(-ww / 2)} ${f1(-hh * .6)} ${f1(-ww * .16)} ${-hh} 0 ${-hh} C${f1(ww * .16)} ${-hh} ${f1(ww / 2)} ${f1(-hh * .6)} ${f1(ww / 2)} 0 Z" fill="url(#${C.fill})" stroke="rgba(255,244,214,.7)" stroke-width=".8" opacity="${op}"/>${layer ? petalTex(ww, hh) : ''}</g></g>`;
     }
   }
   // 绳纹：珐琅和莲瓣之间一圈拧起来的金绳
-  if (key === 'gov') { let rope = ''; for (let i = 0; i < 132; i++) { const a = i * 360 / 132; rope += `M${pp(a, rout - 1.8)} L${pp(a + 2.2, rout + 2.2)} `; }
+  if (C.rope) { let rope = ''; for (let i = 0; i < 132; i++) { const a = i * 360 / 132; rope += `M${pp(a, rout - 1.8)} L${pp(a + 2.2, rout + 2.2)} `; }
     s += `<circle r="${rout}" fill="none" stroke="url(#${C.metal})" stroke-width="4.6" class="f" style="--d:${d0 + .4}s"/><path d="${rope}" stroke="rgba(70,40,6,.6)" stroke-width="1" class="f" style="--d:${d0 + .45}s"/>`; }
   // 錾金团花（金子本身刻出来的花，不镶宝石）
   for (const [k, a] of [0, 90, 180, 270].entries()) s += rosette(pol(a, mid), C.w * .5, C.fill, d0 + 1.1 + k * .08);
@@ -445,80 +445,52 @@ function texts(root, T, key, name, y, times) {
   root.append(h('div', 'tx', { '--y': (y + (key === 'gov' ? 72 : key === 'adm' ? 66 : 60)) + 'px' }, wrap));
 }
 
-// ---------- 舰长 · 园林 ----------
-// 青绿山水：几层远山（石青 → 石绿），山头圆润、山脊描金，山间薄雾，左右两端淡出
-function ridge(peaks, y0) {
-  // peaks: [[x, 高度], ...]，山谷取相邻两峰中点
-  let d = `M${peaks[0][0] - 70} ${y0}`, prevX = peaks[0][0] - 70, prevY = y0;
-  for (let i = 0; i < peaks.length; i++) {
-    const [x, hh] = peaks[i], py = y0 - hh, nx = (peaks[i + 1] || [x + 140])[0], vx = (x + nx) / 2, vy = y0 - hh * .28;
-    d += ` C${f1(prevX + (x - prevX) * .55)} ${f1(prevY)} ${f1(x - (x - prevX) * .28)} ${f1(py)} ${x} ${f1(py)}`;
-    d += ` C${f1(x + (vx - x) * .3)} ${f1(py)} ${f1(x + (vx - x) * .5)} ${f1(vy)} ${f1(vx)} ${f1(vy)}`;
-    prevX = vx; prevY = vy;
-  }
-  return d;
+// ---------- 舰长 · 门楼 ----------
+// 立柱（颜色可换）：漆柱 + 金柱头、柱础、一道高光
+function pillarPair(x0, w, top, bottom, grad, fill, hi, d) {
+  const one = (x) => `<g class="pillar" style="--d:${d}s"><rect x="${x}" y="${top}" width="${w}" height="${bottom - top}" fill="url(#${grad})"/><path d="M${x + w * .3} ${top + 8} V${bottom - 6}" stroke="${hi}" stroke-width="1.2" opacity=".35"/>` +
+    `<rect x="${x - 6}" y="${top - 12}" width="${w + 12}" height="13" rx="2" fill="url(#${fill})"/><rect x="${x - 6}" y="${top}" width="${w + 12}" height="3" fill="rgba(40,24,4,.55)"/>` +
+    `<path d="M${x - 13} ${bottom} h${w + 26} l5 13 h${-w - 36}z" fill="url(#${fill})"/><ellipse cx="${x + w / 2}" cy="${bottom + 15}" rx="${w / 2 + 16}" ry="4.5" fill="url(#${fill})"/></g>`;
+  return one(-x0 - w) + one(x0);
 }
-function mountains(peaks, y0, fill, gold, d) {
-  const r = ridge(peaks, y0), last = peaks[peaks.length - 1][0] + 70;
-  const body = `${r} L${last} ${y0 + 50} L${peaks[0][0] - 70} ${y0 + 50} Z`;
-  return `<g class="f" style="--d:${d}s;--t:1.2s"><path d="${body}" fill="url(#${fill})"/>${gold ? `<path d="${r}" fill="none" stroke="url(#mGov)" stroke-width="1.5" opacity=".9"/>` : ''}</g>`;
-}
-function shan() {
-  const back = mountains([[-250, 70], [-150, 44], [-60, 92], [40, 56], [130, 98], [230, 60]], 178, 'mtBlue', false, .3);
-  const mistA = `<rect x="-360" y="136" width="720" height="44" fill="url(#mistBand)" class="f" style="--d:.6s"/>`;
-  const mid = mountains([[-280, 38], [-190, 62], [-100, 36], [-20, 58], [90, 40], [180, 66], [270, 42]], 200, 'mtGreen', true, .45);
-  const mistB = `<rect x="-360" y="186" width="720" height="36" fill="url(#mistBand)" class="f" style="--d:.8s"/>`;
-  return `<defs><mask id="mtFade" maskUnits="userSpaceOnUse" x="-400" y="0" width="800" height="300"><rect x="-400" y="0" width="800" height="300" fill="url(#hFade)"/></mask></defs><g mask="url(#mtFade)">${back}${mistA}${mid}${mistB}</g>`;
-}
-// 园林墙帽：一段青灰瓦（筒瓦 + 瓦当 + 脊），下面一道白粉墙边
-function coping() {
-  const L = 236, top = -206, eave = -180;
+// 门楼屋顶：一片片蓝琉璃筒瓦 + 金瓦当 + 金屋脊，两端起翘，正脊中间一颗宝珠
+function menlou(d) {
+  const W = 250, eaveY = (x) => -188 - 18 * Math.pow(Math.abs(x) / W, 2.4), ridgeY = (x) => -238 - 4 * (1 - Math.pow(x / 200, 2));
   let tiles = '', ends = '';
-  for (let x = -L + 8; x <= L - 8; x += 13) {
-    tiles += `<path d="M${x} ${top + 5} V${eave - 4}" stroke="url(#tileGrey)" stroke-width="7" stroke-linecap="round"/><path d="M${x + 6.5} ${top + 6} V${eave - 3}" stroke="rgba(10,20,26,.6)" stroke-width="1.1"/>`;
-    ends += `<circle cx="${x}" cy="${eave - 2}" r="5" fill="url(#pCap)" stroke="rgba(10,24,32,.7)" stroke-width=".8"/><circle cx="${x}" cy="${eave - 2}" r="1.6" fill="rgba(10,24,32,.7)"/>`;
+  for (let x = -196; x <= 196; x += 16) {
+    const ex = x * 1.24, ey = eaveY(ex);
+    const t = (xx) => `M${f1(xx)} ${f1(ridgeY(xx) + 5)} Q${f1(xx * 1.1)} ${f1((ridgeY(xx) + eaveY(xx * 1.24)) / 2)} ${f1(xx * 1.24)} ${f1(eaveY(xx * 1.24) - 4)}`;
+    tiles += `<path d="${t(x)}" fill="none" stroke="url(#tileBlue)" stroke-width="7" stroke-linecap="round"/><path d="${t(x + 8)}" fill="none" stroke="rgba(6,18,34,.6)" stroke-width="1.1"/>`;
+    ends += `<circle cx="${f1(ex)}" cy="${f1(ey - 2)}" r="5.2" fill="url(#pGov)" stroke="rgba(40,22,4,.7)" stroke-width=".8"/><circle cx="${f1(ex)}" cy="${f1(ey - 2)}" r="1.6" fill="rgba(70,40,6,.7)"/>`;
   }
-  return `<g class="drop" style="--d:.7s">` +
-    `<rect x="${-L + 6}" y="${eave + 2}" width="${2 * L - 12}" height="9" fill="rgba(226,234,232,.88)"/><rect x="${-L + 6}" y="${eave + 11}" width="${2 * L - 12}" height="2" fill="rgba(40,60,66,.6)"/>` +
-    `<path d="M${-L} ${top + 4} H${L} V${eave} H${-L} Z" fill="#1E2D34"/>${tiles}${ends}` +
-    `<path d="M${-L - 6} ${eave} H${L + 6}" stroke="url(#mCap)" stroke-width="3" stroke-linecap="round"/>` +
-    `<path d="M${-L - 10} ${top} H${L + 10}" stroke="url(#mCap)" stroke-width="7" stroke-linecap="round"/><path d="M${-L - 6} ${top - 2} H${L + 6}" stroke="rgba(255,255,255,.5)" stroke-width="1.1"/>` +
-    `<path d="M${-L - 10} ${top} q-16 -2 -22 -18 M${L + 10} ${top} q16 -2 22 -18" fill="none" stroke="url(#mCap)" stroke-width="5" stroke-linecap="round"/></g>`;
-}
-// 冰裂纹花窗：深色木格，裂纹由抖动的网格连成
-function iceWindow(x0, d) {
-  const w = 58, hgt = 250, y0 = -128, cols = 3, rows = 8, pts = [];
-  let seed = x0 < 0 ? 7 : 13; const rr = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-  for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) {
-    const edgeX = c === 0 || c === cols, edgeY = r === 0 || r === rows;
-    pts.push([x0 + c * w / cols + (edgeX ? 0 : (rr() - .5) * 14), y0 + r * hgt / rows + (edgeY ? 0 : (rr() - .5) * 18)]);
-  }
-  const P0 = (r, c) => pts[r * (cols + 1) + c];
-  let lines = '';
-  for (let r = 0; r <= rows; r++) for (let c = 0; c <= cols; c++) {
-    const a = P0(r, c);
-    if (c < cols && r > 0 && r < rows) { const b = P0(r, c + 1); lines += `M${f1(a[0])} ${f1(a[1])} L${f1(b[0])} ${f1(b[1])} `; }
-    if (r < rows && c > 0 && c < cols) { const b = P0(r + 1, c); lines += `M${f1(a[0])} ${f1(a[1])} L${f1(b[0])} ${f1(b[1])} `; }
-    if (r < rows && c < cols && rr() < .45) { const b = P0(r + 1, c + 1); lines += `M${f1(a[0])} ${f1(a[1])} L${f1(b[0])} ${f1(b[1])} `; }
-  }
-  return `<g class="f" style="--d:${d}s;--t:.9s"><rect x="${x0}" y="${y0}" width="${w}" height="${hgt}" fill="rgba(10,20,20,.55)"/>` +
-    `<path d="${lines}" fill="none" stroke="#2A221A" stroke-width="3.6" stroke-linecap="round"/><path d="${lines}" fill="none" stroke="rgba(160,205,190,.5)" stroke-width="1" stroke-linecap="round" transform="translate(-.8 -.8)"/>` +
-    `<rect x="${x0}" y="${y0}" width="${w}" height="${hgt}" fill="none" stroke="#2A221A" stroke-width="6"/><rect x="${x0}" y="${y0}" width="${w}" height="${hgt}" fill="none" stroke="url(#mCap)" stroke-width="1.6"/></g>`;
+  const eave = Array.from({ length: 41 }, (_, i) => { const x = -W + i * W / 20; return `${i ? 'L' : 'M'}${f1(x)} ${f1(eaveY(x))}`; }).join(' ');
+  let brackets = '';
+  for (let x = -220; x <= 220; x += 22) brackets += `<rect x="${x - 4.5}" y="${f1(eaveY(x) + 3)}" width="9" height="7" rx="1.5" fill="url(#fGov)"/>`;
+  return `<g class="drop" style="--d:${d}s"><path d="${eave} L200 ${f1(ridgeY(200))} L-200 ${f1(ridgeY(-200))} Z" fill="#0C1C30"/>${tiles}${ends}` +
+    `<path d="${eave}" fill="none" stroke="url(#mGov)" stroke-width="4.4" stroke-linecap="round"/>` +
+    `<path d="M${-W} ${f1(eaveY(-W))} q-15 -3 -22 -22 M${W} ${f1(eaveY(W))} q15 -3 22 -22" fill="none" stroke="url(#mGov)" stroke-width="4.6" stroke-linecap="round"/>` +
+    `<path d="M-206 ${f1(ridgeY(-206))} H206" stroke="url(#mGov)" stroke-width="6.5" stroke-linecap="round"/><path d="M-200 ${f1(ridgeY(-200) - 2)} H200" stroke="rgba(255,250,235,.55)" stroke-width="1.1"/>` +
+    `<path d="M-206 -238 q-12 -18 4 -28 q12 -5 10 7 M206 -238 q12 -18 -4 -28 q-12 -5 -10 7" fill="none" stroke="url(#mGov)" stroke-width="3.6" stroke-linecap="round"/>` +
+    `${brackets}<path d="M0 -246 C-8 -258 -5 -270 0 -278 C5 -270 8 -258 0 -246Z" fill="url(#fGov)"/><circle cx="0" cy="-258" r="10" fill="url(#pGov)" stroke="#FFF4D6" stroke-width="1"/></g>`;
 }
 function cap(name) {
   const T = TIER.cap, root = h('div', 'hero t-cap', { '--dur': T.dur + 's' });
   root.append(h('div', 'dim'));
-  const halo = `<circle r="300" fill="url(#haloCap)" class="f" style="--d:.1s"/>`;
-  const ring = royalRing('cap', 114, .15).s;
-  const wins = iceWindow(-236, .4) + iceWindow(178, .45);
-  const hills = shan();
-  root.append(lay(`${halo}${wins}${hills}${ring}`));
-  root.append(avatarEl(name, 228, .55, 2.2));
-  const cop = coping();
-  const front = `<g mask="url(#mtFade)">${mountains([[-230, 20], [-150, 34], [150, 30], [240, 18]], 218, 'mtGreen', true, .6)}</g>`;
-  root.append(lay(`${cop}${front}${sweep(ring + cop, 2.1)}`));
-  [[0, -224, 20, 2.3], [-250, -120, 16, 2.6], [250, -120, 16, 2.8]].forEach((g) => root.append(glintEl(g)));
-  texts(root, T, 'cap', name, 262, { lab: 1, nm: 1.25, seal: 2.05 });
+  const halo = `<circle r="420" fill="url(#haloCap)" class="f" style="--d:.1s"/><defs><mask id="yunmC"><circle r="400" fill="url(#fade)"/></mask></defs><g opacity=".07"><g mask="url(#yunmC)" class="f" style="--d:.3s;--t:1.2s"><rect x="-400" y="-400" width="800" height="800" fill="url(#yunwen)"/></g></g>`;
+  const ring = royalRing('cap', 112, .25).s;
+  const cl = cloud(T, -300, 96, 1.05, -1, .8, 0) + cloud(T, 300, 96, 1.05, 1, .9, -1.4);
+  const pil = pillarPair(196, 15, -170, 196, 'pillarBlue', 'fGov', '#CFE8FF', .15);
+  const base = [[212, 246, 2.2], [226, 272, 1.4]].map(([y, w, sw], i) => P(`M0 ${y} H${-w}`, .3 + i * .08, .8, 'url(#mGov)', sw) + P(`M0 ${y} H${w}`, .3 + i * .08, .8, 'url(#mGov)', sw)).join('');
+  root.append(lay(`${halo}${cl}${pil}${base}${ring}`));
+  root.append(avatarEl(name, 224, .6, 2.3));
+  const lintel = `<g class="grow-x" style="--d:.6s"><rect x="-222" y="-186" width="444" height="15" fill="url(#huiwen)"/><path d="M-224 -188 H224" stroke="url(#mGov)" stroke-width="2.4"/><path d="M-224 -169 H224" stroke="url(#mGov)" stroke-width="1.9"/></g>`;
+  const queti = `<g class="f" style="--d:.8s"><path d="M-196 -167 Q-170 -167 -152 -178 L-196 -178Z M196 -167 Q170 -167 152 -178 L196 -178Z" fill="url(#fGov)" stroke="rgba(255,244,214,.6)" stroke-width=".8"/></g>`;
+  const roof = menlou(.7);
+  const flash = `<circle cx="0" cy="-258" r="60" fill="url(#gFlash)" class="flash" style="--d:1.6s"/>`;
+  root.append(lay(`${queti}${lintel}${roof}${flash}${sweep(pil + ring + lintel + roof + cl, 2.2)}`));
+  [[0, -290, 20, 2.3], [-400, 60, 16, 2.6], [400, 60, 16, 2.8]].forEach((g) => root.append(glintEl(g)));
+  root.append(...dusts(8, T.dust, 280, .8, 2.4));
+  texts(root, T, 'cap', name, 266, { lab: 1.1, nm: 1.35, seal: 2.1 });
   return root;
 }
 
@@ -546,18 +518,19 @@ function pavilion(d) {
 function adm(name) {
   const T = TIER.adm, root = h('div', 'hero t-adm', { '--dur': T.dur + 's' });
   root.append(h('div', 'dim'));
-  const halo = `<circle r="440" fill="url(#haloAdm)" class="f" style="--d:.1s"/>`;
-  const ring = royalRing('adm', 126, .2).s;
-  const cl = cloud(T, -330, 100, 1.2, -1, 1.2, 0) + cloud(T, 330, 100, 1.2, 1, 1.3, -1.4);
+  const halo = `<circle r="480" fill="url(#haloAdm)" class="f" style="--d:.1s"/><defs><mask id="yunmA"><circle r="440" fill="url(#fade)"/></mask></defs><g opacity=".08"><g mask="url(#yunmA)" class="f" style="--d:.4s;--t:1.6s"><rect x="-440" y="-440" width="880" height="880" fill="url(#yunwen)"/></g></g>`;
+  const ring = royalRing('adm', 122, .2).s;
+  const cl = cloud(T, -330, 100, 1.2, -1, 1.2, 0) + cloud(T, 330, 100, 1.2, 1, 1.3, -1.4) + cloud(T, -420, -110, .8, 1, 1.5, -.7) + cloud(T, 420, -110, .8, -1, 1.6, -2.1);
   const posts = post(-1) + post(1) + [[222, 262, 2.2], [236, 290, 1.4], [250, 318, 1]].map(([y, w, sw], i) => P(`M0 ${y} H${-w}`, .45 + i * .08, .9, 'url(#mAdm)', sw) + P(`M0 ${y} H${w}`, .45 + i * .08, .9, 'url(#mAdm)', sw)).join('');
   root.append(lay(`${halo}${cl}${posts}${ring}`));
-  root.append(avatarEl(name, 252, .9, 3));
+  root.append(avatarEl(name, 244, .9, 3));
   const lintel = `<g class="grow-x" style="--d:.95s"><rect x="-240" y="-186" width="480" height="15" fill="url(#huiwen)"/><path d="M-242 -188 H242" stroke="url(#mAdm)" stroke-width="2.6"/><path d="M-242 -169 H242" stroke="url(#mAdm)" stroke-width="2"/></g>`;
   const queti = `<g class="f" style="--d:1.2s"><path d="M-227 -167 Q-196 -167 -176 -180 L-227 -180Z M227 -167 Q196 -167 176 -180 L227 -180Z" fill="url(#fAdm)" stroke="rgba(255,244,214,.6)" stroke-width=".8"/></g>`;
   const roof = pavilion(1.1);
-  root.append(lay(`${queti}${lintel}${roof}${sweep(posts + ring + lintel + roof + cl, 3.1)}`));
+  const pearlFlash = `<circle cx="0" cy="-336" r="70" fill="url(#gFlash)" class="flash" style="--d:2.3s"/>`;
+  root.append(lay(`${queti}${lintel}${roof}${pearlFlash}${tassel(-300, -246, 44, '#7E4BCB', 1.8, 'pAdm')}${tassel(300, -246, 44, '#7E4BCB', 1.8, 'pAdm')}${sweep(posts + ring + lintel + roof + cl, 3.1)}`));
   [[0, -388, 22, 3.3], [-440, 60, 20, 2.8], [440, 60, 20, 3], [-300, -218, 16, 3.6], [300, -218, 16, 3.9]].forEach((g) => root.append(glintEl(g)));
-  root.append(...dusts(10, T.dust, 300, 1, 3.5));
+  root.append(...dusts(16, T.dust, 340, 1.2, 4.5));
   texts(root, T, 'adm', name, 296, { lab: 1.7, nm: 2, seal: 3 });
   return root;
 }

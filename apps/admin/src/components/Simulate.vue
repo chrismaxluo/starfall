@@ -43,7 +43,7 @@ async function run(): Promise<void> {
   }
   if (props.kind === 'guard') {
     body = { kind: 'guard', viewer, ...guard.value };
-    vars = { months: guard.value.months, guardLevel: guard.value.level };
+    vars = { months: guard.value.months, guardLevel: guard.value.level, op: guard.value.op };
   }
   const r = (await attempt(() => post<SimulateResult>('/api/simulate', body))) ?? null;
   res.value = r;

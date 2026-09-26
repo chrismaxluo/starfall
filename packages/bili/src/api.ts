@@ -12,15 +12,19 @@ export interface RoomInit {
   /** 0 未开播，1 直播中，2 轮播 */
   liveStatus: number;
   isPortrait: boolean;
+  /** 这一场的开播时间（毫秒）；未开播时为 null */
+  liveSince?: number | null;
 }
 
 /** 房间号（短号或长号）换算，并取开播状态。公开接口 */
 export async function getRoomInit(http: BiliHttp, id: number): Promise<RoomInit> {
-  const d = await http.getData<{ room_id: number; short_id: number; uid: number; live_status: number; is_portrait?: boolean }>(
+  const d = await http.getData<{ room_id: number; short_id: number; uid: number; live_status: number; is_portrait?: boolean; live_time?: number }>(
     `${LIVE}/room/v1/Room/room_init?id=${id}`,
     { auth: false },
   );
-  return { roomId: d.room_id, shortId: d.short_id, anchorUid: d.uid, liveStatus: d.live_status, isPortrait: Boolean(d.is_portrait) };
+  // live_time 是开播时间（秒）；未开播时是负数
+  const since = typeof d.live_time === 'number' && d.live_time > 0 ? d.live_time * 1000 : null;
+  return { roomId: d.room_id, shortId: d.short_id, anchorUid: d.uid, liveStatus: d.live_status, isPortrait: Boolean(d.is_portrait), liveSince: since };
 }
 
 export interface RoomInfo {

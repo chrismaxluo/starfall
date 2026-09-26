@@ -41,6 +41,8 @@ export interface LiveStatus {
 }
 
 const POLL_MS = 60_000;
+/** 我们发现开播的时间总比 B 站记录的开播时间晚；早于开播时间这么多以上的记录算上一场 */
+const SESSION_SLACK_MS = 60_000;
 const ADMIN_REFRESH_MS = 30 * 60_000;
 
 export class LiveService {
@@ -52,6 +54,10 @@ export class LiveService {
   private readonly eventListeners = new Set<(ev: StdEvent, raw: unknown) => void>();
   private readonly statusListeners = new Set<(s: LiveStatus) => void>();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private reconciling: Promise<void> = Promise.resolve();
+  /** 每次断开加 1：连接过程中断开过就放弃这次连接 */
+  private gen = 0;
+  private stopped = false;
   private adminTimer: ReturnType<typeof setInterval> | null = null;
   private client: Pick<LiveClient, 'start' | 'stop' | 'state'> | null = null;
   private connectedRoom: number | null = null;
@@ -111,13 +117,21 @@ export class LiveService {
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.pollTimer = null;
     this.disconnect();
   }
 
-  /** 设置变化（连接时机、未开播策略）后调用 */
-  async reconcile(): Promise<void> {
+  /** 设置变化（连接时机、未开播策略）后调用。同一时间只运行一个，否则两次调用可能各建一个连接 */
+  reconcile(): Promise<void> {
+    const run = this.reconciling.then(() => this.doReconcile());
+    this.reconciling = run.catch(() => undefined);
+    return run;
+  }
+
+  private async doReconcile(): Promise<void> {
+    if (this.stopped) return;
     const room = this.room.get();
     const http = this.account.http();
     const mode = this.settings.get('connectMode');
@@ -142,19 +156,23 @@ export class LiveService {
     }
     try {
       const init = await this.deps.getRoomInit(this.account.anon, room.roomId);
-      this.setLive(init.liveStatus === 1);
+      this.setLive(init.liveStatus === 1, init.liveSince ?? null);
     } catch {
       /* 查询失败时保持原状态，下次再查 */
     }
     await this.reconcile();
   }
 
-  private setLive(live: boolean): void {
+  /** liveSince：B 站给的这一场开播时间（毫秒），用来判断没关闭的记录是不是同一场 */
+  private setLive(live: boolean, liveSince: number | null = null): void {
     const now = this.deps.now();
     if (live && !this.session) {
-      // 服务重启时如果上一场还没结束，继续使用（"本场只播一次"的记录不丢）
+      // 服务重启时如果这一场还没结束，继续使用（"本场只播一次"的记录不丢）；
+      // 没关闭的记录早于这一场的开播时间，说明是上一场（例如下播时服务没在运行），先关掉再新建
       const open = this.db.select().from(liveSessions).where(isNull(liveSessions.endedAt)).orderBy(desc(liveSessions.id)).get();
-      this.session = open ? { id: open.id, startedAt: open.startedAt } : this.newSession(now);
+      const sameLive = open !== undefined && (liveSince === null || open.startedAt >= liveSince - SESSION_SLACK_MS);
+      if (open && !sameLive) this.db.update(liveSessions).set({ endedAt: liveSince ?? now }).where(isNull(liveSessions.endedAt)).run();
+      this.session = open && sameLive ? { id: open.id, startedAt: open.startedAt } : this.newSession(now);
     }
     if (!live) {
       if (this.session) this.db.update(liveSessions).set({ endedAt: now }).where(eq(liveSessions.id, this.session.id)).run();
@@ -173,8 +191,11 @@ export class LiveService {
   }
 
   private async connect(roomId: number, http: BiliHttp): Promise<void> {
+    const gen = this.gen;
     const buvid = await http.ensureBuvid().catch(() => '');
     await this.refreshAdmins(roomId);
+    // 等待期间断开了（换了直播间、停止服务）：不再连接
+    if (gen !== this.gen || this.stopped) return;
     const wbi = new WbiSigner(http);
     this.connectedRoom = roomId;
     this.client = this.deps.createClient({
@@ -194,6 +215,7 @@ export class LiveService {
   }
 
   private disconnect(): void {
+    this.gen++;
     if (this.adminTimer) clearInterval(this.adminTimer);
     this.adminTimer = null;
     if (this.client) this.client.stop();

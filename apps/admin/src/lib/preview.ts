@@ -7,7 +7,7 @@ export interface PreviewRequest {
   viewer: SampleViewer;
   label: string;
   kind?: TriggerKind;
-  vars?: { text?: string; gift?: string; count?: number; valueGold?: number; months?: number; guardLevel?: 1 | 2 | 3 };
+  vars?: { text?: string; gift?: string; count?: number; valueGold?: number; months?: number; guardLevel?: 1 | 2 | 3; op?: 'open' | 'renew' };
 }
 
 export const yuan = (gold: number) => {

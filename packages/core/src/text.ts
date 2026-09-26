@@ -12,6 +12,8 @@ export interface TextVars {
   /** 礼物价值，单位：金瓜子 */
   valueGold?: number;
   months?: number;
+  /** 上舰：开通还是续费 */
+  op?: 'open' | 'renew';
   /** 上舰事件里的新等级；不填时用观众当前的大航海等级 */
   guardLevel?: 1 | 2 | 3;
 }
@@ -42,6 +44,7 @@ export function fillText(template: string, v: TextVars): string {
     count: v.count !== undefined ? String(v.count) : '',
     value: v.valueGold !== undefined ? `${formatYuan(goldToYuan(v.valueGold))} 元` : '',
     months: v.months !== undefined ? String(v.months) : '',
+    op: v.op === 'renew' ? '续费' : v.op === 'open' ? '开通' : '',
   };
   return template
     .replace(/\{(\w+)\}/g, (all, key: string) => (key in map ? map[key]! : all))

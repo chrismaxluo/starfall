@@ -212,6 +212,38 @@ describe('播放队列', () => {
     expect(t.statuses().at(-1)).toBe('played');
   });
 
+  it('排队后没播出来（暂停、清空、被挤掉）：不算播过，这个人再来还能播', async () => {
+    const t = await setup();
+    t.ctx.settings.set('cooldownMode', 'oncePerLive');
+    t.live.emit(enter({ uid: 1, guard: 3 }));
+    t.live.emit(enter({ uid: 2, guard: 3 }));
+    t.p.pause();
+    t.p.resume();
+    // 同一次进场的重复消息会被合并，隔一会儿再进
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(enter({ uid: 2, guard: 3 }));
+    t.live.emit(enter({ uid: 1, guard: 3 }));
+    expect(t.statuses()).toEqual(['played', 'paused', 'played', 'once']);
+    // 按分钟冷却 + 清空队列
+    t.ctx.settings.set('cooldownMode', 'minutes');
+    vi.advanceTimersByTime(30_000);
+    t.live.emit(enter({ uid: 3, guard: 3 }));
+    t.live.emit(enter({ uid: 4, guard: 3 }));
+    t.p.clear();
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(enter({ uid: 4, guard: 3 }));
+    expect(t.statuses().slice(-3)).toEqual(['played', 'cleared', 'played']);
+    // 被挤掉
+    t.ctx.settings.set('queueMax', 3);
+    vi.advanceTimersByTime(30_000);
+    for (let uid = 10; uid <= 14; uid++) t.live.emit(enter({ uid, guard: 3 }));
+    const dropped = t.events().filter((e) => e.status === 'dropped').map((e) => e.uid);
+    expect(dropped.length).toBeGreaterThan(0);
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(enter({ uid: dropped[0]!, guard: 3 }));
+    expect(t.statuses().at(-1)).not.toBe('cooldown');
+  });
+
   it('清空队列：正在播的播完，排队的记录为已清空', async () => {
     const t = await setup();
     for (let uid = 1; uid <= 3; uid++) t.live.emit(enter({ uid, guard: 3 }));

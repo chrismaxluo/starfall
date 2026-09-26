@@ -30,6 +30,16 @@ describe('数据库', () => {
     expect(db.select().from(outputs).all()).toHaveLength(1);
   });
 
+  it('内置素材的文案升级后同步成新版本（内置素材在后台只读）；复制出来的素材不受影响', () => {
+    const db = openDb(':memory:');
+    seed(db);
+    db.update(effects).set({ texts: { enter: ['旧文案'] } }).where(eq(effects.name, '星冕')).run();
+    db.insert(effects).values({ name: '我的星冕', builtin: false, style: 'star', texts: { enter: ['我自己的'] } }).run();
+    seed(db);
+    expect(db.select().from(effects).where(eq(effects.name, '星冕')).get()?.texts).toEqual(BUILTIN_EFFECTS[0]!.texts);
+    expect(db.select().from(effects).where(eq(effects.name, '我的星冕')).get()?.texts).toEqual({ enter: ['我自己的'] });
+  });
+
   it('被规则引用的素材不能删除（F-AS-14）', () => {
     const db = openDb(':memory:');
     seed(db);

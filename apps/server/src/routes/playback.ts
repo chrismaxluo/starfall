@@ -65,7 +65,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
         draft: EffectPatchSchema.omit({ name: true }).optional(),
         /** 欢迎语变量（弹幕内容、礼物和数量、上舰月数）；不填用示例 */
         vars: z
-          .object({ text: z.string().max(100), gift: z.string().max(40), count: z.number().int().min(1), valueGold: z.number().int().min(0), months: z.number().int().min(1).max(120), guardLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]) })
+          .object({ text: z.string().max(100), gift: z.string().max(40), count: z.number().int().min(1), valueGold: z.number().int().min(0), months: z.number().int().min(1).max(120), guardLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]), op: z.enum(['open', 'renew']) })
           .partial()
           .strict()
           .optional(),

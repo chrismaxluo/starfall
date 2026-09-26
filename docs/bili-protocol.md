@@ -166,6 +166,21 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 - ✅ **免费礼物**：`coin_type` 为 `silver`，例如辣条、小心心。
 - ⚠️ **同名礼物有多个 ID、价格不同**：例如"小电视飞船"有 1245 元和 2999 元两个版本。**指定礼物必须按礼物 ID 匹配**，界面上应从本直播间的礼物面板中选择。
 
+### 5.6.1 上舰 ✅（1 个样本）
+
+一次上舰，B 站会**同时推送三条**消息（P0 抓包里有一次开通舰长）：
+
+| 消息 | 关键字段 | 说明 |
+|---|---|---|
+| `USER_TOAST_MSG_V2` | `sender_uinfo.uid / base.name / base.face`、`guard_info.guard_level`、`guard_info.op_type`、`pay_info.num / unit / price / payflow_id`、`toast_msg` | 信息最完整，**优先使用** |
+| `USER_TOAST_MSG` | `uid`、`username`、`guard_level`、`num`、`unit`、`op_type`、`payflow_id`、`toast_msg` | 与 V2 的 `payflow_id` 相同 |
+| `GUARD_BUY` | `uid`、`username`、`guard_level`、`num`、`price`、`gift_id` | **没有**开通 / 续费信息，也没有流水号 |
+
+- **开通还是续费**：按 `toast_msg` 文案判断（"……开通了舰长" / "……续费了舰长"）。样本里 `op_type = 2`，文案却是"开通了舰长"（用户是第 121 天的老舰长，可能是过期后重新开通），和网上常见的"2 = 续费"不一致，所以**不依赖 `op_type`**；事件记录保留原始消息，以后多收集样本再确认。
+- **月数**：`num`，`unit` 为"月"；为"年"时按 12 个月计算。
+- **去重**：两条 toast 按 `payflow_id` 去重；`GUARD_BUY` 先等 3 秒，同一人同等级的 toast 到了就丢弃（见 `packages/core/src/combo.ts`）。
+- 样本已脱敏为 `fixtures/bili/user_toast_msg_v2.cap-open.json` 等。
+
 ### 5.7 开播 / 下播
 
 - ✅ `PREPARING`（下播）：`{"cmd":"PREPARING","roomid":"<房间号>","send_time":<毫秒>,…}`，注意 `roomid` 是字符串。
@@ -202,7 +217,7 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 | 2 | 进场消息中粉丝牌、大航海、房管 | ✅ 粉丝牌、大航海已确认；房管字段没有，改用**房管名单接口**（公开，`/xlive/web-room/v1/roomAdmin/get_by_room`，分页 100） |
 | 3 | 弹幕 `DANMU_MSG` 的格式 | ✅ |
 | 4 | 礼物格式；免费 / 付费；单价单位 | ✅ `SEND_GIFT_V2`（protobuf）、`COMBO_SEND`；1 元 = 1000 金瓜子 |
-| 5 | 上舰 `GUARD_BUY` / `USER_TOAST_MSG`；开通与续费的区分 | ⏳ |
+| 5 | 上舰 `GUARD_BUY` / `USER_TOAST_MSG`；开通与续费的区分 | ✅ 三条消息同时推送；开通 / 续费按文案判断（见 5.6.1），续费样本待补充 |
 | 6 | 开播 / 下播 `LIVE` / `PREPARING` | ✅ 下播；⏳ 开播 |
 | 7 | 大航海进场时 `INTERACT_WORD_V2` 与 `ENTRY_EFFECT` 的先后和间隔 | ✅ `ENTRY_EFFECT` 先到，间隔 0 ~ 1.5 秒 |
 | 8 | 扫码登录 | ✅ 接口可用：`passport.bilibili.com/x/passport-login/web/qrcode/generate` 与 `…/poll`；返回 `SESSDATA`、`bili_jct`、`DedeUserID` 等 Cookie 和 `refresh_token`；**SESSDATA 有效期约 6 个月** |

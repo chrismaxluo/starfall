@@ -78,3 +78,28 @@ describe('其他消息', () => {
     expect(() => parseMessage({ cmd: 'INTERACT_WORD_V2', data: { pb: '////' } }, ctx)).toThrow();
   });
 });
+
+describe('上舰', () => {
+  it('USER_TOAST_MSG_V2：结构化用户信息、月数、按文案判断开通 / 续费、支付流水号', () => {
+    expect(parseMessage(fixture('user_toast_msg_v2.cap-open'), ctx)).toMatchObject({
+      kind: 'guard', level: 3, months: 1, op: 'open', source: 'toast', dedupeKey: '2609260000000000000000001',
+      viewer: { uid: 10006, name: '测试新舰长', face: 'https://example.invalid/face/10006.jpg', guard: 3 },
+    });
+  });
+  it('USER_TOAST_MSG：和 V2 同一个流水号（用于去重）', () => {
+    expect(parseMessage(fixture('user_toast_msg.cap-open'), ctx)).toMatchObject({ kind: 'guard', level: 3, months: 1, op: 'open', source: 'toast', dedupeKey: '2609260000000000000000001', viewer: { uid: 10006 } });
+  });
+  it('GUARD_BUY：没有开通 / 续费信息、没有流水号', () => {
+    const ev = parseMessage(fixture('guard_buy.cap'), ctx);
+    expect(ev).toMatchObject({ kind: 'guard', level: 3, months: 1, op: 'open', source: 'guard_buy', viewer: { uid: 10006, name: '测试新舰长' } });
+    expect(ev).not.toHaveProperty('dedupeKey');
+  });
+  it('续费、按年购买、缺字段', () => {
+    const renew = { cmd: 'USER_TOAST_MSG', data: { uid: 1, username: 'a', guard_level: 2, num: 1, unit: '年', payflow_id: 'p', toast_msg: '<%a%> 在主播b的直播间续费了提督' } };
+    expect(parseMessage(renew, ctx)).toMatchObject({ level: 2, months: 12, op: 'renew' });
+    expect(parseMessage({ cmd: 'USER_TOAST_MSG', data: { uid: 1, guard_level: 0 } }, ctx)).toBeNull();
+    expect(parseMessage({ cmd: 'USER_TOAST_MSG_V2', data: { guard_info: { guard_level: 3 } } }, ctx)).toBeNull();
+    expect(parseMessage({ cmd: 'GUARD_BUY', data: {} }, ctx)).toBeNull();
+    expect(parseMessage({ cmd: 'USER_TOAST_MSG_V2', data: { sender_uinfo: { uid: 3 }, guard_info: { guard_level: 1 }, pay_info: {} } }, ctx)).toMatchObject({ level: 1, months: 1, op: 'open', viewer: { name: '' } });
+  });
+});

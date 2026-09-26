@@ -124,6 +124,31 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
       };
     }
 
+    // ---- 上舰：一次购买会同时推送下面三条，由调用方去重（见 core 的 GuardDeduper） ----
+    case 'USER_TOAST_MSG_V2': {
+      const d = raw.data as
+        | { sender_uinfo?: { uid?: number; base?: { name?: string; face?: string } }; guard_info?: { guard_level?: number }; pay_info?: { payflow_id?: string; num?: number; unit?: string }; toast_msg?: string }
+        | undefined;
+      const uid = Number(d?.sender_uinfo?.uid) || 0;
+      const level = toGuard(d?.guard_info?.guard_level);
+      if (!uid || !level) return null;
+      return guardEvent(ctx, { uid, name: d?.sender_uinfo?.base?.name ?? '', face: d?.sender_uinfo?.base?.face, level, num: d?.pay_info?.num, unit: d?.pay_info?.unit, toast: d?.toast_msg, key: d?.pay_info?.payflow_id, source: 'toast' });
+    }
+    case 'USER_TOAST_MSG': {
+      const d = raw.data as { uid?: number; username?: string; guard_level?: number; num?: number; unit?: string; payflow_id?: string; toast_msg?: string } | undefined;
+      const uid = Number(d?.uid) || 0;
+      const level = toGuard(d?.guard_level);
+      if (!uid || !level) return null;
+      return guardEvent(ctx, { uid, name: d?.username ?? '', level, num: d?.num, unit: d?.unit, toast: d?.toast_msg, key: d?.payflow_id, source: 'toast' });
+    }
+    case 'GUARD_BUY': {
+      const d = raw.data as { uid?: number; username?: string; guard_level?: number; num?: number } | undefined;
+      const uid = Number(d?.uid) || 0;
+      const level = toGuard(d?.guard_level);
+      if (!uid || !level) return null;
+      return guardEvent(ctx, { uid, name: d?.username ?? '', level, num: d?.num, unit: '月', source: 'guard_buy' });
+    }
+
     case 'LIVE':
       return { kind: 'live', id: ctx.newId(), ts: ctx.now(), live: true };
     case 'PREPARING':
@@ -133,3 +158,26 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
       return null;
   }
 }
+
+/** 上舰事件。开通 / 续费按提示文案判断（"……开通了舰长" / "……续费了舰长"）：
+ *  P0 抓到的样本里 op_type=2 对应的文案是"开通"，和网上常见的说法（2 = 续费）不一致，所以不依赖 op_type。 */
+function guardEvent(
+  ctx: ParseContext,
+  p: { uid: number; name: string; face?: string | undefined; level: 1 | 2 | 3; num?: number | undefined; unit?: string | undefined; toast?: string | undefined; key?: string | undefined; source: 'toast' | 'guard_buy' },
+): StdEvent {
+  const num = Math.max(1, Number(p.num) || 1);
+  const months = p.unit === '年' ? num * 12 : num;
+  const viewer: Viewer = { uid: p.uid, name: p.name, ...(p.face ? { face: p.face } : {}), guard: p.level, isMod: ctx.isMod?.(p.uid) ?? false, mystery: false };
+  return {
+    kind: 'guard',
+    id: ctx.newId(),
+    ts: ctx.now(),
+    viewer,
+    level: p.level,
+    months,
+    op: p.toast && /续费/.test(p.toast) ? 'renew' : 'open',
+    source: p.source,
+    ...(p.key ? { dedupeKey: String(p.key) } : {}),
+  };
+}
+

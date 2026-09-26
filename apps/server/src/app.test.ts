@@ -103,3 +103,42 @@ describe('管理后台静态文件', () => {
     await t.app.close();
   });
 });
+
+describe('管理后台静态文件', () => {
+  it('每次从磁盘读：重新构建后台后不用重启服务；只提供根目录下的页面和图标', async () => {
+    const fsm = await import('node:fs');
+    const os = await import('node:os');
+    const pathm = await import('node:path');
+    const { loadConfig } = await import('./config.ts');
+    const { createContext } = await import('./context.ts');
+    const { buildApp } = await import('./app.ts');
+    const dataDir = fsm.mkdtempSync(pathm.join(os.tmpdir(), 'starfall-admin-'));
+    const dist = pathm.join(dataDir, 'dist');
+    fsm.mkdirSync(pathm.join(dist, 'assets'), { recursive: true });
+    fsm.writeFileSync(pathm.join(dist, 'index.html'), '<p>v1</p>');
+    fsm.writeFileSync(pathm.join(dist, 'assets', 'a-1.js'), 'v1');
+    const app = await buildApp(createContext({ ...loadConfig({ STARFALL_DATA: dataDir }), adminDist: dist }, { dbFile: ':memory:' }));
+    expect((await app.inject({ method: 'GET', url: '/' })).body).toBe('<p>v1</p>');
+    // 重新构建：旧文件删掉、换成新文件名
+    fsm.rmSync(pathm.join(dist, 'assets', 'a-1.js'));
+    fsm.writeFileSync(pathm.join(dist, 'assets', 'a-2.js'), 'v2');
+    fsm.writeFileSync(pathm.join(dist, 'index.html'), '<p>v2</p>');
+    fsm.writeFileSync(pathm.join(dist, 'favicon.svg'), '<svg/>');
+    const page = await app.inject({ method: 'GET', url: '/' });
+    expect(page).toMatchObject({ statusCode: 200, body: '<p>v2</p>', headers: { 'cache-control': 'no-cache' } });
+    expect(page.headers['content-type']).toContain('text/html');
+    const js = await app.inject({ method: 'GET', url: '/assets/a-2.js' });
+    expect(js).toMatchObject({ statusCode: 200, body: 'v2' });
+    expect(js.headers['cache-control']).toContain('immutable');
+    expect((await app.inject({ method: 'GET', url: '/assets/a-1.js' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/favicon.svg' })).headers['content-type']).toContain('image/svg+xml');
+    // 其他文件、隐藏文件都不提供；接口照常
+    fsm.writeFileSync(pathm.join(dist, 'secret.json'), '{}');
+    expect((await app.inject({ method: 'GET', url: '/secret.json' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/.env' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/api/health' })).json()).toMatchObject({ ok: true });
+    expect((await app.inject({ method: 'GET', url: '/api/status' })).statusCode).toBe(401);
+    await app.close();
+    fsm.rmSync(dataDir, { recursive: true, force: true });
+  });
+});

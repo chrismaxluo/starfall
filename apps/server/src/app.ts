@@ -4,7 +4,9 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import fs from 'node:fs';
+import path from 'node:path';
 import Fastify from 'fastify';
+import type { FastifyReply } from 'fastify';
 import { APP_NAME } from '@starfall/shared';
 import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
@@ -28,6 +30,8 @@ export const redactUrl = (url: string) => url.replace(/([?&]key=)[^&]*/g, '$1***
 
 /** 不需要登录的接口 */
 const PUBLIC = new Set(['/api/health', '/api/auth/login']);
+/** 管理后台根目录下可以直接访问的文件类型 */
+const TOP_TYPES: Record<string, string> = { html: 'text/html; charset=utf-8', svg: 'image/svg+xml', ico: 'image/x-icon', png: 'image/png', webmanifest: 'application/manifest+json', txt: 'text/plain; charset=utf-8' };
 
 export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   const app = Fastify({
@@ -75,15 +79,28 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
     app.get('/overlay', async (req, reply) => reply.redirect(`/overlay/${req.url.slice('/overlay'.length)}`));
   }
 
-  // 管理后台（构建好的静态文件，页面内用 # 路由，只需要提供 / 和资源文件）
+  // 管理后台（构建好的静态文件，页面内用 # 路由，只需要提供 / 和资源文件）。
+  // 每次请求都从磁盘读，重新构建后台后不用重启服务（不打断直播画面上的特效）
   if (fs.existsSync(ctx.config.adminDist)) {
+    const dist = ctx.config.adminDist;
     await app.register(fastifyStatic, {
-      root: ctx.config.adminDist,
-      prefix: '/',
+      root: path.join(dist, 'assets'),
+      prefix: '/assets/',
       decorateReply: false,
       cacheControl: false,
-      wildcard: false,
-      setHeaders: (reply, file) => reply.header('Cache-Control', file.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'),
+      setHeaders: (reply) => reply.header('Cache-Control', 'public, max-age=31536000, immutable'),
+    });
+    // 入口页和根目录下的图标：不缓存
+    const sendTop = async (reply: FastifyReply, name: string) => {
+      const ext = path.extname(name).slice(1);
+      const file = path.join(dist, name);
+      if (!TOP_TYPES[ext] || !fs.existsSync(file)) throw new HttpError(404, 'not_found', '没有这个文件');
+      return reply.header('Cache-Control', 'no-cache').type(TOP_TYPES[ext]).send(await fs.promises.readFile(file));
+    };
+    app.get('/', (_req, reply) => sendTop(reply, 'index.html'));
+    app.get<{ Params: { file: string } }>('/:file', (req, reply) => {
+      if (!/^[\w.-]+$/.test(req.params.file) || req.params.file.startsWith('.')) throw new HttpError(404, 'not_found', '没有这个文件');
+      return sendTop(reply, req.params.file);
     });
   }
 

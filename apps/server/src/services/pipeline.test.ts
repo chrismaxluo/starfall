@@ -39,7 +39,7 @@ async function setup(opts: { overlay?: boolean } = {}) {
   t.ctx.db.insert(room).values({ id: 1, roomId: 30000, anchorUid: ANCHOR, anchorName: '主播' }).run();
   const live = fakeLive();
   const hub = new Hub();
-  const p = new Pipeline({ ...t.ctx, live, hub, timeZone: 'Asia/Shanghai', rng: () => 0 });
+  const p = new Pipeline({ ...t.ctx, live, hub, gifts: { iconFor: (id: number) => (id === 31036 ? 'https://i0.hdslb.com/gift/flower.png' : undefined) }, timeZone: 'Asia/Shanghai', rng: () => 0 });
   p.start();
   cleanup.push(() => p.stop());
   const sock = fakeSock();
@@ -462,6 +462,18 @@ describe('礼物', () => {
     ]);
   });
 
+  it('礼物特效带上礼物名称、数量和礼物图（查不到图时不带）', async () => {
+    const t = await setup();
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(gf({ unitPrice: 5000, count: 3 }));
+    expect(t.plays()[0]).toMatchObject({ kind: 'gift', effect: { name: '晶礼', visual: { style: 'glass-gift' } }, text: '小星 送出 小花花', gift: { name: '小花花', count: 3, img: 'https://i0.hdslb.com/gift/flower.png' } });
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ giftId: 1, giftName: '别的礼物', unitPrice: 20_000 }, { uid: 5 }));
+    vi.advanceTimersByTime(10);
+    const last = t.plays().at(-1)!;
+    expect(last.gift).toEqual({ name: '别的礼物', count: 1 });
+  });
+
   it('≥ 100 元的礼物插队；关闭插队后按优先级排（礼物仍然排在进场前面）', async () => {
     const t = await setup();
     t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
@@ -470,7 +482,7 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 20_000 }, { uid: 3 }));
     t.live.emit(gf({ unitPrice: 200_000 }, { uid: 4 }));
     expect(t.p.snapshot().items.map((i) => [i.kind, i.viewerName])).toEqual([['gift', '小星'], ['gift', '小星'], ['enter', '小星']]);
-    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['星冕', '礼物感谢', '门楼']);
+    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['晶耀', '晶礼', '门楼']);
   });
 });
 

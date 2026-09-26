@@ -15,6 +15,7 @@ import { ConfigIO } from './services/config-io.ts';
 import { EffectStore } from './services/effects.ts';
 import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-rules.ts';
 import { EventLog } from './services/events.ts';
+import type { getRoomGifts } from '@starfall/bili';
 import { GiftCatalog } from './services/gifts.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
@@ -58,7 +59,7 @@ export interface AppContext {
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -78,11 +79,11 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const danmuRules = new DanmuRuleStore(db);
   const giftRules = new GiftRuleStore(db, settings);
   const guardRules = new GuardRuleStore(db);
-  const gifts = new GiftCatalog(room, () => account.anon);
+  const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
   const hub = new Hub();
-  const pipeline = new Pipeline({ live, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const pipeline = new Pipeline({ live, gifts, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
   const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
@@ -117,6 +118,7 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   ctx.backups.cleanPartial();
   prune();
   const timer = setInterval(prune, PRUNE_MS);
+  ctx.gifts.start();
   ctx.pipeline.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));
   await ctx.live.start();

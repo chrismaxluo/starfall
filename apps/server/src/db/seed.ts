@@ -29,6 +29,11 @@ export const BUILTIN_EFFECTS: BuiltinEffect[] = [
   { name: '金銮', style: 'royal-gov', position: 'center', durationMs: 8000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
   { name: '亭阁', style: 'royal-adm', position: 'center', durationMs: 6000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
   { name: '门楼', style: 'royal-cap', position: 'center', durationMs: 4000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
+  // 玻璃质感（大航海以外）：礼物 10 ~ 100 元、礼物 100 元以上、房管进场、弹幕回应。数量和礼物图由特效页单独显示，欢迎语里不用写
+  { name: '晶礼', style: 'glass-gift', position: 'bl', durationMs: 4000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
+  { name: '晶耀', style: 'glass-big', position: 'bl', durationMs: 6000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
+  { name: '晶巡', style: 'glass-mod', position: 'bl', durationMs: 3200, texts: { enter: ['{name} 前来巡场'] } },
+  { name: '晶语', style: 'glass-dm', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'], danmu: ['{name}：{text}'] } },
 ];
 
 /** 默认设置 */
@@ -71,7 +76,7 @@ export function seed(db: Db): void {
       { tier: 'gov', effectId: id('金銮'), cooldownMin: 5, enabled: true },
       { tier: 'adm', effectId: id('亭阁'), cooldownMin: 5, enabled: true },
       { tier: 'cap', effectId: id('门楼'), cooldownMin: 5, enabled: true },
-      { tier: 'mod', effectId: id('巡场'), cooldownMin: 10, enabled: true },
+      { tier: 'mod', effectId: id('晶巡'), cooldownMin: 10, enabled: true },
       { tier: 'nor', effectId: id('霜玻·简'), cooldownMin: 30, enabled: false },
     ] as const;
     for (const t of tiers) tx.insert(ruleEnterTiers).values(t).onConflictDoNothing().run();
@@ -81,11 +86,11 @@ export function seed(db: Db): void {
         { fromLevel: 1, effectId: id('霜玻'), cooldownMin: 15, enabled: true },
       ]).run();
     }
-    // 礼物：≥ 100 元星冕、10 ~ 100 元礼物感谢、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
+    // 礼物：≥ 100 元晶耀、10 ~ 100 元晶礼、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
     if (!tx.select().from(ruleGiftBands).limit(1).get()) {
       tx.insert(ruleGiftBands).values([
-        { fromGold: 100_000, effectId: id('星冕'), enabled: true },
-        { fromGold: 10_000, effectId: id('礼物感谢'), enabled: true },
+        { fromGold: 100_000, effectId: id('晶耀'), enabled: true },
+        { fromGold: 10_000, effectId: id('晶礼'), enabled: true },
         { fromGold: 1000, effectId: id('一行字'), enabled: false },
       ]).run();
     }

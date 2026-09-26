@@ -13,6 +13,7 @@ import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rule
 import type { EventLog } from './events.ts';
 import type { Hub } from './hub.ts';
 import type { LiveService } from './live.ts';
+import type { GiftCatalog } from './gifts.ts';
 import type { RoomStore } from './room.ts';
 import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
@@ -20,13 +21,16 @@ import type { ViewerStore } from './viewers.ts';
 
 export type TriggerEvent = Exclude<StdEvent, { kind: 'live' }>;
 /** 欢迎语变量（除观众以外） */
-export type Vars = Omit<TextVars, 'viewer'>;
+export type Vars = Omit<TextVars, 'viewer'> & {
+  /** 礼物图（不进欢迎语，放进播放内容给礼物特效用） */
+  giftImg?: string;
+};
 
 /** 预览时各事件的示例内容 */
 const SAMPLE_VARS: Record<TriggerKind, Vars> = {
   enter: {},
   danmu: { text: '主播晚上好！' },
-  gift: { gift: '小花花', count: 10, valueGold: 1000 },
+  gift: { gift: '小花花', count: 10, valueGold: 1000, giftImg: 'https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png' },
   guard: { months: 1, guardLevel: 3, op: 'open' },
 };
 
@@ -96,6 +100,8 @@ export interface SimulateResult {
 
 export interface PipelineDeps {
   live: Pick<LiveService, 'onEvent' | 'status'>;
+  /** 查礼物图；测试里可以不传 */
+  gifts?: Pick<GiftCatalog, 'iconFor'>;
   room: RoomStore;
   settings: SettingsStore;
   enterRules: EnterRuleStore;
@@ -286,6 +292,10 @@ export class Pipeline {
       case 'gift': {
         const m = matchGift(ev, this.d.giftRules.get());
         vars = { gift: ev.giftName, count: ev.count, valueGold: ev.unitPrice * ev.count };
+        {
+          const img = this.d.gifts?.iconFor(ev.giftId);
+          if (img) vars.giftImg = img;
+        }
         hit = m;
         jump = queueJump && ev.unitPrice * ev.count >= JUMP_GOLD;
         break;
@@ -377,6 +387,7 @@ export class Pipeline {
         ...(viewer.medal ? { medal: { name: viewer.medal.name, level: viewer.medal.level, ...(viewer.medal.colors ? { colors: viewer.medal.colors } : {}) } } : {}),
       },
       ...(kind === 'guard' && vars.op ? { guardOp: vars.op } : {}),
+      ...(kind === 'gift' && vars.gift ? { gift: { name: vars.gift, count: vars.count ?? 1, ...(vars.giftImg ? { img: vars.giftImg } : {}) } } : {}),
       ...(test ? { test: true } : {}),
     };
   }

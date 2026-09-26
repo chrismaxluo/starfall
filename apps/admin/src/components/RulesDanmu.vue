@@ -34,7 +34,7 @@ const TEMPLATES = [
   { name: '主播好', keywords: ['主播好', '晚上好'] },
 ];
 const unusedTemplates = computed(() => TEMPLATES.filter((t) => !state.danmu.some((r) => r.keywords.includes(t.keywords[0]!))));
-const defaultEffect = () => state.effects.find((e) => e.name === '弹幕回应')?.id ?? state.effects[0]?.id ?? null;
+const defaultEffect = () => (state.effects.find((e) => e.name === '晶语') ?? state.effects.find((e) => e.name === '弹幕回应'))?.id ?? state.effects[0]?.id ?? null;
 async function add(keywords: string[] = ['关键词']): Promise<void> {
   const r = await attempt(() => post<DanmuRule>('/api/rules/danmu', { keywords, mode: 'contains', who: 'all', effectId: defaultEffect(), globalCdSec: 10, userCdMin: 10, enabled: true }));
   if (!r) return;

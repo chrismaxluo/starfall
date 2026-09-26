@@ -48,6 +48,8 @@ export const DEFAULT_SETTINGS = {
   giftComboSec: 3,
   /** 每天自动备份数据库和配置（F-DA-03） */
   autoBackup: true,
+  /** 新手引导已完成或跳过（F-UI-06） */
+  onboarded: false,
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

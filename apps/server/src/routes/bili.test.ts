@@ -40,6 +40,14 @@ describe('B 站账号与直播间接口', () => {
     expect((await req({ method: 'PUT', url: '/api/settings', payload: { unknown: 1 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: '/api/settings', payload: { queueMax: 100 } })).statusCode).toBe(400);
   });
+
+  it('新手引导：默认没完成，完成或跳过后记住；导出配置时不包含', async () => {
+    const t = await setup();
+    const req = await t.login();
+    expect((await req({ method: 'GET', url: '/api/settings' })).json().onboarded).toBe(false);
+    expect((await req({ method: 'PUT', url: '/api/settings', payload: { onboarded: true } })).json().onboarded).toBe(true);
+    expect(t.ctx.io.export().settings).not.toHaveProperty('onboarded');
+  });
 });
 
 describe('导入技术验证时的登录信息', () => {

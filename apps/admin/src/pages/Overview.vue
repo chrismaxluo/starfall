@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import Icon from '../components/Icon.vue';
 import IdTag from '../components/IdTag.vue';
@@ -11,7 +11,7 @@ import { clock, duration } from '../lib/format.ts';
 import { IDENTITY, SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
-import { effectById, state } from '../lib/store.ts';
+import { effectById, state, ui } from '../lib/store.ts';
 import type { EventDto, TodayStats, Viewer } from '../lib/types.ts';
 
 const stats = ref<TodayStats | null>(null);
@@ -69,6 +69,16 @@ function test(id: Identity): void {
   const eff = tierEffect(id);
   if (eff) void stage.value?.play(eff, SAMPLES[id]);
 }
+// 命令面板里选了「预览某身份进场特效」
+watch(
+  () => ui.previewTier,
+  (id) => {
+    if (!id) return;
+    ui.previewTier = null;
+    test(id);
+  },
+  { immediate: true, flush: 'post' },
+);
 const queueText = computed(() => (state.queue.playing ? `播放中 · ${state.queue.playing.effectName}` : state.queue.items.length ? `${state.queue.items.length} 个排队` : '空闲'));
 const connText = computed(() => {
   const l = s.value?.live;

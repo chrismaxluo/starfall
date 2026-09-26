@@ -8,7 +8,7 @@ import QrLogin from '../components/QrLogin.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import { del, get, post, put } from '../lib/api.ts';
-import { refreshSettings, refreshStatus, state } from '../lib/store.ts';
+import { refreshSettings, refreshStatus, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { BlacklistEntry, RoomRecord, Settings } from '../lib/types.ts';
 
@@ -87,6 +87,7 @@ onMounted(() => {
   <section class="page">
     <div class="page-head">
       <div><h1>设置</h1><p>账号、直播间、播放方式和数据。</p></div>
+      <div class="actions"><button class="btn" @click="ui.wizard = true"><Icon name="i-star" />重新打开新手引导</button></div>
     </div>
     <div class="set-grid">
       <div class="card">

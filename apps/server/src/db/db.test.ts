@@ -5,6 +5,17 @@ import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleExclusive, settin
 import { BUILTIN_EFFECTS, seed } from './seed.ts';
 
 describe('数据库', () => {
+  it('事件记录翻页（按直播间、按类型，按编号倒序）走索引，不需要把整个直播间的事件取出来再排序', () => {
+    const db = openDb(':memory:');
+    const plan = (q: string) => (db.$client.prepare(`explain query plan ${q}`).all() as Array<{ detail: string }>).map((r) => r.detail).join(' | ');
+    const byRoom = plan('select * from events where room_id = 1 and id < 100 order by id desc limit 51');
+    expect(byRoom).toContain('events_room_id');
+    expect(byRoom).not.toContain('TEMP B-TREE');
+    const byKind = plan("select * from events where room_id = 1 and kind = 'gift' order by id desc limit 51");
+    expect(byKind).toContain('events_room_kind_id');
+    expect(byKind).not.toContain('TEMP B-TREE');
+  });
+
   it('迁移后写入初始数据：8 个内置素材、5 个身份档位、2 个粉丝牌分档、1 个竖屏输出', () => {
     const db = openDb(':memory:');
     seed(db);

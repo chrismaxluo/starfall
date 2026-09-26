@@ -185,7 +185,7 @@ export const events = sqliteTable(
     status: text('status').notNull(),
     raw: text('raw', { mode: 'json' }),
   },
-  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts)],
+  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id)],
 );
 
 /** 观众缓存：昵称、头像（专属用户、黑名单显示用） */

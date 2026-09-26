@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { KEEP_BACKUPS } from '../services/backup.ts';
+import { KEEP_BACKUPS, KEEP_MANUAL } from '../services/backup.ts';
 import { formFile, media, testApp } from '../testing.ts';
 
 let close: Array<() => Promise<unknown>> = [];
@@ -175,10 +175,11 @@ describe('自动备份', () => {
   it('立即备份：数据库和配置各一份，可以下载配置', async () => {
     const t = await setup();
     const item = (await t.req({ method: 'POST', url: '/api/backup/run' })).json();
-    expect(item.stamp).toMatch(/^\d{8}-\d{4}$/);
+    expect(item.stamp).toMatch(/^\d{8}-\d{6}-m$/);
+    expect(item.manual).toBe(true);
     expect(item.dbSize).toBeGreaterThan(0);
     const list = (await t.req({ method: 'GET', url: '/api/backup/list' })).json();
-    expect(list).toMatchObject({ autoBackup: true, keep: 7, items: [{ stamp: item.stamp }] });
+    expect(list).toMatchObject({ autoBackup: true, keep: 7, keepManual: 5, items: [{ stamp: item.stamp }] });
     const dl = await t.req({ method: 'GET', url: `/api/backup/files/${item.config}` });
     expect(dl.json().format).toBe('starfall-config');
     expect((await t.req({ method: 'GET', url: `/api/backup/files/starfall-${item.stamp}.db` })).statusCode).toBe(400);
@@ -207,5 +208,19 @@ describe('自动备份', () => {
     expect(fs.readdirSync(path.join(t.dataDir, 'backups'))).toHaveLength(KEEP_BACKUPS * 2);
     await t.req({ method: 'PUT', url: '/api/settings', payload: { autoBackup: false } });
     expect(await b.tick(day(11, 5))).toBe(false);
+  });
+
+  it('手动备份单独保留，不会挤掉自动备份；同一分钟多次也不会互相覆盖；当天手动备份过也照常自动备份', async () => {
+    const t = await setup();
+    const b = t.ctx.backups;
+    const at = (d: number, h: number, m = 0, s = 0) => Date.UTC(2026, 8, d, h - 8, m, s);
+    for (let d = 1; d <= 3; d++) await b.tick(at(d, 5));
+    for (let i = 0; i < 8; i++) await b.run(at(3, 12, 0, i), true);
+    const list = b.list();
+    expect(list.filter((x) => !x.manual)).toHaveLength(3);
+    expect(list.filter((x) => x.manual)).toHaveLength(KEEP_MANUAL);
+    expect(list.filter((x) => x.manual)[0]!.stamp).toBe('20260903-120007-m');
+    await b.run(at(4, 2), true);
+    expect(await b.tick(at(4, 5))).toBe(true);
   });
 });

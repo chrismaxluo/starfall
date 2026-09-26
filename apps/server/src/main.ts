@@ -5,6 +5,13 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createContext, importSpikeAccount, startBackground } from './context.ts';
 
+// 兜底：漏掉的 Promise 错误只写日志、服务继续运行；真正没接住的异常写日志后退出，由 systemd 重启
+process.on('unhandledRejection', (e) => console.error('[星临] 未处理的异步错误：', e));
+process.on('uncaughtException', (e) => {
+  console.error('[星临] 未处理的异常，服务将重启：', e);
+  process.exit(1);
+});
+
 const config = loadConfig();
 const ctx = createContext(config);
 const app = await buildApp(ctx, { logger: true });

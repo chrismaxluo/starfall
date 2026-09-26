@@ -139,6 +139,14 @@ describe('进场 → 播放', () => {
     expect(t.statuses().at(-1)).not.toBe('once');
   });
 
+  it('换了直播间：还在合并中的进场属于上一个直播间，丢掉，不记到新直播间名下', async () => {
+    const t = await setup();
+    t.live.emit(enter({ guard: 3 }, 'entry_effect'));
+    t.ctx.room.save({ roomId: 40000, shortId: 0, anchorUid: 20001, anchorName: '' });
+    vi.advanceTimersByTime(5000);
+    expect(t.events()).toHaveLength(0);
+  });
+
   it('未开播：默认不播；排练模式照常播', async () => {
     const t = await setup();
     t.live.state.live = false;

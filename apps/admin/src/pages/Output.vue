@@ -1,18 +1,69 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
 import Switch from '../components/Switch.vue';
-import { post, put } from '../lib/api.ts';
+import { del, post, put } from '../lib/api.ts';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
-import { output, refreshOutputs, state } from '../lib/store.ts';
+import { refreshOutputs, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
-import type { OutputDto } from '../lib/types.ts';
+import type { OutputDto, OverlayConfig } from '../lib/types.ts';
 
-const o = computed(() => output());
+// 多个输出（F-OU-05）：记住上次选中的输出
+const SEL_KEY = 'sf.output';
+const readSel = () => {
+  try {
+    return Number(localStorage.getItem(SEL_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+};
+const selId = ref(readSel());
+watch(selId, (id) => {
+  try {
+    localStorage.setItem(SEL_KEY, String(id));
+  } catch {
+    /* 隐私模式下不记住 */
+  }
+});
+const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
+const online = (id: number) => state.overlays.some((x) => x.outputId === id);
+const cfg = computed<OverlayConfig | null>(() => {
+  const x = o.value;
+  return x ? { outputId: x.id, name: x.name, app: x.app, orient: x.orient, width: x.width, height: x.height, safeTop: x.safeTop, safeBottom: x.safeBottom, marginX: x.marginX, scale: x.scale, liteMode: x.liteMode } : null;
+});
+
+async function addOutput(): Promise<void> {
+  // 还没有横屏输出时，新建的默认就是「横屏录播」
+  const land = !state.outputs.some((x) => x.orient === 'landscape');
+  const body = land
+    ? { name: '横屏录播', app: 'obs', orient: 'landscape', width: 1920, height: 1080, safeTop: 0, safeBottom: 0, marginX: 3 }
+    : { name: `输出 ${state.outputs.length + 1}` };
+  const r = await attempt(() => post<OutputDto>('/api/outputs', body), `已新建输出：${body.name}，把它的地址加到对应的直播软件里`);
+  if (!r) return;
+  state.outputs.push(r);
+  selId.value = r.id;
+}
+async function rename(e: Event): Promise<void> {
+  const el = e.target as HTMLInputElement;
+  const name = el.value.trim();
+  if (!name) {
+    el.value = o.value?.name ?? '';
+    return toast('名称不能为空', 'err');
+  }
+  if (name !== o.value?.name) await save({ name }, '已改名');
+}
+async function removeOutput(): Promise<void> {
+  const x = o.value;
+  if (!x) return;
+  if (await attempt(() => del(`/api/outputs/${x.id}`), `已删除输出「${x.name}」，它的地址已失效`)) {
+    state.outputs = state.outputs.filter((y) => y.id !== x.id);
+    selId.value = state.outputs[0]?.id ?? 0;
+  }
+}
 const stage = ref<InstanceType<typeof PreviewStage> | null>(null);
 const showSafe = ref(true);
 const showKey = ref(false);
@@ -92,12 +143,25 @@ function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
         <p>把特效页作为浏览器源加到 OBS 或 B站直播姬里。画布方向和分辨率要和直播软件里的宽高一致。</p>
       </div>
       <div class="actions">
-        <span class="live" :class="overlays.length ? '' : 'off'"><i />{{ overlays.length ? `特效页 ${overlays.length} 个在线` : '特效页不在线' }}</span>
+        <span class="live" :class="overlays.length ? '' : 'off'"><i />{{ overlays.length ? `「${o.name}」特效页 ${overlays.length} 个在线` : `「${o.name}」特效页不在线` }}</span>
       </div>
     </div>
 
     <div class="obs">
       <div class="obs-col">
+        <div class="card">
+          <div class="card-h"><h2>输出</h2><span class="aside">可以为不同场景各建一个，比如竖屏直播 + 横屏录播</span></div>
+          <div class="outs">
+            <button v-for="x in state.outputs" :key="x.id" :aria-pressed="x.id === o.id" @click="selId = x.id"><span class="dot" :class="{ off: !online(x.id) }" />{{ x.name }}<span class="num" style="color: var(--t3); font-size: 12px">{{ x.width }}×{{ x.height }}</span></button>
+            <button @click="addOutput"><Icon name="i-plus" />新建输出</button>
+          </div>
+          <div class="out-name">
+            <label for="outName">名称</label>
+            <input id="outName" :key="o.id" class="inp" :value="o.name" maxlength="40" @change="rename" @keydown.enter="(e) => (e.target as HTMLInputElement).blur()" />
+            <ConfirmButton v-if="state.outputs.length > 1" label="删除这个输出" confirm-label="确认删除？地址会失效" cls="linkish" armed-cls="delb" @confirm="removeOutput" />
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-h"><h2>直播软件</h2><span class="aside">决定下方的添加步骤</span></div>
           <div class="orients">
@@ -193,7 +257,7 @@ function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
         <div class="card">
           <div class="card-h"><h2>实时预览</h2><span class="aside">{{ o.width }} × {{ o.height }} · 只在这里播放</span></div>
           <div class="ostage-wrap">
-            <PreviewStage ref="stage" cls="ostage" :safe="showSafe && o.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
+            <PreviewStage ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && o.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
           </div>
           <div class="prev-tools">
             <button v-for="id in (['gov', 'cap', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', cap: '舰长', fan: '粉丝牌', nor: '普通' }[id as 'gov'] }}</button>

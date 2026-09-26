@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WebSocket } from '@fastify/websocket';
+import { OVERLAY_TIMING } from '@starfall/shared';
 import { room } from '../db/schema.ts';
 import { formFile, media, testApp } from '../testing.ts';
 
@@ -82,6 +83,33 @@ describe('特效页 WebSocket', () => {
     expect(pb.overlays).toHaveLength(1);
     ws.close();
     await vi.waitFor(() => expect(t.ctx.hub.overlayCount()).toBe(0), { timeout: 3000 });
+  });
+
+  it('定时发心跳；报过平安的页面太久不报就断开，没报过的（旧页面）不断开', async () => {
+    const saved = { ...OVERLAY_TIMING };
+    Object.assign(OVERLAY_TIMING, { pingMs: 40, aliveTimeoutMs: 150 });
+    close.push(() => void Object.assign(OVERLAY_TIMING, saved));
+    const t = await setup();
+    await t.app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = t.app.server.address() as { port: number };
+    const url = `ws://127.0.0.1:${port}/ws/overlay?output=${t.output.id}&key=${t.output.key}`;
+    const open = async () => {
+      const ws = new WebSocket(url);
+      close.push(() => ws.close());
+      const types: string[] = [];
+      ws.addEventListener('message', (e) => types.push((JSON.parse(String(e.data)) as { type: string }).type));
+      let code = 0;
+      ws.addEventListener('close', (e) => (code = e.code));
+      await new Promise((r) => ws.addEventListener('open', r, { once: true }));
+      return { ws, types, closed: () => code };
+    };
+    const fresh = await open();
+    const old = await open();
+    fresh.ws.send(JSON.stringify({ type: 'alive' }));
+    await vi.waitFor(() => expect(fresh.types.filter((x) => x === 'ping').length).toBeGreaterThanOrEqual(2));
+    await vi.waitFor(() => expect(fresh.closed()).not.toBe(0), { timeout: 3000 });
+    expect(old.closed()).toBe(0);
+    expect(t.ctx.hub.overlayCount()).toBe(1);
   });
 });
 

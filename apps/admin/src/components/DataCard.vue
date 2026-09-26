@@ -21,17 +21,19 @@ async function load(): Promise<void> {
   backups.value = (await get<{ items: BackupItem[] }>('/api/backup/list').catch(() => ({ items: [] }))).items;
 }
 async function save(patch: Partial<Settings>, msg: string): Promise<void> {
-  if (await attempt(() => put('/api/settings', patch), msg)) await refreshSettings();
+  // 成功失败都重新读取：失败时开关要回到原来的状态
+  await attempt(() => put('/api/settings', patch), msg);
+  await refreshSettings().catch(() => undefined);
 }
 async function runNow(): Promise<void> {
   running.value = true;
   if (await attempt(() => post('/api/backup/run'), '已备份')) await load();
   running.value = false;
 }
-/** 20260926-0400 → 9月26日 04:00 */
+/** 20260926-0400 → 9月26日 04:00；手动备份 20260926-153012-m → 9月26日 15:30 · 手动 */
 function when(stamp: string): string {
-  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(stamp);
-  return m ? `${Number(m[2])}月${Number(m[3])}日 ${m[4]}:${m[5]}` : stamp;
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2}-m)?$/.exec(stamp);
+  return m ? `${Number(m[2])}月${Number(m[3])}日 ${m[4]}:${m[5]}${m[6] ? ' · 手动' : ''}` : stamp;
 }
 
 async function pick(e: Event): Promise<void> {
@@ -56,7 +58,7 @@ onMounted(load);
   <div v-if="state.settings" class="card">
     <div class="card-h"><h2>数据</h2></div>
     <div class="field">
-      <div class="toggle-line">每天自动备份 <span class="hint">凌晨备份数据库和配置，保留最近 7 份</span>
+      <div class="toggle-line">每天自动备份 <span class="hint">凌晨备份数据库和配置，保留最近 7 份；手动备份另外保留最近 5 份</span>
         <Switch v-model="state.settings.autoBackup" label="每天自动备份" @change="(v) => save({ autoBackup: v }, v ? '已开启每天自动备份' : '已关闭自动备份')" />
       </div>
       <div class="bk-list">

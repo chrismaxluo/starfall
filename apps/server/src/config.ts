@@ -14,6 +14,8 @@ export interface Config {
   overlayDist: string;
   /** 主播所在时区，用于"今天"（专属规则有效期、每日统计） */
   timeZone: string;
+  /** 放在反向代理后面时填代理的地址（例如 127.0.0.1），按 X-Forwarded-For / X-Forwarded-Proto 识别真实来源和 HTTPS */
+  trustProxy: string | false;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -25,6 +27,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     adminDist: path.join(REPO_ROOT, 'apps/admin/dist'),
     overlayDist: path.join(REPO_ROOT, 'apps/overlay/dist'),
     timeZone: env.STARFALL_TZ || 'Asia/Shanghai',
+    trustProxy: env.STARFALL_TRUST_PROXY || false,
   };
 }
 

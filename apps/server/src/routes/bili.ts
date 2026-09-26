@@ -20,6 +20,8 @@ export function statusSnapshot(ctx: AppContext) {
     paused: ctx.settings.get('paused'),
     queue: { playing: q.playing !== null, size: q.items.length },
     overlays: ctx.hub.overlayCount(),
+    /** 主播所在时区：后台按这个时区显示时间，和"今天"的统计一致 */
+    timeZone: ctx.config.timeZone,
   };
 }
 

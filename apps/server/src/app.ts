@@ -35,6 +35,7 @@ const TOP_TYPES: Record<string, string> = { html: 'text/html; charset=utf-8', sv
 
 export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   const app = Fastify({
+    trustProxy: ctx.config.trustProxy,
     // 日志里不记录特效页密钥（地址里的 key 参数）
     logger: opts.logger ? { serializers: { req: (req) => ({ method: req.method, url: redactUrl(req.url), remoteAddress: req.ip }) } } : false,
     bodyLimit: 1024 * 1024,
@@ -56,15 +57,32 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
     return sendError(reply, new HttpError(500, 'internal', '服务出错了，请查看日志'));
   });
 
-  // 修改类接口只接受 JSON（配合 SameSite=Strict 防止跨站请求伪造）；除登录和健康检查外都需要登录
+  // 修改类接口只接受 JSON（配合 SameSite=Strict 防止跨站请求伪造）；除登录和健康检查外都需要登录。
+  // 判断用路由匹配到的路径模板：Fastify 匹配前会解码 %xx，原始地址 /%61pi/... 也会匹配到 /api/... 的路由；
+  // 解码后的地址兜底，没有匹配到路由的 /api/... 同样要求登录
   app.addHook('onRequest', async (req) => {
-    const url = req.url.split('?')[0]!;
-    if (!url.startsWith('/api/')) return;
+    const route = req.routeOptions.url ?? '';
+    let path: string;
+    try {
+      path = decodeURIComponent(req.url.split('?')[0]!);
+    } catch {
+      throw new HttpError(400, 'bad_request', '地址格式不对');
+    }
+    if (!route.startsWith('/api/') && !path.toLowerCase().startsWith('/api/')) return;
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.headers['content-type'] && !req.headers['content-type'].startsWith('application/json') && !req.headers['content-type'].startsWith('multipart/form-data')) {
       throw new HttpError(415, 'unsupported_media_type', '只接受 JSON 请求');
     }
-    if (PUBLIC.has(url)) return;
+    if (PUBLIC.has(route)) return;
     if (!ctx.auth.checkSession(req.cookies[SESSION_COOKIE])) throw new HttpError(401, 'unauthorized', '请先登录');
+  });
+
+  // 规则、素材、设置、输出改动成功后通知所有打开的管理后台重新读取（多台设备同时打开时，不会拿着旧数据把别人的修改覆盖掉）
+  const CHANGED: Array<[string, string]> = [['/api/rules', 'rules'], ['/api/effects', 'library'], ['/api/assets', 'library'], ['/api/sounds', 'library'], ['/api/settings', 'settings'], ['/api/blacklist', 'settings'], ['/api/outputs', 'outputs'], ['/api/room', 'settings'], ['/api/backup/import', 'all']];
+  app.addHook('onResponse', async (req, reply) => {
+    if (req.method === 'GET' || reply.statusCode >= 400) return;
+    const route = req.routeOptions.url ?? '';
+    const hit = CHANGED.find(([prefix]) => route.startsWith(prefix));
+    if (hit) ctx.hub.toAdmins({ type: 'changed', what: hit[1] });
   });
 
   // 特效页（构建好的静态文件）：带哈希的资源长期缓存，入口页每次都检查更新

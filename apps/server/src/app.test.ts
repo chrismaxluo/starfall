@@ -22,6 +22,17 @@ describe('后台登录（F-UI-10）', () => {
     expect(res.json()).toEqual({ error: { code: 'unauthorized', message: '请先登录' } });
   });
 
+  it('地址里的字母写成 %xx 编码也绕不过登录', async () => {
+    const { app } = await setup();
+    for (const url of ['/%61pi/outputs', '/%61%70%69/auth/me', '/a%70i/backup/export', '/api/%6futputs', '/api/nope', '/%61pi/auth%2flogin']) {
+      const res = await app.inject({ method: 'GET', url });
+      expect([401, 400], url).toContain(res.statusCode);
+    }
+    expect((await app.inject({ method: 'POST', url: '/%61pi/outputs/1/reset-key', payload: {} })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/%61pi/health' })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/x%ZZ' })).statusCode).toBe(400);
+  });
+
   it('密码错误返回 401；正确则下发 HttpOnly、SameSite=Strict 的会话 Cookie', async () => {
     const { app, password } = await setup();
     expect((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { password: 'wrong' } })).statusCode).toBe(401);
@@ -41,6 +52,13 @@ describe('后台登录（F-UI-10）', () => {
     expect((await req({ method: 'PUT', url: '/api/auth/password', payload: { current: password, next: 'new-password-1' } })).statusCode).toBe(200);
     expect((await req({ method: 'GET', url: '/api/auth/me' })).statusCode).toBe(401);
     expect((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { password: 'new-password-1' } })).statusCode).toBe(200);
+  });
+
+  it('退出登录后，原来的 Cookie 不能再用', async () => {
+    const { login } = await setup();
+    const req = await login();
+    expect((await req({ method: 'POST', url: '/api/auth/logout', payload: {} })).statusCode).toBe(200);
+    expect((await req({ method: 'GET', url: '/api/auth/me' })).statusCode).toBe(401);
   });
 
   it('登录接口限流：每分钟最多 5 次', async () => {

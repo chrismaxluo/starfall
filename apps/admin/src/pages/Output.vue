@@ -74,10 +74,12 @@ const PRESETS = {
   landscape: [[1920, 1080, '推荐'], [1280, 720, '省性能'], [2560, 1440, '2K']],
 } as const;
 
+// 请求返回前可能已经切到另一个输出：结果写回发请求时的那一个
 async function save(patch: Partial<OutputDto>, msg?: string): Promise<void> {
-  if (!o.value) return;
-  const r = await attempt(() => put<OutputDto>(`/api/outputs/${o.value!.id}`, patch), msg);
-  if (r) Object.assign(o.value, r);
+  const target = o.value;
+  if (!target) return;
+  const r = await attempt(() => put<OutputDto>(`/api/outputs/${target.id}`, patch), msg);
+  if (r) Object.assign(target, r);
   else await refreshOutputs();
 }
 function setOrient(orient: 'portrait' | 'landscape'): void {
@@ -110,8 +112,10 @@ async function copy(): Promise<void> {
   }
 }
 async function resetKey(): Promise<void> {
-  const r = await attempt(() => post<OutputDto>(`/api/outputs/${o.value!.id}/reset-key`), '已重置密钥：旧地址立即失效，请把新地址重新填到直播软件');
-  if (r) Object.assign(o.value!, r);
+  const target = o.value;
+  if (!target) return;
+  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：旧地址立即失效，请把新地址重新填到直播软件');
+  if (r) Object.assign(target, r);
 }
 
 function tierEffect(id: Identity): number | null {

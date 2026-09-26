@@ -5,7 +5,7 @@ import { DANMU_WHO_NAMES } from '@starfall/shared/labels';
 import { del, post, put } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
-import { effectById, refreshEffects, state } from '../lib/store.ts';
+import { effectById, refreshEffects, refreshRules, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { DanmuRule, DanmuWho } from '../lib/types.ts';
 import CdPick from './CdPick.vue';
@@ -22,6 +22,8 @@ const WHO = Object.entries(DANMU_WHO_NAMES) as Array<[DanmuWho, string]>;
 async function patch(r: DanmuRule, p: Partial<DanmuRule>, msg?: string): Promise<void> {
   const res = await attempt(() => put<DanmuRule>(`/api/rules/danmu/${r.id}`, p), msg);
   if (res) Object.assign(r, res);
+  // 保存失败：开关、选择框已经在界面上改了，重新读回服务端的真实状态
+  else void refreshRules().catch(() => undefined);
   void refreshEffects();
 }
 /** 常用的几条，点一下直接添加，之后可以改 */

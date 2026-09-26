@@ -34,7 +34,7 @@ function setup(opts: { loggedIn?: boolean; room?: boolean; live?: boolean } = {}
   const events: StdEvent[] = [];
   svc.onEvent((e) => events.push(e));
   const active = () => state.clients.filter((c) => !c.stopped);
-  return { db, svc, state, settings, events, active, roomStore };
+  return { db, svc, state, settings, events, active, roomStore, acc, deps };
 }
 
 describe('只在开播时连接（F-BL-10）', () => {
@@ -157,6 +157,49 @@ describe('只在开播时连接（F-BL-10）', () => {
     expect(rows[0]!.endedAt).not.toBeNull();
     expect(svc.lastSession(30000)).toMatchObject({ id: 1 });
     expect(svc.lastSession(40000)).toBeNull();
+  });
+
+  it('重新扫码换了登录信息：断开，用新的登录信息重连', async () => {
+    const { svc, active, acc } = setup({ live: true });
+    await svc.start();
+    const first = active()[0]!;
+    await acc.save({ SESSDATA: 's2', DedeUserID: '10002', bili_jct: 'c2' }, '', null);
+    await svc.reconcile();
+    expect(first.stopped).toBe(true);
+    expect(active()).toHaveLength(1);
+    expect(active()[0]!.opts.uid).toBe(10002);
+    svc.stop();
+  });
+
+  it('查询开播状态期间换了直播间：旧直播间的结果丢掉，不会给新直播间建场次', async () => {
+    const { svc, db, state, roomStore, deps } = setup({ live: false });
+    await svc.start();
+    let release!: () => void;
+    const orig = deps.getRoomInit;
+    deps.getRoomInit = async (http, roomId) => { await new Promise<void>((r) => (release = r)); return { ...(await orig(http, roomId)), liveStatus: 1 }; };
+    const pending = svc.poll();
+    deps.getRoomInit = orig;
+    roomStore.save({ roomId: 40000, shortId: 0, anchorUid: 20001, anchorName: '' });
+    release();
+    await pending;
+    expect(svc.status().live).toBe(false);
+    expect(db.select().from(liveSessions).all()).toHaveLength(0);
+    state.live = false;
+    svc.stop();
+  });
+
+  it('登录信息无法解密时当作未登录，不抛出异常', async () => {
+    const { svc, db } = setup({ live: true });
+    db.update(account).set({ cookiesEnc: 'broken' }).run();
+    const err = console.error;
+    console.error = () => {};
+    try {
+      await svc.start();
+      expect(svc.status()).toMatchObject({ reason: 'not_logged_in' });
+    } finally {
+      console.error = err;
+      svc.stop();
+    }
   });
 
   it('直播间实时数据（看过人数等）单独转发，不当作观众事件', async () => {

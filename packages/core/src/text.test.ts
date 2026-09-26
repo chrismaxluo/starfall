@@ -32,6 +32,12 @@ describe('变量替换（F-AS-10）', () => {
     expect(fillText('{guard} {name} 驾临', { viewer: viewer({ name: '路过的猫' }) })).toBe('路过的猫 驾临');
   });
 
+  it('只整理模板的空格：昵称、弹幕里原有的连续空格保持不变', () => {
+    expect(fillText('{name}：{text}', { viewer: viewer({ name: 'A  B' }), text: '你好   世界' })).toBe('A  B：你好   世界');
+    expect(fillText('欢迎{guard}  {name} 登船', { viewer: viewer({ name: '猫' }) })).toBe('欢迎 猫 登船');
+    expect(fillText('{guard} {medal} {name}', { viewer: viewer({ name: '猫' }) })).toBe('猫');
+  });
+
   it('礼物：名称、数量、价值换算成元', () => {
     const s = fillText('感谢 {name} 送出 {gift} ×{count}，价值 {value}', { viewer: viewer({ name: '雾里看花' }), gift: '告白花束', count: 3, valueGold: 59700 });
     expect(s).toBe('感谢 雾里看花 送出 告白花束 ×3，价值 59.7 元');

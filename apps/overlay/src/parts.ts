@@ -22,9 +22,16 @@ export function avatar(v: PlayViewer, size?: number): HTMLElement {
     img.referrerPolicy = 'no-referrer';
     img.alt = '';
     img.onload = () => el.replaceChildren(img);
-    img.src = v.face;
+    img.src = thumb(v.face, size ?? 96);
   }
   return el;
+}
+
+/** B 站头像用缩略图（原图可能有上千像素，下载和解码都浪费）；按 2 倍像素取，其他地址原样返回 */
+export function thumb(url: string, px: number): string {
+  if (!/^https?:\/\/i\d\.hdslb\.com\//.test(url) || url.includes('@')) return url;
+  const n = Math.min(512, Math.ceil((px * 2) / 32) * 32);
+  return `${url}@${n}w_${n}h.webp`;
 }
 
 /** 粉丝牌颜色表（B 站没有下发颜色时使用，与设计预览一致） */

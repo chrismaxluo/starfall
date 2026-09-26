@@ -116,9 +116,10 @@ export class Pipeline {
   private readonly d: PipelineDeps;
   private readonly now: () => number;
   private readonly rng: () => number;
-  private readonly merger = new EnterMerger();
-  private readonly combo = new GiftComboMerger();
-  private readonly guards = new GuardDeduper();
+  private merger = new EnterMerger();
+  private combo = new GiftComboMerger();
+  private guards = new GuardDeduper();
+  private unsubscribeRoom: (() => void) | null = null;
   private readonly cooldowns = new Cooldowns();
   private readonly once = new OncePerLive();
   private readonly queue = new PlayQueue<Queued>();
@@ -141,16 +142,36 @@ export class Pipeline {
   }
 
   start(): void {
+    this.d.log.clearStaleQueued();
     this.unsubscribe = this.d.live.onEvent((ev, raw) => this.handle(ev, raw));
-    this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
+    // 换了直播间：还在合并中（等待中的进场、连击中的礼物、等待确认的上舰）属于上一个直播间，丢掉，不要记到新直播间名下
+    this.unsubscribeRoom = this.d.room.onChange(() => {
+      this.merger = new EnterMerger();
+      this.combo = new GiftComboMerger();
+      this.guards = new GuardDeduper();
+    });
+    this.flushTimer = setInterval(() => this.guard('取出合并中的事件', () => this.flush()), FLUSH_MS);
+  }
+
+  /** 定时器里出错时写日志、不让进程退出（例如磁盘满导致写记录失败），下一次还会继续 */
+  private guard(what: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (e) {
+      console.error(`[播放调度] ${what}出错：`, e);
+    }
   }
 
   stop(): void {
     this.unsubscribe?.();
+    this.unsubscribeRoom?.();
+    this.unsubscribeRoom = null;
     if (this.flushTimer) clearInterval(this.flushTimer);
     this.flushTimer = null;
     if (this.current) clearTimeout(this.current.timer);
     this.current = null;
+    // 还在排队的没有播出来：写明原因（服务重启后不会被当作本场已播）
+    for (const q of this.queue.clear()) this.unplayed(q, 'cleared');
   }
 
   onQueueChange(fn: (q: QueueSnapshot) => void): () => void {
@@ -280,7 +301,7 @@ export class Pipeline {
     let effect: EffectDto | null = null;
     if (hit) {
       try {
-        effect = this.d.effects.get(hit.effectId);
+        effect = this.d.effects.get(hit.effectId, { uses: false });
       } catch {
         effect = null;
       }
@@ -383,8 +404,10 @@ export class Pipeline {
       // 播放节奏由服务端控制：时长 + 间隔后播下一个，多个特效页始终同步
       const timer = setTimeout(() => {
         this.current = null;
-        this.pump();
-        this.emitQueue();
+        this.guard('播放下一个', () => {
+          this.pump();
+          this.emitQueue();
+        });
       }, item.effect.durationMs + PLAY_GAP_MS);
       this.current = { q, startedAt: this.now(), timer };
     }

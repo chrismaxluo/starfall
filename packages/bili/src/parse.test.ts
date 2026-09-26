@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { encodePb } from './proto.ts';
 import { parseMessage } from './parse.ts';
+import type { ParseContext } from './parse.ts';
 import { FIXTURE_ANCHOR, fixture } from './testing.ts';
 
 let n = 0;
@@ -20,6 +22,20 @@ describe('进场 INTERACT_WORD_V2', () => {
     expect(ev.viewer.medal?.anchorUid).toBe(99999);
     expect(ev.viewer.isMod).toBe(true);
     expect(ev.viewer.guard).toBe(0);
+  });
+
+  it('粉丝牌上的大航海等级只在牌子属于本直播间时采用（别的主播的舰长不算本直播间舰长）', () => {
+    const enter = (ruid: number, guardLevel: number, own?: number) => ({
+      cmd: 'INTERACT_WORD_V2',
+      data: { pb: encodePb('InteractWord', { uid: 10009, uname: '路人', msgType: 1, uinfo: { uid: 10009, base: { name: '路人' }, medal: { name: '别家', level: 20, ruid, guardLevel }, ...(own ? { guard: { level: own } } : {}) } }) },
+    });
+    const at = { ...ctx, anchorUid: FIXTURE_ANCHOR };
+    const guard = (raw: object, c: ParseContext = at) => { const ev = parseMessage(raw, c); if (ev?.kind !== 'enter') throw new Error(); return ev.viewer.guard; };
+    expect(guard(enter(99999, 3))).toBe(0);
+    expect(guard(enter(FIXTURE_ANCHOR, 3))).toBe(3);
+    expect(guard(enter(99999, 3, 2))).toBe(2);
+    // 不知道主播 UID 时，只相信用户自己的等级
+    expect(guard(enter(FIXTURE_ANCHOR, 3), ctx)).toBe(0);
   });
 
   it('关注消息、未登录（UID 为 0）的消息不产生进场事件', () => {

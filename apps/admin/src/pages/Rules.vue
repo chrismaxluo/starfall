@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 触发规则：四类事件（进场 / 弹幕 / 礼物 / 上舰）分开设置，每条规则写成一句话：谁、做了什么时，播放哪个特效
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import CdPick from '../components/CdPick.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
@@ -231,7 +231,10 @@ async function setUntil(v: string | null): Promise<void> {
   if (!p) return;
   await updateEx(p.x, { until: v || null }, v ? `有效期至 ${v}` : '已设为长期');
 }
-const todayStr = today();
+// 每分钟更新一次：直播跨过零点后，"已过期"的标记跟着变
+const todayStr = ref(today());
+const todayTimer = setInterval(() => (todayStr.value = today()), 60_000);
+onBeforeUnmount(() => clearInterval(todayTimer));
 
 watch(
   () => route.value.sub,
@@ -409,7 +412,7 @@ onMounted(() => void refreshRules());
             <span v-if="!b.enabled" class="offnote">已关闭：这些观众按其他观众处理</span>
           </span>
           <span class="acts">
-            <button v-if="bands.length > 1" class="playmini" :aria-label="`删除粉丝牌 ${bandLabel(i)}这一段`" title="删除这一段（并入相邻的一段）" @click="removeBand(b, i)"><Icon name="i-x" /></button>
+            <ConfirmButton v-if="bands.length > 1" label="删除" confirm-label="确认删除" cls="playmini" :aria-label="`删除粉丝牌 ${bandLabel(i)}这一段`" title="删除这一段（并入相邻的一段），再点一次确认" @confirm="removeBand(b, i)"><Icon name="i-x" /></ConfirmButton>
             <button class="playmini" :aria-label="`预览粉丝牌 ${bandLabel(i)}进场`" @click="preview(b.effectId, { ...SAMPLES.fan, medalLevel: b.fromLevel }, `粉丝牌 ${bandLabel(i)}进场`)"><svg><use href="#i-play" /></svg></button>
             <Switch v-model="b.enabled" :label="`粉丝牌 ${bandLabel(i)}进场特效`" @change="(v) => save(v ? `已打开粉丝牌 ${bandLabel(i)}` : `已关闭粉丝牌 ${bandLabel(i)}，这些观众按其他观众处理`)" />
           </span>

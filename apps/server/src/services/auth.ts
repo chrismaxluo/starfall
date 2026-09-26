@@ -1,5 +1,6 @@
 // 后台登录（需求 F-UI-10）：密码用 scrypt 哈希存储；首次启动生成随机初始密码。
-// 会话是签名的 Cookie（不在服务端保存），修改密码后旧会话全部失效。
+// 会话是签名的 Cookie：到期时间.会话编号.签名。修改密码后旧会话全部失效；
+// 退出登录时把这个会话编号记进已注销名单（到期后自动清掉），偷到的 Cookie 在退出后也不能再用。
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import type { Secret } from './secret.ts';
 import type { SettingsStore } from './settings.ts';
 
 const KEY = 'admin_password';
+const REVOKED_KEY = 'revoked_sessions';
 const SESSION_DAYS = 30;
 
 interface PasswordRecord {
@@ -66,22 +68,34 @@ export class AdminAuth {
     fs.rmSync(this.initialPasswordFile, { force: true });
   }
 
-  /** 生成会话令牌：到期时间.签名 */
+  /** 生成会话令牌：到期时间.会话编号.签名 */
   issueSession(now = Date.now()): { token: string; maxAgeSec: number } {
     const rec = this.settings.getRaw<PasswordRecord>(KEY)!;
     const exp = now + SESSION_DAYS * 86400_000;
-    return { token: `${exp}.${this.secret.hmac(`${exp}:${rec.version}`)}`, maxAgeSec: SESSION_DAYS * 86400 };
+    const id = crypto.randomBytes(12).toString('base64url');
+    return { token: `${exp}.${id}.${this.secret.hmac(`${exp}:${id}:${rec.version}`)}`, maxAgeSec: SESSION_DAYS * 86400 };
   }
 
   checkSession(token: string | undefined, now = Date.now()): boolean {
     if (!token) return false;
-    const [expStr, sig] = token.split('.');
+    const [expStr, id, sig, extra] = token.split('.');
     const exp = Number(expStr);
     const rec = this.settings.getRaw<PasswordRecord>(KEY);
-    if (!rec || !sig || !Number.isFinite(exp) || exp < now) return false;
-    const expect = Buffer.from(this.secret.hmac(`${exp}:${rec.version}`));
+    if (!rec || !id || !sig || extra !== undefined || !Number.isFinite(exp) || exp < now) return false;
+    const expect = Buffer.from(this.secret.hmac(`${exp}:${id}:${rec.version}`));
     const got = Buffer.from(sig);
-    return expect.length === got.length && crypto.timingSafeEqual(expect, got);
+    if (expect.length !== got.length || !crypto.timingSafeEqual(expect, got)) return false;
+    return !(id in (this.settings.getRaw<Record<string, number>>(REVOKED_KEY) ?? {}));
+  }
+
+  /** 退出登录：这个会话以后不能再用 */
+  revokeSession(token: string | undefined, now = Date.now()): void {
+    if (!token || !this.checkSession(token, now)) return;
+    const [expStr, id] = token.split('.');
+    const list = { ...(this.settings.getRaw<Record<string, number>>(REVOKED_KEY) ?? {}) };
+    for (const [k, exp] of Object.entries(list)) if (exp < now) delete list[k];
+    list[id!] = Number(expStr);
+    this.settings.setRaw(REVOKED_KEY, list);
   }
 
   private write(password: string, version: number): void {

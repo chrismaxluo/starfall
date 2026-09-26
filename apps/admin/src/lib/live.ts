@@ -1,5 +1,6 @@
 // 管理后台的实时连接：事件、队列、连接状态、特效页上下线
-import { refreshFeed, refreshStatus, state } from './store.ts';
+import { setTimeZone } from './format.ts';
+import { refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
@@ -9,10 +10,13 @@ type Msg =
   | { type: 'queue'; queue: QueueSnapshot; paused: boolean }
   | { type: 'overlays'; overlays: OverlayInfo[] }
   | { type: 'event'; event: EventDto }
-  | { type: 'event_status'; id: number; status: PlayStatus };
+  | { type: 'event_status'; id: number; status: PlayStatus }
+  /** 别的设备（或这台）改了规则、素材、设置、输出 */
+  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'all' };
 
 const eventListeners = new Set<(e: EventDto) => void>();
 const statusListeners = new Set<(id: number, s: PlayStatus) => void>();
+const resyncListeners = new Set<() => void>();
 
 /** 订阅新事件（事件记录页、总览统计） */
 export function onLiveEvent(fn: (e: EventDto) => void): () => void {
@@ -24,7 +28,14 @@ export function onLiveEventStatus(fn: (id: number, s: PlayStatus) => void): () =
   return () => statusListeners.delete(fn);
 }
 
+/** 断线重连后（可能漏了事件）：事件记录页等重新加载 */
+export function onResync(fn: () => void): () => void {
+  resyncListeners.add(fn);
+  return () => resyncListeners.delete(fn);
+}
+
 let ws: WebSocket | null = null;
+let hellos = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let attempt = 0;
 let stopped = true;
@@ -33,10 +44,21 @@ function handle(m: Msg): void {
   switch (m.type) {
     case 'hello':
       state.status = m.status;
+      setTimeZone(m.status.timeZone);
       state.queue = m.queue;
       state.overlays = m.overlays;
       state.roomInfo = m.roomInfo;
+      // 重连：断开期间的事件和别处的修改都补回来
+      if (hellos++ > 0) {
+        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs()]).catch(() => undefined);
+        for (const fn of resyncListeners) fn();
+      }
       break;
+    case 'changed': {
+      const jobs = { rules: [refreshRules], library: [refreshEffects, refreshRules], settings: [refreshSettings, refreshStatus], outputs: [refreshOutputs], all: [refreshRules, refreshEffects, refreshSettings, refreshOutputs] }[m.what] ?? [];
+      void Promise.all(jobs.map((f) => f())).catch(() => undefined);
+      break;
+    }
     case 'room_info':
       // 换了直播间：实时动态也换成新直播间的
       if (!m.info || (state.roomInfo && m.info.roomId !== state.roomInfo.roomId)) void refreshFeed();
@@ -87,6 +109,8 @@ function open(): void {
     }
   };
   s.onclose = (e) => {
+    // 已经被新连接取代（退出后很快又登录）：旧连接的关闭不影响新连接
+    if (ws !== s) return;
     ws = null;
     state.wsOnline = false;
     if (stopped) return;
@@ -102,12 +126,17 @@ function open(): void {
 export function startLive(): void {
   if (!stopped) return;
   stopped = false;
+  if (timer) clearTimeout(timer);
+  timer = null;
   open();
 }
 
 export function stopLive(): void {
   stopped = true;
   if (timer) clearTimeout(timer);
-  ws?.close();
+  timer = null;
+  const s = ws;
   ws = null;
+  hellos = 0;
+  s?.close();
 }

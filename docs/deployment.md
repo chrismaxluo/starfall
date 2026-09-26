@@ -47,9 +47,13 @@ pnpm --filter @starfall/server start
 
 ## 3. 作为系统服务运行
 
-仓库提供了 systemd 服务文件 `deploy/starfall.service`，默认安装目录为 `/opt/starfall`，端口 17520，并限制内存上限 450 MB。安装目录不同时，请先修改文件中的 `WorkingDirectory` 与 `STARFALL_DATA`。
+仓库提供了 systemd 服务文件 `deploy/starfall.service`，默认安装目录为 `/opt/starfall`，端口 17520，并限制内存上限 450 MB。安装目录不同时，请先修改文件中的 `WorkingDirectory`、`STARFALL_DATA` 与 `ReadWritePaths`。
+
+服务以专用的低权限账号 `starfall` 运行，只能写数据目录，不能改动系统和其他程序。先创建账号并把数据目录交给它：
 
 ```bash
+useradd --system --no-create-home --shell /usr/sbin/nologin starfall
+mkdir -p /opt/starfall/data && chown -R starfall:starfall /opt/starfall/data
 cp deploy/starfall.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now starfall
@@ -84,6 +88,7 @@ journalctl -u starfall --since "1 hour ago"
 | `STARFALL_HOST` | `0.0.0.0` | 监听地址。放在反向代理后面时可以改为 `127.0.0.1` |
 | `STARFALL_DATA` | `<安装目录>/data` | 数据目录 |
 | `STARFALL_TZ` | `Asia/Shanghai` | 主播所在时区，用于「今天」的统计与专属用户有效期 |
+| `STARFALL_TRUST_PROXY` | 不设置 | 放在 HTTPS 反向代理后面时填代理的地址（同一台机器上填 `127.0.0.1`），用于识别访问者的真实地址（登录限流按人计算）和 HTTPS（Cookie 加上 secure） |
 
 ## 6. 配置 HTTPS（可选）
 
@@ -112,12 +117,15 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_read_timeout 3600s;           # 特效页、后台的实时连接是长连接
     }
 }
 ```
+
+配好代理后，在服务文件里加上 `Environment=STARFALL_TRUST_PROXY=127.0.0.1`（见上一节），并建议把 `STARFALL_HOST` 改为 `127.0.0.1`、关闭 17520 端口的公网访问，只通过 HTTPS 访问。
 
 启用 HTTPS 后，直播软件里的浏览器源地址也改用 `https://` 开头的新地址（在「直播软件输出」页重新复制）。
 
@@ -166,6 +174,7 @@ cd /opt/starfall/data
 mv starfall.db starfall.db.bak
 rm -f starfall.db-wal starfall.db-shm
 cp backups/starfall-20260926-0400.db starfall.db
+chown starfall:starfall starfall.db
 systemctl start starfall
 ```
 
@@ -182,6 +191,8 @@ systemctl start starfall
 ```bash
 cd /opt/starfall && pnpm reset-password
 ```
+
+用 root 运行时，命令会把改动过的数据库文件交还给服务账号 `starfall`，服务可以继续正常写入。
 
 ## 10. 常见问题
 

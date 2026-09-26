@@ -26,11 +26,11 @@ describe('进场合并（F-EN-10）', () => {
     expect(m.flush(5000)).toEqual([]);
   });
 
-  it('只有 ENTRY_EFFECT 时，等待 1.6 秒后单独输出', () => {
+  it('只有 ENTRY_EFFECT 时，等待 2 秒后单独输出', () => {
     const m = new EnterMerger();
     m.push(ev(1, 'entry_effect', { guard: 2 }), 0);
-    expect(m.flush(1599)).toEqual([]);
-    expect(m.flush(1600).map((e) => e.viewer.guard)).toEqual([2]);
+    expect(m.flush(1999)).toEqual([]);
+    expect(m.flush(2000).map((e) => e.viewer.guard)).toEqual([2]);
     expect(m.pendingCount).toBe(0);
   });
 

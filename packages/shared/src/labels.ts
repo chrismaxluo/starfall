@@ -28,3 +28,6 @@ export const DANMU_WHO_NAMES = { all: '所有人', fan: '戴本房间粉丝牌',
 
 /** 高价值插队的门槛：单次 ≥ 100 元（F-PL-03），单位：金瓜子 */
 export const JUMP_GOLD = 100_000;
+
+/** 单个素材、音效文件的大小上限（服务端和后台共用） */
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;

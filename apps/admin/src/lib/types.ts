@@ -80,6 +80,8 @@ export interface StatusSnapshot {
   paused: boolean;
   queue: { playing: boolean; size: number };
   overlays: number;
+  /** 主播所在时区（服务端设置） */
+  timeZone?: string;
 }
 
 export interface Settings {
@@ -105,6 +107,8 @@ export interface BackupItem {
   dbSize: number;
   config: string | null;
   configSize: number;
+  /** 手动"立即备份"的 */
+  manual: boolean;
 }
 
 /** 导入配置前的变化预览（与服务端 services/config-io.ts 一致） */

@@ -2749,7 +2749,7 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
   }
   function overlayUrl(o, real) {
     return real ? 'overlay.html?o=' + o.orient + '&w=' + o.w + '&h=' + o.h + '&st=' + o.st + '&sb=' + o.sb + '&mx=' + o.mx + '&scale=' + o.scale + (o.lite === 'on' ? '&lite=1' : '')
-      : 'http://20.46.163.200:8080/overlay?out=' + o.id + '&key=' + (showKey ? o.key : '••••••••••');
+      : 'http://localhost:17520/overlay/?output=' + o.id + '&key=' + (showKey ? o.key : '••••••••••');
   }
   function renderObs() {
     var o = OUT();

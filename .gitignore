@@ -26,7 +26,8 @@ pnpm-debug.log*
 __pycache__/
 
 # 设计预览的生成物：字体（design/tools/fetch_fonts.py）、需求文档网页（design/tools/md2html.py）
-design/preview/assets/
+design/preview/assets/*
+!design/preview/assets/logo.svg
 design/preview/docs/
 
 # 编辑器与系统

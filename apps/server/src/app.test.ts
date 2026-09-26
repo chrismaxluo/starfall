@@ -54,6 +54,13 @@ describe('后台登录（F-UI-10）', () => {
     expect((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { password: 'new-password-1' } })).statusCode).toBe(200);
   });
 
+  it('退出登录后，原来的 Cookie 不能再用', async () => {
+    const { login } = await setup();
+    const req = await login();
+    expect((await req({ method: 'POST', url: '/api/auth/logout', payload: {} })).statusCode).toBe(200);
+    expect((await req({ method: 'GET', url: '/api/auth/me' })).statusCode).toBe(401);
+  });
+
   it('登录接口限流：每分钟最多 5 次', async () => {
     const { app } = await setup();
     const codes = [];

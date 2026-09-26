@@ -78,6 +78,17 @@ describe('SVGA、Lottie 读取自身的元数据', () => {
     expect(await probe(tmp('a.svga', buf), ALLOWED.svga!)).toEqual({ width: 750, height: 1334, durationMs: 3000, hasAlpha: true });
   });
 
+  it('SVGA 压缩炸弹（解压后超过 64 MB）直接拒绝，不会把内存撑爆', async () => {
+    const bomb = zlib.deflateSync(Buffer.alloc(80 * 1024 * 1024), { level: 9 });
+    expect(bomb.length).toBeLessThan(200 * 1024);
+    await expect(probe(tmp('bomb.svga', bomb), ALLOWED.svga!)).rejects.toThrow('太大');
+  });
+
+  it('ffprobe 按扩展名指定格式：内容是播放列表的 .mp3 不会被当成播放列表去读别的文件', async () => {
+    const fake = Buffer.concat([Buffer.from('ID3\x03\x00\x00\x00\x00\x00\x00', 'latin1'), Buffer.from('#EXTM3U\n#EXTINF:1,\n/etc/hostname\n')]);
+    await expect(probe(tmp('list.mp3', fake), ALLOWED.mp3!)).rejects.toThrow();
+  });
+
   it('Lottie：w、h，(op - ip) ÷ fr = 时长；不是动画文件时报错', async () => {
     expect(await probe(tmp('a.json', JSON.stringify({ v: '5.7', w: 512, h: 512, fr: 30, ip: 0, op: 90, layers: [] })), ALLOWED.json!)).toEqual({ width: 512, height: 512, durationMs: 3000, hasAlpha: true });
     await expect(probe(tmp('b.json', '{"hello":1}'), ALLOWED.json!)).rejects.toThrow('Lottie');

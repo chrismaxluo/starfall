@@ -1,4 +1,6 @@
-# 星临服务（服务器部署）。安装：
+# 星临服务（服务器部署）。安装（详见 docs/deployment.md）：
+#   useradd --system --no-create-home --shell /usr/sbin/nologin starfall
+#   mkdir -p /opt/starfall/data && chown -R starfall:starfall /opt/starfall/data
 #   cp deploy/starfall.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now starfall
 # 查看日志：journalctl -u starfall -f
 [Unit]
@@ -20,6 +22,28 @@ RestartSec=3
 Environment=NODE_OPTIONS=--max-old-space-size=256
 MemoryMax=450M
 UMask=0077
+# 以专用账号运行，只能写数据目录：即使上传文件的处理环节（ffprobe 等）被利用，也碰不到系统和其他服务
+User=starfall
+Group=starfall
+ReadWritePaths=/opt/starfall/data
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target

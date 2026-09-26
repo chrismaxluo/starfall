@@ -57,6 +57,22 @@ describe('后台登录', () => {
     expect(auth.checkSession('garbage')).toBe(false);
   });
 
+  it('退出登录后这个会话不能再用，其他会话不受影响；过期的注销记录会被清掉', () => {
+    const { auth } = setup();
+    auth.ensurePassword();
+    const a = auth.issueSession(1000).token;
+    const b = auth.issueSession(1000).token;
+    auth.revokeSession(a, 2000);
+    expect(auth.checkSession(a, 3000)).toBe(false);
+    expect(auth.checkSession(b, 3000)).toBe(true);
+    // 旧格式（到期时间.签名）的令牌不再接受
+    expect(auth.checkSession(`${a.split('.')[0]}.${a.split('.')[2]}`, 3000)).toBe(false);
+    const later = 1000 + 31 * 86400_000;
+    const c = auth.issueSession(later).token;
+    auth.revokeSession(c, later + 1);
+    expect(Object.keys((auth as unknown as { settings: { getRaw(k: string): object } }).settings.getRaw('revoked_sessions'))).toHaveLength(1);
+  });
+
   it('修改密码后旧会话失效、初始密码文件删除；新密码至少 8 位', () => {
     const { dir, auth } = setup();
     const pw = auth.ensurePassword()!;

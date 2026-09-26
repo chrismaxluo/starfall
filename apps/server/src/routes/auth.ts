@@ -15,7 +15,8 @@ export function authRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { ok: true };
   });
 
-  app.post('/api/auth/logout', async (_req, reply) => {
+  app.post('/api/auth/logout', async (req, reply) => {
+    ctx.auth.revokeSession(req.cookies[SESSION_COOKIE]);
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true };
   });
@@ -31,7 +32,7 @@ export function authRoutes(app: FastifyInstance, ctx: AppContext): void {
       throw e;
     }
     const { token, maxAgeSec } = ctx.auth.issueSession();
-    reply.setCookie(SESSION_COOKIE, token, { path: '/', httpOnly: true, sameSite: 'strict', maxAge: maxAgeSec });
+    reply.setCookie(SESSION_COOKIE, token, { path: '/', httpOnly: true, sameSite: 'strict', maxAge: maxAgeSec, secure: req.protocol === 'https' });
     return { ok: true };
   });
 }

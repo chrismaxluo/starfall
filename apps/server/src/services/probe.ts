@@ -79,9 +79,37 @@ async function hasFfprobe(): Promise<boolean> {
   return ffprobeOk;
 }
 
-async function ffprobe(file: string): Promise<ProbeResult> {
+/**
+ * 按扩展名指定 ffprobe 的格式（不让它按内容猜：否则一个 .mp3 文件可以被当成播放列表去读别的文件），
+ * 并且只允许读本地文件。APNG 有可能其实是普通 PNG，失败时按 PNG 再试一次
+ */
+const FFPROBE_FORMAT: Record<string, string[]> = {
+  webm: ['matroska'],
+  mp4: ['mov'],
+  gif: ['gif'],
+  png: ['png_pipe'],
+  apng: ['apng', 'png_pipe'],
+  webp: ['webp_pipe'],
+  jpg: ['jpeg_pipe'],
+  jpeg: ['jpeg_pipe'],
+  mp3: ['mp3'],
+  wav: ['wav'],
+  ogg: ['ogg'],
+};
+
+async function ffprobe(file: string, ext: string): Promise<ProbeResult> {
   if (!(await hasFfprobe())) return EMPTY;
-  const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height,pix_fmt,duration:stream_tags=alpha_mode:format=duration', '-of', 'json', file], { timeout: 20_000 });
+  const formats = FFPROBE_FORMAT[ext];
+  if (!formats) throw new Error(`不支持的文件类型：${ext}`);
+  let stdout = '';
+  for (const [i, f] of formats.entries()) {
+    try {
+      ({ stdout } = await run('ffprobe', ['-v', 'error', '-protocol_whitelist', 'file', '-f', f, '-show_entries', 'stream=codec_type,width,height,pix_fmt,duration:stream_tags=alpha_mode:format=duration', '-of', 'json', file], { timeout: 20_000 }));
+      break;
+    } catch (e) {
+      if (i === formats.length - 1) throw e;
+    }
+  }
   const j = JSON.parse(stdout) as { streams?: Array<{ codec_type: string; width?: number; height?: number; pix_fmt?: string; duration?: string; tags?: { alpha_mode?: string; ALPHA_MODE?: string } }>; format?: { duration?: string } };
   const v = j.streams?.find((x) => x.codec_type === 'video');
   // WebM 的时长只在容器上（流上是 N/A）
@@ -101,7 +129,14 @@ function probeSvga(file: string): ProbeResult {
   const buf = fs.readFileSync(file);
   if (buf.subarray(0, 2).toString('latin1') === 'PK') return { ...EMPTY, hasAlpha: true }; // 1.x 格式不解析
   const T = svgaRoot.lookupType('MovieEntity');
-  const m = T.toObject(T.decode(zlib.inflateSync(buf)), { defaults: false }) as { params?: { viewBoxWidth?: number; viewBoxHeight?: number; fps?: number; frames?: number } };
+  // 限制解压后的大小：防止很小的压缩炸弹解压出几个 GB 把内存撑爆
+  let raw: Buffer;
+  try {
+    raw = zlib.inflateSync(buf, { maxOutputLength: SVGA_MAX_BYTES });
+  } catch {
+    throw new Error('SVGA 文件损坏或解压后太大');
+  }
+  const m = T.toObject(T.decode(raw), { defaults: false }) as { params?: { viewBoxWidth?: number; viewBoxHeight?: number; fps?: number; frames?: number } };
   const p = m.params ?? {};
   return {
     width: p.viewBoxWidth ? Math.round(p.viewBoxWidth) : null,
@@ -111,7 +146,11 @@ function probeSvga(file: string): ProbeResult {
   };
 }
 
+const SVGA_MAX_BYTES = 64 * 1024 * 1024;
+const LOTTIE_MAX_BYTES = 20 * 1024 * 1024;
+
 function probeLottie(file: string): ProbeResult {
+  if (fs.statSync(file).size > LOTTIE_MAX_BYTES) throw new Error(`Lottie 动画文件不能超过 ${LOTTIE_MAX_BYTES / 1024 / 1024} MB`);
   const j = JSON.parse(fs.readFileSync(file, 'utf8')) as { w?: number; h?: number; fr?: number; ip?: number; op?: number; layers?: unknown };
   if (!Array.isArray(j.layers)) throw new Error('不是有效的 Lottie 动画文件');
   const frames = (j.op ?? 0) - (j.ip ?? 0);
@@ -121,7 +160,7 @@ function probeLottie(file: string): ProbeResult {
 export async function probe(file: string, type: FileType): Promise<ProbeResult> {
   if (type.ext === 'svga') return probeSvga(file);
   if (type.ext === 'json') return probeLottie(file);
-  const r = await ffprobe(file);
+  const r = await ffprobe(file, type.ext);
   if (type.kind === 'audio') return { ...r, width: null, height: null, hasAlpha: false };
   if (type.ext === 'jpg') return { ...r, durationMs: null, hasAlpha: false };
   if (type.ext === 'mp4') return { ...r, hasAlpha: false };

@@ -35,6 +35,7 @@ const TOP_TYPES: Record<string, string> = { html: 'text/html; charset=utf-8', sv
 
 export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   const app = Fastify({
+    trustProxy: ctx.config.trustProxy,
     // 日志里不记录特效页密钥（地址里的 key 参数）
     logger: opts.logger ? { serializers: { req: (req) => ({ method: req.method, url: redactUrl(req.url), remoteAddress: req.ip }) } } : false,
     bodyLimit: 1024 * 1024,

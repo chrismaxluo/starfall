@@ -129,14 +129,19 @@ export class EventLog {
     return { enterUnique, guardUnique: composition.gov + composition.adm + composition.cap, played, guardPlayed, composition };
   }
 
-  /** 本场已经播放过进场特效的 UID（服务重启后恢复"每场一次"） */
+  /** 本场已经播放过进场特效的 UID（服务重启后恢复"每场一次"）。排队中没播出来的不算 */
   playedEnterUids(sessionId: number): number[] {
     return this.db
       .selectDistinct({ uid: events.uid })
       .from(events)
-      .where(and(eq(events.sessionId, sessionId), eq(events.kind, 'enter'), inArray(events.status, ['played', 'queued'])))
+      .where(and(eq(events.sessionId, sessionId), eq(events.kind, 'enter'), eq(events.status, 'played')))
       .all()
       .map((r) => r.uid);
+  }
+
+  /** 服务启动时：上次退出（包括崩溃）时还在排队的事件没有播出来，改为"已清空" */
+  clearStaleQueued(): number {
+    return this.db.update(events).set({ status: 'cleared' }).where(eq(events.status, 'queued')).run().changes;
   }
 
   /** 清理：超过保留期的事件删除；超过 7 天的原始消息清空 */

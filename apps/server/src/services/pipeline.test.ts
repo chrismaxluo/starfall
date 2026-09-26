@@ -68,7 +68,7 @@ describe('进场 → 播放', () => {
     expect(ctx.viewers.cached(10001)?.name).toBe('小星');
   });
 
-  it('ENTRY_EFFECT 先到：等 INTERACT_WORD_V2 合并成一条；只有 ENTRY_EFFECT 时 1.6 秒后单独处理', async () => {
+  it('ENTRY_EFFECT 先到：等 INTERACT_WORD_V2 合并成一条；只有 ENTRY_EFFECT 时 2 秒后单独处理', async () => {
     const { live, events, plays } = await setup();
     live.emit(enter({ guard: 3 }, 'entry_effect'));
     vi.advanceTimersByTime(1000);
@@ -78,9 +78,9 @@ describe('进场 → 播放', () => {
     expect(events()[0]!.viewer).toMatchObject({ guard: 3, medal: { level: 25 } });
 
     live.emit(enter({ uid: 10002, name: '小月', guard: 2 }, 'entry_effect'));
-    vi.advanceTimersByTime(1500);
+    vi.advanceTimersByTime(1900);
     expect(events()).toHaveLength(1);
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(300);
     expect(events()).toHaveLength(2);
     expect(events()[1]).toMatchObject({ uid: 10002, rule: '进场 · 提督', status: 'queued' });
     expect(plays()).toHaveLength(1);
@@ -117,6 +117,26 @@ describe('进场 → 播放', () => {
     vi.advanceTimersByTime(4000);
     t.live.emit(enter({ guard: 3 }));
     expect(t.statuses().at(-1)).toBe('played');
+  });
+
+  it('停止时还在排队的事件记为"已清空"；重启后不算本场已播，也会清理上次崩溃遗留的"排队中"', async () => {
+    const t = await setup();
+    t.ctx.settings.set('cooldownMode', 'oncePerLive');
+    t.live.emit(enter({ guard: 3 }));
+    t.live.emit(enter({ uid: 10002, name: '小月', guard: 2 }));
+    expect(t.statuses()).toEqual(['played', 'queued']);
+    t.p.stop();
+    expect(t.statuses()).toEqual(['played', 'cleared']);
+
+    // 模拟崩溃：记录停在"排队中"
+    t.ctx.log.setStatus(t.events()[1]!.id, 'queued');
+    const p2 = new Pipeline({ ...t.ctx, live: t.live, hub: t.hub, timeZone: 'Asia/Shanghai' });
+    p2.start();
+    cleanup.push(() => p2.stop());
+    expect(t.statuses()).toEqual(['played', 'cleared']);
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(enter({ uid: 10002, name: '小月', guard: 2 }));
+    expect(t.statuses().at(-1)).not.toBe('once');
   });
 
   it('未开播：默认不播；排练模式照常播', async () => {

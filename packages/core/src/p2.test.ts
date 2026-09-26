@@ -145,4 +145,13 @@ describe('上舰去重', () => {
     expect(d2.flush(70_000)).toHaveLength(0);
     expect(d2.push(guardEv({ viewer: viewer({ uid: 9 }), dedupeKey: undefined }), 70_001)).toHaveLength(1);
   });
+  it('GUARD_BUY 已经单独输出后，晚到的带流水号的 toast 是同一次购买，不再播一次', () => {
+    const d = new GuardDeduper(3000);
+    d.push(guardEv({ source: 'guard_buy', dedupeKey: undefined }), 0);
+    expect(d.flush(3000)).toMatchObject([{ source: 'guard_buy' }]);
+    expect(d.push(guardEv({ op: 'renew', dedupeKey: 'late-pay' }), 4500)).toHaveLength(0);
+    expect(d.push(guardEv({ op: 'renew', dedupeKey: 'late-pay', id: 'v1' }), 4600)).toHaveLength(0);
+    // 之后真正的另一次购买照常输出
+    expect(d.push(guardEv({ dedupeKey: 'pay-2' }), 20_000)).toHaveLength(1);
+  });
 });

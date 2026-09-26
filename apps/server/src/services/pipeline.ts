@@ -141,6 +141,7 @@ export class Pipeline {
   }
 
   start(): void {
+    this.d.log.clearStaleQueued();
     this.unsubscribe = this.d.live.onEvent((ev, raw) => this.handle(ev, raw));
     this.flushTimer = setInterval(() => this.flush(), FLUSH_MS);
   }
@@ -151,6 +152,8 @@ export class Pipeline {
     this.flushTimer = null;
     if (this.current) clearTimeout(this.current.timer);
     this.current = null;
+    // 还在排队的没有播出来：写明原因（服务重启后不会被当作本场已播）
+    for (const q of this.queue.clear()) this.unplayed(q, 'cleared');
   }
 
   onQueueChange(fn: (q: QueueSnapshot) => void): () => void {

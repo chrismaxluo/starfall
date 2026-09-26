@@ -391,7 +391,7 @@ onMounted(() => void refreshRules());
           <PreviewStage ref="stage" :label="prevLabel" />
           <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" style="width: 100%; justify-content: center; margin-top: 12px" :disabled="!prevEffect" @confirm="sendLive" />
         </div>
-        <Simulate :kind="ev" />
+        <Simulate :kind="ev" @preview="onPreview" />
         <div v-if="state.settings" class="card" style="margin-top: 16px">
           <div class="card-h"><h2>播放队列</h2><span class="aside">所有事件共用</span></div>
           <ol class="qorder"><li><b>上舰</b></li><li><b>礼物</b></li><li><b>进场</b></li><li><b>弹幕</b></li></ol>

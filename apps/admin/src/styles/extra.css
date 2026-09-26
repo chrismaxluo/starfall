@@ -97,3 +97,4 @@
 
 /* 命令面板以文字为主：背景更实一些，保证在任何页面上都清楚 */
 .palette { background: color-mix(in srgb, var(--l3) 94%, transparent); }
+.simres .simnote { color: var(--gov); }

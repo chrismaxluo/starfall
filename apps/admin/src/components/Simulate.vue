@@ -1,13 +1,17 @@
 <script setup lang="ts">
-// 模拟一次事件（F-RU-05）：看会命中哪条规则、播放哪个素材、为什么不播放；只判断，不入队、不记录
+// 模拟一次事件（F-RU-05）：看会命中哪条规则、播放哪个素材、为什么不播放；只判断，不入队、不记录。
+// 没开播也能模拟；命中后在右侧预览里播放（只在本地）
 import { computed, onMounted, ref, watch } from 'vue';
 import { get, post } from '../lib/api.ts';
-import type { Identity } from '../lib/identity.ts';
+import { SAMPLES } from '../lib/identity.ts';
+import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { yuan } from '../lib/preview.ts';
+import type { PreviewRequest } from '../lib/preview.ts';
 import { attempt } from '../lib/toast.ts';
 import type { GiftConfig, SimulateResult, TriggerKind } from '../lib/types.ts';
 
 const props = defineProps<{ kind: TriggerKind }>();
+const emit = defineEmits<{ preview: [PreviewRequest] }>();
 const who = ref({ identity: 'cap' as Identity, medal: 0, own: true });
 const text = ref('生日快乐');
 const giftPick = ref<number | ''>('');
@@ -26,13 +30,29 @@ async function run(): Promise<void> {
   const w = who.value;
   const viewer = { guard: w.identity === 'gov' ? 1 : w.identity === 'adm' ? 2 : w.identity === 'cap' ? 3 : 0, isMod: w.identity === 'mod', medal: w.medal > 0 ? { level: w.medal, own: w.own } : null };
   let body: object = { kind: 'enter', viewer };
-  if (props.kind === 'danmu') body = { kind: 'danmu', viewer, text: text.value || ' ' };
+  let vars: PreviewRequest['vars'] = {};
+  if (props.kind === 'danmu') {
+    body = { kind: 'danmu', viewer, text: text.value || ' ' };
+    vars = { text: text.value || ' ' };
+  }
   if (props.kind === 'gift') {
     const g = catalog.value.find((x) => x.id === Number(giftPick.value));
-    body = g ? { kind: 'gift', viewer, giftId: g.id, giftName: g.name, unitPrice: g.price, count: count.value } : { kind: 'gift', viewer, giftName: '礼物', unitPrice: Math.round(customYuan.value * 1000), count: count.value };
+    const unitPrice = g ? g.price : Math.round(customYuan.value * 1000);
+    body = g ? { kind: 'gift', viewer, giftId: g.id, giftName: g.name, unitPrice, count: count.value } : { kind: 'gift', viewer, giftName: '礼物', unitPrice, count: count.value };
+    vars = { gift: g?.name ?? '礼物', count: count.value, valueGold: unitPrice * count.value };
   }
-  if (props.kind === 'guard') body = { kind: 'guard', viewer, ...guard.value };
-  res.value = (await attempt(() => post<SimulateResult>('/api/simulate', body))) ?? null;
+  if (props.kind === 'guard') {
+    body = { kind: 'guard', viewer, ...guard.value };
+    vars = { months: guard.value.months, guardLevel: guard.value.level };
+  }
+  const r = (await attempt(() => post<SimulateResult>('/api/simulate', body))) ?? null;
+  res.value = r;
+  // 会播放的话，在右侧预览里播一次，看看实际效果
+  if (r?.effect && r.status === 'played') {
+    const guardLv = props.kind === 'guard' ? guard.value.level : (viewer.guard as SampleViewer['guard']);
+    const sample: SampleViewer = { name: SAMPLES[w.identity].name, guard: guardLv, isMod: viewer.isMod, medalLevel: w.medal > 0 ? w.medal : null };
+    emit('preview', { effectId: r.effect.id, viewer: sample, label: `模拟：${r.rule ?? ''}`, kind: props.kind, vars });
+  }
 }
 onMounted(async () => {
   catalog.value = (await get<{ gifts: GiftConfig[] }>('/api/gifts').catch(() => ({ gifts: [] }))).gifts;
@@ -78,7 +98,8 @@ onMounted(async () => {
       <template v-if="res">
         <template v-if="res.rule">命中 <b>{{ res.rule }}</b> → {{ res.effect?.name }}<br /></template>
         <span v-else class="miss">没有命中任何规则{{ kind === 'gift' ? '（免费礼物、低于最低一档，或落在已停用的档）' : '' }}<br /></span>
-        结果：{{ res.status === 'played' ? '会播放' : `不会播放（${res.statusText}）` }}
+        结果：{{ res.status === 'played' ? '会播放（已在上面的预览里播放）' : `不会播放（${res.statusText}）` }}
+        <span v-for="n in res.notes" :key="n" class="simnote"><br />提示：{{ n }}</span>
       </template>
     </div>
   </div>

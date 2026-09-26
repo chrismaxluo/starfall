@@ -129,15 +129,18 @@ describe('播放控制接口', () => {
     expect((await t.req({ method: 'POST', url: '/api/playback/test', payload: { effectId: 9999 } })).statusCode).toBe(404);
   });
 
-  it('模拟：返回命中规则和不播放的原因', async () => {
+  it('模拟：返回命中规则和不播放的原因；没开播、暂停、特效页不在线时也能模拟，只给提醒', async () => {
     const t = await setup();
     const sim = (viewer: object) => t.req({ method: 'POST', url: '/api/simulate', payload: { viewer } }).then((r) => r.json());
-    expect(await sim({ guard: 3 })).toMatchObject({ rule: '进场 · 舰长', effect: { name: '流光' }, status: 'offline', statusText: '未开播' });
+    expect(await sim({ guard: 3 })).toMatchObject({ rule: '进场 · 舰长', effect: { name: '流光' }, status: 'played', notes: ['现在没开播，开播后才会真的播放', '特效页现在不在线，直播画面里看不到'] });
+    t.ctx.settings.set('paused', true);
+    expect((await sim({ guard: 3 })).notes[0]).toBe('现在是暂停状态，恢复播放后才会真的播放');
+    t.ctx.settings.set('paused', false);
     t.ctx.settings.set('offlinePolicy', 'play');
-    expect(await sim({ guard: 3 })).toMatchObject({ status: 'no_overlay', statusText: '特效页不在线' });
+    expect(await sim({ guard: 3 })).toMatchObject({ status: 'played', notes: ['特效页现在不在线，直播画面里看不到'] });
     expect(await sim({ medal: { level: 25 } })).toMatchObject({ rule: '进场 · 粉丝牌 21 级及以上', effect: { name: '霜玻' } });
     expect(await sim({ medal: { level: 25, own: false } })).toMatchObject({ rule: null, status: 'no_rule' });
-    expect(await sim({ uid: 20000, isMod: true })).toMatchObject({ status: 'blacklist' });
+    expect(await sim({ uid: 20000, isMod: true })).toMatchObject({ status: 'blacklist', notes: [] });
     expect((await t.req({ method: 'POST', url: '/api/simulate', payload: { viewer: { guard: 5 } } })).statusCode).toBe(400);
   });
 

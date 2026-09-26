@@ -176,4 +176,6 @@ export interface SimulateResult {
   effect: { id: number; name: string } | null;
   status: PlayStatus;
   statusText: string;
+  /** 现场情况的提醒（没开播、暂停、特效页不在线） */
+  notes: string[];
 }

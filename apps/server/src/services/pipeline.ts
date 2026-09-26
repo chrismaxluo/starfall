@@ -59,7 +59,10 @@ export interface QueueSnapshot {
 export interface SimulateResult {
   rule: string | null;
   effect: { id: number; name: string } | null;
+  /** 只按规则判断（黑名单、规则、冷却、每场一次）；开播、暂停、特效页在线这些现场情况放在 notes 里 */
   status: PlayStatus;
+  /** 现场情况的提醒，例如"现在没开播" */
+  notes: string[];
 }
 
 export interface PipelineDeps {
@@ -182,7 +185,8 @@ export class Pipeline {
   // ---------- 判断 ----------
 
   /** 判断一个事件能不能播（不改变任何状态；入队时再调用 commit） */
-  private judge(ev: TriggerEvent): Judgement {
+  /** whatIf：模拟用，假设已开播、没暂停、特效页在线 */
+  private judge(ev: TriggerEvent, whatIf = false): Judgement {
     const now = this.now();
     const live = this.d.live.status();
     const anchorUid = this.d.room.get()?.anchorUid ?? 0;
@@ -251,12 +255,12 @@ export class Pipeline {
     const result = decide({
       blocked: this.d.blacklist.reason(uid) !== null,
       matched: Boolean(hit && effect),
-      paused: this.d.settings.get('paused'),
-      live: live.live,
+      paused: !whatIf && this.d.settings.get('paused'),
+      live: whatIf || live.live,
       playWhenOffline: this.d.settings.get('offlinePolicy') === 'play',
       inCooldown,
       playedThisLive,
-      overlayOnline: this.d.hub.overlayCount() > 0,
+      overlayOnline: whatIf || this.d.hub.overlayCount() > 0,
     });
     return { hit, effect, status: result.play ? 'queued' : result.status, commit, vars, jump };
   }
@@ -278,9 +282,16 @@ export class Pipeline {
   }
 
   /** 模拟一次事件：只判断，不入队、不记录、不影响冷却（F-RU-05） */
+  // 没开播时也能模拟：只按规则判断，现场情况作为提醒返回
   simulate(ev: TriggerEvent): SimulateResult {
-    const j = this.judge(ev);
-    return { rule: j.hit?.label ?? null, effect: j.effect ? { id: j.effect.id, name: j.effect.name } : null, status: j.status === 'queued' ? 'played' : j.status };
+    const j = this.judge(ev, true);
+    const notes: string[] = [];
+    if (j.status === 'queued') {
+      if (this.d.settings.get('paused')) notes.push('现在是暂停状态，恢复播放后才会真的播放');
+      else if (!this.d.live.status().live && this.d.settings.get('offlinePolicy') !== 'play') notes.push('现在没开播，开播后才会真的播放');
+      if (this.d.hub.overlayCount() === 0) notes.push('特效页现在不在线，直播画面里看不到');
+    }
+    return { rule: j.hit?.label ?? null, effect: j.effect ? { id: j.effect.id, name: j.effect.name } : null, status: j.status === 'queued' ? 'played' : j.status, notes };
   }
 
   // ---------- 播放 ----------

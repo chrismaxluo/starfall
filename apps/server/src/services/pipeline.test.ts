@@ -259,9 +259,9 @@ describe('其他', () => {
 
   it('模拟：返回命中规则和结果，不入队、不记录、不影响冷却', async () => {
     const t = await setup();
-    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toEqual({ rule: '进场 · 总督', effect: { id: expect.any(Number), name: '星冕' }, status: 'played' });
+    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toEqual({ rule: '进场 · 总督', effect: { id: expect.any(Number), name: '星冕' }, status: 'played', notes: [] });
     expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toMatchObject({ status: 'played' });
-    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ uid: 5 }) })).toEqual({ rule: null, effect: null, status: 'no_rule' });
+    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ uid: 5 }) })).toEqual({ rule: null, effect: null, status: 'no_rule', notes: [] });
     expect(t.events()).toHaveLength(0);
     expect(t.plays()).toHaveLength(0);
     t.live.emit(enter({ guard: 1 }));

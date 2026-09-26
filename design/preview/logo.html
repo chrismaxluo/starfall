@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>星临 · Logo 方案（第二轮：降临）</title>
+<title>星临 · Logo 方案（第四轮：明珠 · 玻璃）</title>
 <link rel="stylesheet" href="assets/fonts.css">
 <style>
 :root {
@@ -16,219 +16,200 @@
 body { margin: 0; font-family: var(--font-sans); background: var(--l1); color: var(--t1); -webkit-font-smoothing: antialiased; }
 .wrap { max-width: 1240px; margin: 0 auto; padding: 40px 28px 80px; }
 h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
-.lead { margin: 8px 0 0; color: var(--t3); font-size: 14px; line-height: 1.7; }
-.strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 28px 0 40px; }
-.strip a { text-decoration: none; color: inherit; background: #0B0B16; border-radius: 18px; padding: 28px 16px 18px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 12px 32px -12px rgba(10,10,40,.35); transition: transform .2s; }
-.strip a:hover { transform: translateY(-2px); }
-.strip svg { width: 96px; height: 96px; }
-.strip b { color: #EDEDF1; font-size: 15px; font-weight: 600; }
-.strip span { color: #80838F; font-size: 12px; }
-.concept { background: var(--l3); border: 1px solid var(--line); border-radius: 20px; padding: 26px 28px 30px; margin-bottom: 28px; box-shadow: 0 1px 2px rgba(16,20,40,.04), 0 2px 8px rgba(16,20,40,.03); }
-.c-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-.c-head h2 { margin: 0; font-size: 19px; font-weight: 600; }
-.c-head .tag { font-family: var(--font-mono); font-size: 12px; color: var(--accent); background: rgba(84,81,214,.09); padding: 2px 8px; border-radius: 6px; }
-.c-head p { flex-basis: 100%; margin: 6px 0 0; font-size: 13.5px; color: var(--t2); line-height: 1.75; }
-.grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; margin-top: 20px; }
-.hero { display: grid; grid-template-rows: 1fr 1fr; gap: 12px; }
-.hero > div { border-radius: 16px; display: grid; place-items: center; min-height: 170px; position: relative; }
-.hero .dk { background: radial-gradient(70% 60% at 50% 30%, rgba(111,110,255,.22), transparent 70%), #07070F; }
-.hero .lt { background: var(--l2); border: 1px solid var(--line); }
-.hero svg { width: 120px; height: 120px; }
-.hero small { position: absolute; left: 12px; top: 10px; font-size: 11px; color: #80838F; font-family: var(--font-mono); }
-.right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.row { border-radius: 14px; border: 1px solid var(--line); padding: 16px 18px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
-.row.dk { background: #0E0E12; border-color: rgba(255,255,255,.06); color: #EDEDF1; }
-.row .lbl { width: 72px; font-size: 12px; color: var(--t3); flex-shrink: 0; }
-.row.dk .lbl { color: #80838F; }
-.sizes { display: flex; align-items: flex-end; gap: 22px; }
-.sizes div { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 10.5px; color: var(--t3); font-family: var(--font-mono); }
-.row.dk .sizes div { color: #80838F; }
-.sizes .mono { color: var(--accent); }
-.row.dk .sizes .mono { color: #C9C7FF; }
+h1 small { font-size: 14px; color: var(--t3); font-weight: 400; margin-left: 8px; }
+h1 a { color: var(--accent); font-size: 13px; font-weight: 400; margin-left: 10px; }
+.lead { margin: 8px 0 0; color: var(--t3); font-size: 14px; line-height: 1.75; }
+.sec { margin-top: 36px; }
+.sec-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sec-h .n { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; background: rgba(84,81,214,.1); color: var(--accent); font-family: var(--font-mono); font-size: 13px; font-weight: 600; align-self: center; }
+.sec-h h2 { margin: 0; font-size: 19px; font-weight: 600; }
+.sec-h span { font-size: 13px; color: var(--t3); }
+
+/* 主视觉：两套配色并排 */
+.hero { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.hero .pane { border-radius: 22px; min-height: 380px; position: relative; display: grid; place-items: center; overflow: hidden; }
+.hero .pane.indigo { background: radial-gradient(60% 55% at 50% 35%, rgba(111,110,255,.28), transparent 70%), radial-gradient(40% 30% at 50% 90%, rgba(242,196,110,.08), transparent 70%), #06061A; }
+.hero .pane.black { background: radial-gradient(60% 55% at 50% 35%, rgba(227,197,142,.16), transparent 70%), #050506; }
+.hero svg { width: 220px; height: 220px; filter: drop-shadow(0 30px 50px rgba(0,0,0,.6)); }
+.hero .cap { position: absolute; left: 20px; top: 16px; color: #EDEDF1; }
+.hero .cap b { font-size: 16px; font-weight: 600; display: block; }
+.hero .cap span { font-size: 12px; color: #80838F; font-family: var(--font-mono); }
+.hero .anim { position: absolute; right: 18px; bottom: 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: #80838F; }
+.hero .anim svg { width: 72px; height: 72px; filter: none; }
+
+.details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.details div { background: var(--l3); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 12.5px; line-height: 1.7; color: var(--t2); }
+.details b { display: block; color: var(--t1); font-size: 13.5px; margin-bottom: 2px; }
+
+/* 细节三选一 */
+.vars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.var { background: var(--l3); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(16,20,40,.04), 0 2px 8px rgba(16,20,40,.03); }
+.var .two { display: grid; grid-template-columns: 1fr 1fr; }
+.var .st { height: 180px; display: grid; place-items: center; position: relative; }
+.var .st.indigo { background: radial-gradient(70% 60% at 50% 30%, rgba(111,110,255,.24), transparent 70%), #07071A; }
+.var .st.black { background: radial-gradient(70% 60% at 50% 30%, rgba(227,197,142,.14), transparent 70%), #060607; }
+.var .st > svg { width: 104px; height: 104px; filter: drop-shadow(0 16px 26px rgba(0,0,0,.5)); }
+.var .sm { position: absolute; right: 10px; bottom: 8px; display: flex; gap: 6px; align-items: flex-end; }
+.var .sm svg:first-child { width: 32px; height: 32px; }
+.var .sm svg:last-child { width: 16px; height: 16px; }
+.var .meta { padding: 12px 14px 14px; }
+.var .meta b { font-size: 14px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.var .meta b em { font-style: normal; font-size: 11px; color: var(--accent); background: rgba(84,81,214,.09); border-radius: 5px; padding: 1px 6px; font-weight: 500; }
+.var .meta span { display: block; margin-top: 4px; font-size: 12.5px; color: var(--t2); line-height: 1.65; }
+
 /* 场景 */
-.side { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-radius: 10px; }
+.scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.scene { border-radius: 16px; border: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 12px; background: var(--l3); }
+.scene h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--t2); }
+.row { border-radius: 12px; border: 1px solid var(--line); padding: 14px 16px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; background: var(--l2); }
+.row.dk { background: #0E0E12; border-color: rgba(255,255,255,.06); color: #EDEDF1; }
+.side { display: flex; align-items: center; gap: 10px; }
 .side .nm { font-size: 15px; font-weight: 600; letter-spacing: .06em; }
 .side .sub { font-size: 10.5px; letter-spacing: .3em; font-family: var(--font-mono); color: var(--t3); }
 .row.dk .side .sub { color: #80838F; }
-.tab { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px 0 10px; border-radius: 10px 10px 0 0; background: var(--l2); border: 1px solid var(--line); border-bottom: 0; font-size: 12.5px; color: var(--t2); min-width: 200px; }
+.tab { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 10px; border-radius: 9px 9px 0 0; background: var(--l3); border: 1px solid var(--line); border-bottom: 0; font-size: 12px; color: var(--t2); }
 .row.dk .tab { background: #1B1B22; border-color: rgba(255,255,255,.08); color: #C9CAD3; }
-.tab svg { width: 16px; height: 16px; }
-.tab i { margin-left: auto; font-style: normal; color: var(--t3); }
-.card { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; background: var(--l3); border: 1px solid var(--line-strong); box-shadow: 0 12px 32px -8px rgba(16,20,40,.14); }
-.row.dk .card { background: rgba(24,24,31,.9); border-color: rgba(255,255,255,.1); box-shadow: 0 24px 64px -12px rgba(0,0,0,.7); }
-.card b { font-size: 17px; font-weight: 600; display: block; color: var(--t1); }
+.card { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: var(--l3); border: 1px solid var(--line-strong); box-shadow: 0 12px 32px -8px rgba(16,20,40,.14); }
+.row.dk .card { background: rgba(24,24,31,.9); border-color: rgba(255,255,255,.1); }
+.card b { font-size: 15px; font-weight: 600; display: block; color: var(--t1); }
 .row.dk .card b { color: #EDEDF1; }
-.card span { font-size: 12px; color: var(--t3); }
-.appicon { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; }
-.appicon svg { width: 72px; height: 72px; filter: drop-shadow(0 8px 16px rgba(0,0,0,.35)); }
-.pick { margin-top: 16px; font-size: 13px; color: var(--t2); line-height: 1.8; background: var(--l2); border-radius: 12px; padding: 12px 16px; border: 1px solid var(--line); }
-.pick b { color: var(--t1); }
-.word { display: flex; flex-direction: column; gap: 2px; }
-.word .zh { font-size: 34px; font-weight: 700; letter-spacing: .1em; }
-.word .en { font-size: 12px; font-family: var(--font-mono); letter-spacing: .5em; color: var(--t3); }
-.row.dk .word .en { color: #80838F; }
-.lockup { display: flex; align-items: center; gap: 16px; }
-.lockup svg { width: 56px; height: 56px; }
-@media (max-width: 900px) { .strip { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
+.card span span { font-size: 11.5px; color: var(--t3); }
+.lockup { display: flex; align-items: center; gap: 14px; }
+.lockup .zh { font-size: 30px; font-weight: 700; letter-spacing: .1em; display: block; line-height: 1.1; }
+.lockup .en { font-size: 11px; font-family: var(--font-mono); letter-spacing: .5em; color: #80838F; }
+.taskbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 10px; background: rgba(32,32,36,.92); margin-left: auto; }
+.taskbar .dot { width: 26px; height: 26px; border-radius: 6px; background: rgba(255,255,255,.08); }
+.taskbar .act { position: relative; padding: 4px; border-radius: 6px; background: rgba(255,255,255,.1); display: flex; }
+.taskbar .act::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 12px; height: 3px; margin-left: -6px; border-radius: 3px; background: #7FB2FF; }
+.note { margin-top: 16px; font-size: 13px; line-height: 1.8; color: var(--t2); background: rgba(84,81,214,.06); border: 1px solid rgba(84,81,214,.18); border-radius: 12px; padding: 12px 16px; }
+.note b { color: var(--t1); }
+@media (max-width: 1000px) { .hero, .scenes, .details, .vars { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <!-- 公共：图标底板（深靛渐变 + 顶部高光） -->
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34318A"/><stop offset=".55" stop-color="#15143A"/><stop offset="1" stop-color="#0A0A1A"/></linearGradient>
-    <radialGradient id="bgGlow" cx=".3" cy=".15" r=".8"><stop offset="0" stop-color="#8D8BFF" stop-opacity=".45"/><stop offset="1" stop-color="#8D8BFF" stop-opacity="0"/></radialGradient>
-    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF6DE"/><stop offset=".45" stop-color="#F7D58B"/><stop offset="1" stop-color="#D9913A"/></linearGradient>
-    <radialGradient id="goldGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#F7D58B" stop-opacity=".55"/><stop offset="1" stop-color="#F7D58B" stop-opacity="0"/></radialGradient>
-    <linearGradient id="trail" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D58B" stop-opacity=".95"/><stop offset=".35" stop-color="#C9C7FF" stop-opacity=".7"/><stop offset="1" stop-color="#8D8BFF" stop-opacity="0"/></linearGradient>
-    <linearGradient id="arch" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E2FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".35"/></linearGradient>
-    <linearGradient id="archFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8D8BFF" stop-opacity=".0"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".32"/></linearGradient>
-    <linearGradient id="floor" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#C9C7FF" stop-opacity="0"/><stop offset=".5" stop-color="#E4E2FF"/><stop offset="1" stop-color="#C9C7FF" stop-opacity="0"/></linearGradient>
-    <linearGradient id="horizon" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8D8BFF" stop-opacity="0"/><stop offset=".5" stop-color="#E4E2FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity="0"/></linearGradient>
-    <linearGradient id="planet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A2870"/><stop offset=".4" stop-color="#0C0B22"/></linearGradient>
-    <linearGradient id="sTrail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D58B"/><stop offset=".45" stop-color="#C9C7FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".15"/></linearGradient>
-    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E2FF" stop-opacity=".02"/><stop offset=".7" stop-color="#C9C7FF" stop-opacity=".3"/><stop offset="1" stop-color="#C9C7FF" stop-opacity=".0"/></linearGradient>
-    <linearGradient id="beamCore" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".8" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-    <linearGradient id="fall" gradientUnits="userSpaceOnUse" x1="0" y1="4" x2="0" y2="30"><stop offset="0" stop-color="#C9C7FF" stop-opacity="0"/><stop offset="1" stop-color="#F7D58B"/></linearGradient>
-    <linearGradient id="crownFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D58B" stop-opacity=".05"/><stop offset="1" stop-color="#F7D58B" stop-opacity=".28"/></linearGradient>
-    <linearGradient id="crownStroke" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF1CC"/><stop offset="1" stop-color="#D9913A"/></linearGradient>
-    <linearGradient id="wingL" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#C9C7FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".1"/></linearGradient>
-    <linearGradient id="wingR" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#C9C7FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".1"/></linearGradient>
-    <clipPath id="tileClip"><rect width="64" height="64" rx="15"/></clipPath>
-  </defs>
-
-  <!-- 四角星（圆润的内凹） -->
-  <symbol id="spark" viewBox="-1 -1 2 2"><path d="M0 -1 C.1 -.28 .28 -.1 1 0 C.28 .1 .1 .28 0 1 C-.1 .28 -.28 .1 -1 0 C-.28 -.1 -.1 -.28 0 -1Z"/></symbol>
-
-  <!-- 底板 -->
-  <symbol id="tile" viewBox="0 0 64 64">
-    <rect width="64" height="64" rx="15" fill="url(#bg)"/>
-    <rect width="64" height="64" rx="15" fill="url(#bgGlow)"/>
-    <rect x=".5" y=".5" width="63" height="63" rx="14.5" fill="none" stroke="url(#rim)"/>
-  </symbol>
-
-  <!-- E 光柱降临 -->
-  <symbol id="E" viewBox="0 0 64 64">
-    <use href="#tile" width="64" height="64"/>
-    <g clip-path="url(#tileClip)">
-      <path d="M28.5 -2 H35.5 L44 47 H20 Z" fill="url(#beam)"/>
-      <path d="M31 -2 H33 L34.5 40 H29.5 Z" fill="url(#beamCore)"/>
-    </g>
-    <ellipse cx="32" cy="48.5" rx="21" ry="4.6" fill="none" stroke="#C9C7FF" stroke-opacity=".28" stroke-width="1"/>
-    <ellipse cx="32" cy="48.5" rx="13" ry="2.9" fill="none" stroke="#E4E2FF" stroke-opacity=".6" stroke-width="1.2"/>
-    <ellipse cx="32" cy="48.5" rx="6" ry="1.4" fill="#E4E2FF" opacity=".55"/>
-    <circle cx="32" cy="39" r="11" fill="url(#goldGlow)"/>
-    <use href="#spark" x="23.5" y="30.5" width="17" height="17" fill="url(#gold)"/>
-  </symbol>
-  <symbol id="E-mono" viewBox="0 0 64 64">
-    <path d="M29.5 4 H34.5 L41 38 H23 Z" fill="currentColor" opacity=".22"/>
-    <ellipse cx="32" cy="49" rx="17" ry="3.8" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/>
-    <use href="#spark" x="23" y="29" width="18" height="18" fill="currentColor"/>
-  </symbol>
-
-  <!-- F 星落 -->
-  <symbol id="F" viewBox="0 0 64 64">
-    <use href="#tile" width="64" height="64"/>
-    <path d="M32 5 V28" stroke="url(#fall)" stroke-width="2.6" stroke-linecap="round"/>
-    <path d="M24.5 13 V29" stroke="url(#fall)" stroke-width="1.5" stroke-linecap="round" opacity=".55"/>
-    <path d="M39.5 11 V27" stroke="url(#fall)" stroke-width="1.5" stroke-linecap="round" opacity=".55"/>
-    <path d="M19 49.5 Q32 43.5 45 49.5" fill="none" stroke="#E4E2FF" stroke-opacity=".55" stroke-width="1.4" stroke-linecap="round"/>
-    <circle cx="32" cy="37" r="13" fill="url(#goldGlow)"/>
-    <use href="#spark" x="21.5" y="26.5" width="21" height="21" fill="url(#gold)"/>
-  </symbol>
-  <symbol id="F-mono" viewBox="0 0 64 64">
-    <path d="M32 5 V26" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".5"/>
-    <path d="M24.5 13 V27 M39.5 11 V25" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".3"/>
-    <use href="#spark" x="21" y="26" width="22" height="22" fill="currentColor"/>
-  </symbol>
-
-  <!-- G 驾临 -->
-  <symbol id="G" viewBox="0 0 64 64">
-    <use href="#tile" width="64" height="64"/>
-    <path d="M32 4 V16" stroke="url(#fall)" stroke-width="2" stroke-linecap="round"/>
-    <path d="M15.5 50 L17.5 36 L25 42.5 L32 32 L39 42.5 L46.5 36 L48.5 50 Z" fill="url(#crownFill)" stroke="url(#crownStroke)" stroke-width="1.8" stroke-linejoin="round"/>
-    <path d="M15.5 50 H48.5" stroke="#F7D58B" stroke-opacity=".7" stroke-width="1.8" stroke-linecap="round"/>
-    <circle cx="32" cy="22" r="10" fill="url(#goldGlow)"/>
-    <use href="#spark" x="24.5" y="14.5" width="15" height="15" fill="url(#gold)"/>
-  </symbol>
-  <symbol id="G-mono" viewBox="0 0 64 64">
-    <path d="M32 4 V14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".45"/>
-    <path d="M15.5 50 L17.5 36 L25 42.5 L32 32 L39 42.5 L46.5 36 L48.5 50 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" opacity=".6"/>
-    <use href="#spark" x="24" y="14" width="16" height="16" fill="currentColor"/>
-  </symbol>
-
-  <!-- H 光翼 -->
-  <symbol id="H" viewBox="0 0 64 64">
-    <use href="#tile" width="64" height="64"/>
-    <g fill="none" stroke-linecap="round">
-      <path d="M28 36 C20 34 13.5 27 11 16" stroke="url(#wingL)" stroke-width="2.4"/>
-      <path d="M28 39 C21 38.5 15.5 34 12.5 27" stroke="url(#wingL)" stroke-width="1.8" opacity=".75"/>
-      <path d="M28.5 42 C23 42.5 18.5 40 16 36" stroke="url(#wingL)" stroke-width="1.3" opacity=".55"/>
-      <path d="M36 36 C44 34 50.5 27 53 16" stroke="url(#wingR)" stroke-width="2.4"/>
-      <path d="M36 39 C43 38.5 48.5 34 51.5 27" stroke="url(#wingR)" stroke-width="1.8" opacity=".75"/>
-      <path d="M35.5 42 C41 42.5 45.5 40 48 36" stroke="url(#wingR)" stroke-width="1.3" opacity=".55"/>
-    </g>
-    <ellipse cx="32" cy="51" rx="10" ry="2.2" fill="#C9C7FF" opacity=".35"/>
-    <circle cx="32" cy="38" r="11" fill="url(#goldGlow)"/>
-    <use href="#spark" x="24" y="30" width="16" height="16" fill="url(#gold)"/>
-  </symbol>
-  <symbol id="H-mono" viewBox="0 0 64 64">
-    <g fill="none" stroke="currentColor" stroke-linecap="round" opacity=".55">
-      <path d="M28 36 C20 34 13.5 27 11 16" stroke-width="3"/><path d="M28 40 C21 39.5 15.5 35 12.5 28" stroke-width="2.2"/>
-      <path d="M36 36 C44 34 50.5 27 53 16" stroke-width="3"/><path d="M36 40 C43 39.5 48.5 35 51.5 28" stroke-width="2.2"/>
-    </g>
-    <use href="#spark" x="23.5" y="29.5" width="17" height="17" fill="currentColor"/>
-  </symbol>
-</svg>
-
 <div class="wrap">
-  <h1>星临 · Logo 方案 <span style="font-size:14px;color:var(--t3);font-weight:400">第二轮 · 降临　<a href="logo-v1.html" style="color:var(--accent)">第一轮方案</a></span></h1>
-  <p class="lead">四个方向都围绕"<b>降临</b>"：从天而降、落地有回响。仍然使用同一套底板（深靛渐变 + 顶部高光）和同一颗金色四角星。<br>每个方案都放进真实会用到的位置：浏览器标签页（16 像素）、后台侧栏、登录卡片、Windows 应用图标，以及亮色 / 暗色背景。</p>
+  <h1>星临 · Logo 方案<small>第四轮 · G2 明珠 · 玻璃 · 靛金 / 玄金</small><a href="logo-v3.html">第三轮</a><a href="logo-v2.html">第二轮</a><a href="logo-v1.html">第一轮</a></h1>
+  <p class="lead">按你选的方向深化：<b>造型 G2 明珠</b>（星从天而降，落进王冠正中的缺口，成为冠上的明珠）、<b>玻璃质感</b>，做<b>靛金</b>和<b>玄金</b>两套配色。<br>这一版重点把"玻璃"做实，并加入降临的动态（右下角的小图在循环播放）。</p>
 
-  <div class="strip">
-    <a href="#cE"><svg><use href="#E"/></svg><b>E 光柱降临</b><span>光从天而降，星落地泛起光环</span></a>
-    <a href="#cF"><svg><use href="#F"/></svg><b>F 星落</b><span>星垂直落下，刚刚着陆</span></a>
-    <a href="#cG"><svg><use href="#G"/></svg><b>G 驾临</b><span>星落向王冠，尊贵的到来</span></a>
-    <a href="#cH"><svg><use href="#H"/></svg><b>H 光翼</b><span>展开光翼缓缓降落</span></a>
-  </div>
+  <section class="sec">
+    <div class="sec-h"><span class="n">1</span><h2>主视觉</h2><span>细节 A「精修」· 两套配色</span></div>
+    <div class="hero">
+      <div class="pane indigo"><div class="cap"><b>靛金</b><span>#34318A → #0A0A1A · 金 #F2C46E</span></div><span id="heroIndigo"></span><div class="anim"><span id="animIndigo"></span>降临动画</div></div>
+      <div class="pane black"><div class="cap"><b>玄金</b><span>#2E2E38 → #050507 · 香槟金 #E3C58E</span></div><span id="heroBlack"></span><div class="anim"><span id="animBlack"></span>降临动画</div></div>
+    </div>
+    <div class="details">
+      <div><b>玻璃王冠</b>王冠是一块有厚度的金色玻璃：上沿一道高光，内部一条斜向反光，越往下金色越浓，外面一圈金边，背后有柔和的投影光。</div>
+      <div><b>明珠与冠带</b>两侧峰顶是带高光点的小玻璃珠；底部是一条玻璃冠带，让王冠更稳、更完整。</div>
+      <div><b>降临的星</b>金色四角星带光晕，一道光迹从正上方落下；星的横向有一道细细的闪光，像刚刚着陆。</div>
+    </div>
+  </section>
 
-  <!-- 用脚本生成四个方案的详情，保证每个方案的展示完全一致 -->
-  <div id="concepts"></div>
+  <section class="sec">
+    <div class="sec-h"><span class="n">2</span><h2>细节三选一</h2><span>每个都有靛金 / 玄金两套；右下角是 32 和 16 像素的实际效果</span></div>
+    <div class="vars" id="vars"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><span class="n">3</span><h2>放进实际场景</h2><span>细节 A · 后台侧栏、浏览器标签、登录卡片、标志组合、任务栏</span></div>
+    <div class="scenes" id="scenes"></div>
+    <div class="note"><b>我的建议：</b>主配色用 <b>靛金</b>（和后台的星辉靛一致，整套产品颜色统一），<b>玄金</b>作为特别版本（例如 Windows 版安装包、宣传图、深色周边）。细节选 <b>A 精修</b>：层次最清楚，16 像素也干净；如果想更有排面可以选 B。<br>确认后我会：导出正式的 SVG / PNG / ICO（网页图标、应用图标各尺寸），替换后台和特效页里的旧图标，并把降临动画用在新登录页上。</div>
+  </section>
 </div>
 
 <script>
-var C = [
-  { id: 'E', name: '光柱降临', tag: 'Descent', desc: '一束光从正上方照下，星落在光柱底部，地面泛起两圈光环——"降临"最直接的画面：从天而降，落地有回响。也正是观众进场时特效出现的那一刻。', pros: '<b>推荐</b>：降临感最强、画面最有仪式感；16 像素时是"一颗星 + 下面一道光环"，依然好认。登录页可以做成动画：光柱照下 → 星落下 → 光环散开。' },
-  { id: 'F', name: '星落', tag: 'Falling', desc: '星垂直落下，上方留着三道速度线，下方一道被照亮的弧线，像刚刚着陆。比光柱更轻快、更有速度感。', pros: '简洁有力，小尺寸最清楚；仪式感比光柱弱一些。' },
-  { id: 'G', name: '驾临', tag: 'Royal', desc: '星从上方缓缓落向一顶王冠。直播间里总督、提督进场叫"驾临"，这个图形把"尊贵的人到来"画了出来。', pros: '寓意最贴合大航海；王冠的识别度高，但图形偏复杂、偏"尊贵"，普通观众的进场感弱一些。' },
-  { id: 'H', name: '光翼', tag: 'Wings', desc: '星展开两道光翼降落，下方投下一小片光影。像天使降临，最有神圣感和情绪。', pros: '最有氛围和情绪；翅膀在 16 像素时会变成两道弧线，细节会丢。' }
-];
-var box = document.getElementById('concepts');
-C.forEach(function (c) {
-  var u = function (id, w) { return '<svg width="' + w + '" height="' + w + '"><use href="#' + id + '"/></svg>'; };
-  var sizes = function () { return [64, 32, 24, 16].map(function (s) { return '<div>' + u(c.id, s) + s + '</div>'; }).join(''); };
-  var monos = function () { return [64, 32, 24, 16].map(function (s) { return '<div class="mono">' + u(c.id + '-mono', s) + s + '</div>'; }).join(''); };
-  var ctx = function () {
-    return '<div class="side">' + u(c.id, 30) + '<span><div class="nm">星临</div><div class="sub">STARFALL</div></span></div>' +
-      '<div class="tab">' + u(c.id, 16) + '星临 · 管理后台<i>×</i></div>' +
-      '<div class="card">' + u(c.id, 44) + '<span><b>登录星临</b><span>直播间特效管理后台</span></span></div>';
-  };
-  var el = document.createElement('section');
-  el.className = 'concept'; el.id = 'c' + c.id;
-  el.innerHTML = '<div class="c-head"><h2>' + c.id + ' · ' + c.name + '</h2><span class="tag">' + c.tag + '</span><p>' + c.desc + '</p></div>' +
-    '<div class="grid"><div class="hero"><div class="dk"><small>暗色</small>' + u(c.id, 120) + '</div><div class="lt"><small>亮色</small>' + u(c.id, 120) + '</div></div>' +
-    '<div class="right">' +
-      '<div class="row"><span class="lbl">尺寸</span><div class="sizes">' + sizes() + '</div><span class="lbl" style="margin-left:24px">单色</span><div class="sizes">' + monos() + '</div></div>' +
-      '<div class="row dk"><span class="lbl">尺寸</span><div class="sizes">' + sizes() + '</div><span class="lbl" style="margin-left:24px">单色</span><div class="sizes">' + monos() + '</div></div>' +
-      '<div class="row"><span class="lbl">使用场景</span>' + ctx() + '</div>' +
-      '<div class="row dk"><span class="lbl">使用场景</span>' + ctx() + '</div>' +
-      '<div class="row dk"><span class="lbl">标志组合</span><div class="lockup">' + u(c.id, 56) + '<div class="word"><span class="zh">星临</span><span class="en">STARFALL</span></div></div>' +
-        '<span class="lbl" style="margin-left:auto">应用图标</span><div class="appicon">' + u(c.id, 72) + '<span style="color:#80838F">Windows 版</span></div></div>' +
-    '</div></div>' +
-    '<div class="pick">' + c.pros + '</div>';
-  box.appendChild(el);
-});
+var SCHEMES = {
+  indigo: { bg: ['#3A37A0', '#17164A', '#0A0A1C'], glow: '#8D8BFF', gold: ['#FFF3D6', '#F2C46E', '#B8741F'], star: ['#FFF8E6', '#F7D58B', '#D9913A'], line: '#C9C7FF', rim: ['#FFF6DE', '#E9B45C', '#A8691D'] },
+  black: { bg: ['#34343F', '#141419', '#050507'], glow: '#D9C39A', gold: ['#FDF6E6', '#E3C58E', '#9C7438'], star: ['#FFFAEE', '#EFD9A8', '#B98F4A'], line: '#EDE2C8', rim: ['#FFF8E8', '#DDBB7D', '#8F6A33'] }
+};
+var VARIANTS = {
+  A: { name: '精修', tag: '推荐', desc: '比例和第三轮一致，线条精修；冠带细、留白多，最干净，小尺寸最清楚。',
+       crown: 'M14 49 L15.5 35.5 L23 43 L28 36.5 L32 41 L36 36.5 L41 43 L48.5 35.5 L50 49 Z', jewels: [[15.5, 35.5], [48.5, 35.5]], band: [14, 47.6, 36, 3.6], gems: false, star: [32, 28.5, 17], beam: false },
+  B: { name: '高冠', desc: '王冠更高、峰更尖，冠带更宽并镶三颗小宝石——更有排面，更像"总督驾临"。',
+       crown: 'M13.5 48.5 L15 31.5 L22.5 42 L28 34 L32 40 L36 34 L41.5 42 L49 31.5 L50.5 48.5 Z', jewels: [[15, 31.5], [49, 31.5]], band: [13.5, 47, 37, 4.6], gems: true, star: [32, 25.5, 17], beam: false },
+  C: { name: '光束', desc: '在 A 的基础上，背后加一道从天而降的淡淡光束，照在王冠上——"降临"的感觉最强。',
+       crown: 'M14 49 L15.5 35.5 L23 43 L28 36.5 L32 41 L36 36.5 L41 43 L48.5 35.5 L50 49 Z', jewels: [[15.5, 35.5], [48.5, 35.5]], band: [14, 47.6, 36, 3.6], gems: false, star: [32, 28.5, 17], beam: true }
+};
+var SPARK = 'M0 -1 C.1 -.28 .28 -.1 1 0 C.28 .1 .1 .28 0 1 C-.1 .28 -.28 .1 -1 0 C-.28 -.1 -.1 -.28 0 -1Z';
+var uid = 0;
+
+function icon(vk, sk, size, animated) {
+  var v = VARIANTS[vk], c = SCHEMES[sk], id = 'L' + (++uid);
+  var cx = v.star[0], cy = v.star[1], s = v.star[2];
+  var top = cy - s / 2;
+  var d = '';
+  d += '<linearGradient id="' + id + 'bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.bg[0] + '"/><stop offset=".55" stop-color="' + c.bg[1] + '"/><stop offset="1" stop-color="' + c.bg[2] + '"/></linearGradient>';
+  d += '<radialGradient id="' + id + 'gl" cx=".3" cy=".1" r=".85"><stop offset="0" stop-color="' + c.glow + '" stop-opacity=".42"/><stop offset="1" stop-color="' + c.glow + '" stop-opacity="0"/></radialGradient>';
+  d += '<radialGradient id="' + id + 'gl2" cx=".5" cy=".95" r=".55"><stop offset="0" stop-color="' + c.gold[1] + '" stop-opacity=".16"/><stop offset="1" stop-color="' + c.gold[1] + '" stop-opacity="0"/></radialGradient>';
+  d += '<linearGradient id="' + id + 'rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".26"/><stop offset=".45" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity=".03"/></linearGradient>';
+  // 玻璃：越往下越浓
+  d += '<linearGradient id="' + id + 'gb" gradientUnits="userSpaceOnUse" x1="0" y1="32" x2="0" y2="52"><stop offset="0" stop-color="' + c.gold[0] + '" stop-opacity=".08"/><stop offset=".6" stop-color="' + c.gold[1] + '" stop-opacity=".3"/><stop offset="1" stop-color="' + c.gold[2] + '" stop-opacity=".55"/></linearGradient>';
+  d += '<linearGradient id="' + id + 'rm" gradientUnits="userSpaceOnUse" x1="0" y1="31" x2="0" y2="52"><stop offset="0" stop-color="' + c.rim[0] + '"/><stop offset=".5" stop-color="' + c.rim[1] + '"/><stop offset="1" stop-color="' + c.rim[2] + '"/></linearGradient>';
+  d += '<linearGradient id="' + id + 'hl" gradientUnits="userSpaceOnUse" x1="0" y1="31" x2="0" y2="44"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>';
+  d += '<linearGradient id="' + id + 'st" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.star[0] + '"/><stop offset=".45" stop-color="' + c.star[1] + '"/><stop offset="1" stop-color="' + c.star[2] + '"/></linearGradient>';
+  d += '<radialGradient id="' + id + 'sg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="' + c.star[1] + '" stop-opacity=".6"/><stop offset="1" stop-color="' + c.star[1] + '" stop-opacity="0"/></radialGradient>';
+  d += '<linearGradient id="' + id + 'tr" gradientUnits="userSpaceOnUse" x1="0" y1="3" x2="0" y2="' + top + '"><stop offset="0" stop-color="' + c.line + '" stop-opacity="0"/><stop offset="1" stop-color="' + c.star[1] + '"/></linearGradient>';
+  d += '<linearGradient id="' + id + 'gx" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>';
+  d += '<radialGradient id="' + id + 'jw" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="' + c.star[0] + '"/><stop offset=".6" stop-color="' + c.gold[1] + '"/><stop offset="1" stop-color="' + c.gold[2] + '"/></radialGradient>';
+  d += '<linearGradient id="' + id + 'bm" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="44"><stop offset="0" stop-color="' + c.line + '" stop-opacity="0"/><stop offset=".7" stop-color="' + c.line + '" stop-opacity=".2"/><stop offset="1" stop-color="' + c.line + '" stop-opacity="0"/></linearGradient>';
+  d += '<clipPath id="' + id + 'cc"><path d="' + v.crown + '"/></clipPath>';
+  d += '<clipPath id="' + id + 'tc"><rect width="64" height="64" rx="15"/></clipPath>';
+  d += '<filter id="' + id + 'bl" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2"/></filter>';
+
+  var o = '<rect width="64" height="64" rx="15" fill="url(#' + id + 'bg)"/><rect width="64" height="64" rx="15" fill="url(#' + id + 'gl)"/><rect width="64" height="64" rx="15" fill="url(#' + id + 'gl2)"/>';
+  if (v.beam) o += '<g clip-path="url(#' + id + 'tc)"><path d="M28.5 -2 H35.5 L44 44 H20 Z" fill="url(#' + id + 'bm)"/></g>';
+  // 王冠：投影光 → 玻璃体 → 反光带 → 金边 → 上沿高光
+  o += '<path d="' + v.crown + '" fill="' + c.gold[1] + '" opacity=".35" filter="url(#' + id + 'bl)"/>';
+  o += '<path d="' + v.crown + '" fill="url(#' + id + 'gb)"/>';
+  o += '<g clip-path="url(#' + id + 'cc)" fill="#fff"><path d="M19 30 L26.5 30 L19.5 52 L12 52 Z" opacity=".2"/><path d="M28.8 30 L30.6 30 L23.6 52 L21.8 52 Z" opacity=".14"/></g>';
+  o += '<path d="' + v.crown + '" fill="none" stroke="url(#' + id + 'rm)" stroke-width="1.5" stroke-linejoin="round"/>';
+  o += '<path d="' + v.crown + '" fill="none" stroke="url(#' + id + 'hl)" stroke-width=".6" stroke-linejoin="round" transform="translate(0 .7)"/>';
+  // 冠带
+  var b = v.band;
+  o += '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + b[3] + '" rx="' + b[3] / 2 + '" fill="url(#' + id + 'gb)" stroke="url(#' + id + 'rm)" stroke-width="1.1"/>';
+  o += '<path d="M' + (b[0] + 2.5) + ' ' + (b[1] + 1) + ' H' + (b[0] + b[2] - 2.5) + '" stroke="#fff" stroke-opacity=".45" stroke-width=".5" stroke-linecap="round"/>';
+  if (v.gems) [22, 32, 42].forEach(function (x) { o += '<circle cx="' + x + '" cy="' + (b[1] + b[3] / 2) + '" r="1.05" fill="url(#' + id + 'jw)"/>'; });
+  // 明珠（峰顶）
+  v.jewels.forEach(function (j) { o += '<circle cx="' + j[0] + '" cy="' + j[1] + '" r="2.1" fill="url(#' + id + 'jw)"/><circle cx="' + (j[0] - .6) + '" cy="' + (j[1] - .7) + '" r=".55" fill="#fff" opacity=".9"/>'; });
+  // 降临的星（可动画）
+  var st = '<path d="M' + cx + ' 3 V' + (top + 1) + '" stroke="url(#' + id + 'tr)" stroke-width="2" stroke-linecap="round"/>' +
+    '<circle cx="' + cx + '" cy="' + cy + '" r="' + (s * .74) + '" fill="url(#' + id + 'sg)"/>' +
+    '<rect x="' + (cx - 13) + '" y="' + (cy - .35) + '" width="26" height=".7" rx=".35" fill="url(#' + id + 'gx)" opacity=".75"/>' +
+    '<path d="' + SPARK + '" transform="translate(' + cx + ' ' + cy + ') scale(' + (s / 2) + ')" fill="url(#' + id + 'st)"/>' +
+    '<circle cx="' + (cx - 1.6) + '" cy="' + (cy - 2) + '" r=".7" fill="#fff" opacity=".85"/>';
+  if (animated) {
+    st = '<g opacity="0">' + st +
+      '<animateTransform attributeName="transform" type="translate" values="0 -30; 0 0; 0 0" keyTimes="0; .32; 1" dur="4s" repeatCount="indefinite" calcMode="spline" keySplines=".25 .1 .1 1; 0 0 1 1"/>' +
+      '<animate attributeName="opacity" values="0; 1; 1; 1; 0" keyTimes="0; .12; .32; .88; 1" dur="4s" repeatCount="indefinite"/></g>' +
+      // 着陆时王冠闪光
+      '<g clip-path="url(#' + id + 'cc)"><rect x="0" y="30" width="64" height="22" fill="#fff" opacity="0"><animate attributeName="opacity" values="0; 0; .35; 0; 0" keyTimes="0; .3; .36; .55; 1" dur="4s" repeatCount="indefinite"/></rect></g>';
+  }
+  o += st;
+  o += '<rect x=".5" y=".5" width="63" height="63" rx="14.5" fill="none" stroke="url(#' + id + 'rim)"/>';
+  return '<svg viewBox="0 0 64 64" width="' + size + '" height="' + size + '"><defs>' + d + '</defs>' + o + '</svg>';
+}
+
+document.getElementById('heroIndigo').innerHTML = icon('A', 'indigo', 220);
+document.getElementById('heroBlack').innerHTML = icon('A', 'black', 220);
+document.getElementById('animIndigo').innerHTML = icon('A', 'indigo', 72, true);
+document.getElementById('animBlack').innerHTML = icon('A', 'black', 72, true);
+
+document.getElementById('vars').innerHTML = Object.keys(VARIANTS).map(function (k) {
+  var v = VARIANTS[k];
+  var pane = function (s) { return '<div class="st ' + s + '">' + icon(k, s, 104) + '<div class="sm">' + icon(k, s, 32) + icon(k, s, 16) + '</div></div>'; };
+  return '<div class="var"><div class="two">' + pane('indigo') + pane('black') + '</div><div class="meta"><b>' + k + ' ' + v.name + (v.tag ? '<em>' + v.tag + '</em>' : '') + '</b><span>' + v.desc + '</span></div></div>';
+}).join('');
+
+function scene(sk, title) {
+  var I = function (n) { return icon('A', sk, n); };
+  var ctx = '<div class="side">' + I(30) + '<span><div class="nm">星临</div><div class="sub">STARFALL</div></span></div>' +
+    '<div class="tab">' + I(16) + '星临 · 管理后台</div>' +
+    '<div class="card">' + I(42) + '<span><b>登录星临</b><span>直播间特效管理后台</span></span></div>';
+  return '<div class="scene"><h3>' + title + '</h3>' +
+    '<div class="row">' + ctx + '</div><div class="row dk">' + ctx + '</div>' +
+    '<div class="row dk"><div class="lockup">' + I(56) + '<span><span class="zh">星临</span><span class="en">STARFALL</span></span></div>' +
+    '<div class="taskbar"><span class="dot"></span><span class="act">' + I(26) + '</span><span class="dot"></span></div></div></div>';
+}
+document.getElementById('scenes').innerHTML = scene('indigo', '靛金') + scene('black', '玄金');
 </script>
 </body>
 </html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · Logo 方案（第三轮：驾临）</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+:root {
+  --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  --l1: #F5F5F7; --l2: #FAFAFB; --l3: #FFFFFF; --line: rgba(15,17,30,.08); --line-strong: rgba(15,17,30,.14);
+  --t1: #0E1016; --t2: #454A59; --t3: #686D7D; --accent: #5451D6;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans); background: var(--l1); color: var(--t1); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 40px 28px 80px; }
+h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
+h1 small { font-size: 14px; color: var(--t3); font-weight: 400; margin-left: 8px; }
+h1 a { color: var(--accent); font-size: 13px; font-weight: 400; margin-left: 10px; }
+.lead { margin: 8px 0 0; color: var(--t3); font-size: 14px; line-height: 1.75; }
+.sec { margin-top: 34px; }
+.sec-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.sec-h .n { width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; background: rgba(84,81,214,.1); color: var(--accent); font-family: var(--font-mono); font-size: 13px; font-weight: 600; align-self: center; }
+.sec-h h2 { margin: 0; font-size: 19px; font-weight: 600; }
+.sec-h span { font-size: 13px; color: var(--t3); }
+.opts { display: grid; gap: 14px; }
+.opts.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.opts.c5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.opts.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.opt { background: var(--l3); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(16,20,40,.04), 0 2px 8px rgba(16,20,40,.03); }
+.opt .stage { height: 190px; display: grid; place-items: center; position: relative;
+  background: radial-gradient(70% 60% at 50% 30%, rgba(111,110,255,.2), transparent 70%), #07070F; }
+.opt .stage.lt { background: var(--l2); border-bottom: 1px solid var(--line); height: 110px; }
+.opt .stage svg { width: 112px; height: 112px; filter: drop-shadow(0 14px 24px rgba(0,0,0,.45)); }
+.opt .stage.lt svg { width: 64px; height: 64px; filter: drop-shadow(0 8px 14px rgba(16,20,40,.2)); }
+.opt .small { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 8px; align-items: flex-end; }
+.opt .small svg { filter: none; }
+.opt .stage .small svg:first-child { width: 32px; height: 32px; }
+.opt .stage .small svg:last-child { width: 16px; height: 16px; }
+.opt .meta { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; }
+.opt .meta b { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.opt .meta b em { font-style: normal; font-size: 11px; color: var(--accent); background: rgba(84,81,214,.09); border-radius: 5px; padding: 1px 6px; font-weight: 500; }
+.opt .meta span { font-size: 12.5px; color: var(--t2); line-height: 1.65; }
+.opt .code { font-family: var(--font-mono); font-size: 11px; color: var(--t3); margin-top: 2px; }
+.sw { display: flex; gap: 4px; margin-top: 4px; }
+.sw i { width: 18px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.final { background: var(--l3); border: 1px solid var(--line); border-radius: 20px; padding: 24px; display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px; }
+.final .big { border-radius: 16px; display: grid; place-items: center; min-height: 360px; background: radial-gradient(70% 55% at 50% 30%, rgba(111,110,255,.24), transparent 70%), #07070F; position: relative; }
+.final .big svg { width: 176px; height: 176px; filter: drop-shadow(0 22px 40px rgba(0,0,0,.55)); }
+.final .big small { position: absolute; left: 14px; top: 12px; font-size: 11px; color: #80838F; font-family: var(--font-mono); }
+.ctx { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.row { border-radius: 14px; border: 1px solid var(--line); padding: 16px 18px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.row.dk { background: #0E0E12; border-color: rgba(255,255,255,.06); color: #EDEDF1; }
+.row .lbl { width: 64px; font-size: 12px; color: var(--t3); flex-shrink: 0; }
+.row.dk .lbl { color: #80838F; }
+.side { display: flex; align-items: center; gap: 10px; }
+.side .nm { font-size: 15px; font-weight: 600; letter-spacing: .06em; }
+.side .sub { font-size: 10.5px; letter-spacing: .3em; font-family: var(--font-mono); color: var(--t3); }
+.row.dk .side .sub { color: #80838F; }
+.tab { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px 0 10px; border-radius: 10px 10px 0 0; background: var(--l2); border: 1px solid var(--line); border-bottom: 0; font-size: 12.5px; color: var(--t2); min-width: 190px; }
+.row.dk .tab { background: #1B1B22; border-color: rgba(255,255,255,.08); color: #C9CAD3; }
+.tab i { margin-left: auto; font-style: normal; color: var(--t3); }
+.card { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; background: var(--l3); border: 1px solid var(--line-strong); box-shadow: 0 12px 32px -8px rgba(16,20,40,.14); }
+.row.dk .card { background: rgba(24,24,31,.9); border-color: rgba(255,255,255,.1); }
+.card b { font-size: 16px; font-weight: 600; display: block; color: var(--t1); }
+.row.dk .card b { color: #EDEDF1; }
+.card span span { font-size: 12px; color: var(--t3); }
+.taskbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 10px; background: rgba(32,32,36,.92); }
+.taskbar .dot { width: 26px; height: 26px; border-radius: 6px; background: rgba(255,255,255,.08); }
+.taskbar .act { position: relative; padding: 4px; border-radius: 6px; background: rgba(255,255,255,.1); display: flex; }
+.taskbar .act::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 12px; height: 3px; margin-left: -6px; border-radius: 3px; background: #7FB2FF; }
+.lockup { display: flex; align-items: center; gap: 16px; }
+.lockup .zh { font-size: 34px; font-weight: 700; letter-spacing: .1em; display: block; }
+.lockup .en { font-size: 12px; font-family: var(--font-mono); letter-spacing: .5em; color: #80838F; }
+.note { margin-top: 14px; font-size: 13px; line-height: 1.8; color: var(--t2); background: rgba(84,81,214,.06); border: 1px solid rgba(84,81,214,.18); border-radius: 12px; padding: 12px 16px; }
+.note b { color: var(--t1); }
+@media (max-width: 1100px) { .opts.c4, .opts.c5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .opts.c3 { grid-template-columns: 1fr; } .final { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>星临 · Logo 方案<small>第三轮 · 在 G「驾临」上深化</small><a href="logo.html">第四轮（最新）</a><a href="logo-v2.html">第二轮</a><a href="logo-v1.html">第一轮</a></h1>
+  <p class="lead">把"驾临"拆成三个维度分别选：<b>造型</b>（王冠和星的关系）、<b>配色</b>（底板和王冠的颜色）、<b>质感</b>（线描 / 实心 / 玻璃）。<br>配色和质感可以套在任何一种造型上，下面以推荐的造型为例。每个选项右下角是 32 和 16 像素（浏览器标签）的实际效果。</p>
+
+  <section class="sec">
+    <div class="sec-h"><span class="n">1</span><h2>造型</h2><span>王冠和星怎么组合</span></div>
+    <div class="opts c4" id="forms"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><span class="n">2</span><h2>配色</h2><span>以「G2 明珠 · 实心」为例；上面暗色背景，下面亮色背景</span></div>
+    <div class="opts c5" id="schemes"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><span class="n">3</span><h2>质感</h2><span>以「G2 明珠 · 靛金」为例</span></div>
+    <div class="opts c3" id="styles"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><span class="n">★</span><h2>推荐组合</h2><span>G2 明珠 · 靛金 · 实心 —— 放进实际场景</span></div>
+    <div class="final">
+      <div class="big"><small>应用图标</small><span id="finalBig"></span></div>
+      <div class="ctx" id="finalCtx"></div>
+    </div>
+    <div class="note"><b>为什么推荐这一组：</b>「明珠」让星成为王冠正中缺的那颗宝石——星从天而降、落进王冠，就是"驾临"；王冠只保留两侧的峰，比完整王冠轻，小尺寸也清楚。靛金和后台主色一致；实心金冠在 16 像素时比线描更醒目。<br>也可以自由组合，比如「G1 经典 · 玄金 · 线描」，告诉我编号就行。</div>
+  </section>
+</div>
+
+<script>
+// ---------- 配色 ----------
+var SCHEMES = {
+  indigo: { name: '靛金', code: '#34318A → #0A0A1A · 金 #F2C46E', desc: '和后台主色（星辉靛）一致，最统一', bg: ['#34318A', '#15143A', '#0A0A1A'], glow: '#8D8BFF', crown: ['#FFF1CC', '#F2C46E', '#C8812F'], star: ['#FFF6DE', '#F7D58B', '#D9913A'], line: '#C9C7FF' },
+  black: { name: '玄金', code: '#2A2A33 → #050507 · 香槟金', desc: '黑金奢华感，最"贵"，像高端品牌', bg: ['#2A2A33', '#101014', '#050507'], glow: '#B8A27A', crown: ['#FBF1DC', '#E3C58E', '#A9803F'], star: ['#FFF8E8', '#EFD9A8', '#B98F4A'], line: '#D9C9A6' },
+  violet: { name: '星紫', code: '#7446E0 → #1A0C45 · 金', desc: '更鲜亮、更年轻，接近 B 站的活泼气质', bg: ['#7446E0', '#3A1F8C', '#1A0C45'], glow: '#C9A8FF', crown: ['#FFF1CC', '#F2C46E', '#C8812F'], star: ['#FFF6DE', '#F7D58B', '#D9913A'], line: '#E0CCFF' },
+  navy: { name: '夜蓝', code: '#23428A → #050B1E · 金', desc: '深夜蓝，稳重、冷静，像夜空', bg: ['#23428A', '#0C1A3D', '#050B1E'], glow: '#7FB2FF', crown: ['#FFF1CC', '#F2C46E', '#C8812F'], star: ['#FFF6DE', '#F7D58B', '#D9913A'], line: '#BBD4FF' },
+  gold: { name: '金底', code: '#FFE7AE → #B06F25 · 靛', desc: '反色：金色底板配深靛王冠，任务栏里最显眼', bg: ['#FFE7AE', '#E6AE55', '#B06F25'], glow: '#FFF6DE', crown: ['#3B3796', '#221F63', '#12103A'], star: ['#2E2B84', '#1C1A55', '#0E0C2E'], line: '#1C1A55', inverted: true }
+};
+
+// ---------- 造型 ----------
+var FORMS = {
+  G1: { name: '经典', desc: '三峰王冠，星从正上方落下，悬在中央峰顶——第二轮的 G，线条重新精修，两侧峰顶加了宝石。', crown: 'M15.5 50 L17.5 36 L25 42.5 L32 32 L39 42.5 L46.5 36 L48.5 50 Z', base: 'M15.5 50 H48.5', jewels: [[17.5, 36], [46.5, 36]], star: [32, 21, 15], trail: [4, 14] },
+  G2: { name: '明珠', tag: '推荐', desc: '王冠正中缺一颗宝石，星从天而降、正好落进缺口——星就是冠上的明珠。', crown: 'M14 50 L15.5 35.5 L23 43 L28 36.5 L32 41 L36 36.5 L41 43 L48.5 35.5 L50 50 Z', base: 'M14 50 H50', jewels: [[15.5, 35.5], [48.5, 35.5]], star: [32, 28.5, 17], trail: [4, 19] },
+  G3: { name: '光冠', desc: '王冠由光勾勒，轻盈透明；只有落下的星是金色——更空灵，更有"降临"的神圣感。', crown: 'M15.5 50 L17.5 36 L25 42.5 L32 32 L39 42.5 L46.5 36 L48.5 50 Z', base: 'M15.5 50 H48.5', light: true, star: [32, 21, 15], trail: [4, 14] },
+  G4: { name: '徽章', desc: '王冠收进一枚圆形徽章，星从上方冲破圆环落下——像勋章、印章，更正式。', badge: true, crown: 'M22 45 L23 35.5 L28 40 L32 33.5 L36 40 L41 35.5 L42 45 Z', base: 'M22 45 H42', star: [32, 17, 12], trail: [2, 10] }
+};
+
+var uid = 0;
+var SPARK = 'M0 -1 C.1 -.28 .28 -.1 1 0 C.28 .1 .1 .28 0 1 C-.1 .28 -.28 .1 -1 0 C-.28 -.1 -.1 -.28 0 -1Z';
+/** 生成一个图标（每个都有独立的渐变编号，互不影响） */
+function icon(formKey, schemeKey, style, size) {
+  var f = FORMS[formKey], c = SCHEMES[schemeKey], id = 'g' + (++uid);
+  var cx = f.star[0], cy = f.star[1], s = f.star[2];
+  var defs =
+    '<linearGradient id="' + id + 'bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.bg[0] + '"/><stop offset=".55" stop-color="' + c.bg[1] + '"/><stop offset="1" stop-color="' + c.bg[2] + '"/></linearGradient>' +
+    '<radialGradient id="' + id + 'gl" cx=".3" cy=".12" r=".85"><stop offset="0" stop-color="' + c.glow + '" stop-opacity="' + (c.inverted ? '.7' : '.42') + '"/><stop offset="1" stop-color="' + c.glow + '" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="' + id + 'rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="' + (c.inverted ? '.6' : '.24') + '"/><stop offset=".5" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>' +
+    '<linearGradient id="' + id + 'cr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + c.crown[0] + '"/><stop offset=".55" stop-color="' + c.crown[1] + '"/><stop offset="1" stop-color="' + c.crown[2] + '"/></linearGradient>' +
+    '<linearGradient id="' + id + 'st" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c.star[0] + '"/><stop offset=".45" stop-color="' + c.star[1] + '"/><stop offset="1" stop-color="' + c.star[2] + '"/></linearGradient>' +
+    '<radialGradient id="' + id + 'sg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="' + (c.inverted ? '#FFFFFF' : c.star[1]) + '" stop-opacity=".55"/><stop offset="1" stop-color="' + c.star[1] + '" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="' + id + 'tr" gradientUnits="userSpaceOnUse" x1="0" y1="' + f.trail[0] + '" x2="0" y2="' + f.trail[1] + '"><stop offset="0" stop-color="' + c.line + '" stop-opacity="0"/><stop offset="1" stop-color="' + c.star[1] + '"/></linearGradient>' +
+    '<linearGradient id="' + id + 'lt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="' + c.line + '" stop-opacity=".55"/></linearGradient>';
+  var tile = '<rect width="64" height="64" rx="15" fill="url(#' + id + 'bg)"/><rect width="64" height="64" rx="15" fill="url(#' + id + 'gl)"/><rect x=".5" y=".5" width="63" height="63" rx="14.5" fill="none" stroke="url(#' + id + 'rim)"/>';
+  var mode = f.light ? 'light' : style;
+  var crown = '';
+  if (f.badge) {
+    // 圆环：顶部留缺口，星从缺口落下
+    var r = 17, a = 0.42, y0 = 37;
+    crown += '<path d="M' + (32 - r * Math.sin(a)).toFixed(2) + ' ' + (y0 - r * Math.cos(a)).toFixed(2) + ' A' + r + ' ' + r + ' 0 1 0 ' + (32 + r * Math.sin(a)).toFixed(2) + ' ' + (y0 - r * Math.cos(a)).toFixed(2) + '" fill="none" stroke="url(#' + id + 'cr)" stroke-width="1.8" stroke-linecap="round"/>';
+  }
+  if (mode === 'line') crown += '<path d="' + f.crown + '" fill="none" stroke="url(#' + id + 'cr)" stroke-width="2.4" stroke-linejoin="round"/>';
+  else if (mode === 'solid') crown += '<path d="' + f.crown + '" fill="url(#' + id + 'cr)"/><path d="' + f.crown + '" fill="none" stroke="#fff" stroke-opacity="' + (c.inverted ? '.25' : '.35') + '" stroke-width=".8" stroke-linejoin="round"/>';
+  else if (mode === 'light') crown += '<path d="' + f.crown + '" fill="none" stroke="' + c.line + '" stroke-opacity=".3" stroke-width="5" stroke-linejoin="round"/><path d="' + f.crown + '" fill="' + c.line + '" fill-opacity=".08" stroke="url(#' + id + 'lt)" stroke-width="1.6" stroke-linejoin="round"/>';
+  else crown += '<path d="' + f.crown + '" fill="url(#' + id + 'cr)" fill-opacity=".22" stroke="url(#' + id + 'cr)" stroke-width="1.8" stroke-linejoin="round"/>';
+  crown += '<path d="' + f.base + '" stroke="' + (mode === 'light' ? c.line : c.crown[1]) + '" stroke-opacity=".85" stroke-width="1.8" stroke-linecap="round"/>';
+  (f.jewels || []).forEach(function (j) { crown += '<circle cx="' + j[0] + '" cy="' + (j[1] - 0.4) + '" r="1.7" fill="url(#' + id + 'st)"/>'; });
+  var star = '<path d="M' + cx + ' ' + f.trail[0] + ' V' + f.trail[1] + '" stroke="url(#' + id + 'tr)" stroke-width="2.1" stroke-linecap="round"/>' +
+    '<circle cx="' + cx + '" cy="' + cy + '" r="' + (s * 0.72) + '" fill="url(#' + id + 'sg)"/>' +
+    '<path d="' + SPARK + '" transform="translate(' + cx + ' ' + cy + ') scale(' + (s / 2) + ')" fill="url(#' + id + 'st)"/>';
+  return '<svg viewBox="0 0 64 64" width="' + size + '" height="' + size + '"><defs>' + defs + '</defs>' + tile + crown + star + '</svg>';
+}
+function smalls(f, s, st) { return '<div class="small">' + icon(f, s, st, 32) + icon(f, s, st, 16) + '</div>'; }
+
+document.getElementById('forms').innerHTML = Object.keys(FORMS).map(function (k) {
+  var f = FORMS[k];
+  return '<div class="opt"><div class="stage">' + icon(k, 'indigo', 'glass', 112) + smalls(k, 'indigo', 'glass') + '</div>' +
+    '<div class="meta"><b>' + k + ' ' + f.name + (f.tag ? '<em>' + f.tag + '</em>' : '') + '</b><span>' + f.desc + '</span></div></div>';
+}).join('');
+
+document.getElementById('schemes').innerHTML = Object.keys(SCHEMES).map(function (k) {
+  var c = SCHEMES[k];
+  return '<div class="opt"><div class="stage">' + icon('G2', k, 'solid', 112) + smalls('G2', k, 'solid') + '</div>' +
+    '<div class="stage lt">' + icon('G2', k, 'solid', 64) + '</div>' +
+    '<div class="meta"><b>' + c.name + (k === 'indigo' ? '<em>推荐</em>' : '') + '</b><span>' + c.desc + '</span>' +
+    '<div class="sw"><i style="background:' + c.bg[0] + '"></i><i style="background:' + c.bg[2] + '"></i><i style="background:' + c.crown[1] + '"></i></div><span class="code">' + c.code + '</span></div></div>';
+}).join('');
+
+var STYLES = { line: ['线描', '只有金色轮廓，最轻、最现代；16 像素时线条偏细'], solid: ['实心', '实心金冠带一道细高光，最醒目、最像"徽标"，小尺寸最清楚'], glass: ['玻璃', '半透明金色填充 + 金边，通透有层次，和后台的磨砂玻璃风格呼应'] };
+document.getElementById('styles').innerHTML = Object.keys(STYLES).map(function (k) {
+  return '<div class="opt"><div class="stage">' + icon('G2', 'indigo', k, 112) + smalls('G2', 'indigo', k) + '</div>' +
+    '<div class="meta"><b>' + STYLES[k][0] + (k === 'solid' ? '<em>推荐</em>' : '') + '</b><span>' + STYLES[k][1] + '</span></div></div>';
+}).join('');
+
+var F = ['G2', 'indigo', 'solid'];
+function I(sz) { return icon(F[0], F[1], F[2], sz); }
+document.getElementById('finalBig').innerHTML = I(176);
+function ctx() {
+  return '<div class="side">' + I(30) + '<span><div class="nm">星临</div><div class="sub">STARFALL</div></span></div>' +
+    '<div class="tab">' + I(16) + '星临 · 管理后台<i>×</i></div>' +
+    '<div class="card">' + I(44) + '<span><b>登录星临</b><span>直播间特效管理后台</span></span></div>';
+}
+document.getElementById('finalCtx').innerHTML =
+  '<div class="row"><span class="lbl">亮色</span>' + ctx() + '</div>' +
+  '<div class="row dk"><span class="lbl">暗色</span>' + ctx() + '</div>' +
+  '<div class="row dk"><span class="lbl">标志组合</span><div class="lockup">' + I(60) + '<span><span class="zh">星临</span><span class="en">STARFALL</span></span></div>' +
+    '<span class="lbl" style="margin-left:auto">任务栏</span><div class="taskbar"><span class="dot"></span><span class="act">' + I(26) + '</span><span class="dot"></span><span class="dot"></span></div></div>';
+</script>
+</body>
+</html>

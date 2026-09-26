@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · Logo 方案（第二轮：降临）</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+:root {
+  --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  --l1: #F5F5F7; --l2: #FAFAFB; --l3: #FFFFFF; --line: rgba(15,17,30,.08); --line-strong: rgba(15,17,30,.14);
+  --t1: #0E1016; --t2: #454A59; --t3: #686D7D; --accent: #5451D6;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans); background: var(--l1); color: var(--t1); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 40px 28px 80px; }
+h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
+.lead { margin: 8px 0 0; color: var(--t3); font-size: 14px; line-height: 1.7; }
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 28px 0 40px; }
+.strip a { text-decoration: none; color: inherit; background: #0B0B16; border-radius: 18px; padding: 28px 16px 18px; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 12px 32px -12px rgba(10,10,40,.35); transition: transform .2s; }
+.strip a:hover { transform: translateY(-2px); }
+.strip svg { width: 96px; height: 96px; }
+.strip b { color: #EDEDF1; font-size: 15px; font-weight: 600; }
+.strip span { color: #80838F; font-size: 12px; }
+.concept { background: var(--l3); border: 1px solid var(--line); border-radius: 20px; padding: 26px 28px 30px; margin-bottom: 28px; box-shadow: 0 1px 2px rgba(16,20,40,.04), 0 2px 8px rgba(16,20,40,.03); }
+.c-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.c-head h2 { margin: 0; font-size: 19px; font-weight: 600; }
+.c-head .tag { font-family: var(--font-mono); font-size: 12px; color: var(--accent); background: rgba(84,81,214,.09); padding: 2px 8px; border-radius: 6px; }
+.c-head p { flex-basis: 100%; margin: 6px 0 0; font-size: 13.5px; color: var(--t2); line-height: 1.75; }
+.grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; margin-top: 20px; }
+.hero { display: grid; grid-template-rows: 1fr 1fr; gap: 12px; }
+.hero > div { border-radius: 16px; display: grid; place-items: center; min-height: 170px; position: relative; }
+.hero .dk { background: radial-gradient(70% 60% at 50% 30%, rgba(111,110,255,.22), transparent 70%), #07070F; }
+.hero .lt { background: var(--l2); border: 1px solid var(--line); }
+.hero svg { width: 120px; height: 120px; }
+.hero small { position: absolute; left: 12px; top: 10px; font-size: 11px; color: #80838F; font-family: var(--font-mono); }
+.right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.row { border-radius: 14px; border: 1px solid var(--line); padding: 16px 18px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.row.dk { background: #0E0E12; border-color: rgba(255,255,255,.06); color: #EDEDF1; }
+.row .lbl { width: 72px; font-size: 12px; color: var(--t3); flex-shrink: 0; }
+.row.dk .lbl { color: #80838F; }
+.sizes { display: flex; align-items: flex-end; gap: 22px; }
+.sizes div { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 10.5px; color: var(--t3); font-family: var(--font-mono); }
+.row.dk .sizes div { color: #80838F; }
+.sizes .mono { color: var(--accent); }
+.row.dk .sizes .mono { color: #C9C7FF; }
+/* 场景 */
+.side { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-radius: 10px; }
+.side .nm { font-size: 15px; font-weight: 600; letter-spacing: .06em; }
+.side .sub { font-size: 10.5px; letter-spacing: .3em; font-family: var(--font-mono); color: var(--t3); }
+.row.dk .side .sub { color: #80838F; }
+.tab { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px 0 10px; border-radius: 10px 10px 0 0; background: var(--l2); border: 1px solid var(--line); border-bottom: 0; font-size: 12.5px; color: var(--t2); min-width: 200px; }
+.row.dk .tab { background: #1B1B22; border-color: rgba(255,255,255,.08); color: #C9CAD3; }
+.tab svg { width: 16px; height: 16px; }
+.tab i { margin-left: auto; font-style: normal; color: var(--t3); }
+.card { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px; background: var(--l3); border: 1px solid var(--line-strong); box-shadow: 0 12px 32px -8px rgba(16,20,40,.14); }
+.row.dk .card { background: rgba(24,24,31,.9); border-color: rgba(255,255,255,.1); box-shadow: 0 24px 64px -12px rgba(0,0,0,.7); }
+.card b { font-size: 17px; font-weight: 600; display: block; color: var(--t1); }
+.row.dk .card b { color: #EDEDF1; }
+.card span { font-size: 12px; color: var(--t3); }
+.appicon { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; }
+.appicon svg { width: 72px; height: 72px; filter: drop-shadow(0 8px 16px rgba(0,0,0,.35)); }
+.pick { margin-top: 16px; font-size: 13px; color: var(--t2); line-height: 1.8; background: var(--l2); border-radius: 12px; padding: 12px 16px; border: 1px solid var(--line); }
+.pick b { color: var(--t1); }
+.word { display: flex; flex-direction: column; gap: 2px; }
+.word .zh { font-size: 34px; font-weight: 700; letter-spacing: .1em; }
+.word .en { font-size: 12px; font-family: var(--font-mono); letter-spacing: .5em; color: var(--t3); }
+.row.dk .word .en { color: #80838F; }
+.lockup { display: flex; align-items: center; gap: 16px; }
+.lockup svg { width: 56px; height: 56px; }
+@media (max-width: 900px) { .strip { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 公共：图标底板（深靛渐变 + 顶部高光） -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34318A"/><stop offset=".55" stop-color="#15143A"/><stop offset="1" stop-color="#0A0A1A"/></linearGradient>
+    <radialGradient id="bgGlow" cx=".3" cy=".15" r=".8"><stop offset="0" stop-color="#8D8BFF" stop-opacity=".45"/><stop offset="1" stop-color="#8D8BFF" stop-opacity="0"/></radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".5" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF6DE"/><stop offset=".45" stop-color="#F7D58B"/><stop offset="1" stop-color="#D9913A"/></linearGradient>
+    <radialGradient id="goldGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#F7D58B" stop-opacity=".55"/><stop offset="1" stop-color="#F7D58B" stop-opacity="0"/></radialGradient>
+    <linearGradient id="trail" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D58B" stop-opacity=".95"/><stop offset=".35" stop-color="#C9C7FF" stop-opacity=".7"/><stop offset="1" stop-color="#8D8BFF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="arch" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E2FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".35"/></linearGradient>
+    <linearGradient id="archFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8D8BFF" stop-opacity=".0"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".32"/></linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#C9C7FF" stop-opacity="0"/><stop offset=".5" stop-color="#E4E2FF"/><stop offset="1" stop-color="#C9C7FF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="horizon" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8D8BFF" stop-opacity="0"/><stop offset=".5" stop-color="#E4E2FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="planet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A2870"/><stop offset=".4" stop-color="#0C0B22"/></linearGradient>
+    <linearGradient id="sTrail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D58B"/><stop offset=".45" stop-color="#C9C7FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".15"/></linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E2FF" stop-opacity=".02"/><stop offset=".7" stop-color="#C9C7FF" stop-opacity=".3"/><stop offset="1" stop-color="#C9C7FF" stop-opacity=".0"/></linearGradient>
+    <linearGradient id="beamCore" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".8" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="fall" gradientUnits="userSpaceOnUse" x1="0" y1="4" x2="0" y2="30"><stop offset="0" stop-color="#C9C7FF" stop-opacity="0"/><stop offset="1" stop-color="#F7D58B"/></linearGradient>
+    <linearGradient id="crownFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D58B" stop-opacity=".05"/><stop offset="1" stop-color="#F7D58B" stop-opacity=".28"/></linearGradient>
+    <linearGradient id="crownStroke" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF1CC"/><stop offset="1" stop-color="#D9913A"/></linearGradient>
+    <linearGradient id="wingL" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#C9C7FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".1"/></linearGradient>
+    <linearGradient id="wingR" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#C9C7FF"/><stop offset="1" stop-color="#8D8BFF" stop-opacity=".1"/></linearGradient>
+    <clipPath id="tileClip"><rect width="64" height="64" rx="15"/></clipPath>
+  </defs>
+
+  <!-- 四角星（圆润的内凹） -->
+  <symbol id="spark" viewBox="-1 -1 2 2"><path d="M0 -1 C.1 -.28 .28 -.1 1 0 C.28 .1 .1 .28 0 1 C-.1 .28 -.28 .1 -1 0 C-.28 -.1 -.1 -.28 0 -1Z"/></symbol>
+
+  <!-- 底板 -->
+  <symbol id="tile" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+    <rect width="64" height="64" rx="15" fill="url(#bgGlow)"/>
+    <rect x=".5" y=".5" width="63" height="63" rx="14.5" fill="none" stroke="url(#rim)"/>
+  </symbol>
+
+  <!-- E 光柱降临 -->
+  <symbol id="E" viewBox="0 0 64 64">
+    <use href="#tile" width="64" height="64"/>
+    <g clip-path="url(#tileClip)">
+      <path d="M28.5 -2 H35.5 L44 47 H20 Z" fill="url(#beam)"/>
+      <path d="M31 -2 H33 L34.5 40 H29.5 Z" fill="url(#beamCore)"/>
+    </g>
+    <ellipse cx="32" cy="48.5" rx="21" ry="4.6" fill="none" stroke="#C9C7FF" stroke-opacity=".28" stroke-width="1"/>
+    <ellipse cx="32" cy="48.5" rx="13" ry="2.9" fill="none" stroke="#E4E2FF" stroke-opacity=".6" stroke-width="1.2"/>
+    <ellipse cx="32" cy="48.5" rx="6" ry="1.4" fill="#E4E2FF" opacity=".55"/>
+    <circle cx="32" cy="39" r="11" fill="url(#goldGlow)"/>
+    <use href="#spark" x="23.5" y="30.5" width="17" height="17" fill="url(#gold)"/>
+  </symbol>
+  <symbol id="E-mono" viewBox="0 0 64 64">
+    <path d="M29.5 4 H34.5 L41 38 H23 Z" fill="currentColor" opacity=".22"/>
+    <ellipse cx="32" cy="49" rx="17" ry="3.8" fill="none" stroke="currentColor" stroke-width="2" opacity=".45"/>
+    <use href="#spark" x="23" y="29" width="18" height="18" fill="currentColor"/>
+  </symbol>
+
+  <!-- F 星落 -->
+  <symbol id="F" viewBox="0 0 64 64">
+    <use href="#tile" width="64" height="64"/>
+    <path d="M32 5 V28" stroke="url(#fall)" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M24.5 13 V29" stroke="url(#fall)" stroke-width="1.5" stroke-linecap="round" opacity=".55"/>
+    <path d="M39.5 11 V27" stroke="url(#fall)" stroke-width="1.5" stroke-linecap="round" opacity=".55"/>
+    <path d="M19 49.5 Q32 43.5 45 49.5" fill="none" stroke="#E4E2FF" stroke-opacity=".55" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="32" cy="37" r="13" fill="url(#goldGlow)"/>
+    <use href="#spark" x="21.5" y="26.5" width="21" height="21" fill="url(#gold)"/>
+  </symbol>
+  <symbol id="F-mono" viewBox="0 0 64 64">
+    <path d="M32 5 V26" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".5"/>
+    <path d="M24.5 13 V27 M39.5 11 V25" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".3"/>
+    <use href="#spark" x="21" y="26" width="22" height="22" fill="currentColor"/>
+  </symbol>
+
+  <!-- G 驾临 -->
+  <symbol id="G" viewBox="0 0 64 64">
+    <use href="#tile" width="64" height="64"/>
+    <path d="M32 4 V16" stroke="url(#fall)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M15.5 50 L17.5 36 L25 42.5 L32 32 L39 42.5 L46.5 36 L48.5 50 Z" fill="url(#crownFill)" stroke="url(#crownStroke)" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M15.5 50 H48.5" stroke="#F7D58B" stroke-opacity=".7" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="32" cy="22" r="10" fill="url(#goldGlow)"/>
+    <use href="#spark" x="24.5" y="14.5" width="15" height="15" fill="url(#gold)"/>
+  </symbol>
+  <symbol id="G-mono" viewBox="0 0 64 64">
+    <path d="M32 4 V14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".45"/>
+    <path d="M15.5 50 L17.5 36 L25 42.5 L32 32 L39 42.5 L46.5 36 L48.5 50 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" opacity=".6"/>
+    <use href="#spark" x="24" y="14" width="16" height="16" fill="currentColor"/>
+  </symbol>
+
+  <!-- H 光翼 -->
+  <symbol id="H" viewBox="0 0 64 64">
+    <use href="#tile" width="64" height="64"/>
+    <g fill="none" stroke-linecap="round">
+      <path d="M28 36 C20 34 13.5 27 11 16" stroke="url(#wingL)" stroke-width="2.4"/>
+      <path d="M28 39 C21 38.5 15.5 34 12.5 27" stroke="url(#wingL)" stroke-width="1.8" opacity=".75"/>
+      <path d="M28.5 42 C23 42.5 18.5 40 16 36" stroke="url(#wingL)" stroke-width="1.3" opacity=".55"/>
+      <path d="M36 36 C44 34 50.5 27 53 16" stroke="url(#wingR)" stroke-width="2.4"/>
+      <path d="M36 39 C43 38.5 48.5 34 51.5 27" stroke="url(#wingR)" stroke-width="1.8" opacity=".75"/>
+      <path d="M35.5 42 C41 42.5 45.5 40 48 36" stroke="url(#wingR)" stroke-width="1.3" opacity=".55"/>
+    </g>
+    <ellipse cx="32" cy="51" rx="10" ry="2.2" fill="#C9C7FF" opacity=".35"/>
+    <circle cx="32" cy="38" r="11" fill="url(#goldGlow)"/>
+    <use href="#spark" x="24" y="30" width="16" height="16" fill="url(#gold)"/>
+  </symbol>
+  <symbol id="H-mono" viewBox="0 0 64 64">
+    <g fill="none" stroke="currentColor" stroke-linecap="round" opacity=".55">
+      <path d="M28 36 C20 34 13.5 27 11 16" stroke-width="3"/><path d="M28 40 C21 39.5 15.5 35 12.5 28" stroke-width="2.2"/>
+      <path d="M36 36 C44 34 50.5 27 53 16" stroke-width="3"/><path d="M36 40 C43 39.5 48.5 35 51.5 28" stroke-width="2.2"/>
+    </g>
+    <use href="#spark" x="23.5" y="29.5" width="17" height="17" fill="currentColor"/>
+  </symbol>
+</svg>
+
+<div class="wrap">
+  <h1>星临 · Logo 方案 <span style="font-size:14px;color:var(--t3);font-weight:400">第二轮 · 降临　<a href="logo-v1.html" style="color:var(--accent)">第一轮方案</a>　<a href="logo.html" style="color:var(--accent)">第三轮（最新）</a></span></h1>
+  <p class="lead">四个方向都围绕"<b>降临</b>"：从天而降、落地有回响。仍然使用同一套底板（深靛渐变 + 顶部高光）和同一颗金色四角星。<br>每个方案都放进真实会用到的位置：浏览器标签页（16 像素）、后台侧栏、登录卡片、Windows 应用图标，以及亮色 / 暗色背景。</p>
+
+  <div class="strip">
+    <a href="#cE"><svg><use href="#E"/></svg><b>E 光柱降临</b><span>光从天而降，星落地泛起光环</span></a>
+    <a href="#cF"><svg><use href="#F"/></svg><b>F 星落</b><span>星垂直落下，刚刚着陆</span></a>
+    <a href="#cG"><svg><use href="#G"/></svg><b>G 驾临</b><span>星落向王冠，尊贵的到来</span></a>
+    <a href="#cH"><svg><use href="#H"/></svg><b>H 光翼</b><span>展开光翼缓缓降落</span></a>
+  </div>
+
+  <!-- 用脚本生成四个方案的详情，保证每个方案的展示完全一致 -->
+  <div id="concepts"></div>
+</div>
+
+<script>
+var C = [
+  { id: 'E', name: '光柱降临', tag: 'Descent', desc: '一束光从正上方照下，星落在光柱底部，地面泛起两圈光环——"降临"最直接的画面：从天而降，落地有回响。也正是观众进场时特效出现的那一刻。', pros: '<b>推荐</b>：降临感最强、画面最有仪式感；16 像素时是"一颗星 + 下面一道光环"，依然好认。登录页可以做成动画：光柱照下 → 星落下 → 光环散开。' },
+  { id: 'F', name: '星落', tag: 'Falling', desc: '星垂直落下，上方留着三道速度线，下方一道被照亮的弧线，像刚刚着陆。比光柱更轻快、更有速度感。', pros: '简洁有力，小尺寸最清楚；仪式感比光柱弱一些。' },
+  { id: 'G', name: '驾临', tag: 'Royal', desc: '星从上方缓缓落向一顶王冠。直播间里总督、提督进场叫"驾临"，这个图形把"尊贵的人到来"画了出来。', pros: '寓意最贴合大航海；王冠的识别度高，但图形偏复杂、偏"尊贵"，普通观众的进场感弱一些。' },
+  { id: 'H', name: '光翼', tag: 'Wings', desc: '星展开两道光翼降落，下方投下一小片光影。像天使降临，最有神圣感和情绪。', pros: '最有氛围和情绪；翅膀在 16 像素时会变成两道弧线，细节会丢。' }
+];
+var box = document.getElementById('concepts');
+C.forEach(function (c) {
+  var u = function (id, w) { return '<svg width="' + w + '" height="' + w + '"><use href="#' + id + '"/></svg>'; };
+  var sizes = function () { return [64, 32, 24, 16].map(function (s) { return '<div>' + u(c.id, s) + s + '</div>'; }).join(''); };
+  var monos = function () { return [64, 32, 24, 16].map(function (s) { return '<div class="mono">' + u(c.id + '-mono', s) + s + '</div>'; }).join(''); };
+  var ctx = function () {
+    return '<div class="side">' + u(c.id, 30) + '<span><div class="nm">星临</div><div class="sub">STARFALL</div></span></div>' +
+      '<div class="tab">' + u(c.id, 16) + '星临 · 管理后台<i>×</i></div>' +
+      '<div class="card">' + u(c.id, 44) + '<span><b>登录星临</b><span>直播间特效管理后台</span></span></div>';
+  };
+  var el = document.createElement('section');
+  el.className = 'concept'; el.id = 'c' + c.id;
+  el.innerHTML = '<div class="c-head"><h2>' + c.id + ' · ' + c.name + '</h2><span class="tag">' + c.tag + '</span><p>' + c.desc + '</p></div>' +
+    '<div class="grid"><div class="hero"><div class="dk"><small>暗色</small>' + u(c.id, 120) + '</div><div class="lt"><small>亮色</small>' + u(c.id, 120) + '</div></div>' +
+    '<div class="right">' +
+      '<div class="row"><span class="lbl">尺寸</span><div class="sizes">' + sizes() + '</div><span class="lbl" style="margin-left:24px">单色</span><div class="sizes">' + monos() + '</div></div>' +
+      '<div class="row dk"><span class="lbl">尺寸</span><div class="sizes">' + sizes() + '</div><span class="lbl" style="margin-left:24px">单色</span><div class="sizes">' + monos() + '</div></div>' +
+      '<div class="row"><span class="lbl">使用场景</span>' + ctx() + '</div>' +
+      '<div class="row dk"><span class="lbl">使用场景</span>' + ctx() + '</div>' +
+      '<div class="row dk"><span class="lbl">标志组合</span><div class="lockup">' + u(c.id, 56) + '<div class="word"><span class="zh">星临</span><span class="en">STARFALL</span></div></div>' +
+        '<span class="lbl" style="margin-left:auto">应用图标</span><div class="appicon">' + u(c.id, 72) + '<span style="color:#80838F">Windows 版</span></div></div>' +
+    '</div></div>' +
+    '<div class="pick">' + c.pros + '</div>';
+  box.appendChild(el);
+});
+</script>
+</body>
+</html>

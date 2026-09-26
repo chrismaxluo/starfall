@@ -242,6 +242,9 @@ importers:
       '@fontsource/noto-sans-sc':
         specifier: ^5.3.0
         version: 5.3.0
+      '@fontsource/noto-serif-sc':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@starfall/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -927,6 +930,9 @@ packages:
 
   '@fontsource/noto-sans-sc@5.3.0':
     resolution: {integrity: sha512-HeqIlGm0+ohOKxZLuHj1qW6r6avHH0OWdKERAcSDI0RQ+MXrteuLKA+M+5eOA8rYy0MFvOR5AT0fQo2rUkye0Q==}
+
+  '@fontsource/noto-serif-sc@5.3.0':
+    resolution: {integrity: sha512-0/zaEFkidiWldE62rTeD74x8ygUsQvejiSNtO0LQxQk3qpaHnlMZ3w4C7yH80B4KTIg8VKeFP4oSgwWMchY9+g==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2758,6 +2764,8 @@ snapshots:
   '@fontsource/geist-sans@5.3.0': {}
 
   '@fontsource/noto-sans-sc@5.3.0': {}
+
+  '@fontsource/noto-serif-sc@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

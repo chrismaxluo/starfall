@@ -16,17 +16,17 @@ const setup = async (opts?: { maxUpload?: number }) => {
 };
 
 describe('素材列表', () => {
-  it('内置 8 个素材，带"用于哪些规则"', async () => {
+  it('内置 11 个素材，带"用于哪些规则"', async () => {
     const { effects, byName } = await setup();
     const list = await effects();
-    expect(list.map((e) => e.name)).toEqual(['星冕', '流星', '流光', '巡场', '霜玻', '礼物感谢', '弹幕回应', '一行字']);
+    expect(list.map((e) => e.name)).toEqual(['星冕', '流星', '流光', '巡场', '霜玻', '礼物感谢', '弹幕回应', '一行字', '金銮', '亭阁', '门楼']);
     expect(list.every((e) => e.builtin)).toBe(true);
-    expect((await byName('星冕')).usedBy).toEqual([
+    expect((await byName('金銮')).usedBy).toEqual([
       { page: 'enter', label: '进场 · 总督' },
-      { page: 'gift', label: '礼物 · 单次 ≥ 100 元' },
       { page: 'guard', label: '上舰 · 开通总督' },
       { page: 'guard', label: '上舰 · 续费总督' },
     ]);
+    expect((await byName('星冕')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 100 元' }]);
     expect((await byName('霜玻')).usedBy.map((u) => u.label)).toEqual(['进场 · 粉丝牌 21 级及以上', '进场 · 粉丝牌 1 – 20 级']);
     // 普通观众档默认关闭，但仍然引用了"一行字"
     expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['进场 · 普通观众', '礼物 · 单次 1 – 10 元']);
@@ -169,7 +169,7 @@ describe('复制与删除', () => {
     expect(a).toMatchObject({ name: '星冕 副本', builtin: false, visual: { type: 'builtin_style', style: 'star' }, usedBy: [] });
     const b = (await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { replaceRefs: true } })).json();
     expect(b).toMatchObject({ name: '星冕 副本 2' });
-    expect(b.usedBy.map((u: { label: string }) => u.label)).toEqual(['进场 · 总督', '礼物 · 单次 ≥ 100 元', '上舰 · 开通总督', '上舰 · 续费总督']);
+    expect(b.usedBy.map((u: { label: string }) => u.label)).toEqual(['礼物 · 单次 ≥ 100 元']);
     expect((await byName('星冕')).usedBy).toEqual([]);
     expect((await req({ method: 'PUT', url: `/api/effects/${b.id}`, payload: { volume: 20 } })).statusCode).toBe(200);
     expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '流星' } })).statusCode).toBe(409);

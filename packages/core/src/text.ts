@@ -45,6 +45,7 @@ export function fillText(template: string, v: TextVars): string {
     value: v.valueGold !== undefined ? `${formatYuan(goldToYuan(v.valueGold))} 元` : '',
     months: v.months !== undefined ? String(v.months) : '',
     op: v.op === 'renew' ? '续费' : v.op === 'open' ? '开通' : '',
+    act: v.op === 'renew' ? '续费' : v.op === 'open' ? '上舰' : '',
   };
   return template
     .replace(/\{(\w+)\}/g, (all, key: string) => (key in map ? map[key]! : all))

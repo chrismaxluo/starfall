@@ -31,7 +31,16 @@ const TEXT_TABS: Array<{ value: TextKey; label: string }> = [
   { value: 'guard', label: '上舰时' },
   { value: 'danmu', label: '弹幕时' },
 ];
-const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{text}', '{gift}', '{count}', '{value}', '{months}', '{op}'];
+const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{text}', '{gift}', '{count}', '{value}', '{months}', '{op}', '{act}'];
+// 宫廷特效铺满画面，位置只分偏上 / 居中 / 偏下
+const ROYAL_POSITIONS: Array<{ value: Position; label: string }> = [
+  { value: 'top', label: '偏上' },
+  { value: 'center', label: '居中' },
+  { value: 'bl', label: '偏下' },
+];
+const positionOptions = computed(() =>
+  eff.value?.visual.type === 'builtin_style' && eff.value.visual.style.startsWith('royal-') ? ROYAL_POSITIONS : (Object.keys(POSITION_NAMES) as Position[]).map((k) => ({ value: k, label: POSITION_NAMES[k] })),
+);
 
 function snapshot(e: EffectDto) {
   return {
@@ -237,7 +246,7 @@ const confirmLeave = ref(false);
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
               <div class="vars"><button v-for="v in VARS" :key="v" type="button" @click="insertVar(v)">{{ v }}</button></div>
-              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：月数 {months}、开通 / 续费 {op}</span>
+              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：月数 {months}、开通 / 续费 {op}、上舰 / 续费 {act}</span>
             </template>
           </div>
 
@@ -258,7 +267,7 @@ const confirmLeave = ref(false);
           <div class="ed-sec">
             <h3><span class="n">4</span>位置与时长</h3>
             <div class="row2">
-              <Seg v-model="d.position" label="位置" :options="(Object.keys(POSITION_NAMES) as Position[]).map((k) => ({ value: k, label: POSITION_NAMES[k] }))" />
+              <Seg v-model="d.position" label="位置" :options="positionOptions" />
               <div class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" max="30" step="0.1" aria-label="时长" /><span>秒</span></div>
             </div>
             <span v-if="o?.orient === 'portrait'" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>

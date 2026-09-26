@@ -9,6 +9,8 @@ import '@fontsource/noto-sans-sc/400.css';
 import '@fontsource/noto-sans-sc/500.css';
 import '@fontsource/noto-sans-sc/600.css';
 import '@fontsource/noto-sans-sc/700.css';
+import '@fontsource/noto-serif-sc/600.css';
+import '@fontsource/noto-serif-sc/900.css';
 import './style.css';
 import type { OverlayConfig, ServerToOverlay } from '@starfall/shared';
 import { connect } from './conn.ts';

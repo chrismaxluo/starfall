@@ -5,6 +5,9 @@ import { checklist, detect } from './env.ts';
 import type { Player } from './player.ts';
 
 const DEMOS: Array<{ style: string; position: Position; durationMs: number; text: string; viewer: PlayItem['viewer'] }> = [
+  { style: 'royal-gov', position: 'center', durationMs: 8000, text: '恭迎总督 长夜未央', viewer: { name: '长夜未央', guard: 1, isMod: false, medal: { name: '星临', level: 41 } } },
+  { style: 'royal-adm', position: 'center', durationMs: 6000, text: '恭迎提督 月下独酌', viewer: { name: '月下独酌', guard: 2, isMod: false, medal: { name: '星临', level: 38 } } },
+  { style: 'royal-cap', position: 'center', durationMs: 4000, text: '恭迎舰长 星河漫步', viewer: { name: '星河漫步', guard: 3, isMod: false, medal: { name: '星临', level: 27 } } },
   { style: 'star', position: 'center', durationMs: 6800, text: '总督 长夜未央 驾临', viewer: { name: '长夜未央', guard: 1, isMod: false, medal: { name: '星临', level: 41 } } },
   { style: 'meteor', position: 'bl', durationMs: 5200, text: '欢迎提督 月下独酌 登船', viewer: { name: '月下独酌', guard: 2, isMod: false, medal: { name: '星临', level: 38 } } },
   { style: 'flow', position: 'bl', durationMs: 4200, text: '欢迎舰长 星河漫步 登船', viewer: { name: '星河漫步', guard: 3, isMod: false, medal: { name: '星临', level: 27 } } },
@@ -17,7 +20,7 @@ const DEMOS: Array<{ style: string; position: Position; durationMs: number; text
 
 let seq = 0;
 export function demoItem(style: string): PlayItem {
-  const d = DEMOS.find((x) => x.style === style) ?? DEMOS[2]!;
+  const d = DEMOS.find((x) => x.style === style) ?? DEMOS.find((x) => x.style === 'flow')!;
   return {
     id: `demo-${++seq}`,
     kind: 'enter',

@@ -40,6 +40,9 @@ describe('变量替换（F-AS-10）', () => {
 
   it('上舰：用新等级和月数', () => {
     expect(fillText('{name} 开通{guard} {months} 个月', { viewer: viewer({ name: '北岛以北' }), guardLevel: 1, months: 3 })).toBe('北岛以北 开通总督 3 个月');
+    expect(fillText('{name} {op}{guard}', { viewer: viewer({ name: '北岛以北' }), guardLevel: 2, op: 'open' })).toBe('北岛以北 开通提督');
+    expect(fillText('{guard}·{act} {name}', { viewer: viewer({ name: '北岛以北' }), guardLevel: 2, op: 'open' })).toBe('提督·上舰 北岛以北');
+    expect(fillText('{guard}·{act}', { viewer: viewer(), guardLevel: 3, op: 'renew' })).toBe('舰长·续费');
   });
 
   it('弹幕内容原样保留（显示时按纯文本处理）', () => {

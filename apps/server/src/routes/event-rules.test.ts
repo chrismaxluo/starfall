@@ -82,11 +82,11 @@ describe('上舰规则接口', () => {
   it('默认规则；保存；素材必须存在', async () => {
     const t = await setup();
     const g = (await t.req({ method: 'GET', url: '/api/rules/guard' })).json();
-    expect(g.cap).toEqual({ openEffectId: t.effectId('流光'), renewEffectId: t.effectId('礼物感谢'), enabled: true });
-    g.cap.renewEffectId = t.effectId('流光');
+    expect(g.cap).toEqual({ openEffectId: t.effectId('门楼'), renewEffectId: t.effectId('门楼'), enabled: true });
+    g.cap.renewEffectId = t.effectId('礼物感谢');
     g.gov.enabled = false;
     const r = (await t.req({ method: 'PUT', url: '/api/rules/guard', payload: g })).json();
-    expect(r).toMatchObject({ cap: { renewEffectId: t.effectId('流光') }, gov: { enabled: false } });
+    expect(r).toMatchObject({ cap: { renewEffectId: t.effectId('礼物感谢') }, gov: { enabled: false } });
     expect((await t.req({ method: 'PUT', url: '/api/rules/guard', payload: { ...g, adm: { ...g.adm, openEffectId: 9999 } } })).statusCode).toBe(400);
   });
 });
@@ -100,9 +100,9 @@ describe('素材的使用位置、删除保护、复制替换', () => {
     expect(got.usedBy).toEqual([{ page: 'danmu', label: '弹幕 · 「晚安」' }]);
     const del = await t.req({ method: 'DELETE', url: `/api/effects/${copy.id}` });
     expect(del.statusCode).toBe(409);
-    const flow = t.effectId('流光');
-    const c2 = (await t.req({ method: 'POST', url: `/api/effects/${flow}/copy`, payload: { replaceRefs: true } })).json();
-    expect(c2.usedBy.map((u: { label: string }) => u.label)).toEqual(['进场 · 舰长', '上舰 · 开通舰长']);
+    const gate = t.effectId('门楼');
+    const c2 = (await t.req({ method: 'POST', url: `/api/effects/${gate}/copy`, payload: { replaceRefs: true } })).json();
+    expect(c2.usedBy.map((u: { label: string }) => u.label)).toEqual(['进场 · 舰长', '上舰 · 开通舰长', '上舰 · 续费舰长']);
     expect((await t.req({ method: 'GET', url: '/api/rules/guard' })).json().cap.openEffectId).toBe(c2.id);
   });
 });
@@ -117,7 +117,7 @@ describe('模拟与预览', () => {
     expect(await sim({ kind: 'danmu', viewer: {}, text: '随便' })).toMatchObject({ rule: null, status: 'no_rule' });
     expect(await sim({ kind: 'gift', viewer: {}, giftName: '告白花束', unitPrice: 22_000, count: 5 })).toMatchObject({ rule: '礼物 · 单次 ≥ 100 元', effect: { name: '星冕' } });
     expect(await sim({ kind: 'gift', viewer: {}, unitPrice: 0, count: 5 })).toMatchObject({ rule: null, statusText: '未命中规则' });
-    expect(await sim({ kind: 'guard', viewer: {}, level: 3, op: 'renew', months: 3 })).toMatchObject({ rule: '上舰 · 续费舰长', effect: { name: '礼物感谢' } });
+    expect(await sim({ kind: 'guard', viewer: {}, level: 3, op: 'renew', months: 3 })).toMatchObject({ rule: '上舰 · 续费舰长', effect: { name: '门楼' } });
     expect(await sim({ viewer: { guard: 3 } })).toMatchObject({ rule: '进场 · 舰长' });
     expect((await t.req({ method: 'POST', url: '/api/simulate', payload: { kind: 'gift', viewer: {}, count: 1 } })).statusCode).toBe(400);
   });

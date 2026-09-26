@@ -55,7 +55,7 @@ describe('进场 → 播放', () => {
     const { live, plays, events } = await setup();
     live.emit(enter({ guard: 3, medal: medal(12), face: 'https://i0.hdslb.com/f.jpg' }), { cmd: 'INTERACT_WORD_V2' });
     const [item] = plays();
-    expect(item).toMatchObject({ kind: 'enter', text: '欢迎舰长 小星 登船', effect: { name: '流光', visual: { type: 'builtin_style', style: 'flow' }, showText: true }, viewer: { name: '小星', guard: 3, face: 'https://i0.hdslb.com/f.jpg', medal: { level: 12 } } });
+    expect(item).toMatchObject({ kind: 'enter', text: '恭迎舰长 小星', effect: { name: '门楼', visual: { type: 'builtin_style', style: 'royal-cap' }, showText: true }, viewer: { name: '小星', guard: 3, face: 'https://i0.hdslb.com/f.jpg', medal: { level: 12 } } });
     expect(events()).toMatchObject([{ kind: 'enter', uid: 10001, rule: '进场 · 舰长', status: 'played' }]);
     expect(events()[0]!.viewer).toMatchObject({ guard: 3 });
   });
@@ -174,8 +174,8 @@ describe('播放队列', () => {
     t.live.emit(enter({ uid: 2, guard: 3 }));
     expect(t.plays()).toHaveLength(1);
     expect(t.statuses()).toEqual(['played', 'queued']);
-    expect(t.p.snapshot()).toMatchObject({ playing: { effectName: '流光' }, items: [{ viewerName: '小星' }] });
-    vi.advanceTimersByTime(4200 + 299);
+    expect(t.p.snapshot()).toMatchObject({ playing: { effectName: '门楼' }, items: [{ viewerName: '小星' }] });
+    vi.advanceTimersByTime(4000 + 299);
     expect(t.plays()).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(t.plays()).toHaveLength(2);
@@ -284,13 +284,13 @@ describe('播放队列', () => {
 
   it('上传的素材：推送文件地址、音效；播放用入队时的快照', async () => {
     const t = await setup();
-    const e = t.ctx.effects.list().find((x) => x.name === '流光')!;
+    const e = t.ctx.effects.list().find((x) => x.name === '门楼')!;
     const copy = t.ctx.effects.copy(e.id, { replaceRefs: true });
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 3 }));
     t.ctx.effects.update(copy.id, { texts: { enter: ['改过的 {name}'] } });
     vi.advanceTimersByTime(5000);
-    expect(t.plays().map((p) => p.text)).toEqual(['欢迎舰长 小星 登船', '欢迎舰长 小星 登船']);
+    expect(t.plays().map((p) => p.text)).toEqual(['恭迎舰长 小星', '恭迎舰长 小星']);
   });
 });
 
@@ -304,7 +304,7 @@ describe('其他', () => {
 
   it('模拟：返回命中规则和结果，不入队、不记录、不影响冷却', async () => {
     const t = await setup();
-    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toEqual({ rule: '进场 · 总督', effect: { id: expect.any(Number), name: '星冕' }, status: 'played', notes: [] });
+    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toEqual({ rule: '进场 · 总督', effect: { id: expect.any(Number), name: '金銮' }, status: 'played', notes: [] });
     expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toMatchObject({ status: 'played' });
     expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ uid: 5 }) })).toEqual({ rule: null, effect: null, status: 'no_rule', notes: [] });
     expect(t.events()).toHaveLength(0);
@@ -418,13 +418,14 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 20_000 }, { uid: 3 }));
     t.live.emit(gf({ unitPrice: 200_000 }, { uid: 4 }));
     expect(t.p.snapshot().items.map((i) => [i.kind, i.viewerName])).toEqual([['gift', '小星'], ['gift', '小星'], ['enter', '小星']]);
-    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['星冕', '礼物感谢', '流光']);
+    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['星冕', '礼物感谢', '门楼']);
   });
 });
 
 describe('上舰', () => {
   it('同一次上舰的三条消息只播一次；开通 / 续费用不同素材；欢迎语显示月数；插队', async () => {
     const t = await setup();
+    t.ctx.guardRules.set({ ...t.ctx.guardRules.get(), cap: { ...t.ctx.guardRules.get().cap, renewEffectId: t.ctx.effects.list().find((x) => x.name === '礼物感谢')!.id } });
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 3 }));
     t.live.emit(gd({ dedupeKey: 'p1' }, { uid: 5 }));
@@ -434,10 +435,12 @@ describe('上舰', () => {
     vi.advanceTimersByTime(3500);
     const guards = t.events().filter((e) => e.kind === 'guard');
     expect(guards.map((e) => [e.uid, e.rule])).toEqual([[5, '上舰 · 开通舰长'], [6, '上舰 · 续费舰长']]);
-    // 两次上舰都插到进场前面，按先后顺序：先开通（流光），再续费（礼物感谢）
-    expect(t.p.snapshot().items.map((i) => [i.kind, i.effectName])).toEqual([['guard', '流光'], ['guard', '礼物感谢'], ['enter', '流光']]);
-    vi.advanceTimersByTime(6000);
-    expect(t.plays().at(-1)!.text).toBe('感谢 小星 续费舰长 3 个月');
+    // 两次上舰都插到进场前面，按先后顺序：先开通（门楼），再续费（礼物感谢）
+    expect(t.p.snapshot().items.map((i) => [i.kind, i.effectName])).toEqual([['guard', '门楼'], ['guard', '礼物感谢'], ['enter', '门楼']]);
+    vi.advanceTimersByTime(1000);
+    expect(t.plays().at(-1)).toMatchObject({ kind: 'guard', guardOp: 'open', text: '舰长·上舰 小星' });
+    vi.advanceTimersByTime(5000);
+    expect(t.plays().at(-1)).toMatchObject({ guardOp: 'renew', text: '感谢 小星 续费舰长 3 个月' });
   });
 
   it('只有 GUARD_BUY 时 3 秒后按开通处理；停用上舰规则时不播', async () => {

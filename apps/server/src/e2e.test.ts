@@ -112,8 +112,8 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
   const play = got.find((m) => m.type === 'play') as Extract<ServerToOverlay, { type: 'play' }>;
   expect(play.item).toMatchObject({
     kind: 'enter',
-    text: '欢迎舰长 测试舰长 登船',
-    effect: { name: '流光', visual: { type: 'builtin_style', style: 'flow' }, durationMs: 4200 },
+    text: '恭迎舰长 测试舰长',
+    effect: { name: '门楼', visual: { type: 'builtin_style', style: 'royal-cap' }, durationMs: 4000 },
     viewer: { name: '测试舰长', guard: 3, medal: { name: '测试牌', level: 25, colors: { border: '#5FC7F4' } } },
   });
 

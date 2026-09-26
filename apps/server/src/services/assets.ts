@@ -78,6 +78,23 @@ export class AssetStore {
     fs.mkdirSync(this.dir, { recursive: true });
     fs.mkdirSync(this.tmpDir, { recursive: true });
   }
+  /** 清理临时目录里超过 maxAgeMs 的文件（上传中断、没有确认的导入包）；启动时传 0 全部清掉 */
+  cleanTmp(maxAgeMs: number, now = Date.now()): number {
+    let n = 0;
+    for (const f of fs.readdirSync(this.tmpDir)) {
+      const p = path.join(this.tmpDir, f);
+      try {
+        if (now - fs.statSync(p).mtimeMs >= maxAgeMs) {
+          fs.rmSync(p, { recursive: true, force: true });
+          n++;
+        }
+      } catch {
+        /* 正在被删除 */
+      }
+    }
+    return n;
+  }
+
 
   get(id: number): AssetRow | undefined {
     return this.db.select().from(assets).where(eq(assets.id, id)).get();
@@ -142,11 +159,14 @@ export class AssetStore {
       }
       const final = path.join(this.dir, `${sha256}.${type.ext}`);
       fs.renameSync(tmp, final);
+      // 同一个文件同时上传两次时，检测期间另一个请求可能已经存好了：用已有的那条
       const asset = this.db
         .insert(assets)
         .values({ kind: type.kind, filename, sha256, ext: type.ext, mime: type.mime, size, ...info })
+        .onConflictDoNothing({ target: assets.sha256 })
         .returning()
         .get();
+      if (!asset) return { asset: this.db.select().from(assets).where(eq(assets.sha256, sha256)).get()!, created: false };
       return { asset, created: true };
     } catch (e) {
       stream.resume();

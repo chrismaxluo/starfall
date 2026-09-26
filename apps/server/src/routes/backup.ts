@@ -12,6 +12,7 @@ import yazl from 'yazl';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { HttpError, parseBody } from '../http.ts';
+import { KEEP_BACKUPS, KEEP_MANUAL } from '../services/backup.ts';
 import { CONFIG_ENTRY, parseConfigFile } from '../services/config-io.ts';
 import type { ConfigFile } from '../services/config-io.ts';
 
@@ -196,13 +197,13 @@ export function backupRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   // ---------- 自动备份 ----------
-  app.get('/api/backup/list', async () => ({ items: ctx.backups.list(), autoBackup: ctx.settings.get('autoBackup'), keep: 7 }));
+  app.get('/api/backup/list', async () => ({ items: ctx.backups.list(), autoBackup: ctx.settings.get('autoBackup'), keep: KEEP_BACKUPS, keepManual: KEEP_MANUAL }));
 
-  app.post('/api/backup/run', async () => ctx.backups.run());
+  app.post('/api/backup/run', async () => ctx.backups.run(Date.now(), true));
 
   // 只能下载配置（JSON）：数据库备份里有加密的登录信息，留在服务器上
   app.get('/api/backup/files/:name', async (req, reply) => {
-    const { name } = parseBody(z.object({ name: z.string().regex(/^starfall-\d{8}-\d{4}\.json$/) }), req.params);
+    const { name } = parseBody(z.object({ name: z.string().regex(/^starfall-\d{8}-\d{4}(?:\d{2}-m)?\.json$/) }), req.params);
     const p = ctx.backups.file(name);
     if (!p) throw new HttpError(404, 'not_found', '这份备份已经不在了');
     return reply

@@ -102,7 +102,19 @@ const PRUNE_MS = 6 * 3600_000;
 
 /** 启动后台任务：直播连接、事件管道、定时清理事件记录。返回停止函数 */
 export async function startBackground(ctx: AppContext): Promise<() => void> {
-  const prune = () => ctx.log.prune(Date.now(), ctx.settings.get('retentionDays'));
+  const prune = () => {
+    try {
+      const days = ctx.settings.get('retentionDays');
+      ctx.log.prune(Date.now(), days);
+      ctx.viewers.prune(days);
+      // 导入包等待确认最多 30 分钟，超过 1 小时的临时文件都没用了
+      ctx.assets.cleanTmp(3600_000);
+    } catch (e) {
+      console.error('清理事件记录失败', e);
+    }
+  };
+  ctx.assets.cleanTmp(0);
+  ctx.backups.cleanPartial();
   prune();
   const timer = setInterval(prune, PRUNE_MS);
   ctx.pipeline.start();

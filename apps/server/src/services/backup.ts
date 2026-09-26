@@ -1,5 +1,6 @@
 // 每天自动备份（需求 F-DA-03）：用 SQLite 的在线备份功能复制数据库，同时保存一份导出配置（含素材清单），
-// 放在 data/backups/，保留最近 7 份。数据库里的登录信息是加密的，密钥 secret.key 不在备份里。
+// 放在 data/backups/。自动备份保留最近 7 份；手动"立即备份"单独命名、单独保留最近 5 份，不会挤掉每天的自动备份。
+// 数据库里的登录信息是加密的，密钥 secret.key 不在备份里。
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Db } from '../db/index.ts';
@@ -7,10 +8,12 @@ import type { ConfigIO } from './config-io.ts';
 import type { SettingsStore } from './settings.ts';
 
 export const KEEP_BACKUPS = 7;
+export const KEEP_MANUAL = 5;
 /** 凌晨几点之后做当天的备份（服务器时区按直播间所在地） */
 const BACKUP_HOUR = 4;
 const CHECK_MS = 3600_000;
-const NAME = /^starfall-(\d{8}-\d{4})\.(db|json)$/;
+/** 自动备份 starfall-20260926-0400.db；手动备份 starfall-20260926-153012-m.db（精确到秒，同一分钟多次不会覆盖） */
+const NAME = /^starfall-(\d{8}-\d{4}(?:\d{2}-m)?)\.(db|json)$/;
 
 export interface BackupItem {
   /** 备份时间标记，例如 20260926-0400 */
@@ -20,6 +23,8 @@ export interface BackupItem {
   /** 导出配置的文件名（可以下载后导入） */
   config: string | null;
   configSize: number;
+  /** 手动"立即备份"的 */
+  manual: boolean;
 }
 
 export class BackupService {
@@ -36,14 +41,14 @@ export class BackupService {
     this.settings = opts.settings;
     this.io = opts.io;
     this.dir = opts.dir;
-    this.fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: opts.timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    this.fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: opts.timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
-  /** 本地时间 → { day: 20260926, stamp: 20260926-0400, hour } */
-  private local(ms: number): { day: string; stamp: string; hour: number } {
-    const s = this.fmt.format(ms); // 2026-09-26 04:00
+  /** 本地时间 → { day: 20260926, stamp: 20260926-0400, seconds: 12, hour } */
+  private local(ms: number): { day: string; stamp: string; seconds: string; hour: number } {
+    const s = this.fmt.format(ms); // 2026-09-26 04:00:12
     const day = s.slice(0, 10).replaceAll('-', '');
-    return { day, stamp: `${day}-${s.slice(11, 13)}${s.slice(14, 16)}`, hour: Number(s.slice(11, 13)) };
+    return { day, stamp: `${day}-${s.slice(11, 13)}${s.slice(14, 16)}`, seconds: s.slice(17, 19), hour: Number(s.slice(11, 13)) };
   }
 
   /** 文件名里用的本地时间，例如 20260926-0400 */
@@ -58,7 +63,7 @@ export class BackupService {
       const m = NAME.exec(f);
       if (!m) continue;
       const st = fs.statSync(path.join(this.dir, f));
-      const it = by.get(m[1]!) ?? { stamp: m[1]!, at: st.mtimeMs, dbSize: 0, config: null, configSize: 0 };
+      const it = by.get(m[1]!) ?? { stamp: m[1]!, at: st.mtimeMs, dbSize: 0, config: null, configSize: 0, manual: m[1]!.endsWith('-m') };
       if (m[2] === 'db') it.dbSize = st.size;
       else {
         it.config = f;
@@ -77,15 +82,16 @@ export class BackupService {
     return fs.existsSync(p) ? p : null;
   }
 
-  /** 立即备份一次（同一时间只跑一个） */
-  run(now = Date.now()): Promise<BackupItem> {
-    this.running ??= this.doRun(now).finally(() => (this.running = null));
+  /** 备份一次（同一时间只跑一个）；manual 为手动"立即备份" */
+  run(now = Date.now(), manual = false): Promise<BackupItem> {
+    this.running ??= this.doRun(now, manual).finally(() => (this.running = null));
     return this.running;
   }
 
-  private async doRun(now: number): Promise<BackupItem> {
+  private async doRun(now: number, manual: boolean): Promise<BackupItem> {
     fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 });
-    const { stamp } = this.local(now);
+    const t = this.local(now);
+    const stamp = manual ? `${t.stamp}${t.seconds}-m` : t.stamp;
     const dbFile = path.join(this.dir, `starfall-${stamp}.db`);
     const tmp = `${dbFile}.part`;
     await this.db.$client.backup(tmp);
@@ -96,11 +102,19 @@ export class BackupService {
     return this.list().find((b) => b.stamp === stamp)!;
   }
 
-  /** 只保留最近 KEEP_BACKUPS 份 */
+  /** 自动备份保留最近 KEEP_BACKUPS 份，手动备份保留最近 KEEP_MANUAL 份 */
   private prune(): void {
-    for (const old of this.list().slice(KEEP_BACKUPS)) {
-      for (const ext of ['db', 'json']) fs.rmSync(path.join(this.dir, `starfall-${old.stamp}.${ext}`), { force: true });
+    const all = this.list();
+    const expired = [...all.filter((b) => !b.manual).slice(KEEP_BACKUPS), ...all.filter((b) => b.manual).slice(KEEP_MANUAL)];
+    for (const b of expired) {
+      for (const ext of ['db', 'json']) fs.rmSync(path.join(this.dir, `starfall-${b.stamp}.${ext}`), { force: true });
     }
+  }
+
+  /** 启动时删掉上次没写完的备份（.part） */
+  cleanPartial(): void {
+    if (!fs.existsSync(this.dir)) return;
+    for (const f of fs.readdirSync(this.dir)) if (f.endsWith('.part')) fs.rmSync(path.join(this.dir, f), { force: true });
   }
 
   /** 定时检查：开启了自动备份、今天还没备份、已经过了凌晨 4 点，就备份一次 */
@@ -108,7 +122,7 @@ export class BackupService {
     if (!this.settings.get('autoBackup')) return false;
     const { day, hour } = this.local(now);
     if (hour < BACKUP_HOUR) return false;
-    if (this.list().some((b) => b.stamp.startsWith(day))) return false;
+    if (this.list().some((b) => !b.manual && b.stamp.startsWith(day))) return false;
     await this.run(now);
     return true;
   }

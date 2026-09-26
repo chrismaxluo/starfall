@@ -1,9 +1,9 @@
 // 观众昵称、头像缓存：添加专属用户、黑名单时按 UID 查询；直播时收到的消息也会更新缓存。
-import { eq } from 'drizzle-orm';
+import { and, eq, lt, sql } from 'drizzle-orm';
 import { BiliApiError, getUserCard } from '@starfall/bili';
 import type { BiliHttp } from '@starfall/bili';
 import type { Db } from '../db/index.ts';
-import { viewers } from '../db/schema.ts';
+import { blacklist, ruleExclusive, viewers } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 
 export interface ViewerCard {
@@ -34,6 +34,13 @@ export class ViewerStore {
     if (v.uid <= 0 || !v.name) return;
     const values = { ...v, updatedAt: this.now() };
     this.db.insert(viewers).values(values).onConflictDoUpdate({ target: viewers.uid, set: values }).run();
+  }
+
+  /** 清理很久没出现的观众（专属用户、黑名单里的保留）；keepDays 为 0 表示不清理 */
+  prune(keepDays: number): number {
+    if (keepDays <= 0) return 0;
+    const keep = sql`${viewers.uid} not in (select ${ruleExclusive.uid} from ${ruleExclusive}) and ${viewers.uid} not in (select ${blacklist.uid} from ${blacklist})`;
+    return this.db.delete(viewers).where(and(lt(viewers.updatedAt, this.now() - keepDays * 86400_000), keep)).run().changes;
   }
 
   /** 查询昵称头像：优先用缓存，过期或没有时问 B 站（不使用登录账号） */

@@ -1,6 +1,6 @@
 // 素材（需求 F-AS-01 ~ 15）：内置素材只读；被规则使用时不能删除；复制时可以把原来用它的地方换成副本。
 import path from 'node:path';
-import { eq, like } from 'drizzle-orm';
+import { eq, inArray, like } from 'drizzle-orm';
 import { bandLabel, danmuLabel, giftBandLabel, sortedBands, sortedGiftBands } from '@starfall/core';
 import { EffectSchema, TIER_NAMES } from '@starfall/shared';
 import type { Effect } from '@starfall/shared';
@@ -76,14 +76,15 @@ export class EffectStore {
       .map((r) => this.dto(r, files, uses.get(r.id) ?? []));
   }
 
-  get(id: number): EffectDto {
+  /** uses: false 时不统计"被哪些规则使用"（播放判断每个事件都要查一次，用不到这一项） */
+  get(id: number, opts: { uses?: boolean } = {}): EffectDto {
     const r = this.row(id);
     const files = new Map<number, AssetRow>();
     for (const aid of [r.assetId, r.soundAssetId]) {
       const a = aid === null ? undefined : this.assets.get(aid);
       if (a) files.set(a.id, a);
     }
-    return this.dto(r, files, this.allUses().get(id) ?? []);
+    return this.dto(r, files, opts.uses === false ? [] : (this.allUses().get(id) ?? []));
   }
 
   private dto(r: EffectRow, files: Map<number, AssetRow>, usedBy: EffectUse[]): EffectDto {
@@ -119,8 +120,11 @@ export class EffectStore {
     };
     for (const t of this.db.select().from(ruleEnterTiers).all()) add(t.effectId, { page: 'enter', label: `进场 · ${TIER_NAMES[t.tier]}` });
     for (const b of sortedBands(this.db.select().from(ruleEnterBands).all())) add(b.effectId, { page: 'enter', label: `进场 · 粉丝牌 ${bandLabel(b.fromLevel, b.toLevel)}` });
-    const names = new Map(this.db.select({ uid: viewers.uid, name: viewers.name }).from(viewers).all().map((v) => [v.uid, v.name]));
-    for (const x of this.db.select().from(ruleExclusive).all()) add(x.effectId, { page: 'enter', label: `进场 · 专属 ${names.get(x.uid) ?? `UID ${x.uid}`}` });
+    // 只查专属用户的昵称（观众表会越来越大，不能每次整张读出来）
+    const exclusives = this.db.select().from(ruleExclusive).all();
+    const uids = exclusives.map((x) => x.uid);
+    const names = new Map(uids.length ? this.db.select({ uid: viewers.uid, name: viewers.name }).from(viewers).where(inArray(viewers.uid, uids)).all().map((v) => [v.uid, v.name]) : []);
+    for (const x of exclusives) add(x.effectId, { page: 'enter', label: `进场 · 专属 ${names.get(x.uid) ?? `UID ${x.uid}`}` });
     for (const r of this.db.select().from(ruleDanmu).orderBy(ruleDanmu.sort).all()) add(r.effectId, { page: 'danmu', label: danmuLabel(r) });
     for (const g of this.db.select().from(ruleGiftSpecific).all()) add(g.effectId, { page: 'gift', label: `礼物 · 「${g.giftName || g.giftId}」` });
     for (const b of sortedGiftBands(this.db.select().from(ruleGiftBands).all())) add(b.effectId, { page: 'gift', label: `礼物 · 单次 ${giftBandLabel(b.fromGold, b.toGold)}` });

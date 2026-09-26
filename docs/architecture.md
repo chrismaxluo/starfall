@@ -437,7 +437,7 @@ data/
 | 输出 | `GET/POST /api/outputs`、`PUT/DELETE /api/outputs/:id`、`POST /api/outputs/:id/reset-key` | |
 | 事件记录 | `GET /api/events?kind=&status=&q=&cursor=` | |
 | 设置 | `GET/PUT /api/settings` | |
-| 数据 | `GET /api/backup/export`、`POST /api/backup/import`（先返回变化预览，确认后再导入） | F-DA-04 |
+| 数据 | `GET /api/backup/export`（`?files=1` 连同素材文件打包成 zip）；`POST /api/backup/import` 上传后返回变化预览和令牌，`POST /api/backup/import/:token` 确认导入、`DELETE` 取消；`GET /api/backup/list`、`POST /api/backup/run`、`GET /api/backup/files/:name`（只能下载配置 JSON） | F-DA-03、F-DA-04 |
 | 健康检查 | `GET /api/health` | 给监控用，不需要登录 |
 
 ### 9.3 WebSocket
@@ -509,8 +509,8 @@ data/
 | 进程 | systemd 守护：崩溃自动重启、开机自启 |
 | 日志 | Pino 结构化日志，按天切割，保留 14 天；B 站连接、规则判断、播放各有日志 |
 | 健康检查 | `/api/health` 返回数据库、B 站连接、特效页在线情况 |
-| 备份 | 每天凌晨用 SQLite 的在线备份功能备份数据库，连同文件清单保存到 `data/backups/`，保留 7 份（F-DA-03） |
-| 导出导入 | 带版本号的 JSON：规则、素材信息、设置、输出（不含登录信息）；素材文件可以选择一起打包成 zip |
+| 备份 | 每天凌晨 4 点后用 SQLite 的在线备份功能备份数据库，同时保存一份导出配置（含素材清单），放在 `data/backups/`（目录 700、文件 600），保留 7 份；设置里可以关闭、立即备份、下载配置（F-DA-03） |
+| 导出导入 | 带版本号的 JSON（`format: starfall-config`）：规则、素材设置、素材清单、设置、黑名单、输出（不含登录信息、后台密码、特效页密钥）；规则和素材之间用素材名称关联，素材和文件之间用 SHA-256 关联，不用数据库 ID。素材文件可以选择一起打包成 zip（`starfall-config.json` + `files/<sha256>.<ext>`，不压缩）。导入时规则整体替换；素材、黑名单、输出只增加和更新，不删除；已有输出保留原地址 |
 | 优雅退出 | 退出前通知特效页、写完正在进行的数据库操作 |
 | 时间 | 服务器已运行 chrony 自动校时 |
 

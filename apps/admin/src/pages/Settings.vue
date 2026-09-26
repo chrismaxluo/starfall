@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
+import DataCard from '../components/DataCard.vue';
 import Icon from '../components/Icon.vue';
 import QrLogin from '../components/QrLogin.vue';
 import Seg from '../components/Seg.vue';
@@ -157,19 +158,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <div v-if="state.settings" class="card">
-        <div class="card-h"><h2>数据</h2></div>
-        <div class="field">
-          <div class="slider-row">
-            <label for="keep">事件记录保留</label>
-            <select id="keep" class="sel" :value="state.settings.retentionDays" @change="(e) => saveSetting({ retentionDays: Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'] }, '保留期已修改')">
-              <option :value="30">30 天</option><option :value="90">90 天</option><option :value="180">180 天</option><option :value="0">永久</option>
-            </select>
-            <span />
-          </div>
-          <span class="hint" style="font-size: 12px; color: var(--t3)">原始消息只保留 7 天，用于排查问题。导出 / 导入配置、自动备份在后续版本提供。</span>
-        </div>
-      </div>
+      <DataCard />
     </div>
     <QrLogin v-if="qr" @close="qr = false" />
   </section>

@@ -9,6 +9,7 @@ import { APP_NAME } from '@starfall/shared';
 import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
+import { backupRoutes } from './routes/backup.ts';
 import { biliRoutes } from './routes/bili.ts';
 import { eventRuleRoutes } from './routes/event-rules.ts';
 import { eventRoutes } from './routes/events.ts';
@@ -95,6 +96,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   outputRoutes(app, ctx);
   playbackRoutes(app, ctx);
   eventRoutes(app, ctx);
+  backupRoutes(app, ctx);
   await app.register(async (scope) => wsRoutes(scope, ctx));
   app.addHook('onClose', async () => ctx.hub.closeAll());
 

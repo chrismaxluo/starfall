@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 登录页：全屏，和后台同一套风格。背景五层（底色、光晕、点阵、颗粒、地平线光弧），中间一张玻璃卡片。
+// 登录页（织幕）：左边标语，右边玻璃卡片；背景是三团缓慢变化的色块 + 三层丝绸光带（亮 / 暗各一套配色）
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { ApiError, post } from '../lib/api.ts';
 import { toggleTheme } from '../lib/theme.ts';
@@ -66,30 +66,70 @@ onMounted(() => {
   addEventListener('mousedown', outside);
 });
 onBeforeUnmount(() => removeEventListener('mousedown', outside));
+
+// 丝绸光带：上沿 + 其余轮廓（后 / 中 / 前三层，只从下方和右侧流过，不挡左边的标语）
+const RIBBONS = [
+  { g: 'lgRb1', top: 'M -150 860 C 250 820, 650 760, 1000 560 S 1450 180, 1800 120', rest: 'L 1800 300 C 1500 360, 1250 560, 1060 700 S 450 1000, -150 1040 Z' },
+  { g: 'lgRb2', top: 'M -150 800 C 300 720, 700 900, 1100 770 S 1500 610, 1800 660', rest: 'L 1800 790 C 1500 750, 1250 910, 1080 910 S 400 890, -150 950 Z' },
+  { g: 'lgRb3', top: 'M 480 1030 C 800 910, 1100 870, 1350 730 S 1700 530, 1850 480', rest: 'L 1850 525 C 1700 585, 1450 800, 1360 812 S 820 975, 500 1070 Z' },
+];
 </script>
 
 <template>
   <div class="lg" :class="{ 'lg-ok': state === 'ok' }">
     <div class="lg-bg" aria-hidden="true">
-      <i class="lg-aurora a1" /><i class="lg-aurora a2" /><i class="lg-aurora a3" />
-      <i class="lg-grid" />
-      <i class="lg-horizon" />
+      <div class="lg-fields"><i class="f1" /><i class="f2" /><i class="f3" /></div>
+      <svg class="lg-silk" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient v-for="(n, i) in ['1', '2', '3']" :id="`lgRb${n}`" :key="n" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" :style="{ stopColor: `rgb(var(--lg-rb${n}))`, stopOpacity: 0 }" />
+            <stop :offset="['.45', '.35', '.5'][i]" :style="{ stopColor: `rgb(var(--lg-rb${n}))`, stopOpacity: `var(--lg-rb${n}-a)` }" />
+            <stop v-if="i < 2" :offset="['.85', '.8'][i]" :style="{ stopColor: `rgb(var(--lg-rb${n}))`, stopOpacity: `calc(var(--lg-rb${n}-a) * .75)` }" />
+            <stop offset="1" :style="{ stopColor: `rgb(var(--lg-rb${n}))`, stopOpacity: 0 }" />
+          </linearGradient>
+          <linearGradient id="lgFold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35" /><stop offset=".35" stop-color="#fff" stop-opacity="0" /><stop offset="1" stop-color="#000" stop-opacity=".12" /></linearGradient>
+        </defs>
+        <g class="lg-drift">
+          <g v-for="r in RIBBONS" :key="r.g">
+            <path class="lg-rb-shadow" :d="`${r.top} ${r.rest}`" transform="translate(0 18)" />
+            <path :d="`${r.top} ${r.rest}`" :fill="`url(#${r.g})`" />
+            <path :d="`${r.top} ${r.rest}`" fill="url(#lgFold)" opacity=".8" />
+            <path class="lg-sheen soft" :d="r.top" />
+            <path class="lg-sheen" :d="r.top" transform="translate(0 3)" />
+          </g>
+        </g>
+      </svg>
       <i class="lg-grain" />
+      <i class="lg-vignette" />
     </div>
 
-    <button class="icon-btn lg-theme" aria-label="切换亮色 / 暗色" @click="theme">
-      <Icon name="i-moon" class="theme-light-only" /><Icon name="i-sun" class="theme-dark-only" />
-    </button>
+    <header class="lg-top">
+      <div class="lg-brand">
+        <Logo :size="36" animated="once" />
+        <span><b>星临</b><span>STARFALL</span></span>
+      </div>
+      <button class="lg-theme" aria-label="切换亮色 / 暗色" @click="theme">
+        <Icon name="i-moon" class="theme-light-only" /><Icon name="i-sun" class="theme-dark-only" />
+      </button>
+    </header>
 
-    <main class="lg-center">
-      <form class="lg-card" :class="{ shake }" novalidate @submit.prevent="submit" @animationend="shake = false">
-        <div class="lg-brand">
-          <span class="lg-logo"><Logo :size="64" animated="once" /></span>
-          <h1>登录星临</h1>
-          <p>直播间特效管理后台</p>
+    <main class="lg-main">
+      <section class="lg-pitch">
+        <span class="lg-eyebrow"><i />B 站直播间进场特效</span>
+        <h1>让每一次进场，<br /><span class="l2">都成为一场驾临。</span></h1>
+        <p>舰长登船、粉丝进场、专属用户驾到——星临认出每一位观众，自动播放为 TA 准备的特效。</p>
+        <div class="lg-chips">
+          <div class="lg-chip"><span class="ic"><Icon name="g-gov" /></span><span><b>身份识别</b><span>大航海 · 房管 · 粉丝牌</span></span></div>
+          <div class="lg-chip"><span class="ic"><Icon name="i-spark" /></span><span><b>专属特效</b><span>为重要的人单独准备</span></span></div>
+          <div class="lg-chip"><span class="ic"><Icon name="i-screen" /></span><span><b>即插即用</b><span>直播姬 · OBS</span></span></div>
         </div>
+      </section>
 
-        <div class="lg-field">
+      <form class="lg-card" :class="{ shake }" novalidate @submit.prevent="submit" @animationend="shake = false">
+        <h2>欢迎回来</h2>
+        <p class="lg-sub">登录星临管理后台</p>
+
+        <div>
           <label for="lg-pw" class="lg-sr">密码</label>
           <div class="lg-pw" :class="{ bad: error }">
             <Icon name="i-lock" />
@@ -117,7 +157,7 @@ onBeforeUnmount(() => removeEventListener('mousedown', outside));
           </div>
         </div>
 
-        <button class="btn primary lg-submit" type="submit" :disabled="state !== 'idle'">
+        <button class="lg-submit" type="submit" :disabled="state !== 'idle'">
           <template v-if="state === 'busy'"><span class="spin lg-spin" />正在登录</template>
           <template v-else-if="state === 'ok'"><Icon name="i-check" />欢迎回来</template>
           <template v-else>登录<Icon name="i-arrow" /></template>
@@ -135,6 +175,7 @@ onBeforeUnmount(() => removeEventListener('mousedown', outside));
         </div>
       </form>
     </main>
-    <footer class="lg-foot">星临 STARFALL</footer>
+
+    <footer class="lg-foot">© 2026 星临 Starfall</footer>
   </div>
 </template>

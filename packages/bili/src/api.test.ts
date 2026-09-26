@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getRoomAdmins, getRoomGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
+import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
 import { WbiSigner } from './wbi.ts';
 import { BiliApiError, BiliHttp } from './http.ts';
 
@@ -106,6 +106,19 @@ describe('接口字段转换', () => {
     const http = new BiliHttp({ SESSDATA: 's', buvid3: 'b' });
     expect(await getDanmuInfo(http, new WbiSigner(http), 30000)).toEqual({ token: 'tok', hosts: [{ host: 'h1', wssPort: 443 }] });
     expect(calls[1]).toMatch(/getDanmuInfo\?id=30000&type=0&web_location=444\.8&wts=\d+&w_rid=[0-9a-f]{32} \| SESSDATA=s/);
+  });
+
+  it('点赞总数、看过人数：带签名和登录 Cookie；字段缺失时为 null', async () => {
+    const calls = mockFetch([
+      { body: { code: 0, data: { wbi_img: { img_url: 'https://x/7cd084941338484aae1ad9425b84077c.png', sub_url: 'https://x/4932caff0ff746eab6f01bf08b70ac45.png' } } } },
+      { body: { code: 0, data: { like_info_v3: { total_likes: 7037 }, watched_show: { num: 427, text_small: '427' } } } },
+      { body: { code: 0, data: { room_info: {} } } },
+    ]);
+    const http = new BiliHttp({ SESSDATA: 's' });
+    const wbi = new WbiSigner(http);
+    expect(await getLiveCounts(http, wbi, 30000)).toEqual({ likes: 7037, watched: 427 });
+    expect(calls[1]).toMatch(/getInfoByRoom\?room_id=30000&web_location=444\.8&wts=\d+&w_rid=[0-9a-f]{32} \| SESSDATA=s/);
+    expect(await getLiveCounts(http, wbi, 30000)).toEqual({ likes: null, watched: null });
   });
 
   it('没有弹幕服务器时报错', async () => {

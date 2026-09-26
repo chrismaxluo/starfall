@@ -26,6 +26,7 @@ function setup() {
   };
   const calls: number[] = [];
   let fail = false;
+  const counts = { n: 0, likes: 7037 as number | null, loggedIn: true };
   const deps: RoomInfoDeps = {
     getRoomInfo: async (_h, roomId) => {
       calls.push(roomId);
@@ -33,13 +34,17 @@ function setup() {
       return { roomId, anchorUid: 20000, title: `标题${roomId}`, liveStatus: live ? 1 : 0, liveTime: '', liveSince: null, isPortrait: true, parentAreaName: '娱乐', areaName: '视频唱见', cover: '', keyframe: live ? 'k.jpg' : '', followers: 100 };
     },
     getAnchorInfo: async (_h, uid) => ({ uid, name: '主播', face: 'f.jpg', followers: 120 }),
+    getLiveCounts: async () => {
+      counts.n++;
+      return { likes: counts.likes, watched: 40 };
+    },
     now: () => 1,
   };
-  const svc = new RoomInfoService({ room: roomStore, live: liveFake, http: () => new BiliHttp() }, deps);
+  const svc = new RoomInfoService({ room: roomStore, live: liveFake, http: () => new BiliHttp(), authHttp: () => (counts.loggedIn ? new BiliHttp({ SESSDATA: 's' }) : null) }, deps);
   const got: unknown[] = [];
   svc.onChange((i) => got.push(i));
   return {
-    svc, roomStore, calls, got,
+    svc, roomStore, calls, got, counts,
     stats: (p: RoomStatsPatch) => statsFns.forEach((f) => f(p)),
     setLive: (v: boolean) => { live = v; statusFns.forEach((f) => f(status())); },
     setFail: (v: boolean) => (fail = v),
@@ -86,6 +91,32 @@ describe('直播间信息', () => {
     t.roomStore.save({ roomId: 40000, shortId: 0, anchorUid: 20001, anchorName: '' });
     expect(t.got.at(-1)).toBeNull();
     await vi.waitFor(() => expect(t.svc.get()).toMatchObject({ roomId: 40000, title: '标题40000', anchor: { uid: 20001 } }));
+    t.svc.stop();
+  });
+
+  it('直播时用登录账号每分钟查一次点赞数和看过人数；没开播、没登录时不查', async () => {
+    const t = setup();
+    await t.svc.start();
+    expect(t.counts.n).toBe(0);
+    t.setLive(true);
+    await vi.waitFor(() => expect(t.svc.get()).toMatchObject({ likes: 7037, watched: 40 }));
+    const n = t.counts.n;
+    t.counts.likes = 7100;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(t.counts.n).toBe(n + 1);
+    expect(t.svc.get()?.likes).toBe(7100);
+    // 接口没给点赞数时保留原来的
+    t.counts.likes = null;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(t.svc.get()?.likes).toBe(7100);
+    t.counts.loggedIn = false;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(t.counts.n).toBe(n + 2);
+    t.counts.loggedIn = true;
+    t.setLive(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(t.counts.n).toBe(n + 2);
+    expect(t.svc.get()?.likes).toBeNull();
     t.svc.stop();
   });
 });

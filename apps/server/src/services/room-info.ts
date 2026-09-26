@@ -1,6 +1,7 @@
 // 直播间信息（总览）：标题、分区、封面、主播、粉丝数，以及直播时的看过人数、高能榜人数、点赞数。
 // 标题等用公开接口定时查询；直播时的数字来自弹幕连接里的实时消息（LiveService.onStats）。
-import { getAnchorInfo, getRoomInfo } from '@starfall/bili';
+// 点赞数只在有人点赞时才推送，所以直播时再用登录账号每分钟查一次点赞总数和看过人数。
+import { WbiSigner, getAnchorInfo, getLiveCounts, getRoomInfo } from '@starfall/bili';
 import type { BiliHttp, RoomStatsPatch } from '@starfall/bili';
 import type { LiveService } from './live.ts';
 import type { RoomStore } from './room.ts';
@@ -25,10 +26,13 @@ export interface RoomInfoDto {
 export interface RoomInfoDeps {
   getRoomInfo: typeof getRoomInfo;
   getAnchorInfo: typeof getAnchorInfo;
+  getLiveCounts: typeof getLiveCounts;
   now: () => number;
 }
 
 const REFRESH_MS = 5 * 60_000;
+/** 直播时查点赞数的间隔 */
+const COUNTS_MS = 60_000;
 /** 实时数字变化很频繁，合并后再推给后台 */
 const EMIT_MS = 2000;
 
@@ -36,7 +40,12 @@ export class RoomInfoService {
   private readonly room: RoomStore;
   private readonly live: Pick<LiveService, 'onStats' | 'onStatus' | 'status'>;
   private readonly http: () => BiliHttp;
+  /** 登录账号的请求（没登录时为 null）；只在直播时使用 */
+  private readonly authHttp: () => BiliHttp | null;
   private readonly deps: RoomInfoDeps;
+  /** 同一个登录一直用同一个签名器（签名密钥会缓存，不用每次都查） */
+  private wbi: { sess: string; http: BiliHttp; signer: WbiSigner } | null = null;
+  private countsTimer: ReturnType<typeof setInterval> | null = null;
   private readonly listeners = new Set<(info: RoomInfoDto | null) => void>();
   private info: RoomInfoDto | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -46,10 +55,14 @@ export class RoomInfoService {
   private gen = 0;
   private offs: Array<() => void> = [];
 
-  constructor(opts: { room: RoomStore; live: Pick<LiveService, 'onStats' | 'onStatus' | 'status'>; http: () => BiliHttp }, deps: RoomInfoDeps = { getRoomInfo, getAnchorInfo, now: Date.now }) {
+  constructor(
+    opts: { room: RoomStore; live: Pick<LiveService, 'onStats' | 'onStatus' | 'status'>; http: () => BiliHttp; authHttp?: () => BiliHttp | null },
+    deps: RoomInfoDeps = { getRoomInfo, getAnchorInfo, getLiveCounts, now: Date.now },
+  ) {
     this.room = opts.room;
     this.live = opts.live;
     this.http = opts.http;
+    this.authHttp = opts.authHttp ?? (() => null);
     this.deps = deps;
   }
 
@@ -76,20 +89,43 @@ export class RoomInfoService {
         this.wasLive = s.live;
         // 开播、下播时重新查一次（封面、标题可能刚改过）；下播后直播时的数字清空
         if (!s.live && this.info) Object.assign(this.info, { watched: null, rankCount: null, likes: null });
-        void this.refresh();
+        void this.refresh().then(() => this.refreshCounts());
       }),
     );
     this.wasLive = this.live.status().live;
     this.timer = setInterval(() => void this.refresh(), REFRESH_MS);
-    return this.refresh();
+    this.countsTimer = setInterval(() => void this.refreshCounts(), COUNTS_MS);
+    return this.refresh().then(() => this.refreshCounts());
+  }
+
+  /** 直播时查一次点赞总数、看过人数（需要登录）；没开播、没登录、查询失败时什么都不做 */
+  async refreshCounts(): Promise<void> {
+    const room = this.room.get();
+    const fresh = this.authHttp();
+    if (!room || !fresh || !this.live.status().live || !this.info) return;
+    const sess = fresh.cookies.SESSDATA ?? '';
+    if (this.wbi?.sess !== sess) this.wbi = { sess, http: fresh, signer: new WbiSigner(fresh) };
+    const { http, signer } = this.wbi;
+    const gen = this.gen;
+    try {
+      const c = await this.deps.getLiveCounts(http, signer, room.roomId);
+      if (gen !== this.gen || !this.info || !this.live.status().live) return;
+      const p: RoomStatsPatch = {};
+      if (c.likes !== null) p.likes = c.likes;
+      if (c.watched !== null) p.watched = c.watched;
+      if (Object.keys(p).length) this.apply(p);
+    } catch {
+      /* 下次再查 */
+    }
   }
 
   stop(): void {
     for (const off of this.offs) off();
     this.offs = [];
     if (this.timer) clearInterval(this.timer);
+    if (this.countsTimer) clearInterval(this.countsTimer);
     if (this.emitTimer) clearTimeout(this.emitTimer);
-    this.timer = this.emitTimer = null;
+    this.timer = this.emitTimer = this.countsTimer = null;
   }
 
   /** 用公开接口查一次；查询失败时保留上一次的结果 */

@@ -171,6 +171,14 @@ export async function getDanmuInfo(http: BiliHttp, wbi: WbiSigner, roomId: numbe
   return { token: d.token, hosts: d.host_list.map((h) => ({ host: h.host, wssPort: h.wss_port })) };
 }
 
+/** 直播间的点赞总数、看过人数（需要登录 + 签名；弹幕连接里只有有人点赞时才推送，所以直播时定时查一次） */
+export async function getLiveCounts(http: BiliHttp, wbi: WbiSigner, roomId: number): Promise<{ likes: number | null; watched: number | null }> {
+  const q = await wbi.sign({ room_id: roomId, web_location: '444.8' });
+  const d = await http.getData<{ like_info_v3?: { total_likes?: number }; watched_show?: { num?: number } }>(`${LIVE}/xlive/web-room/v1/index/getInfoByRoom?${q}`);
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  return { likes: n(d.like_info_v3?.total_likes), watched: n(d.watched_show?.num) };
+}
+
 // ---------- 扫码登录 ----------
 
 export interface QrCode {

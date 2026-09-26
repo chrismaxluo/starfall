@@ -80,6 +80,7 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
     roomInfoDeps: {
       getRoomInfo: async () => ({ roomId: 30000, anchorUid: 20000, title: '测试直播', liveStatus: 1, liveTime: '', liveSince: null, isPortrait: true, parentAreaName: '娱乐', areaName: '视频唱见', cover: '', keyframe: '', followers: 10 }),
       getAnchorInfo: async () => ({ uid: 20000, name: '主播', face: '', followers: 10 }),
+      getLiveCounts: async () => ({ likes: 5, watched: 6 }),
       now: Date.now,
     },
   });

@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import { del, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
+import { route } from '../lib/route.ts';
 import { STYLES } from '../lib/identity.ts';
 import { refreshEffects, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { AssetDto, EffectDto, SoundDto } from '../lib/types.ts';
 
-const tab = ref<'anim' | 'sound'>('anim');
+// #assets/sound 直接打开音效（命令面板）
+const tab = ref<'anim' | 'sound'>(route.value.sub === 'sound' ? 'sound' : 'anim');
+watch(
+  () => route.value.sub,
+  (sub) => (tab.value = sub === 'sound' ? 'sound' : 'anim'),
+);
 const q = ref('');
 const sort = ref<'new' | 'name' | 'used'>('new');
 const over = ref(false);

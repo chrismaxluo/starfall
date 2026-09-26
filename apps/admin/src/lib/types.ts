@@ -95,6 +95,7 @@ export interface Settings {
   giftComboEnabled: boolean;
   giftComboSec: number;
   autoBackup: boolean;
+  onboarded: boolean;
 }
 
 /** 一份自动备份（数据库 + 配置） */

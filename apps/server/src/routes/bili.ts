@@ -74,6 +74,7 @@ export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
         giftComboEnabled: z.boolean().optional(),
         giftComboSec: z.number().int().min(1).max(15).optional(),
         autoBackup: z.boolean().optional(),
+        onboarded: z.boolean().optional(),
       }).strict(),
       req.body,
     );

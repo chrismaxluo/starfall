@@ -6,6 +6,8 @@ import Avatar from './components/Avatar.vue';
 import Logo from './components/Logo.vue';
 import EffectEditor from './components/EffectEditor.vue';
 import QuickExclusive from './components/QuickExclusive.vue';
+import Palette from './components/Palette.vue';
+import Wizard from './components/Wizard.vue';
 import Login from './pages/Login.vue';
 import Overview from './pages/Overview.vue';
 import Rules from './pages/Rules.vue';
@@ -13,6 +15,7 @@ import Assets from './pages/Assets.vue';
 import Events from './pages/Events.vue';
 import Output from './pages/Output.vue';
 import SettingsPage from './pages/Settings.vue';
+import { clearQueue, togglePause } from './lib/actions.ts';
 import { get, post, setUnauthorizedHandler } from './lib/api.ts';
 import { duration } from './lib/format.ts';
 import { startLive, stopLive } from './lib/live.ts';
@@ -46,6 +49,9 @@ async function boot(): Promise<void> {
   state.authed = true;
   await attempt(loadAll);
   startLive();
+  // 首次使用、还没设置好时自动打开新手引导（跳过或完成后不再弹出）
+  const s = state.status;
+  if (state.settings && !state.settings.onboarded && s && (!s.account.loggedIn || !s.room)) ui.wizard = true;
 }
 
 setUnauthorizedHandler(() => {
@@ -61,19 +67,16 @@ async function logout(): Promise<void> {
 }
 
 const paused = computed(() => state.status?.paused ?? false);
-async function togglePause(): Promise<void> {
-  await attempt(() => post(paused.value ? '/api/playback/resume' : '/api/playback/pause'), paused.value ? '已恢复播放' : '已暂停所有特效');
-  await refreshStatus().catch(() => undefined);
-}
-async function clearQueue(): Promise<void> {
-  const r = await attempt(() => post<{ cleared: number }>('/api/playback/clear'));
-  if (r) await attempt(async () => undefined, r.cleared ? `已清空 ${r.cleared} 个排队的特效` : '队列本来就是空的');
-}
 
 function onKey(e: KeyboardEvent): void {
-  if (state.authed && e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+  if (!state.authed) return;
+  const k = e.key.toLowerCase();
+  if (e.ctrlKey && e.shiftKey && k === 'p') {
     e.preventDefault();
     void togglePause();
+  } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === 'k') {
+    e.preventDefault();
+    ui.palette = !ui.palette;
   }
 }
 
@@ -175,7 +178,8 @@ onBeforeUnmount(() => {
           </div>
           <span class="live" :class="conn.cls"><i />{{ conn.text }}</span>
           <span class="livestate" :class="{ on: state.status?.live.live }"><i />{{ liveText }}</span>
-          <button class="pausebtn" style="margin-left: auto" :aria-pressed="paused" title="快捷键 Ctrl + Shift + P" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
+          <button class="search" aria-label="打开命令面板" @click="ui.palette = true"><Icon name="i-search" />搜索或执行命令<span class="kbd">Ctrl K</span></button>
+          <button class="pausebtn" :aria-pressed="paused" title="快捷键 Ctrl + Shift + P" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
           <button class="icon-btn" aria-label="切换亮色 / 暗色" @click="(e) => toggleTheme((e.currentTarget as HTMLElement).getBoundingClientRect().left + 17, (e.currentTarget as HTMLElement).getBoundingClientRect().top + 17)">
             <Icon name="i-moon" class="theme-light-only" /><Icon name="i-sun" class="theme-dark-only" />
           </button>
@@ -205,6 +209,8 @@ onBeforeUnmount(() => {
 
     <EffectEditor v-if="ui.editorId !== null" :key="ui.editorId" :effect-id="ui.editorId" @close="ui.editorId = null" />
     <QuickExclusive v-if="ui.quick" :key="ui.quick.uid" @close="ui.quick = null" />
+    <Wizard v-if="ui.wizard" @close="ui.wizard = false" />
+    <Palette v-if="ui.palette" @close="ui.palette = false" />
   </template>
 
   <div class="toasts" aria-live="polite">

@@ -59,7 +59,8 @@ async function saveRoom(): Promise<void> {
 // ---------- 第 3 步：加到直播软件 ----------
 const out = computed(() => output());
 const url = computed(() => (out.value ? `${location.origin}${out.value.path}` : ''));
-const online = computed(() => state.overlays.some((x) => x.outputId === out.value?.id));
+// 只算直播软件里的特效页，不算「在浏览器里查看」打开的
+const online = computed(() => state.overlays.some((x) => x.outputId === out.value?.id && !x.env?.view));
 async function setApp(app: OutputDto['app']): Promise<void> {
   const o = out.value;
   if (!o || o.app === app) return;

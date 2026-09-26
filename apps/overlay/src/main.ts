@@ -17,7 +17,8 @@ import { showCheck, startDemo, startLoop } from './demo.ts';
 import { h } from './dom.ts';
 import { detect } from './env.ts';
 import { Player } from './player.ts';
-import { DEFAULT_CONFIG, applyConfig, fit, metrics, showSafeAreas } from './stage.ts';
+import { DEFAULT_CONFIG, applyConfig, fit, metrics, setViewInset, showSafeAreas } from './stage.ts';
+import { VIEW_BAR, startView } from './view.ts';
 
 const q = new URLSearchParams(location.search);
 const stage = document.getElementById('stage')!;
@@ -28,14 +29,22 @@ let config: OverlayConfig = { ...DEFAULT_CONFIG };
 if (q.get('o') === 'landscape') config = { ...config, orient: 'landscape', width: 1920, height: 1080, safeTop: 0, safeBottom: 0, marginX: 3 };
 if (Number(q.get('w')) && Number(q.get('h'))) config = { ...config, width: Number(q.get('w')), height: Number(q.get('h')) };
 
+// 浏览器查看模式（&view=1）：深色背景、安全区、顶部状态栏
+const view = q.get('view') === '1' && q.get('preview') !== '1' ? startView() : null;
+if (view) setViewInset(VIEW_BAR);
+const showSafe = q.get('debug') === '1' || view !== null;
+
 const lite = () => q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
 const apply = () => applyConfig(stage, config, lite());
 apply();
 addEventListener('resize', () => fit(stage, config));
-if (q.get('debug') === '1') showSafeAreas(stage);
+if (showSafe) showSafeAreas(stage);
 
 let conn: Conn | null = null;
-const player = new Player(stage, () => metrics(config), (m) => conn?.send(m));
+const player = new Player(stage, () => metrics(config), (m) => {
+  conn?.send(m);
+  view?.onPlayer(m);
+});
 
 function notice(title: string, detail: string): void {
   stage.querySelector('.notice')?.remove();
@@ -53,20 +62,22 @@ function onMessage(m: ServerToOverlay): void {
       config = m.config;
       apply();
       stage.querySelector('.notice')?.remove();
-      conn?.send({ type: 'report', env: { ...detect(), lite: lite(), canvas: `${config.width}×${config.height}` } });
+      view?.setConfig(config);
+      conn?.send({ type: 'report', env: { ...detect(), lite: lite(), canvas: `${config.width}×${config.height}`, ...(view ? { view: true } : {}) } });
       void preload(m.preload);
       break;
     case 'config':
       config = m.config;
       apply();
       stage.querySelectorAll('.safe').forEach((el) => el.remove());
-      if (q.get('debug') === '1') showSafeAreas(stage);
+      if (showSafe) showSafeAreas(stage);
       break;
     case 'preload':
       void preload(m.preload);
       break;
     case 'play':
       player.play(m.item);
+      view?.onPlay(m.item);
       break;
     case 'stop':
       player.stop();
@@ -90,9 +101,14 @@ const offline = preview || q.get('check') === '1' || q.get('loop') === '1' || q.
 
 if (output && key) {
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/overlay?output=${encodeURIComponent(output)}&key=${encodeURIComponent(key)}`;
+  view?.setConn('connecting');
   conn = connect(url, {
     onMessage,
-    onFatal: () => notice('特效页地址已失效', '可能是重置了密钥或删除了这个输出，请在星临管理后台「直播软件输出」重新复制地址'),
+    onState: (online) => view?.setConn(online ? 'online' : 'offline'),
+    onFatal: () => {
+      view?.setConn('invalid');
+      notice('特效页地址已失效', '可能是重置了密钥或删除了这个输出，请在星临管理后台「直播软件输出」重新复制地址');
+    },
   });
 } else if (!offline) {
   notice('这是星临特效页', '请在管理后台「直播软件输出」复制完整地址（带 output 和 key）粘贴到浏览器源');

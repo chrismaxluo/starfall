@@ -177,3 +177,26 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 .check-card button { height: 64px; padding: 0 28px; border-radius: 14px; border: 0; font: inherit; font-size: 24px; background: #8D8BFF; color: #0B0B12; font-weight: 600; cursor: pointer; }
 .check-card button.sec { background: #22222B; color: #EDEDF1; }
 .loop-badge { position: absolute; left: 50%; top: calc(var(--st) + 40px); transform: translateX(-50%); z-index: 30; padding: 18px 32px; border-radius: 18px; background: rgba(12,12,18,.85); font-size: 30px; font-family: var(--font-mono); color: #EDEDF1; box-shadow: inset 0 0 0 2px rgba(255,255,255,.1); }
+
+/* 浏览器查看模式（&view=1）：只在普通浏览器里查看效果用，直播软件里的地址不带这个参数 */
+html.view, html.view body { background: #0B0B10; }
+html.view #stage {
+  background-color: #15151C;
+  background-image: linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%), linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%);
+  background-size: 64px 64px; background-position: 0 0, 32px 32px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.14), 0 20px 60px rgba(0,0,0,.5);
+}
+.vbar { position: fixed; left: 0; right: 0; top: 0; height: 44px; z-index: 100; display: flex; align-items: center; gap: 18px; padding: 0 16px; box-sizing: border-box;
+  background: #121218; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 13px; color: #EDEDF1; white-space: nowrap; overflow: hidden; }
+.vbar b { font-weight: 600; }
+.vb-conn { display: inline-flex; align-items: center; gap: 7px; }
+.vb-dot { width: 8px; height: 8px; border-radius: 50%; background: #80838F; }
+.vb-dot.online { background: #3DD68C; box-shadow: 0 0 0 3px rgba(61,214,140,.2); }
+.vb-dot.offline, .vb-dot.connecting { background: #F0B45A; }
+.vb-dot.invalid { background: #F07272; }
+.vb-mute { color: #80838F; font-family: var(--font-mono); font-size: 12px; }
+.vb-now { color: #A6A8B4; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vb-now.on { color: #8D8BFF; font-weight: 500; }
+.vb-sound { margin-left: auto; flex: none; height: 28px; padding: 0 12px; border-radius: 8px; border: 0; font: inherit; font-size: 12.5px; font-weight: 600; background: #8D8BFF; color: #0B0B12; cursor: pointer; }
+.vb-sound.on { background: rgba(61,214,140,.16); color: #3DD68C; cursor: default; }
+@media (max-width: 720px) { .vbar > b, .vbar .vb-mute { display: none; } }

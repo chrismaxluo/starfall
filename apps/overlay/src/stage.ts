@@ -36,7 +36,21 @@ export function applyConfig(stage: HTMLElement, c: OverlayConfig, lite: boolean)
   fit(stage, c);
 }
 
+/** 浏览器查看模式：顶部留出状态栏，画布居中 */
+let viewInset = 0;
+export function setViewInset(px: number): void {
+  viewInset = px;
+}
+
 export function fit(stage: HTMLElement, c: OverlayConfig): void {
+  if (viewInset) {
+    const pad = 16;
+    const s = Math.min((innerWidth - 2 * pad) / c.width, (innerHeight - viewInset - 2 * pad) / c.height) || 1;
+    const x = (innerWidth - c.width * s) / 2;
+    const y = viewInset + (innerHeight - viewInset - c.height * s) / 2;
+    stage.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    return;
+  }
   const s = Math.min(innerWidth / c.width, innerHeight / c.height) || 1;
   stage.style.transform = Math.abs(s - 1) < 0.001 ? '' : `scale(${s})`;
 }

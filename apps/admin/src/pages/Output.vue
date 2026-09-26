@@ -226,7 +226,7 @@ function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
             <button class="btn" @click="showKey = !showKey">{{ showKey ? '隐藏密钥' : '显示密钥' }}</button>
           </div>
           <div style="display: flex; gap: 16px; margin-top: 10px">
-            <a class="linkish" :href="o.path" target="_blank" rel="noopener">在新标签页打开特效页</a>
+            <a class="linkish" :href="`${o.path}&view=1`" target="_blank" rel="noopener" title="深色背景、显示安全区和连接状态；只用来查看，直播软件里请用上面的地址">在浏览器里查看</a>
             <ConfirmButton label="重置密钥" confirm-label="确认重置？旧地址会立即失效" cls="linkish" armed-cls="delb" @confirm="resetKey" />
           </div>
         </div>
@@ -269,7 +269,7 @@ function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
           <div class="clients">
             <div v-for="(c, i) in overlays" :key="i" class="client">
               <div class="top1">
-                <span class="live" style="height: 20px; padding: 0 8px"><i />在线</span>{{ c.env?.host ?? '特效页' }}
+                <span class="live" style="height: 20px; padding: 0 8px"><i />在线</span>{{ c.env?.view ? '浏览器查看' : (c.env?.host ?? '特效页') }}
                 <span class="num">{{ c.env?.chrome ? `Chromium ${c.env.chrome}` : '' }}{{ c.env?.viewport ? ` · ${c.env.viewport}` : '' }} · {{ clock(c.since) }} 起</span>
               </div>
               <div class="caps">

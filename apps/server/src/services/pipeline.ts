@@ -391,6 +391,8 @@ export class Pipeline {
     const effect = this.d.effects.get(effectId);
     const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
     const item = this.playItem(effect, v, 'enter', {}, true);
+    // 正在播的也是测试：直接换成新的，不用等它播完（真实观众的特效不打断）
+    if (this.current?.q.payload.item.test) this.stopCurrent();
     this.enqueue(item, null, true);
     return { id: item.id };
   }

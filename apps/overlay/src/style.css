@@ -104,7 +104,7 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 @keyframes admLife { 0% { opacity: 0; transform: translateY(30px) scale(.96); filter: blur(8px); } 10% { opacity: 1; transform: none; filter: blur(0); } 88% { opacity: 1; filter: blur(0); } 100% { opacity: 0; transform: scale(1.02); filter: blur(6px); } }
 
 /* ---- 星冕（全屏居中） ---- */
-.fx-star { position: absolute; inset: 0; display: grid; place-items: center; animation: govLife var(--dur) ease forwards; }
+.fx-star { position: absolute; inset: 0; display: grid; place-items: center; animation: govLife var(--dur) ease forwards; will-change: opacity, transform; }
 .fx-star .vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 100%); }
 .fx-star .halo { position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border-radius: 50%;
   background: radial-gradient(circle, rgba(247,213,139,.28), rgba(247,213,139,0) 60%); animation: halo var(--dur) ease-out forwards; }
@@ -124,7 +124,8 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 @keyframes nameIn { from { opacity: 0; letter-spacing: .5em; filter: blur(12px) drop-shadow(0 4px 24px rgba(240,180,90,.35)); } to { opacity: 1; letter-spacing: .06em; filter: blur(0) drop-shadow(0 4px 24px rgba(240,180,90,.35)); } }
 @keyframes halo { 0% { transform: scale(.4); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1.15); opacity: .6; } }
 @keyframes dust { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: .9; } 100% { opacity: 0; transform: translateY(-420px); } }
-@keyframes govLife { 0% { opacity: 0; } 6% { opacity: 1; } 90% { opacity: 1; filter: blur(0); } 100% { opacity: 0; filter: blur(8px); } }
+/* 结尾不对整个画面做模糊（全屏模糊很耗性能，弱一点的电脑会卡），改为轻微放大 + 淡出 */
+@keyframes govLife { 0% { opacity: 0; } 6% { opacity: 1; } 90% { opacity: 1; transform: none; } 100% { opacity: 0; transform: scale(1.03); } }
 
 /* ---- 气泡（顶部） ---- */
 .fx-bubble { display: flex; align-items: center; gap: 14px; padding: 12px 26px 12px 12px; border-radius: 26px 26px 26px 8px; max-width: 900px;
@@ -208,3 +209,6 @@ html.seen:not(.view) #stage {
   background-image: linear-gradient(45deg, #E6E6EA 25%, transparent 25%, transparent 75%, #E6E6EA 75%), linear-gradient(45deg, #E6E6EA 25%, transparent 25%, transparent 75%, #E6E6EA 75%);
   background-size: 64px 64px; background-position: 0 0, 32px 32px;
 }
+
+/* 预热（warm.ts）：肉眼看不见，只为提前下载字体、完成第一次绘制 */
+.slot.warm { opacity: .001 !important; pointer-events: none; }

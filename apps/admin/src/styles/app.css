@@ -679,6 +679,8 @@ td .excl { font-size: 11px; color: var(--accent); background: var(--accent-soft)
 .addband { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--r-md); border: 1px dashed var(--line-strong); font-size: 13px; color: var(--t2); }
 .addband input { width: 70px; height: 30px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--line-strong); background: var(--l2); color: var(--t1); font-family: var(--font-mono); }
 .addband .msg { font-size: 12px; color: var(--t3); }
+.trow.gift { grid-template-columns: 28px minmax(0, 1fr) minmax(170px, 210px) 40px 32px 30px; }
+.trow.combo { grid-template-columns: minmax(0, 1fr) 110px 40px; }
 .live-send[data-armed="1"] { background: #D64545; border-color: transparent; color: #fff; }
 
 /* 特效选择按钮 + 弹出列表 */
@@ -810,6 +812,7 @@ td .excl { font-size: 11px; color: var(--accent); background: var(--accent-soft)
 .rcard .l2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-left: 32px; font-size: 12.5px; color: var(--t3); }
 .rcard .l2 .effbtn { width: 220px; }
 .rcard .l2 .sel { width: auto; height: 32px; font-size: 12.5px; padding-left: 10px; }
+.rcard .l2 .grp { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .kwchips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .kw { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 10px; border-radius: 7px; background: var(--accent-soft); color: var(--t1); font-size: 13px; }
 .kw button { width: 18px; height: 18px; border: 0; border-radius: 5px; background: none; color: var(--t3); display: grid; place-items: center; }
@@ -825,6 +828,9 @@ td .excl { font-size: 11px; color: var(--accent); background: var(--accent-soft)
 .grow { display: grid; grid-template-columns: 118px minmax(0, 1fr) minmax(0, 1fr) 40px 32px; gap: 12px; align-items: center; padding: 10px 12px; border-radius: var(--r-md); background: var(--l3); border: 1px solid var(--line); box-shadow: var(--shadow-card); }
 .grow.off { opacity: .55; }
 .grow.head { background: none; border: 0; box-shadow: none; padding: 0 12px; font-size: 12px; color: var(--t3); }
+.gpick { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gpick > i { display: none; font-style: normal; font-size: 12px; color: var(--t3); flex: none; }
+.gpick .effbtn { flex: 1; min-width: 0; }
 .simres { margin-top: 10px; font-size: 12.5px; color: var(--t2); line-height: 1.6; min-height: 20px; }
 .simres b { color: var(--accent); font-weight: 500; }
 .simres .miss { color: var(--t3); }
@@ -933,6 +939,18 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
   .trow > :nth-child(2) { display: none; }
   .trow .effbtn { grid-column: 2 / -1; order: 5; }
   .trow .cdin { display: none; }
+  .trow.gift { grid-template-columns: 24px minmax(0, 1fr) 40px 32px 30px; }
+  .trow.gift > :nth-child(2) { display: flex; }
+  .trow.combo { grid-template-columns: minmax(0, 1fr) 40px; }
+  .trow.combo .cdin { display: flex; grid-column: 1; }
+  .trow.combo > .switch { grid-row: 1; grid-column: 2; }
+  .tgroup { flex-wrap: wrap; row-gap: 2px; }
+  .addband { flex-wrap: wrap; }
+  .addband .msg { flex-basis: 100%; }
+  .grow { grid-template-columns: minmax(0, 1fr) 40px 32px; row-gap: 8px; }
+  .grow.head { display: none; }
+  .grow .gpick { grid-column: 1 / -1; order: 5; }
+  .gpick > i { display: inline; width: 28px; }
   .extable, .logtable { min-width: 640px; }
   .ed-b { overflow: auto; }
 }
@@ -954,5 +972,8 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
   .search { display: none; }
   .rule, .rule-head { grid-template-columns: 20px 1fr 44px; }
   .rule > :nth-child(n+4):not(.switch), .rule-head > :nth-child(n+4) { display: none; }
+  .rcard .l2 { padding-left: 0; }
+  .rcard .l2 .grp.eff { flex: 1 1 100%; }
+  .rcard .l2 .grp.eff .effbtn { flex: 1; width: auto; min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition: none !important; } }

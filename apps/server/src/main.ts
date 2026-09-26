@@ -10,7 +10,8 @@ const ctx = createContext(config);
 const app = await buildApp(ctx, { logger: true });
 
 if (ctx.initialPassword) {
-  app.log.warn(`首次启动：已生成管理后台初始密码 ${ctx.initialPassword}（也保存在 ${config.dataDir}/initial-password.txt），登录后请修改`);
+  // 密码只写进文件（权限 600），不写日志：能读系统日志的人不一定该知道密码
+  app.log.warn(`首次启动：已生成管理后台初始密码，保存在 ${config.dataDir}/initial-password.txt，登录后请修改`);
 }
 
 if (await importSpikeAccount(ctx)) app.log.info('已把技术验证时保存的 B 站登录信息加密导入，并删除了明文文件');

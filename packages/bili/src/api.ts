@@ -34,15 +34,68 @@ export interface RoomInfo {
   liveStatus: number;
   /** 开播时间，形如 "2026-09-25 13:00:00"；未开播为 "0000-00-00 00:00:00" */
   liveTime: string;
+  /** 开播时间（毫秒）；未开播时为 null */
+  liveSince: number | null;
   isPortrait: boolean;
+  /** 分区：大分区、小分区 */
+  parentAreaName: string;
+  areaName: string;
+  /** 封面；没有设置封面时为空 */
+  cover: string;
+  /** 直播画面截图（直播中才有） */
+  keyframe: string;
+  /** 粉丝数 */
+  followers: number;
+}
+
+/** B 站接口里的时间都是北京时间 */
+export function parseBeijingTime(s: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(s);
+  if (!m || m[1] === '0000') return null;
+  return Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]! - 8, +m[5]!, +m[6]!);
 }
 
 export async function getRoomInfo(http: BiliHttp, roomId: number): Promise<RoomInfo> {
-  const d = await http.getData<{ room_id: number; uid: number; title: string; live_status: number; live_time: string; is_portrait?: boolean }>(
-    `${LIVE}/room/v1/Room/get_info?room_id=${roomId}`,
-    { auth: false },
-  );
-  return { roomId: d.room_id, anchorUid: d.uid, title: d.title, liveStatus: d.live_status, liveTime: d.live_time, isPortrait: Boolean(d.is_portrait) };
+  const d = await http.getData<{
+    room_id: number;
+    uid: number;
+    title: string;
+    live_status: number;
+    live_time: string;
+    is_portrait?: boolean;
+    area_name?: string;
+    parent_area_name?: string;
+    user_cover?: string;
+    keyframe?: string;
+    attention?: number;
+  }>(`${LIVE}/room/v1/Room/get_info?room_id=${roomId}`, { auth: false });
+  return {
+    roomId: d.room_id,
+    anchorUid: d.uid,
+    title: d.title,
+    liveStatus: d.live_status,
+    liveTime: d.live_time,
+    liveSince: d.live_status === 1 ? parseBeijingTime(d.live_time) : null,
+    isPortrait: Boolean(d.is_portrait),
+    parentAreaName: d.parent_area_name ?? '',
+    areaName: d.area_name ?? '',
+    cover: d.user_cover ?? '',
+    keyframe: d.keyframe ?? '',
+    followers: d.attention ?? 0,
+  };
+}
+
+export interface AnchorInfo {
+  uid: number;
+  name: string;
+  face: string;
+  followers: number;
+}
+
+/** 主播信息（昵称、头像、粉丝数）。公开接口 */
+export async function getAnchorInfo(http: BiliHttp, uid: number): Promise<AnchorInfo> {
+  const d = await http.getData<{ info: { uid: number; uname: string; face: string }; follower_num?: number }>(`${LIVE}/live_user/v1/Master/info?uid=${uid}`, { auth: false });
+  return { uid: d.info.uid, name: d.info.uname, face: d.info.face, followers: d.follower_num ?? 0 };
 }
 
 export interface RoomAdmin {

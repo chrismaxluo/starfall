@@ -39,7 +39,12 @@ export class RoomStore {
     } catch {
       /* 取不到昵称不影响设置 */
     }
-    const values = { id: 1, roomId: init.roomId, shortId: init.shortId, anchorUid: init.anchorUid, anchorName, updatedAt: Date.now() };
+    return this.save({ roomId: init.roomId, shortId: init.shortId, anchorUid: init.anchorUid, anchorName });
+  }
+
+  /** 保存直播间并通知（换直播间） */
+  save(r: RoomRecord): RoomRecord {
+    const values = { id: 1, ...r, updatedAt: Date.now() };
     this.db.insert(room).values(values).onConflictDoUpdate({ target: room.id, set: values }).run();
     for (const fn of this.listeners) fn();
     return this.get()!;

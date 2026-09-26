@@ -282,6 +282,30 @@ describe('播放队列', () => {
     expect(t.p.snapshot()).toMatchObject({ playing: { test: false }, items: [{ test: true }] });
   });
 
+  it('队列里每一项带头像和一句话说明；可以跳过正在播的、移出排队的', async () => {
+    const t = await setup();
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(enter({ uid: 1, guard: 3, face: 'https://i0.hdslb.com/a.jpg' }));
+    t.live.emit(enter({ uid: 2, guard: 2 }));
+    t.live.emit(gf({ unitPrice: 20_000, count: 2 }, { uid: 3 }));
+    const snap = t.p.snapshot();
+    expect(snap.playing).toMatchObject({ viewerFace: 'https://i0.hdslb.com/a.jpg', detail: '舰长进场', durationMs: 4000 });
+    expect(snap.items.map((i) => i.detail)).toEqual(['小花花 ×2', '提督进场']);
+    expect(snap.items[1]).toMatchObject({ viewerFace: null, effectName: '亭阁', durationMs: 6000 });
+    // 移出排队的：这次不播，事件记录为已清空
+    expect(t.p.remove(snap.items[1]!.id)).toBe(true);
+    expect(t.p.remove('nope')).toBe(false);
+    expect(t.events().find((e) => e.uid === 2)?.status).toBe('cleared');
+    // 跳过正在播的：马上播下一个
+    const before = t.plays().length;
+    expect(t.p.skip()).toBe(true);
+    expect(t.sock.sent.at(-2)).toMatchObject({ type: 'stop' });
+    expect(t.plays()).toHaveLength(before + 1);
+    expect(t.p.snapshot()).toMatchObject({ playing: { detail: '小花花 ×2' }, items: [] });
+    vi.advanceTimersByTime(10_000);
+    expect(t.p.skip()).toBe(false);
+  });
+
   it('上传的素材：推送文件地址、音效；播放用入队时的快照', async () => {
     const t = await setup();
     const e = t.ctx.effects.list().find((x) => x.name === '门楼')!;

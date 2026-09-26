@@ -4,7 +4,7 @@
 // 四种事件共用同一套判断（黑名单 → 匹配规则 → 暂停 → 开播 → 冷却 → 特效页在线），只有匹配规则、冷却、欢迎语变量、是否插队不同。
 import { Cooldowns, EnterMerger, GiftComboMerger, GuardDeduper, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchDanmu, matchEnter, matchGift, matchGuard, pickText } from '@starfall/core';
 import type { QueueItem, TextVars } from '@starfall/core';
-import { JUMP_GOLD } from '@starfall/shared';
+import { GUARD_NAMES, JUMP_GOLD } from '@starfall/shared';
 import type { PlayItem, PlayStatus, StdEvent, TriggerKind, Viewer } from '@starfall/shared';
 import { HttpError } from '../http.ts';
 import type { BlacklistStore } from './blacklist.ts';
@@ -49,13 +49,40 @@ const RAW_TTL_MS = 10_000;
 interface Queued {
   item: PlayItem;
   eventId: number | null;
+  /** 队列里显示的一句话，例如「舰长进场」「告白花束 ×1」「开通 提督」 */
+  detail: string;
   /** 没播出来时撤销冷却 / 每场一次的记录 */
   undo?: () => void;
 }
 
+interface QueueBrief {
+  id: string;
+  kind: TriggerKind;
+  effectName: string;
+  viewerName: string;
+  viewerFace: string | null;
+  detail: string;
+  durationMs: number;
+  test: boolean;
+}
+
 export interface QueueSnapshot {
-  playing: { id: string; kind: TriggerKind; effectName: string; viewerName: string; startedAt: number; durationMs: number; test: boolean } | null;
-  items: Array<{ id: string; kind: TriggerKind; effectName: string; viewerName: string; enqueuedAt: number; test: boolean }>;
+  playing: (QueueBrief & { startedAt: number }) | null;
+  items: Array<QueueBrief & { enqueuedAt: number }>;
+}
+
+/** 队列里显示的一句话 */
+export function queueDetail(ev: TriggerEvent, rule: string | null): string {
+  switch (ev.kind) {
+    case 'enter':
+      return `${(rule ?? '').replace(/^进场 · /, '') || '观众'}进场`;
+    case 'gift':
+      return `${ev.giftName} ×${ev.count}`;
+    case 'guard':
+      return `${ev.op === 'renew' ? '续费' : '开通'} ${GUARD_NAMES[ev.level]}`;
+    case 'danmu':
+      return `弹幕「${[...ev.text].slice(0, 16).join('')}」`;
+  }
 }
 
 export interface SimulateResult {
@@ -181,7 +208,7 @@ export class Pipeline {
   private record(ev: TriggerEvent, hit: Judgement['hit'], status: PlayStatus): number {
     const raw = this.raws.get(ev.id)?.raw;
     this.raws.delete(ev.id);
-    return this.d.log.record(ev, { sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
+    return this.d.log.record(ev, { roomId: this.d.room.get()?.roomId ?? null, sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
   }
 
   // ---------- 判断 ----------
@@ -284,7 +311,7 @@ export class Pipeline {
     const eventId = this.record(ev, j.hit, j.status);
     if (j.status !== 'queued' || !j.hit || !j.effect) return;
     const undo = j.commit();
-    this.enqueue(this.playItem(j.effect, ev.viewer, ev.kind, j.vars), eventId, j.jump, undo);
+    this.enqueue(this.playItem(j.effect, ev.viewer, ev.kind, j.vars), eventId, j.jump, queueDetail(ev, j.hit.label), undo);
   }
 
   /** 模拟一次事件：只判断，不入队、不记录、不影响冷却（F-RU-05） */
@@ -333,9 +360,9 @@ export class Pipeline {
     };
   }
 
-  private enqueue(item: PlayItem, eventId: number | null, jump: boolean, undo?: () => void): void {
+  private enqueue(item: PlayItem, eventId: number | null, jump: boolean, detail: string, undo?: () => void): void {
     this.queue.max = this.d.settings.get('queueMax');
-    const { dropped } = this.queue.enqueue({ id: item.id, kind: item.kind, enqueuedAt: this.now(), jump, payload: { item, eventId, ...(undo ? { undo } : {}) } });
+    const { dropped } = this.queue.enqueue({ id: item.id, kind: item.kind, enqueuedAt: this.now(), jump, payload: { item, eventId, detail, ...(undo ? { undo } : {}) } });
     if (dropped) this.unplayed(dropped, 'dropped');
     this.pump();
     this.emitQueue();
@@ -382,6 +409,24 @@ export class Pipeline {
     this.emitQueue();
   }
 
+  /** 跳过正在播的特效，马上播下一个 */
+  skip(): boolean {
+    if (!this.current) return false;
+    this.stopCurrent();
+    this.pump();
+    this.emitQueue();
+    return true;
+  }
+
+  /** 把排队中的一项移出队列（这次不播） */
+  remove(id: string): boolean {
+    const q = this.queue.remove(id);
+    if (!q) return false;
+    this.unplayed(q, 'cleared');
+    this.emitQueue();
+    return true;
+  }
+
   /** 清空待播放的特效（正在播的播完）（F-PL-06） */
   clear(): number {
     const items = this.queue.clear();
@@ -406,7 +451,7 @@ export class Pipeline {
     const item = this.playItem(effect, v, 'enter', {}, true);
     // 正在播的也是测试：直接换成新的，不用等它播完（真实观众的特效不打断）
     if (this.current?.q.payload.item.test) this.stopCurrent();
-    this.enqueue(item, null, true);
+    this.enqueue(item, null, true, '测试播放');
     return { id: item.id };
   }
 
@@ -417,10 +462,13 @@ export class Pipeline {
   }
 
   snapshot(): QueueSnapshot {
-    const brief = (q: QueueItem<Queued>) => ({ id: q.id, kind: q.kind, effectName: q.payload.item.effect.name, viewerName: q.payload.item.viewer.name, test: Boolean(q.payload.item.test) });
+    const brief = (q: QueueItem<Queued>): QueueBrief => {
+      const it = q.payload.item;
+      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, detail: q.payload.detail, durationMs: it.effect.durationMs, test: Boolean(it.test) };
+    };
     const c = this.current;
     return {
-      playing: c ? { ...brief(c.q), startedAt: c.startedAt, durationMs: c.q.payload.item.effect.durationMs } : null,
+      playing: c ? { ...brief(c.q), startedAt: c.startedAt } : null,
       items: this.queue.list().map((q) => ({ ...brief(q), enqueuedAt: q.enqueuedAt })),
     };
   }

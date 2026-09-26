@@ -77,6 +77,11 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
       createClient: (o) => new LiveClient({ ...o, urlFor: (h) => `ws://${h.host}:${h.wssPort}/sub` }),
       now: Date.now,
     },
+    roomInfoDeps: {
+      getRoomInfo: async () => ({ roomId: 30000, anchorUid: 20000, title: '测试直播', liveStatus: 1, liveTime: '', liveSince: null, isPortrait: true, parentAreaName: '娱乐', areaName: '视频唱见', cover: '', keyframe: '', followers: 10 }),
+      getAnchorInfo: async () => ({ uid: 20000, name: '主播', face: '', followers: 10 }),
+      now: Date.now,
+    },
   });
   ctx.db.insert(room).values({ id: 1, roomId: 30000, anchorUid: 20000, anchorName: '主播' }).run();
   ctx.db.insert(account).values({ id: 1, uid: 10099, cookiesEnc: ctx.secret.encrypt(JSON.stringify({ SESSDATA: 's', DedeUserID: '10099', bili_jct: 'c', buvid3: 'B3' })) }).run();

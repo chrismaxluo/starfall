@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLoginQrCode, logoutRemote, getDanmuInfo, getRoomAdmins, getRoomGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
+import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getRoomAdmins, getRoomGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
 import { WbiSigner } from './wbi.ts';
 import { BiliApiError, BiliHttp } from './http.ts';
 
@@ -68,8 +68,18 @@ describe('接口字段转换', () => {
   });
 
   it('直播间信息', async () => {
-    mockFetch([{ body: { code: 0, data: { room_id: 30000, uid: 20000, title: '测试', live_status: 0, live_time: '0000-00-00 00:00:00' } } }]);
-    expect(await getRoomInfo(new BiliHttp(), 30000)).toMatchObject({ roomId: 30000, anchorUid: 20000, title: '测试', liveStatus: 0, isPortrait: false });
+    mockFetch([
+      { body: { code: 0, data: { room_id: 30000, uid: 20000, title: '测试', live_status: 0, live_time: '0000-00-00 00:00:00' } } },
+      { body: { code: 0, data: { room_id: 30000, uid: 20000, title: '直播中', live_status: 1, live_time: '2026-09-26 19:02:30', area_name: '视频唱见', parent_area_name: '娱乐', user_cover: 'c.jpg', keyframe: 'k.jpg', attention: 3671294 } } },
+    ]);
+    expect(await getRoomInfo(new BiliHttp(), 30000)).toMatchObject({ roomId: 30000, anchorUid: 20000, title: '测试', liveStatus: 0, liveSince: null, isPortrait: false, areaName: '', cover: '', followers: 0 });
+    // 开播时间是北京时间
+    expect(await getRoomInfo(new BiliHttp(), 30000)).toMatchObject({ liveSince: Date.parse('2026-09-26T19:02:30+08:00'), parentAreaName: '娱乐', areaName: '视频唱见', cover: 'c.jpg', keyframe: 'k.jpg', followers: 3671294 });
+  });
+
+  it('主播信息', async () => {
+    mockFetch([{ body: { code: 0, data: { info: { uid: 20000, uname: '主播', face: 'f.jpg' }, follower_num: 123 } } }]);
+    expect(await getAnchorInfo(new BiliHttp(), 20000)).toEqual({ uid: 20000, name: '主播', face: 'f.jpg', followers: 123 });
   });
 
   it('礼物面板：金瓜子单价、付费 / 免费', async () => {

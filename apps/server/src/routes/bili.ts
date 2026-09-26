@@ -58,6 +58,8 @@ export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/status', async () => statusSnapshot(ctx));
 
+  app.get('/api/room/info', async () => ({ info: ctx.roomInfo.get() }));
+
   app.get('/api/settings', async () => ctx.settings.all());
 
   app.put('/api/settings', async (req) => {

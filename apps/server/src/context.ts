@@ -19,6 +19,8 @@ import { GiftCatalog } from './services/gifts.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
 import type { LiveDeps } from './services/live.ts';
+import { RoomInfoService } from './services/room-info.ts';
+import type { RoomInfoDeps } from './services/room-info.ts';
 import { OutputStore } from './services/outputs.ts';
 import { Pipeline } from './services/pipeline.ts';
 import { RoomStore } from './services/room.ts';
@@ -36,6 +38,7 @@ export interface AppContext {
   account: BiliAccount;
   room: RoomStore;
   live: LiveService;
+  roomInfo: RoomInfoService;
   assets: AssetStore;
   effects: EffectStore;
   viewers: ViewerStore;
@@ -55,7 +58,7 @@ export interface AppContext {
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; maxUpload?: number } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -66,6 +69,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const account = new BiliAccount(db, secret);
   const room = new RoomStore(db);
   const live = new LiveService({ db, account, room, settings }, opts.liveDeps);
+  const roomInfo = new RoomInfoService({ room, live, http: () => account.anon }, opts.roomInfoDeps);
   const assets = new AssetStore(db, p, opts.maxUpload);
   const effects = new EffectStore(db, assets);
   const viewers = new ViewerStore(db, () => account.anon);
@@ -89,8 +93,9 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   log.onChange((m) => hub.toAdmins(m));
   pipeline.onQueueChange((queue) => hub.toAdmins({ type: 'queue', queue, paused: settings.get('paused') }));
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
+  roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -103,8 +108,10 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   ctx.pipeline.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));
   await ctx.live.start();
+  void ctx.roomInfo.start().catch((e: Error) => console.error('查询直播间信息失败', e.message));
   return () => {
     clearInterval(timer);
+    ctx.roomInfo.stop();
     ctx.backups.stop();
     ctx.pipeline.stop();
     ctx.live.stop();

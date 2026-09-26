@@ -4,7 +4,7 @@ import { PLAY_STATUS } from '@starfall/shared';
 import type { Viewer } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
-import { parseBody } from '../http.ts';
+import { HttpError, parseBody } from '../http.ts';
 import { assetDto } from '../services/assets.ts';
 import { EffectPatchSchema } from '../services/effects.ts';
 import type { TriggerEvent } from '../services/pipeline.ts';
@@ -44,6 +44,14 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.post('/api/playback/clear', async () => ({ cleared: ctx.pipeline.clear() }));
+
+  app.post('/api/playback/skip', async () => ({ skipped: ctx.pipeline.skip() }));
+
+  app.delete('/api/playback/queue/:id', async (req) => {
+    const { id } = parseBody(z.object({ id: z.string().min(1).max(64) }), req.params);
+    if (!ctx.pipeline.remove(id)) throw new HttpError(404, 'not_found', '这一项已经播放或不在队列里了');
+    return { removed: true };
+  });
 
   app.post('/api/playback/test', async (req) => {
     const { effectId } = parseBody(z.object({ effectId: z.number().int().positive() }).strict(), req.body);
@@ -87,10 +95,20 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   // 今天（按主播时区）的统计
-  app.get('/api/stats/today', async () => {
-    const day = ctx.pipeline.today();
-    const since = dayStart(day, ctx.config.timeZone);
-    return { day, since, ...ctx.log.statsSince(since, ctx.room.get()?.anchorUid ?? 0) };
+  // 总览的统计：scope=live 本场（没开播时是上一场），scope=today 今天；只算当前直播间
+  app.get('/api/stats', async (req) => {
+    const { scope } = parseBody(z.object({ scope: z.enum(['live', 'today']).default('today') }), req.query);
+    const room = ctx.room.get();
+    const live = ctx.live.status();
+    const last = room ? ctx.live.lastSession(room.roomId) : null;
+    let from: number | null = null;
+    let to: number | null = null;
+    if (scope === 'today') from = dayStart(ctx.pipeline.today(), ctx.config.timeZone);
+    else if (live.live && live.liveSince !== null) from = live.liveSince;
+    else if (last) [from, to] = [last.startedAt, last.endedAt];
+    const empty = { enterUnique: 0, guardUnique: 0, played: 0, guardPlayed: 0, composition: { gov: 0, adm: 0, cap: 0, mod: 0, fan: 0, nor: 0 } };
+    const stats = room && from !== null ? ctx.log.stats(room.roomId, from, to, room.anchorUid) : empty;
+    return { scope, roomId: room?.roomId ?? null, from, to, live: scope === 'live' && live.live, lastSession: last ? { startedAt: last.startedAt, endedAt: last.endedAt } : null, ...stats };
   });
 
   // 模拟一次事件（进场 / 弹幕 / 礼物 / 上舰）：只判断，不入队、不记录

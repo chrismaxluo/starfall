@@ -1,13 +1,15 @@
 // 全局状态：登录后加载一次，之后由实时连接（/ws/admin）和各页面的修改保持最新
 import { reactive } from 'vue';
 import { get } from './api.ts';
-import type { Identity } from './identity.ts';
-import type { DanmuRule, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+import type { PreviewRequest } from './preview.ts';
+import type { DanmuRule, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
 export const state = reactive({
   /** null：还没检查 */
   authed: null as boolean | null,
   status: null as StatusSnapshot | null,
+  /** 直播间信息：标题、分区、封面、主播、直播时的实时数字 */
+  roomInfo: null as RoomInfo | null,
   settings: null as Settings | null,
   effects: [] as EffectDto[],
   sounds: [] as SoundDto[],
@@ -71,7 +73,7 @@ export const ui = reactive({
   editorId: null as number | null,
   wizard: false,
   palette: false,
-  /** 命令面板里的「预览某身份进场特效」：总览页收到后播放 */
-  previewTier: null as Identity | null,
+  /** 预览小窗：点规则的 ▶、命令面板里的「预览某身份进场特效」 */
+  preview: null as PreviewRequest | null,
   quick: null as { uid: number; name: string; face?: string | undefined; viewer?: Viewer } | null,
 });

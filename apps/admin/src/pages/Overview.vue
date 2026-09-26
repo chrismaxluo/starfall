@@ -206,7 +206,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
           <div><small>点赞</small><span class="kpi-v num">{{ live ? bigNum(info?.likes) : '—' }}</span></div>
           <div><small>粉丝</small><span class="kpi-v num">{{ bigNum(info?.followers) }}</span></div>
         </div>
-        <div class="delta">{{ info?.fansClub ? `粉丝团 ${bigNum(info.fansClub)} 人` : live ? '点赞数开播后更新' : '粉丝数随时更新' }}</div>
+        <div class="delta">{{ info?.fansClub ? `粉丝团 ${bigNum(info.fansClub)} 人` : live ? '点赞是本场累计' : '点赞开播后显示' }}</div>
       </div>
 
       <div class="card span7" style="grid-row: span 2">

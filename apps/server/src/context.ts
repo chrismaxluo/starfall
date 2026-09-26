@@ -69,7 +69,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const account = new BiliAccount(db, secret);
   const room = new RoomStore(db);
   const live = new LiveService({ db, account, room, settings }, opts.liveDeps);
-  const roomInfo = new RoomInfoService({ room, live, http: () => account.anon }, opts.roomInfoDeps);
+  const roomInfo = new RoomInfoService({ room, live, http: () => account.anon, authHttp: () => account.http() }, opts.roomInfoDeps);
   const assets = new AssetStore(db, p, opts.maxUpload);
   const effects = new EffectStore(db, assets);
   const viewers = new ViewerStore(db, () => account.anon);

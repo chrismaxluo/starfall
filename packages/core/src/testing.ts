@@ -1,7 +1,7 @@
 // 测试用的辅助数据（不在正式代码中使用）
 import type { EnterRules, Viewer } from '@starfall/shared';
 
-export const ANCHOR = 375189050;
+export const ANCHOR = 20000;
 
 export function viewer(p: Partial<Viewer> = {}): Viewer {
   return { uid: 1001, name: '测试观众', guard: 0, isMod: false, mystery: false, ...p };

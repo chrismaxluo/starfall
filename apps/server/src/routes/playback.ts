@@ -1,11 +1,13 @@
 // 播放控制、测试、模拟（需求 F-PL-05 ~ 06、F-RU-05）
 import type { FastifyInstance } from 'fastify';
 import { PLAY_STATUS } from '@starfall/shared';
+import type { Viewer } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { parseBody } from '../http.ts';
 import { assetDto } from '../services/assets.ts';
 import { EffectPatchSchema } from '../services/effects.ts';
+import type { TriggerEvent } from '../services/pipeline.ts';
 
 const SimViewerSchema = z
   .object({
@@ -61,6 +63,12 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
           .optional(),
         /** 还没保存的修改（素材设置里预览用） */
         draft: EffectPatchSchema.omit({ name: true }).optional(),
+        /** 欢迎语变量（弹幕内容、礼物和数量、上舰月数）；不填用示例 */
+        vars: z
+          .object({ text: z.string().max(100), gift: z.string().max(40), count: z.number().int().min(1), valueGold: z.number().int().min(0), months: z.number().int().min(1).max(120), guardLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]) })
+          .partial()
+          .strict()
+          .optional(),
       }).strict(),
       req.body,
     );
@@ -75,7 +83,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     const v = b.viewer ?? {};
     const medal = v.medalLevel === null ? { medal: undefined } : v.medalLevel ? { medal: { name: '星临', level: v.medalLevel, anchorUid: 0 } } : {};
     const { medalLevel: _m, ...rest } = v;
-    return ctx.pipeline.preview(effect, { ...rest, ...medal }, b.kind);
+    return ctx.pipeline.preview(effect, { ...rest, ...medal }, b.kind, b.vars);
   });
 
   // 今天（按主播时区）的统计
@@ -85,18 +93,46 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { day, since, ...ctx.log.statsSince(since, ctx.room.get()?.anchorUid ?? 0) };
   });
 
+  // 模拟一次事件（进场 / 弹幕 / 礼物 / 上舰）：只判断，不入队、不记录
   app.post('/api/simulate', async (req) => {
-    const b = parseBody(z.object({ kind: z.literal('enter').default('enter'), viewer: SimViewerSchema }).strict(), req.body);
+    const b = parseBody(
+      z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('enter'), viewer: SimViewerSchema }).strict(),
+        z.object({ kind: z.literal('danmu'), viewer: SimViewerSchema, text: z.string().min(1).max(100) }).strict(),
+        z.object({
+          kind: z.literal('gift'),
+          viewer: SimViewerSchema,
+          giftId: z.number().int().min(0).default(0),
+          giftName: z.string().max(40).default('礼物'),
+          /** 单价（金瓜子）；0 表示免费礼物 */
+          unitPrice: z.number().int().min(0).max(100_000_000),
+          count: z.number().int().min(1).max(100_000),
+        }).strict(),
+        z.object({ kind: z.literal('guard'), viewer: SimViewerSchema, level: z.union([z.literal(1), z.literal(2), z.literal(3)]), op: z.enum(['open', 'renew']), months: z.number().int().min(1).max(120).default(1) }).strict(),
+      ]),
+      // 兼容旧的调用方式（没有 kind 时按进场处理）
+      req.body && typeof req.body === 'object' && !('kind' in req.body) ? { ...req.body, kind: 'enter' } : req.body,
+    );
     const v = b.viewer;
     const anchorUid = ctx.room.get()?.anchorUid ?? 0;
-    const r = ctx.pipeline.simulate({
+    const viewer: Viewer = {
       uid: v.uid,
       name: v.name,
-      guard: v.guard,
+      guard: b.kind === 'guard' ? b.level : v.guard,
       isMod: v.isMod,
       mystery: false,
       ...(v.medal ? { medal: { name: '粉丝牌', level: v.medal.level, anchorUid: v.medal.own ? anchorUid : -1 } } : {}),
-    });
+    };
+    const base = { id: 'sim', ts: Date.now(), viewer };
+    const ev: TriggerEvent =
+      b.kind === 'enter'
+        ? { ...base, kind: 'enter', source: 'interact' }
+        : b.kind === 'danmu'
+          ? { ...base, kind: 'danmu', text: b.text }
+          : b.kind === 'gift'
+            ? { ...base, kind: 'gift', giftId: b.giftId, giftName: b.giftName, unitPrice: b.unitPrice, count: b.count, paid: b.unitPrice > 0 }
+            : { ...base, kind: 'guard', level: b.level, op: b.op, months: b.months, source: 'toast' };
+    const r = ctx.pipeline.simulate(ev);
     return { ...r, statusText: PLAY_STATUS[r.status] };
   });
 }

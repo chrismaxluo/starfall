@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { EffectTexts, Position } from '@starfall/shared';
 import type { Db } from './index.ts';
-import { effects, outputs, ruleEnterBands, ruleEnterTiers, settings } from './schema.ts';
+import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleGiftBands, ruleGuard, settings } from './schema.ts';
 
 interface BuiltinEffect {
   name: string;
@@ -43,6 +43,9 @@ export const DEFAULT_SETTINGS = {
   blockAccount: true,
   /** 事件记录保留天数，0 为永久（F-DA-02） */
   retentionDays: 90,
+  /** 礼物连击合并（F-GF-04） */
+  giftComboEnabled: true,
+  giftComboSec: 3,
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 
@@ -66,6 +69,20 @@ export function seed(db: Db): void {
         { fromLevel: 1, effectId: id('霜玻'), cooldownMin: 15, enabled: true },
       ]).run();
     }
+    // 礼物：≥ 100 元星冕、10 ~ 100 元礼物感谢、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
+    if (!tx.select().from(ruleGiftBands).limit(1).get()) {
+      tx.insert(ruleGiftBands).values([
+        { fromGold: 100_000, effectId: id('星冕'), enabled: true },
+        { fromGold: 10_000, effectId: id('礼物感谢'), enabled: true },
+        { fromGold: 1000, effectId: id('一行字'), enabled: false },
+      ]).run();
+    }
+    const guards = [
+      { tier: 'gov', openEffectId: id('星冕'), renewEffectId: id('星冕'), enabled: true },
+      { tier: 'adm', openEffectId: id('流星'), renewEffectId: id('流星'), enabled: true },
+      { tier: 'cap', openEffectId: id('流光'), renewEffectId: id('礼物感谢'), enabled: true },
+    ] as const;
+    for (const g of guards) tx.insert(ruleGuard).values(g).onConflictDoNothing().run();
     if (!tx.select().from(outputs).limit(1).get()) {
       tx.insert(outputs).values({ name: '竖屏直播', key: crypto.randomBytes(16).toString('base64url') }).run();
     }

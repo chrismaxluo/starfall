@@ -9,6 +9,15 @@ import { HttpError } from '../http.ts';
 import type { SettingsStore } from './settings.ts';
 import type { ViewerStore } from './viewers.ts';
 
+/** 规则里选的素材必须存在，否则返回 400 */
+export function checkEffectIds(db: Db, ids: Array<number | null | undefined>): void {
+  const want = [...new Set(ids.filter((x): x is number => typeof x === 'number'))];
+  if (!want.length) return;
+  const have = new Set(db.select({ id: effects.id }).from(effects).where(inArray(effects.id, want)).all().map((r) => r.id));
+  const missing = want.filter((id) => !have.has(id));
+  if (missing.length) throw new HttpError(400, 'invalid_effect', `所选的素材不存在（ID ${missing.join('、')}）`);
+}
+
 export const EnterBaseSchema = z
   .object({
     tiers: z.object({ gov: TierRuleSchema, adm: TierRuleSchema, cap: TierRuleSchema, mod: TierRuleSchema, nor: TierRuleSchema }).strict(),
@@ -67,12 +76,8 @@ export class EnterRuleStore {
     return { ...this.base(), exclusives };
   }
 
-  private checkEffects(ids: Array<number | null>): void {
-    const want = [...new Set(ids.filter((x): x is number => x !== null))];
-    if (!want.length) return;
-    const have = new Set(this.db.select({ id: effects.id }).from(effects).where(inArray(effects.id, want)).all().map((r) => r.id));
-    const missing = want.filter((id) => !have.has(id));
-    if (missing.length) throw new HttpError(400, 'invalid_effect', `所选的素材不存在（ID ${missing.join('、')}）`);
+  private checkEffects(ids: Array<number | null | undefined>): void {
+    checkEffectIds(this.db, ids);
   }
 
   setBase(b: EnterBase): EnterBase {

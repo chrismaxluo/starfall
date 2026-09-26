@@ -1,13 +1,13 @@
 // 素材（需求 F-AS-01 ~ 15）：内置素材只读；被规则使用时不能删除；复制时可以把原来用它的地方换成副本。
 import path from 'node:path';
 import { eq, like } from 'drizzle-orm';
-import { bandLabel, sortedBands } from '@starfall/core';
+import { bandLabel, danmuLabel, giftBandLabel, sortedBands, sortedGiftBands } from '@starfall/core';
 import { EffectSchema, TIER_NAMES } from '@starfall/shared';
 import type { Effect } from '@starfall/shared';
 import type { Readable } from 'node:stream';
 import type { z } from 'zod';
 import type { Db } from '../db/index.ts';
-import { effects, ruleEnterBands, ruleEnterTiers, ruleExclusive, viewers } from '../db/schema.ts';
+import { effects, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, viewers } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 import { assetDto } from './assets.ts';
 import type { AssetDto, AssetRow, AssetStore } from './assets.ts';
@@ -16,7 +16,7 @@ type EffectRow = typeof effects.$inferSelect;
 
 export interface EffectUse {
   /** 规则所在页面，界面据此跳转 */
-  page: 'enter';
+  page: 'enter' | 'danmu' | 'gift' | 'guard';
   label: string;
 }
 
@@ -121,6 +121,14 @@ export class EffectStore {
     for (const b of sortedBands(this.db.select().from(ruleEnterBands).all())) add(b.effectId, { page: 'enter', label: `进场 · 粉丝牌 ${bandLabel(b.fromLevel, b.toLevel)}` });
     const names = new Map(this.db.select({ uid: viewers.uid, name: viewers.name }).from(viewers).all().map((v) => [v.uid, v.name]));
     for (const x of this.db.select().from(ruleExclusive).all()) add(x.effectId, { page: 'enter', label: `进场 · 专属 ${names.get(x.uid) ?? `UID ${x.uid}`}` });
+    for (const r of this.db.select().from(ruleDanmu).orderBy(ruleDanmu.sort).all()) add(r.effectId, { page: 'danmu', label: danmuLabel(r) });
+    for (const g of this.db.select().from(ruleGiftSpecific).all()) add(g.effectId, { page: 'gift', label: `礼物 · 「${g.giftName || g.giftId}」` });
+    for (const b of sortedGiftBands(this.db.select().from(ruleGiftBands).all())) add(b.effectId, { page: 'gift', label: `礼物 · 单次 ${giftBandLabel(b.fromGold, b.toGold)}` });
+    const GUARD = { gov: '总督', adm: '提督', cap: '舰长' } as const;
+    for (const g of this.db.select().from(ruleGuard).all()) {
+      add(g.openEffectId, { page: 'guard', label: `上舰 · 开通${GUARD[g.tier]}` });
+      add(g.renewEffectId, { page: 'guard', label: `上舰 · 续费${GUARD[g.tier]}` });
+    }
     return out;
   }
 
@@ -194,6 +202,11 @@ export class EffectStore {
         tx.update(ruleEnterTiers).set({ effectId: n }).where(eq(ruleEnterTiers.effectId, id)).run();
         tx.update(ruleEnterBands).set({ effectId: n }).where(eq(ruleEnterBands.effectId, id)).run();
         tx.update(ruleExclusive).set({ effectId: n }).where(eq(ruleExclusive.effectId, id)).run();
+        tx.update(ruleDanmu).set({ effectId: n }).where(eq(ruleDanmu.effectId, id)).run();
+        tx.update(ruleGiftSpecific).set({ effectId: n }).where(eq(ruleGiftSpecific.effectId, id)).run();
+        tx.update(ruleGiftBands).set({ effectId: n }).where(eq(ruleGiftBands.effectId, id)).run();
+        tx.update(ruleGuard).set({ openEffectId: n }).where(eq(ruleGuard.openEffectId, id)).run();
+        tx.update(ruleGuard).set({ renewEffectId: n }).where(eq(ruleGuard.renewEffectId, id)).run();
       }
       return n;
     });

@@ -12,9 +12,9 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-2F6FEB?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24-3C873A?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/tests-266%20passed-0E8C7A?style=flat-square)](#质量保障)
+[![Tests](https://img.shields.io/badge/tests-passing-0E8C7A?style=flat-square)](#质量保障)
 
-[界面预览](#界面预览) · [快速开始](#快速开始) · [部署指南](docs/deployment.md) · [使用手册](docs/user-guide.md) · [更新记录](CHANGELOG.md)
+[界面预览](#界面预览) · [系统架构](#系统架构) · [快速开始](#快速开始) · [部署指南](docs/deployment.md) · [使用手册](docs/user-guide.md) · [更新记录](CHANGELOG.md)
 
 </div>
 
@@ -49,37 +49,6 @@
     <td width="50%"><img src="docs/images/login.jpg" alt="登录页"><br><sub><b>登录页</b></sub></td>
   </tr>
 </table>
-
-## 快速开始
-
-**环境要求**：Linux 服务器（已在 Debian 12 验证）、Node.js 24+、可访问 B 站；推荐安装 ffmpeg，用于检测上传视频的透明通道与时长。
-
-```bash
-git clone https://github.com/chrismaxluo/starfall.git /opt/starfall
-cd /opt/starfall
-corepack enable && pnpm install
-pnpm build
-pnpm --filter @starfall/server start
-```
-
-启动后访问 `http://<服务器地址>:17520/`，使用日志中显示的初始密码登录（同时保存在 `data/initial-password.txt`），按新手引导完成：
-
-1. 扫码登录 B 站账号（仅用于读取直播间消息，建议使用小号）
-2. 填写直播间房间号
-3. 将特效页地址添加为直播软件的浏览器源
-
-作为系统服务运行、更新、HTTPS 与备份恢复，请参阅 **[部署指南](docs/deployment.md)**；规则配置与直播中的操作，请参阅 **[使用手册](docs/user-guide.md)**。
-
-## 配置
-
-| 环境变量 | 默认值 | 说明 |
-|---|---|---|
-| `STARFALL_PORT` | `17520` | 服务端口 |
-| `STARFALL_HOST` | `0.0.0.0` | 监听地址 |
-| `STARFALL_DATA` | `./data` | 数据目录：数据库、素材文件、加密密钥、备份 |
-| `STARFALL_TZ` | `Asia/Shanghai` | 主播所在时区，用于「今天」的统计与专属用户有效期 |
-
-连接时机、未开播时的处理、排队上限、黑名单、事件保留天数、自动备份等，均在管理后台「设置」中调整。
 
 ## 系统架构
 
@@ -145,23 +114,23 @@ sequenceDiagram
 
 ## 技术栈
 
-| 层级 | 技术 |
-|---|---|
-| 运行环境 | Node.js 24 · TypeScript 6 · pnpm workspace（monorepo） |
-| 服务端 | Fastify 5 · @fastify/websocket · SQLite（better-sqlite3 13 + Drizzle ORM）· Zod 4 · protobufjs 8 |
-| 管理后台 | Vue 3.5 · Vite 8 |
-| 特效页 | TypeScript · Vite 8 · CSS / SVG 动画 · lottie-web · svgaplayerweb |
-| 质量保障 | Vitest · ESLint · vue-tsc 类型检查 |
-| 部署 | systemd（开机自启、崩溃自动重启）· 可选 HTTPS 反向代理 |
-
-服务端由 Node.js 直接运行 TypeScript 源码，无需编译；管理后台与特效页由 Vite 构建为静态文件，由服务端提供。
+| 层级 | 技术 | 选择理由 |
+|---|---|---|
+| 运行环境 | Node.js 24 · TypeScript 6 · pnpm workspace | Node.js 直接运行 TypeScript 源码，服务端无需编译；多个包共享类型定义 |
+| 服务端 | Fastify 5 · @fastify/websocket | 轻量高效，REST 接口与实时推送共用一个端口 |
+| 数据 | SQLite（better-sqlite3 + Drizzle ORM）· Zod 4 | 单文件数据库，无需额外服务，备份即复制；接口参数与配置文件统一校验 |
+| 协议 | protobufjs 8 · ws | B 站的进场、礼物等消息已改为 protobuf 编码 |
+| 管理后台 | Vue 3.5 · Vite 8 | 构建为静态文件，由服务端直接提供，电脑与手机共用一套界面 |
+| 特效页 | CSS / SVG 动画 · lottie-web · svgaplayerweb | B 站直播姬与 OBS 的浏览器源均可流畅渲染，兼容常见特效素材格式 |
+| 质量保障 | Vitest · ESLint · vue-tsc | 单元、集成与端到端测试，类型与代码检查一条命令完成 |
+| 部署 | systemd · 可选 HTTPS 反向代理 | 开机自启、崩溃自动重启，内存占用受限 |
 
 ## 项目结构
 
 ```
 starfall/
 ├── apps/
-│   ├── server/        星临服务：REST 接口、实时推送、规则判断、播放队列
+│   ├── server/        星临服务：REST 接口、实时推送、直播连接、播放调度
 │   ├── admin/         管理后台（Vue 3）
 │   └── overlay/       特效页（浏览器源）
 ├── packages/
@@ -174,6 +143,35 @@ starfall/
 └── fixtures/          测试样本（已脱敏）
 ```
 
+各个包之间的依赖关系：
+
+```mermaid
+flowchart BT
+    shared["shared<br/>类型 · 消息格式"]
+    core["core<br/>规则 · 冷却 · 队列"]
+    bili["bili<br/>B 站协议"]
+    server["server<br/>星临服务"]
+    admin["admin<br/>管理后台"]
+    overlay["overlay<br/>特效页"]
+    core --> shared
+    bili --> shared
+    server --> core
+    server --> bili
+    admin --> shared
+    overlay --> shared
+```
+
+`core` 不接触网络、数据库与文件，所有规则判断都可以脱离直播环境单独测试；`bili` 只负责和 B 站通信，协议变化时改动集中在这一处。
+
+## 设计要点
+
+- **进场消息合并**：B 站的一次进场会拆成两条消息先后到达，间隔 0～1.5 秒，且只有后一条带粉丝牌。服务端等待 1.6 秒将两者合并，既不重复播放，也不丢失身份信息。
+- **仅在开播时连接**：默认只在直播间开播期间连接弹幕服务器，下播自动断开，降低登录账号的风险。
+- **服务端统一调度**：播放队列由服务端维护，多个特效页（例如同时接入直播姬与 OBS）画面保持同步；上舰与大额礼物插队，队列满时优先丢弃低优先级的事件。
+- **规则可验证**：后台可以模拟任意进场、弹幕、礼物与上舰事件，未开播时也能查看命中了哪条规则以及原因。
+- **账号信息加密**：B 站登录凭据加密后存入数据库，密钥单独保存在数据目录。
+- **端到端测试**：测试中启动一个模拟的 B 站弹幕服务器，完整走通连接、解析、匹配、排队到推送特效页的流程。
+
 ## 开发
 
 ```bash
@@ -185,9 +183,29 @@ pnpm build        # 构建管理后台与特效页
 
 ### 质量保障
 
-- **测试**：266 个单元与集成测试，覆盖消息解析、规则匹配、冷却与合并、播放队列、接口，以及基于模拟 B 站服务器的端到端流程。
+- **测试**：260 余个单元与集成测试，覆盖消息解析、规则匹配、冷却与合并、播放队列、接口，以及基于模拟 B 站服务器的端到端流程。
 - **检查**：TypeScript 严格模式、ESLint、Vue 模板类型检查，`pnpm check` 一次完成。
 - **分支**：`main` 仅承载里程碑版本并打标签，日常开发在 `dev`；详见[开发约定](docs/development.md)。
+
+## 快速开始
+
+**环境要求**：一台 Linux 服务器（已在 Debian 12 验证）、Node.js 24+、可访问 B 站；推荐安装 ffmpeg，用于检测上传视频的透明通道与时长。
+
+```bash
+git clone https://github.com/chrismaxluo/starfall.git /opt/starfall
+cd /opt/starfall
+corepack enable && pnpm install
+pnpm build
+pnpm --filter @starfall/server start
+```
+
+启动后访问 `http://<服务器地址>:17520/`，使用日志中显示的初始密码登录（同时保存在 `data/initial-password.txt`），按新手引导完成：
+
+1. 扫码登录 B 站账号（仅用于读取直播间消息，建议使用小号）
+2. 填写直播间房间号
+3. 将特效页地址添加为直播软件的浏览器源
+
+端口、数据目录、时区可通过环境变量修改，其余设置都在管理后台「设置」中调整。作为系统服务运行、更新、HTTPS 与备份恢复，请参阅 **[部署指南](docs/deployment.md)**；规则配置与直播中的操作，请参阅 **[使用手册](docs/user-guide.md)**。
 
 ## 文档
 

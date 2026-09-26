@@ -16,10 +16,10 @@ const setup = async (opts?: { maxUpload?: number }) => {
 };
 
 describe('素材列表', () => {
-  it('内置 11 个素材，带"用于哪些规则"', async () => {
+  it('内置 12 个素材，带"用于哪些规则"', async () => {
     const { effects, byName } = await setup();
     const list = await effects();
-    expect(list.map((e) => e.name)).toEqual(['星冕', '流星', '流光', '巡场', '霜玻', '礼物感谢', '弹幕回应', '一行字', '金銮', '亭阁', '门楼']);
+    expect(list.map((e) => e.name)).toEqual(['星冕', '流星', '流光', '巡场', '霜玻', '礼物感谢', '弹幕回应', '一行字', '霜玻·简', '金銮', '亭阁', '门楼']);
     expect(list.every((e) => e.builtin)).toBe(true);
     expect((await byName('金銮')).usedBy).toEqual([
       { page: 'enter', label: '进场 · 总督' },
@@ -29,7 +29,9 @@ describe('素材列表', () => {
     expect((await byName('星冕')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 100 元' }]);
     expect((await byName('霜玻')).usedBy.map((u) => u.label)).toEqual(['进场 · 粉丝牌 21 级及以上', '进场 · 粉丝牌 1 – 20 级']);
     // 普通观众档默认关闭，但仍然引用了"一行字"
-    expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['进场 · 普通观众', '礼物 · 单次 1 – 10 元']);
+    expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['礼物 · 单次 1 – 10 元']);
+    // 普通观众默认用霜玻的简短版（默认关闭）
+    expect((await byName('霜玻·简'))).toMatchObject({ durationMs: 2400, visual: { type: 'builtin_style', style: 'frost' }, usedBy: [{ page: 'enter', label: '进场 · 普通观众' }] });
   });
 
   it('未登录不能访问', async () => {

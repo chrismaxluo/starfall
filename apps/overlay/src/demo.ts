@@ -4,7 +4,7 @@ import { h } from './dom.ts';
 import { checklist, detect } from './env.ts';
 import type { Player } from './player.ts';
 
-const DEMOS: Array<{ style: string; position: Position; durationMs: number; text: string; viewer: PlayItem['viewer'] }> = [
+const DEMOS: Array<{ style: string; position: Position; durationMs: number; text: string; viewer: PlayItem['viewer']; gift?: PlayItem['gift'] }> = [
   { style: 'royal-gov', position: 'center', durationMs: 8000, text: '恭迎总督 长夜未央', viewer: { name: '长夜未央', guard: 1, isMod: false, medal: { name: '星临', level: 41 } } },
   { style: 'royal-adm', position: 'center', durationMs: 6000, text: '恭迎提督 月下独酌', viewer: { name: '月下独酌', guard: 2, isMod: false, medal: { name: '星临', level: 38 } } },
   { style: 'royal-cap', position: 'center', durationMs: 4000, text: '恭迎舰长 星河漫步', viewer: { name: '星河漫步', guard: 3, isMod: false, medal: { name: '星临', level: 27 } } },
@@ -16,6 +16,10 @@ const DEMOS: Array<{ style: string; position: Position; durationMs: number; text
   { style: 'gift', position: 'bl', durationMs: 4000, text: '感谢 半糖主义 送出 小花花 ×10', viewer: { name: '半糖主义', guard: 0, isMod: false, medal: { name: '星临', level: 8 } } },
   { style: 'bubble', position: 'top', durationMs: 3000, text: '路过的猫：主播晚上好！', viewer: { name: '路过的猫', guard: 0, isMod: false } },
   { style: 'line', position: 'bl', durationMs: 2400, text: '路过的猫 进入直播间', viewer: { name: '路过的猫', guard: 0, isMod: false } },
+  { style: 'glass-gift', position: 'bl', durationMs: 4000, text: '半糖主义 送出 小花花', viewer: { name: '半糖主义', guard: 0, isMod: false, medal: { name: '星临', level: 8 } }, gift: { name: '小花花', count: 200, img: 'https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png' } },
+  { style: 'glass-big', position: 'bl', durationMs: 6000, text: '晚风与星河漫步 送出 星愿水晶球', viewer: { name: '晚风与星河漫步', guard: 0, isMod: false }, gift: { name: '星愿水晶球', count: 1, img: 'https://s1.hdslb.com/bfs/live/f26242d5dc86bbc695336383e2ac4ba50ec033eb.png' } },
+  { style: 'glass-mod', position: 'bl', durationMs: 3200, text: '青柠汽水 前来巡场', viewer: { name: '青柠汽水', guard: 0, isMod: true } },
+  { style: 'glass-dm', position: 'top', durationMs: 3000, text: '路过的猫：主播晚上好！', viewer: { name: '路过的猫', guard: 0, isMod: false } },
 ];
 
 let seq = 0;
@@ -27,6 +31,7 @@ export function demoItem(style: string): PlayItem {
     effect: { id: 0, name: d.style, visual: { type: 'builtin_style', style: d.style }, showText: true, position: d.position, durationMs: d.durationMs, sound: null, volume: 70 },
     text: d.text,
     viewer: d.viewer,
+    ...(d.gift ? { gift: d.gift } : {}),
     test: true,
   };
 }

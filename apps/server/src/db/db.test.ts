@@ -16,7 +16,7 @@ describe('数据库', () => {
     expect(byKind).not.toContain('TEMP B-TREE');
   });
 
-  it('迁移后写入初始数据：8 个内置素材、5 个身份档位、2 个粉丝牌分档、1 个竖屏输出', () => {
+  it('迁移后写入初始数据：内置素材、5 个身份档位、2 个粉丝牌分档、1 个竖屏输出', () => {
     const db = openDb(':memory:');
     seed(db);
     expect(db.select().from(effects).all().map((e) => e.name)).toEqual(BUILTIN_EFFECTS.map((e) => e.name));
@@ -35,7 +35,7 @@ describe('数据库', () => {
     db.update(settings).set({ value: true }).where(eq(settings.key, 'paused')).run();
     db.update(ruleEnterTiers).set({ cooldownMin: 99 }).where(eq(ruleEnterTiers.tier, 'cap')).run();
     seed(db);
-    expect(db.select().from(effects).all()).toHaveLength(12);
+    expect(db.select().from(effects).all()).toHaveLength(BUILTIN_EFFECTS.length);
     expect(db.select().from(settings).where(eq(settings.key, 'paused')).get()?.value).toBe(true);
     expect(db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'cap')).get()?.cooldownMin).toBe(99);
     expect(db.select().from(outputs).all()).toHaveLength(1);
@@ -54,8 +54,8 @@ describe('数据库', () => {
   it('被规则引用的素材不能删除（F-AS-14）', () => {
     const db = openDb(':memory:');
     seed(db);
-    const star = db.select().from(effects).where(eq(effects.name, '星冕')).get()!;
-    expect(() => db.delete(effects).where(eq(effects.id, star.id)).run()).toThrow(/FOREIGN KEY/);
+    const used = db.select().from(effects).where(eq(effects.name, '晶耀')).get()!;
+    expect(() => db.delete(effects).where(eq(effects.id, used.id)).run()).toThrow(/FOREIGN KEY/);
   });
 
   it('专属用户必须指向存在的素材', () => {

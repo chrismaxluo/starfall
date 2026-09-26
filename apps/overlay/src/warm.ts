@@ -15,7 +15,7 @@ const FONTS: Array<[string, number[]]> = [
   ['Geist Mono', [500, 600]],
   ['Noto Serif SC', [600, 900]],
 ];
-const STYLES = ['line', 'frost', 'patrol', 'flow', 'gift', 'meteor', 'star', 'bubble', 'royal-cap', 'royal-adm', 'royal-gov'];
+const STYLES = ['line', 'frost', 'patrol', 'flow', 'gift', 'meteor', 'star', 'bubble', 'royal-cap', 'royal-adm', 'royal-gov', 'glass-gift', 'glass-big', 'glass-mod', 'glass-dm'];
 const WARM_MS = 600;
 
 export async function warmFonts(): Promise<void> {

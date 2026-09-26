@@ -47,6 +47,8 @@ export interface PlayItem {
   };
   /** 上舰事件：开通还是续费（宫廷特效的印章用） */
   guardOp?: 'open' | 'renew';
+  /** 礼物事件：礼物名称、数量（连击合并后的）、礼物图（从直播间礼物面板查，查不到时没有） */
+  gift?: { name: string; count: number; img?: string };
   /** 后台"测试播放"发出的 */
   test?: boolean;
 }

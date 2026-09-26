@@ -141,7 +141,9 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 @keyframes bubbleLife { 0% { opacity: 0; transform: translateY(-16px) scale(.94); } 12% { opacity: 1; transform: none; } 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-8px); } }
 
 /* ---- 上传的素材 ---- */
-.fx-asset { display: flex; flex-direction: column; align-items: inherit; gap: 18px; animation: assetLife var(--dur) linear forwards; }
+/* 淡入淡出加在素材和昵称条各自身上：外层做透明度动画会让昵称条的毛玻璃失效 */
+.fx-asset { display: flex; flex-direction: column; align-items: inherit; gap: 18px; }
+.fx-asset > * { animation: assetLife var(--dur) linear forwards; }
 .slot.pos-center .fx-asset, .slot.full .fx-asset { position: absolute; inset: 0; display: grid; place-items: center; }
 .media { display: block; }
 .media video, .media img, .media canvas, .media svg { width: 100% !important; height: 100% !important; object-fit: contain; display: block; }

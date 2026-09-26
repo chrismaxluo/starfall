@@ -18,6 +18,29 @@ export class GiftCatalog {
     this.fetchGifts = fetchGifts;
   }
 
+  /**
+   * 礼物图（播放礼物特效用）：只查缓存，不等网络；缓存里没有时在后台刷新一次，下一次就有了。
+   * 播放判断不能等 B 站接口，查不到就不显示礼物图
+   */
+  iconFor(giftId: number): string | undefined {
+    const room = this.room.get();
+    const c = this.cache;
+    const hit = c && room && c.roomId === room.roomId ? c.gifts.find((g) => g.id === giftId) : undefined;
+    if (this.autoRefresh && !hit && room && !this.refreshing && (!c || c.roomId !== room.roomId || Date.now() - c.at > 60_000)) {
+      this.refreshing = this.list(true).then(() => undefined, () => undefined).finally(() => (this.refreshing = null));
+    }
+    return hit?.icon || undefined;
+  }
+
+  private refreshing: Promise<void> | null = null;
+  private autoRefresh = false;
+
+  /** 服务启动时调用：先读一次礼物面板，之后查不到礼物图时自动在后台刷新 */
+  start(): void {
+    this.autoRefresh = true;
+    if (this.room.get()) void this.list().catch(() => undefined);
+  }
+
   async list(refresh = false): Promise<GiftConfig[]> {
     const room = this.room.get();
     if (!room) throw new HttpError(409, 'no_room', '请先在设置里填写直播间号');

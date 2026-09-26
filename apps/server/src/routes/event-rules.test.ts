@@ -115,7 +115,7 @@ describe('模拟与预览', () => {
     const sim = (payload: object) => t.req({ method: 'POST', url: '/api/simulate', payload }).then((r) => r.json());
     expect(await sim({ kind: 'danmu', viewer: {}, text: '生日快乐' })).toMatchObject({ rule: '弹幕 · 「生日快乐」', effect: { name: '弹幕回应' }, status: 'played', notes: ['特效页现在不在线，直播画面里看不到'] });
     expect(await sim({ kind: 'danmu', viewer: {}, text: '随便' })).toMatchObject({ rule: null, status: 'no_rule' });
-    expect(await sim({ kind: 'gift', viewer: {}, giftName: '告白花束', unitPrice: 22_000, count: 5 })).toMatchObject({ rule: '礼物 · 单次 ≥ 100 元', effect: { name: '星冕' } });
+    expect(await sim({ kind: 'gift', viewer: {}, giftName: '告白花束', unitPrice: 22_000, count: 5 })).toMatchObject({ rule: '礼物 · 单次 ≥ 100 元', effect: { name: '晶耀' } });
     expect(await sim({ kind: 'gift', viewer: {}, unitPrice: 0, count: 5 })).toMatchObject({ rule: null, statusText: '未命中规则' });
     expect(await sim({ kind: 'guard', viewer: {}, level: 3, op: 'renew', months: 3 })).toMatchObject({ rule: '上舰 · 续费舰长', effect: { name: '门楼' } });
     expect(await sim({ viewer: { guard: 3 } })).toMatchObject({ rule: '进场 · 舰长' });

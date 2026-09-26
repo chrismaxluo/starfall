@@ -62,6 +62,8 @@ export class GuardDeduper {
   private readonly seenKeys = new Map<string, number>();
   private readonly seenBuyer = new Map<string, number>();
   private readonly pending = new Map<string, { ev: GuardEvent; at: number }>();
+  /** GUARD_BUY 等不到 toast、已经单独输出的购买：之后晚到的 toast 是同一次购买，丢弃 */
+  private readonly buyEmitted = new Map<string, number>();
 
   constructor(holdMs = 3000, windowMs = 60_000) {
     this.holdMs = holdMs;
@@ -72,6 +74,12 @@ export class GuardDeduper {
     const buyer = `${ev.viewer.uid}:${ev.level}`;
     if (ev.source === 'toast') {
       if (ev.dedupeKey && this.seenKeys.has(ev.dedupeKey)) return [];
+      const byBuy = this.buyEmitted.get(buyer);
+      if (byBuy !== undefined && now - byBuy < this.windowMs) {
+        this.buyEmitted.delete(buyer);
+        if (ev.dedupeKey) this.seenKeys.set(ev.dedupeKey, now);
+        return [];
+      }
       const recent = this.seenBuyer.get(buyer);
       if (!ev.dedupeKey && recent !== undefined && now - recent < this.windowMs) return [];
       if (ev.dedupeKey) this.seenKeys.set(ev.dedupeKey, now);
@@ -91,10 +99,11 @@ export class GuardDeduper {
       if (now - p.at >= this.holdMs) {
         this.pending.delete(buyer);
         this.seenBuyer.set(buyer, now);
+        this.buyEmitted.set(buyer, now);
         out.push(p.ev);
       }
     }
-    for (const m of [this.seenKeys, this.seenBuyer]) for (const [k, t] of m) if (now - t >= this.windowMs) m.delete(k);
+    for (const m of [this.seenKeys, this.seenBuyer, this.buyEmitted]) for (const [k, t] of m) if (now - t >= this.windowMs) m.delete(k);
     return out;
   }
 }

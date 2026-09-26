@@ -47,10 +47,26 @@ export function fillText(template: string, v: TextVars): string {
     op: v.op === 'renew' ? '续费' : v.op === 'open' ? '开通' : '',
     act: v.op === 'renew' ? '续费' : v.op === 'open' ? '上舰' : '',
   };
-  return template
-    .replace(/\{(\w+)\}/g, (all, key: string) => (key in map ? map[key]! : all))
-    .replace(/ {2,}/g, ' ')
-    .trim();
+  // 只整理模板本身的空格：变量为空时去掉它两边多出来的空格；昵称、弹幕里原有的空格保持不变
+  let out = '';
+  let afterEmpty = false;
+  for (const part of template.split(/(\{\w+\})/)) {
+    const key = /^\{(\w+)\}$/.exec(part)?.[1];
+    if (key === undefined) {
+      const lit = part.replace(/ {2,}/g, ' ');
+      out += afterEmpty && (out === '' || out.endsWith(' ')) ? lit.replace(/^ /, '') : lit;
+      afterEmpty = false;
+      continue;
+    }
+    const val = key in map ? map[key]! : part;
+    if (val === '') {
+      afterEmpty = true;
+      continue;
+    }
+    out += val;
+    afterEmpty = false;
+  }
+  return out.trim();
 }
 
 function formatYuan(y: number): string {

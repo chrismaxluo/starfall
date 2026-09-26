@@ -1,7 +1,7 @@
 // WebSocket（方案设计 9.3）：/ws/overlay 给特效页，/ws/admin 给管理后台。
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from '@fastify/websocket';
-import { OVERLAY_CLOSE } from '@starfall/shared';
+import { OVERLAY_CLOSE, OVERLAY_TIMING } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { SESSION_COOKIE } from './auth.ts';
@@ -14,6 +14,7 @@ const OverlayMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('started'), id: z.string().max(64) }),
   z.object({ type: z.literal('ended'), id: z.string().max(64) }),
   z.object({ type: z.literal('error'), id: z.string().max(64).optional(), message: z.string().max(500) }),
+  z.object({ type: z.literal('alive') }),
 ]);
 
 /** 本输出可能用到的文件：规则里引用的素材的画面和音效 */
@@ -48,6 +49,25 @@ function keepAlive(socket: WebSocket, onDead: () => void): () => void {
   return () => clearInterval(t);
 }
 
+/**
+ * 特效页的应用层保活：
+ * - 定时发 { type: 'ping' }，特效页据此判断连接是否还活着（浏览器里看不到协议层的 ping）；
+ * - 特效页定时报平安，太久没报就认为页面卡死（协议层的 pong 由浏览器网络层自动回复，页面卡死时照样会回）。
+ *   只对报过平安的页面生效：更新前打开、还没刷新的旧页面不会报平安。
+ */
+function overlayAlive(socket: WebSocket, onDead: () => void): { alive(): void; stop(): void } {
+  let aliveAt: number | null = null;
+  const t = setInterval(() => {
+    if (aliveAt !== null && Date.now() - aliveAt > OVERLAY_TIMING.aliveTimeoutMs) {
+      socket.terminate();
+      onDead();
+      return;
+    }
+    socket.send(JSON.stringify({ type: 'ping' }));
+  }, OVERLAY_TIMING.pingMs);
+  return { alive: () => (aliveAt = Date.now()), stop: () => clearInterval(t) };
+}
+
 export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get<{ Querystring: { output?: string; key?: string } }>('/ws/overlay', { websocket: true }, (socket, req) => {
     const output = ctx.outputs.verify(Number(req.query.output), String(req.query.key ?? ''));
@@ -56,7 +76,18 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       return;
     }
     const client = ctx.hub.addOverlay(socket, output, preloadUrls(ctx));
-    const stop = keepAlive(socket, () => ctx.hub.removeOverlay(client));
+    const log = req.log.child({ output: output.id, ip: req.ip });
+    log.info('特效页已连接');
+    // 记录断开原因，方便排查"特效页不显示"
+    let reason: string | null = null;
+    const stop = keepAlive(socket, () => {
+      reason ??= '收不到回应（网络断开）';
+      ctx.hub.removeOverlay(client);
+    });
+    const hb = overlayAlive(socket, () => {
+      reason ??= '页面长时间没有报平安（可能卡死）';
+      ctx.hub.removeOverlay(client);
+    });
     socket.on('message', (data) => {
       let msg;
       try {
@@ -64,15 +95,21 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       } catch {
         return;
       }
-      if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
+      if (msg.type === 'alive') hb.alive();
+      else if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
       else if (msg.type === 'error') {
         ctx.hub.report(client, { lastError: msg.message });
-        req.log.warn({ output: output.id, id: msg.id }, `特效页报错：${msg.message}`);
+        log.warn({ id: msg.id }, `特效页报错：${msg.message}`);
       }
     });
-    socket.on('close', () => {
+    socket.on('close', (code) => {
       stop();
+      hb.stop();
       ctx.hub.removeOverlay(client);
+      const minutes = Math.round((Date.now() - client.since) / 6000) / 10;
+      const msg = `特效页已断开：${reason ?? `页面关闭连接（${code}）`}，本次连接 ${minutes} 分钟`;
+      if (reason) log.warn(msg);
+      else log.info(msg);
     });
   });
 

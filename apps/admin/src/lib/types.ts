@@ -94,6 +94,28 @@ export interface Settings {
   retentionDays: 0 | 30 | 90 | 180;
   giftComboEnabled: boolean;
   giftComboSec: number;
+  autoBackup: boolean;
+}
+
+/** 一份自动备份（数据库 + 配置） */
+export interface BackupItem {
+  stamp: string;
+  at: number;
+  dbSize: number;
+  config: string | null;
+  configSize: number;
+}
+
+/** 导入配置前的变化预览（与服务端 services/config-io.ts 一致） */
+export interface ImportPreview {
+  token: string;
+  filename: string;
+  plan: {
+    exportedAt: string;
+    sections: Array<{ key: string; label: string; summary: string; changed: boolean; details: string[] }>;
+    warnings: string[];
+    files: { needed: number; missing: number };
+  };
 }
 
 /** 本直播间礼物面板里的一种礼物 */

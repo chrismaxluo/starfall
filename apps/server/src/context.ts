@@ -8,8 +8,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { AssetStore } from './services/assets.ts';
 import { AdminAuth } from './services/auth.ts';
+import { BackupService } from './services/backup.ts';
 import { BlacklistStore } from './services/blacklist.ts';
 import { BiliAccount } from './services/bili-account.ts';
+import { ConfigIO } from './services/config-io.ts';
 import { EffectStore } from './services/effects.ts';
 import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-rules.ts';
 import { EventLog } from './services/events.ts';
@@ -47,6 +49,8 @@ export interface AppContext {
   log: EventLog;
   hub: Hub;
   pipeline: Pipeline;
+  io: ConfigIO;
+  backups: BackupService;
   /** 首次启动生成的初始密码（只在首次启动时有值，用于打印到日志） */
   initialPassword: string | null;
 }
@@ -76,6 +80,9 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const hub = new Hub();
   const pipeline = new Pipeline({ live, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
+  const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
+  const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
+
   // 把变化推给在线的特效页和管理后台
   outputs.onChange((o, change) => hub.outputChanged(o, change));
   live.onStatus(() => hub.toAdmins({ type: 'status', status: { live: live.status(), paused: settings.get('paused'), overlays: hub.overlayCount() } }));
@@ -83,7 +90,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   pipeline.onQueueChange((queue) => hub.toAdmins({ type: 'queue', queue, paused: settings.get('paused') }));
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
 
-  return { config, db, secret, settings, auth, account, room, live, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, pipeline, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -94,9 +101,11 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   prune();
   const timer = setInterval(prune, PRUNE_MS);
   ctx.pipeline.start();
+  ctx.backups.start((e) => console.error('自动备份失败', e));
   await ctx.live.start();
   return () => {
     clearInterval(timer);
+    ctx.backups.stop();
     ctx.pipeline.stop();
     ctx.live.stop();
   };

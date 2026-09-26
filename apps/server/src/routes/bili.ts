@@ -73,6 +73,7 @@ export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
         retentionDays: z.union([z.literal(0), z.literal(30), z.literal(90), z.literal(180)]).optional(),
         giftComboEnabled: z.boolean().optional(),
         giftComboSec: z.number().int().min(1).max(15).optional(),
+        autoBackup: z.boolean().optional(),
       }).strict(),
       req.body,
     );

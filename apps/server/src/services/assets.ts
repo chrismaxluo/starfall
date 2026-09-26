@@ -66,7 +66,7 @@ export function cleanName(name: string): string {
 export class AssetStore {
   private readonly db: Db;
   readonly dir: string;
-  private readonly tmpDir: string;
+  readonly tmpDir: string;
   /** 单个文件上限（测试时调小） */
   readonly maxBytes: number;
 

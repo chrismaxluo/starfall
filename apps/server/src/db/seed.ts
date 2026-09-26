@@ -46,6 +46,8 @@ export const DEFAULT_SETTINGS = {
   /** 礼物连击合并（F-GF-04） */
   giftComboEnabled: true,
   giftComboSec: 3,
+  /** 每天自动备份数据库和配置（F-DA-03） */
+  autoBackup: true,
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

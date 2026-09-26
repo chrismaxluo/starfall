@@ -171,7 +171,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
       <div class="ov-side">
         <div class="row"><span>弹幕服务器</span><span :class="{ ok: s?.live.connection === 'connected' }">{{ connText }}</span></div>
         <div class="row"><span>特效页</span><span :class="(s?.overlays ?? 0) > 0 ? 'ok' : 'warn'">{{ (s?.overlays ?? 0) > 0 ? `${s!.overlays} 个在线` : '不在线' }}</span></div>
-        <div v-if="live" class="row"><span>房管</span><span class="num">{{ s?.live.adminCount }} 人</span></div>
+        <div v-if="live" class="row"><span>房管总数</span><span class="num">{{ s?.live.adminCount }} 人</span></div>
         <div class="row"><span>换直播间</span><a class="linkish" href="#settings">去设置 →</a></div>
       </div>
     </div>

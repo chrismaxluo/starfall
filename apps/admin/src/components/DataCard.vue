@@ -21,7 +21,9 @@ async function load(): Promise<void> {
   backups.value = (await get<{ items: BackupItem[] }>('/api/backup/list').catch(() => ({ items: [] }))).items;
 }
 async function save(patch: Partial<Settings>, msg: string): Promise<void> {
-  if (await attempt(() => put('/api/settings', patch), msg)) await refreshSettings();
+  // 成功失败都重新读取：失败时开关要回到原来的状态
+  await attempt(() => put('/api/settings', patch), msg);
+  await refreshSettings().catch(() => undefined);
 }
 async function runNow(): Promise<void> {
   running.value = true;

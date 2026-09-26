@@ -8,7 +8,7 @@ import Seg from '../components/Seg.vue';
 import { get } from '../lib/api.ts';
 import { EV_ICON, describe, statusCls, statusText } from '../lib/events.ts';
 import { dateTime } from '../lib/format.ts';
-import { onLiveEvent, onLiveEventStatus } from '../lib/live.ts';
+import { onLiveEvent, onLiveEventStatus, onResync } from '../lib/live.ts';
 import { effectById, state } from '../lib/store.ts';
 import { toast } from '../lib/toast.ts';
 import type { EventDto, Viewer } from '../lib/types.ts';
@@ -32,16 +32,20 @@ function query(c?: number): string {
   if (c) p.set('cursor', String(c));
   return `/api/events?${p}`;
 }
+// 每次请求编号：只采用最新一次的结果（连续切换筛选、打字搜索时，慢返回的旧请求不会把列表盖掉）
+let seq = 0;
 async function load(more = false): Promise<void> {
+  const my = ++seq;
   loading.value = true;
   try {
     const r = await get<{ events: EventDto[]; nextCursor: number | null }>(query(more ? (cursor.value ?? undefined) : undefined));
+    if (my !== seq) return;
     rows.value = more ? [...rows.value, ...r.events] : r.events;
     cursor.value = r.nextCursor;
   } catch (e) {
-    toast(e instanceof Error ? e.message : String(e), 'err');
+    if (my === seq) toast(e instanceof Error ? e.message : String(e), 'err');
   } finally {
-    loading.value = false;
+    if (my === seq) loading.value = false;
   }
 }
 let t: ReturnType<typeof setTimeout> | null = null;
@@ -59,13 +63,42 @@ function matches(e: EventDto): boolean {
   if (st.value === 'skip') return NOT_PLAYED.split(',').includes(e.status);
   return true;
 }
-const off1 = onLiveEvent((e) => matches(e) && rows.value.unshift(e));
+// 实时插入的最多保留这么多条（开几个小时也不会越积越多）；想看更早的点"加载更多"
+const LIVE_MAX = 300;
+function insert(e: EventDto): void {
+  if (rows.value.some((x) => x.id === e.id)) return;
+  // 按编号倒序放到正确的位置（晚一点才符合筛选的事件不会跑到更新的事件上面）
+  const i = rows.value.findIndex((x) => x.id < e.id);
+  if (i < 0 && cursor.value !== null) return;
+  rows.value.splice(i < 0 ? rows.value.length : i, 0, e);
+  if (rows.value.length > LIVE_MAX) {
+    rows.value.length = LIVE_MAX;
+    cursor.value = rows.value[LIVE_MAX - 1]!.id;
+  }
+}
+// 新事件刚进来时可能还是"排队中"，之后才变成"已播放"：先记下来，状态符合筛选时再插入
+const waiting = new Map<number, EventDto>();
+const off1 = onLiveEvent((e) => {
+  if (matches(e)) insert(e);
+  else if (e.status === 'queued') {
+    waiting.set(e.id, e);
+    if (waiting.size > 100) waiting.delete(waiting.keys().next().value!);
+  }
+});
 const off2 = onLiveEventStatus((id, s) => {
   const r = rows.value.find((x) => x.id === id);
   if (r) r.status = s;
+  const w = waiting.get(id);
+  if (w) {
+    waiting.delete(id);
+    w.status = s;
+    if (!r && matches(w)) insert(w);
+  }
 });
+// 断线重连后，断开期间的事件从头加载
+const off3 = onResync(() => void load());
 onMounted(() => void load());
-onBeforeUnmount(() => (off1(), off2()));
+onBeforeUnmount(() => (off1(), off2(), off3()));
 
 const isExcl = (uid: number) => state.exclusives.some((x) => x.uid === uid && x.enabled);
 function setExclusive(e: EventDto): void {
@@ -84,7 +117,7 @@ function setExclusive(e: EventDto): void {
     </div>
     <div class="toolbar">
       <Seg v-model="kind" label="事件类型" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物' }, { value: 'guard', label: '上舰' }]" />
-      <div class="s"><Icon name="i-search" /><input v-model.trim="q" class="inp" placeholder="搜索昵称或 UID" aria-label="搜索昵称或 UID" /></div>
+      <div class="s"><Icon name="i-search" /><input v-model.trim="q" class="inp" maxlength="40" placeholder="搜索昵称或 UID" aria-label="搜索昵称或 UID" /></div>
       <select v-model="st" class="sel" style="width: 140px" aria-label="播放状态">
         <option value="all">全部状态</option><option value="played">已播放</option><option value="skip">未播放</option>
       </select>

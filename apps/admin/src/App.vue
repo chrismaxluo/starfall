@@ -16,7 +16,8 @@ import Assets from './pages/Assets.vue';
 import Events from './pages/Events.vue';
 import Output from './pages/Output.vue';
 import SettingsPage from './pages/Settings.vue';
-import { clearQueue, togglePause } from './lib/actions.ts';
+import { clearQueue, pauseOnly, togglePause } from './lib/actions.ts';
+import ConfirmButton from './components/ConfirmButton.vue';
 import { get, post, setUnauthorizedHandler } from './lib/api.ts';
 import { duration } from './lib/format.ts';
 import { startLive, stopLive } from './lib/live.ts';
@@ -36,6 +37,8 @@ const NAV: Array<{ page: Page; name: string; icon: string }> = [
 /** 手机底部导航的短名称 */
 const SHORT: Partial<Record<Page, string>> = { overview: '总览', rules: '规则', assets: '素材', logs: '记录' };
 const moreOpen = ref(false);
+// 换了页面（包括点底栏其他标签）就收起
+watch(() => route.value.page, () => (moreOpen.value = false));
 const now = ref(Date.now());
 let clock: ReturnType<typeof setInterval> | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
@@ -74,7 +77,8 @@ function onKey(e: KeyboardEvent): void {
   const k = e.key.toLowerCase();
   if (e.ctrlKey && e.shiftKey && k === 'p') {
     e.preventDefault();
-    void togglePause();
+    // 按住不放时浏览器会连续触发，只认第一下
+    if (!e.repeat) void pauseOnly();
   } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === 'k') {
     e.preventDefault();
     ui.palette = !ui.palette;
@@ -180,7 +184,7 @@ onBeforeUnmount(() => {
           <span class="live" :class="conn.cls"><i />{{ conn.text }}</span>
           <span class="livestate" :class="{ on: state.status?.live.live }"><i />{{ liveText }}</span>
           <button class="search" aria-label="打开命令面板" @click="ui.palette = true"><Icon name="i-search" />搜索或执行命令<span class="kbd">Ctrl K</span></button>
-          <button class="pausebtn" :aria-pressed="paused" title="快捷键 Ctrl + Shift + P" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
+          <button class="pausebtn" :aria-pressed="paused" title="快捷键 Ctrl + Shift + P（快捷键只暂停，恢复请点按钮）" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
           <button class="icon-btn" aria-label="切换亮色 / 暗色" @click="(e) => toggleTheme((e.currentTarget as HTMLElement).getBoundingClientRect().left + 17, (e.currentTarget as HTMLElement).getBoundingClientRect().top + 17)">
             <Icon name="i-moon" class="theme-light-only" /><Icon name="i-sun" class="theme-dark-only" />
           </button>
@@ -188,7 +192,7 @@ onBeforeUnmount(() => {
         </header>
         <div v-if="paused" class="pausebar">
           <Icon name="i-pause" /><b>所有特效已暂停</b><span>观众暂时看不到任何特效，事件照常记录。</span>
-          <button class="btn" @click="clearQueue">清空队列</button><button class="btn primary" @click="togglePause">恢复播放</button>
+          <ConfirmButton label="清空队列" @confirm="clearQueue" /><button class="btn primary" @click="togglePause">恢复播放</button>
         </div>
         <Overview v-if="route.page === 'overview'" />
         <Rules v-else-if="route.page === 'rules'" />
@@ -203,6 +207,7 @@ onBeforeUnmount(() => {
       <a v-for="n in NAV.slice(0, 4)" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ SHORT[n.page] }}</a>
       <button :aria-current="route.page === 'obs' || route.page === 'settings' ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
     </nav>
+    <div v-if="moreOpen" style="position: fixed; inset: 0; z-index: 44" @click="moreOpen = false" />
     <div v-if="moreOpen" class="sheet" @click="moreOpen = false">
       <a href="#obs" @click="go('obs')"><Icon name="i-screen" />直播软件输出</a>
       <a href="#settings"><Icon name="i-gear" />设置</a>

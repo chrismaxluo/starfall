@@ -24,9 +24,13 @@ onMounted(async () => {
   const h = el.value?.offsetHeight ?? 180;
   pos.value = { left: Math.min(props.x, innerWidth - w - 12), top: Math.min(props.y, innerHeight - h - 12) };
   addEventListener('mousedown', outside, true);
-  addEventListener('scroll', () => emit('close'), { capture: true, once: true });
+  addEventListener('scroll', onScroll, { capture: true, once: true });
 });
-onBeforeUnmount(() => removeEventListener('mousedown', outside, true));
+const onScroll = () => emit('close');
+onBeforeUnmount(() => {
+  removeEventListener('mousedown', outside, true);
+  removeEventListener('scroll', onScroll, { capture: true });
+});
 
 function exclusive(): void {
   ui.quick = { uid: props.viewer.uid, name: props.viewer.name, face: props.viewer.face, viewer: props.viewer };

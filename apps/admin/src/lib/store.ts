@@ -1,6 +1,7 @@
 // 全局状态：登录后加载一次，之后由实时连接（/ws/admin）和各页面的修改保持最新
 import { reactive } from 'vue';
 import { get } from './api.ts';
+import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
 import type { DanmuRule, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
@@ -34,6 +35,7 @@ export const output = () => state.outputs[0];
 
 export async function refreshStatus(): Promise<void> {
   state.status = await get<StatusSnapshot>('/api/status');
+  setTimeZone(state.status.timeZone);
 }
 export async function refreshSettings(): Promise<void> {
   state.settings = await get<Settings>('/api/settings');

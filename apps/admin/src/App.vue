@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Sprite from './components/Sprite.vue';
 import Icon from './components/Icon.vue';
 import Avatar from './components/Avatar.vue';
+import Logo from './components/Logo.vue';
 import EffectEditor from './components/EffectEditor.vue';
 import QuickExclusive from './components/QuickExclusive.vue';
 import Login from './pages/Login.vue';
@@ -130,7 +131,7 @@ onBeforeUnmount(() => {
     <div class="app">
       <aside class="side">
         <div class="brand">
-          <span class="brand-mark"><Icon name="i-spark" /></span>
+          <Logo :size="32" />
           <span><div class="brand-name">星临</div><div class="brand-sub">STARFALL</div></span>
         </div>
         <div>

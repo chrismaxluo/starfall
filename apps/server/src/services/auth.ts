@@ -42,11 +42,6 @@ export class AdminAuth {
     return this.generate((this.settings.getRaw<PasswordRecord>(KEY)?.version ?? 0) + 1);
   }
 
-  /** 是否还在用初始密码（登录页据此显示"初始密码在哪"） */
-  usingInitialPassword(): boolean {
-    return fs.existsSync(this.initialPasswordFile);
-  }
-
   private generate(version: number): string {
     const pw = crypto.randomBytes(9).toString('base64url');
     this.write(pw, version);

@@ -34,6 +34,10 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 .medal b { padding: 0 8px; background: var(--ml); font-family: var(--font-mono); font-weight: 600; }
 .lbl { font-family: var(--font-mono); font-size: 15px; letter-spacing: .22em; text-transform: uppercase; opacity: .72; }
 .line { white-space: nowrap; }
+/* 昵称太长时截断加省略号（B 站昵称最长 16 个字；角落样式的宽度有限，超出会被画面边缘切掉） */
+.line .name { display: inline-block; max-width: 11em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.fx-star .line .name, .fx-star .name { max-width: none; }
+.fx-meteor .line .name { max-width: 8.5em; }
 .line .say { font-weight: 400; }
 .glass {
   background: rgba(14, 15, 24, 0.55);
@@ -154,6 +158,13 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 .lite .dust, .lite .twk, .lite .halo { display: none; }
 .lite .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(14, 15, 24, 0.86); }
 .lite .fx-meteor::before { animation: none; }
+/* 省资源模式：出入场只用透明度和位移，不做模糊（模糊每帧都要重算整块画面） */
+.lite .fx-frost, .lite .fx-patrol { animation-name: fanLifeLite; }
+.lite .fx-meteor { animation-name: admLifeLite; }
+.lite .fx-star .name { animation-name: nameInLite; }
+@keyframes fanLifeLite { 0% { opacity: 0; transform: translateX(-30px); } 14% { opacity: 1; transform: none; } 84% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes admLifeLite { 0% { opacity: 0; transform: translateY(30px) scale(.96); } 10% { opacity: 1; transform: none; } 88% { opacity: 1; } 100% { opacity: 0; transform: scale(1.02); } }
+@keyframes nameInLite { from { opacity: 0; } to { opacity: 1; } }
 
 /* 配置错误提示（地址不对时才显示，正常直播时不会出现） */
 .notice { position: absolute; left: 50%; top: calc(var(--st, 12%) + 40px); transform: translateX(-50%); z-index: 30; max-width: 90%; padding: 22px 32px; border-radius: 18px;

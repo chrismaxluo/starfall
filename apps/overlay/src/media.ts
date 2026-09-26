@@ -36,10 +36,11 @@ function video(v: AssetVisual, volume: number): Media {
     async start() {
       try {
         await el.play();
-      } catch {
-        // 普通浏览器不允许有声自动播放；直播软件里一般不会走到这里
+      } catch (e) {
+        // 普通浏览器不允许有声自动播放：改成静音再播（直播软件里一般不会走到这里）。其他错误（文件没了、格式不支持）照常上报
+        if ((e as Error).name !== 'NotAllowedError') throw e;
         el.muted = true;
-        await el.play().catch(() => undefined);
+        await el.play();
       }
     },
     stop() {
@@ -53,8 +54,12 @@ function video(v: AssetVisual, volume: number): Media {
 function image(v: AssetVisual): Media {
   const el = h('img');
   el.alt = '';
+  const loaded = new Promise<void>((resolve, reject) => {
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error('图片加载失败'));
+  });
   el.src = v.url;
-  return { el, start: async () => undefined, stop: () => undefined };
+  return { el, start: () => loaded, stop: () => el.removeAttribute('src') };
 }
 
 function svga(v: AssetVisual): Media {

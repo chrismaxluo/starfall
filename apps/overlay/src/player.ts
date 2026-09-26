@@ -61,9 +61,10 @@ export class Player {
     if (e.sound) {
       audio = new Audio(e.sound.url);
       audio.volume = Math.min(1, Math.max(0, e.volume / 100));
-      audio.play().catch((err: Error) => this.send({ type: 'error', id: item.id, message: `音效没有播放：${err.message}` }));
+      // 还没开始播就被停止（紧急暂停、特效很短）时浏览器会报 AbortError，不算出错
+      audio.play().catch((err: Error) => this.current?.id === item.id && err.name !== 'AbortError' && this.send({ type: 'error', id: item.id, message: `音效没有播放：${err.message}` }));
     }
-    media?.start().catch((err: Error) => this.send({ type: 'error', id: item.id, message: `素材播放失败：${err.message}` }));
+    media?.start().catch((err: Error) => this.current?.id === item.id && err.name !== 'AbortError' && this.send({ type: 'error', id: item.id, message: `素材播放失败：${err.message}` }));
 
     const timer = setTimeout(() => {
       this.stop();
@@ -79,7 +80,11 @@ export class Player {
     this.current = null;
     clearTimeout(c.timer);
     c.media?.stop();
-    c.audio?.pause();
+    if (c.audio) {
+      c.audio.pause();
+      c.audio.removeAttribute('src');
+      c.audio.load();
+    }
     c.slot.remove();
   }
 }

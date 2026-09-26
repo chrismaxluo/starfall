@@ -3,7 +3,7 @@
 // 昵称、欢迎语一律用 textContent 写入。
 import type { PlayItem } from '@starfall/shared/overlay';
 import './royal.css';
-import { textWithoutName } from './parts.ts';
+import { textWithoutName, thumb } from './parts.ts';
 
 type Position = PlayItem['effect']['position'];
 
@@ -160,7 +160,7 @@ function royalRing(key: 'cap' | 'gov', R: number, d0: number): string {
   s += `<g class="rx-ringIn" style="--d:${d0}s">`;
   // 珐琅底 + 砂感 + 釉面反光
   s += `<path d="${annulus(rin, rout)}" fill="url(#${id})" fill-rule="evenodd"/>`;
-  s += `<path d="${annulus(rin, rout)}" fill="${C.grain}" fill-rule="evenodd" filter="url(#enamelGrain)" opacity=".5"/>`;
+  s += `<path d="${annulus(rin, rout)}" fill="${C.grain}" fill-rule="evenodd" filter="url(#enamelGrain)" opacity=".5" class="rx-tex"/>`;
   s += `<path d="M${pp(-62, mid)} A${mid} ${mid} 0 0 1 ${pp(28, mid)}" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="${f1(C.w * 0.32)}" stroke-linecap="round"/>`;
   // 金丝花纹：舰长回纹，总督缠枝莲
   let pat = '';
@@ -239,8 +239,8 @@ function octRing(R: number, d0: number): string {
   let s = `<defs><radialGradient id="${id}" cx="0" cy="0" r="${f1(rc)}" gradientUnits="userSpaceOnUse"><stop offset="${(rin / rc).toFixed(3)}" stop-color="#16061A"/><stop offset="${((rin + 12) / rc).toFixed(3)}" stop-color="#4A1A52"/><stop offset="1" stop-color="#22092A"/></radialGradient></defs>`;
   s += `<g class="rx-ringIn" style="--d:${d0}s">`;
   s += `<path d="${oct(rc)} ${circ(rin)}" fill="url(#${id})" fill-rule="evenodd"/>`;
-  s += `<path d="${oct(rc)} ${circ(rin)}" fill="#F3D39B" fill-rule="evenodd" filter="url(#goldFleck)" opacity=".42"/>`;
-  s += `<path d="${oct(rc)} ${circ(rin)}" fill="#FFF3D6" fill-rule="evenodd" filter="url(#goldFleck2)" opacity=".5"/>`;
+  s += `<path d="${oct(rc)} ${circ(rin)}" fill="#F3D39B" fill-rule="evenodd" filter="url(#goldFleck)" opacity=".42" class="rx-tex"/>`;
+  s += `<path d="${oct(rc)} ${circ(rin)}" fill="#FFF3D6" fill-rule="evenodd" filter="url(#goldFleck2)" opacity=".5" class="rx-tex"/>`;
   s += `<path d="M${pp(-66, rin + 12)} A${rin + 12} ${rin + 12} 0 0 1 ${pp(20, rin + 12)}" fill="none" stroke="rgba(255,236,250,.16)" stroke-width="9" stroke-linecap="round"/>`;
   const scroll = 'M-34 2 C-30 -7 -18 -8 -14 -1 C-11 5 -4 5 -4 -1 C-4 -5 -9 -6 -11 -3 M34 2 C30 -7 18 -8 14 -1 C11 5 4 5 4 -1 C4 -5 9 -6 11 -3 M-14 -1 C-8 -9 8 -9 14 -1';
   for (let i = 0; i < 8; i++) {
@@ -390,7 +390,7 @@ function sweep(inner: string, d: number): string {
   const id = `sw${++uid}`;
   return (
     `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-540" y="-650" width="1080" height="1300"><g transform="rotate(-24)"><rect x="-1500" y="-900" width="420" height="1800" fill="url(#band)" class="rx-swp" style="--d:${d}s"/></g></mask></defs>` +
-    `<g mask="url(#${id})" filter="url(#toWhite)" opacity=".75">${inner}</g>`
+    `<g mask="url(#${id})" filter="url(#toWhite)" opacity=".75" class="rx-sweep">${inner}</g>`
   );
 }
 function glints(list: Array<[number, number, number, number]>): HTMLElement[] {
@@ -429,7 +429,7 @@ function avatarEl(v: PlayItem['viewer'], size: number, avd: number, shd: number)
     img.referrerPolicy = 'no-referrer';
     img.alt = '';
     img.onload = () => ini.replaceWith(img);
-    img.src = v.face;
+    img.src = thumb(v.face, size);
   }
   aw.append(el('i', '', null));
   return aw;

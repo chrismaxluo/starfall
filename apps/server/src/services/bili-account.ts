@@ -20,6 +20,7 @@ export class BiliAccount {
   private readonly db: Db;
   private readonly secret: Secret;
   private readonly listeners = new Set<() => void>();
+  private decryptWarned = false;
   /** 公开接口和扫码用的匿名请求（不带登录信息） */
   readonly anon = new BiliHttp();
 
@@ -33,13 +34,30 @@ export class BiliAccount {
     return () => this.listeners.delete(fn);
   }
 
-  /** 已登录时返回带登录信息的请求对象，否则返回 null */
+  /** 已登录时返回带登录信息的请求对象，否则返回 null（登录信息无法解密时也当作未登录） */
   http(): BiliHttp | null {
     const row = this.db.select().from(account).where(eq(account.id, 1)).get();
     if (!row) return null;
-    const cookies = JSON.parse(this.secret.decrypt(row.cookiesEnc)) as Cookies;
+    let cookies: Cookies;
+    try {
+      cookies = JSON.parse(this.secret.decrypt(row.cookiesEnc)) as Cookies;
+    } catch (e) {
+      if (!this.decryptWarned) console.error('B 站登录信息无法解密（密钥文件可能换过），请重新扫码登录：', (e as Error).message);
+      this.decryptWarned = true;
+      return null;
+    }
+    // 设备标识沿用同一个，避免每次连接都换新设备
     if (this.anon.cookies.buvid3) cookies.buvid3 ??= this.anon.cookies.buvid3;
-    return new BiliHttp(cookies);
+    if (this.anon.cookies.buvid4) cookies.buvid4 ??= this.anon.cookies.buvid4;
+    const http = new BiliHttp(cookies);
+    const ensure = http.ensureBuvid.bind(http);
+    http.ensureBuvid = async () => {
+      const b = await ensure();
+      this.anon.cookies.buvid3 ??= http.cookies.buvid3;
+      this.anon.cookies.buvid4 ??= http.cookies.buvid4;
+      return b;
+    };
+    return http;
   }
 
   status(): AccountStatus {

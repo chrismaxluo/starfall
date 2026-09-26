@@ -73,6 +73,9 @@ export class LiveService {
   private reason: LiveReason = 'no_room';
   /** 解析失败的消息数（协议可能变了） */
   parseErrors = 0;
+  /** 协议层的警告合并后写日志：每分钟最多一条，避免坏数据刷屏 */
+  private warnings = new Map<string, number>();
+  private warnFlushAt = 0;
 
   constructor(opts: { db: Db; account: BiliAccount; room: RoomStore; settings: SettingsStore }, deps: LiveDeps = defaultLiveDeps) {
     this.db = opts.db;
@@ -116,7 +119,11 @@ export class LiveService {
   }
 
   async start(): Promise<void> {
-    this.account.onChange(() => void this.reconcile());
+    // 换了账号（重新扫码、退出）：断开，用新的登录信息重新连接
+    this.account.onChange(() => {
+      this.disconnect();
+      void this.reconcile();
+    });
     this.room.onChange(() => {
       // 换了直播间：上一个直播间的这一场到此为止，数据分开算
       this.disconnect();
@@ -167,6 +174,8 @@ export class LiveService {
     }
     try {
       const init = await this.deps.getRoomInit(this.account.anon, room.roomId);
+      // 查询期间换了直播间：这是旧直播间的结果，丢掉
+      if (this.room.get()?.roomId !== room.roomId) return;
       this.setLive(init.liveStatus === 1, init.liveSince ?? null);
     } catch {
       /* 查询失败时保持原状态，下次再查 */
@@ -240,6 +249,7 @@ export class LiveService {
         this.emitStatus();
       },
       onMessage: (raw) => this.handle(raw),
+      onWarn: (msg) => this.warn(msg),
     });
     this.client.start();
     this.adminTimer = setInterval(() => void this.refreshAdmins(roomId), ADMIN_REFRESH_MS);
@@ -272,9 +282,10 @@ export class LiveService {
     }
     let ev: StdEvent | null;
     try {
-      ev = parseMessage(raw, { newId: () => `b${this.deps.now()}-${++this.seq}`, now: this.deps.now, isMod: (uid) => this.admins.has(uid) });
-    } catch {
+      ev = parseMessage(raw, { newId: () => `b${this.deps.now()}-${++this.seq}`, now: this.deps.now, isMod: (uid) => this.admins.has(uid), anchorUid: this.room.get()?.anchorUid ?? 0 });
+    } catch (e) {
       this.parseErrors++;
+      this.warn(`解析 ${raw.cmd ?? '?'} 失败：${(e as Error).message}`);
       return;
     }
     if (!ev) return;
@@ -285,6 +296,15 @@ export class LiveService {
       return;
     }
     for (const fn of this.eventListeners) fn(ev, raw);
+  }
+
+  private warn(msg: string): void {
+    this.warnings.set(msg, (this.warnings.get(msg) ?? 0) + 1);
+    const now = this.deps.now();
+    if (now < this.warnFlushAt) return;
+    this.warnFlushAt = now + 60_000;
+    for (const [m, n] of this.warnings) console.warn(`[直播连接] ${m}${n > 1 ? `（${n} 次）` : ''}`);
+    this.warnings.clear();
   }
 
   private emitStatus(): void {

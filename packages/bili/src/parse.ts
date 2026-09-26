@@ -10,6 +10,8 @@ export interface ParseContext {
   now: () => number;
   /** 房管名单（进场消息里没有房管字段，靠名单判断） */
   isMod?: (uid: number) => boolean;
+  /** 本直播间主播 UID：粉丝牌上的大航海等级属于牌子所属的主播，只有是本直播间的牌子才能用 */
+  anchorUid?: number;
 }
 
 type Raw = { cmd?: string; data?: unknown; info?: unknown };
@@ -25,14 +27,20 @@ function medalFromPb(m: PbMedal | undefined): Medal | undefined {
   return { name: m.name, level: m.level, anchorUid: m.ruid ?? 0, ...(colors ? { colors } : {}) };
 }
 
-function viewerFromPb(u: PbUserInfo | undefined, fallback: { uid?: number; name?: string; face?: string; guard?: number }, ctx: ParseContext): Viewer {
+/** 本直播间的大航海等级：优先用户自己的等级（22.6.1）；粉丝牌上的等级只在牌子属于本直播间时采用 */
+function guardOf(u: PbUserInfo | undefined, fallback: { guard?: number; guardAnchor?: number }, ctx: ParseContext): GuardLevel {
+  const own = (ruid: number | undefined) => ctx.anchorUid !== undefined && ctx.anchorUid > 0 && ruid === ctx.anchorUid;
+  return toGuard(u?.guard?.level) || (own(u?.medal?.ruid) ? toGuard(u?.medal?.guardLevel) : 0) || (own(fallback.guardAnchor) ? toGuard(fallback.guard) : 0);
+}
+
+function viewerFromPb(u: PbUserInfo | undefined, fallback: { uid?: number; name?: string; face?: string; guard?: number; guardAnchor?: number }, ctx: ParseContext): Viewer {
   const uid = u?.uid || fallback.uid || 0;
   const medal = medalFromPb(u?.medal);
   return {
     uid,
     name: u?.base?.name || fallback.name || '',
     ...(u?.base?.face || fallback.face ? { face: u?.base?.face || fallback.face } : {}),
-    guard: toGuard(u?.guard?.level || u?.medal?.guardLevel || fallback.guard),
+    guard: guardOf(u, fallback, ctx),
     isMod: uid > 0 && (ctx.isMod?.(uid) ?? false),
     ...(medal ? { medal } : {}),
     mystery: false,
@@ -47,7 +55,7 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
       const w = decodeInteractWord(pb);
       if ((w.msgType ?? 0) !== 1) return null; // 1 进场；2 关注、3 分享等不处理
       const fm = w.fansMedal;
-      const viewer = viewerFromPb(w.uinfo, { uid: w.uid, name: w.uname, guard: fm?.guardLevel }, ctx);
+      const viewer = viewerFromPb(w.uinfo, { uid: w.uid, name: w.uname, guard: fm?.guardLevel, guardAnchor: fm?.targetId }, ctx);
       if (!viewer.medal && fm?.name && fm.level) viewer.medal = { name: fm.name, level: fm.level, anchorUid: fm.targetId ?? 0 };
       if (!viewer.uid) return null; // 未登录时 UID 为 0，无法按人处理
       return { kind: 'enter', id: ctx.newId(), ts: w.timestamp ? w.timestamp * 1000 : ctx.now(), viewer, source: 'interact' };

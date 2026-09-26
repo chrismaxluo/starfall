@@ -39,4 +39,20 @@ describe('数据包编解码', () => {
     const buf = Buffer.concat([inner('1'), inner('2'), inner('3').subarray(0, 10)]);
     expect(decodePackets(buf).map((p) => p.body.toString())).toEqual(['1', '2']);
   });
+
+  it('长度为 0 的包不会原地打转；解压失败的包跳过，其余照常解析', () => {
+    const zero = Buffer.alloc(32);
+    const bad = { count: 0 };
+    expect(decodePackets(zero, bad)).toEqual([]);
+    expect(bad.count).toBe(1);
+
+    const good = outer(3, zlib.brotliCompressSync(inner('{"cmd":"OK"}')));
+    const broken = outer(2, Buffer.from('not zlib'));
+    const bad2 = { count: 0 };
+    const out = decodePackets(Buffer.concat([broken, good]), bad2);
+    expect(out.map((p) => p.body.toString())).toEqual(['{"cmd":"OK"}']);
+    expect(bad2.count).toBe(1);
+    // 解压后内容里含长度为 0 的包
+    expect(decodePackets(outer(2, zlib.deflateSync(Buffer.alloc(40))))).toEqual([]);
+  });
 });

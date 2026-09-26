@@ -1,0 +1,98 @@
+// WebSocket（方案设计 9.3）：/ws/overlay 给特效页，/ws/admin 给管理后台。
+import type { FastifyInstance } from 'fastify';
+import type { WebSocket } from '@fastify/websocket';
+import { OVERLAY_CLOSE } from '@starfall/shared';
+import { z } from 'zod';
+import type { AppContext } from '../context.ts';
+import { SESSION_COOKIE } from './auth.ts';
+import { statusSnapshot } from './bili.ts';
+
+const PING_MS = 30_000;
+
+const OverlayMsg = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('report'), env: z.record(z.string().max(40), z.union([z.string().max(300), z.number(), z.boolean(), z.null()])) }),
+  z.object({ type: z.literal('started'), id: z.string().max(64) }),
+  z.object({ type: z.literal('ended'), id: z.string().max(64) }),
+  z.object({ type: z.literal('error'), id: z.string().max(64).optional(), message: z.string().max(500) }),
+]);
+
+/** 本输出可能用到的文件：规则里引用的素材的画面和音效 */
+export function preloadUrls(ctx: AppContext): string[] {
+  const rules = ctx.enterRules.full();
+  const ids = new Set<number>();
+  for (const t of Object.values(rules.tiers)) if (t.enabled && t.effectId) ids.add(t.effectId);
+  for (const b of rules.bands) if (b.enabled && b.effectId) ids.add(b.effectId);
+  for (const x of rules.exclusives) if (x.enabled) ids.add(x.effectId);
+  const urls = new Set<string>();
+  for (const e of ctx.effects.list()) {
+    if (!ids.has(e.id)) continue;
+    if (e.asset) urls.add(e.asset.url);
+    if (e.sound) urls.add(e.sound.url);
+  }
+  return [...urls];
+}
+
+/** 定时 ping，收不到 pong 就断开（直播软件里的页面可能卡死或网络断了但没有关闭事件） */
+function keepAlive(socket: WebSocket, onDead: () => void): () => void {
+  let alive = true;
+  socket.on('pong', () => (alive = true));
+  const t = setInterval(() => {
+    if (!alive) {
+      socket.terminate();
+      onDead();
+      return;
+    }
+    alive = false;
+    socket.ping();
+  }, PING_MS);
+  return () => clearInterval(t);
+}
+
+export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
+  app.get<{ Querystring: { output?: string; key?: string } }>('/ws/overlay', { websocket: true }, (socket, req) => {
+    const output = ctx.outputs.verify(Number(req.query.output), String(req.query.key ?? ''));
+    if (!output) {
+      socket.close(OVERLAY_CLOSE.badKey, 'bad key');
+      return;
+    }
+    const client = ctx.hub.addOverlay(socket, output, preloadUrls(ctx));
+    const stop = keepAlive(socket, () => ctx.hub.removeOverlay(client));
+    socket.on('message', (data) => {
+      let msg;
+      try {
+        msg = OverlayMsg.parse(JSON.parse(String(data)));
+      } catch {
+        return;
+      }
+      if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
+      else if (msg.type === 'error') {
+        ctx.hub.report(client, { lastError: msg.message });
+        req.log.warn({ output: output.id, id: msg.id }, `特效页报错：${msg.message}`);
+      }
+    });
+    socket.on('close', () => {
+      stop();
+      ctx.hub.removeOverlay(client);
+    });
+  });
+
+  app.get('/ws/admin', { websocket: true }, (socket, req) => {
+    // 只接受同源页面（Cookie 已经是 SameSite=Strict，这里再加一道）
+    const origin = req.headers.origin;
+    if (origin && new URL(origin).host !== req.headers.host) {
+      socket.close(4003, 'bad origin');
+      return;
+    }
+    if (!ctx.auth.checkSession(req.cookies[SESSION_COOKIE])) {
+      socket.close(4401, 'unauthorized');
+      return;
+    }
+    ctx.hub.addAdmin(socket);
+    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get() }));
+    const stop = keepAlive(socket, () => ctx.hub.removeAdmin(socket));
+    socket.on('close', () => {
+      stop();
+      ctx.hub.removeAdmin(socket);
+    });
+  });
+}

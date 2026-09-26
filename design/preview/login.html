@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 登录页设计稿（第二版：冠环 / 织幕）</title>
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+:root {
+  --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  /* ---------- 亮色：不靠发光，靠色块、阴影、深色细线、金色点缀 ---------- */
+  --bg: linear-gradient(160deg, #F6F4FC 0%, #ECE9F7 45%, #E3DEF3 100%);
+  --field-1: rgba(160, 150, 255, .34); --field-2: rgba(250, 200, 165, .42); --field-3: rgba(120, 110, 240, .18);
+  --t1: #111225; --t2: #474B60; --t3: #6E7288;
+  --accent: #5451D6; --accent-ring: rgba(84, 81, 214, .26); --on-accent: #fff;
+  --ring: rgba(66, 62, 186, .42); --ring-gold: rgba(196, 124, 40, .85); --ring-dash: rgba(66, 62, 186, .26); --ring-wide: rgba(84, 81, 214, .07); --ring-shadow: rgba(60, 50, 150, .10);
+  --beam: rgba(196, 124, 40, .75);
+  --rb1: 124, 104, 245; --rb1-a: .42; --rb2: 99, 96, 232; --rb2-a: .5; --rb3: 240, 168, 110; --rb3-a: .62; --sheen: rgba(255, 255, 255, .95); --rb-shadow: rgba(70, 60, 160, .13);
+  --card: rgba(255, 255, 255, .72); --edge-t: rgba(255, 255, 255, 1); --edge-b: rgba(40, 40, 110, .10);
+  --card-shadow: 0 1px 1px rgba(16, 20, 40, .04), 0 30px 70px -26px rgba(50, 40, 140, .38), 0 12px 24px -16px rgba(50, 40, 140, .18);
+  --input: rgba(255, 255, 255, .85); --line: rgba(20, 20, 60, .12);
+  --chip: rgba(255, 255, 255, .62); --chip-line: rgba(84, 81, 214, .14); --chip-shadow: 0 8px 20px -14px rgba(50, 40, 140, .35);
+  --grain: .05; --grain-blend: multiply; --vig: rgba(70, 60, 160, .10);
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg: radial-gradient(120% 90% at 30% 20%, #0B0B24, #040410);
+  --field-1: rgba(84, 81, 214, .38); --field-2: rgba(242, 196, 110, .08); --field-3: rgba(130, 90, 240, .26);
+  --t1: #EDEDF1; --t2: #B4B6C4; --t3: #82859A;
+  --accent: #8D8BFF; --accent-ring: rgba(141, 139, 255, .35); --on-accent: #0B0B12;
+  --ring: rgba(201, 199, 255, .40); --ring-gold: rgba(242, 196, 110, .70); --ring-dash: rgba(201, 199, 255, .26); --ring-wide: rgba(141, 139, 255, .09); --ring-shadow: transparent;
+  --beam: rgba(242, 196, 110, .8);
+  --rb1: 150, 110, 255; --rb1-a: .30; --rb2: 111, 108, 255; --rb2-a: .42; --rb3: 242, 196, 110; --rb3-a: .40; --sheen: rgba(255, 255, 255, .55); --rb-shadow: transparent;
+  --card: rgba(16, 16, 38, .56); --edge-t: rgba(255, 255, 255, .22); --edge-b: rgba(255, 255, 255, .04);
+  --card-shadow: 0 0 0 1px rgba(0, 0, 0, .25), 0 40px 90px -24px rgba(0, 0, 0, .8), 0 0 90px -30px rgba(141, 139, 255, .45);
+  --input: rgba(6, 6, 20, .55); --line: rgba(255, 255, 255, .12);
+  --chip: rgba(255, 255, 255, .05); --chip-line: rgba(201, 199, 255, .14); --chip-shadow: none;
+  --grain: .08; --grain-blend: overlay; --vig: rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: var(--font-sans); color: var(--t1); -webkit-font-smoothing: antialiased; overflow: hidden; background: var(--bg); }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* ---------- 背景 ---------- */
+.bg { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.bg > * { position: absolute; inset: 0; }
+.fields i { position: absolute; border-radius: 50%; }
+.fields .f1 { width: 90vmax; height: 90vmax; right: -30vmax; top: -45vmax; background: radial-gradient(closest-side, var(--field-1), transparent); animation: drift1 36s ease-in-out infinite alternate; }
+.fields .f2 { width: 70vmax; height: 60vmax; left: -22vmax; bottom: -34vmax; background: radial-gradient(closest-side, var(--field-2), transparent); animation: drift2 42s ease-in-out infinite alternate; }
+.fields .f3 { width: 60vmax; height: 50vmax; left: 44%; top: 18%; background: radial-gradient(closest-side, var(--field-3), transparent); animation: drift3 30s ease-in-out infinite alternate; }
+@keyframes drift1 { to { transform: translate(-6vmax, 6vmax) scale(1.06); } }
+@keyframes drift2 { to { transform: translate(6vmax, -4vmax) scale(1.1); } }
+@keyframes drift3 { to { transform: translate(-4vmax, 3vmax) scale(.94); } }
+.grain { opacity: var(--grain); mix-blend-mode: var(--grain-blend);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.vignette { background: radial-gradient(120% 100% at 50% 45%, transparent 55%, var(--vig)); }
+.art { width: 100%; height: 100%; }
+.front { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+.front svg { width: 100%; height: 100%; }
+/* 方案切换 */
+.show-rings, .show-silk { opacity: 0; transition: opacity .6s ease; }
+body[data-bg="rings"] .show-rings, body[data-bg="combo"] .show-rings, body[data-bg="silk"] .show-silk, body[data-bg="combo"] .show-silk { opacity: 1; }
+body[data-bg="combo"] .show-silk { opacity: .7; }
+
+/* 冠环 */
+.ring { fill: none; stroke: var(--ring); stroke-width: 1.3; }
+.ring.gold { stroke: var(--ring-gold); stroke-width: 1.6; }
+.ring.dash { stroke: var(--ring-dash); stroke-width: 1.4; stroke-dasharray: 2 9; stroke-linecap: round; }
+.ring.wide { stroke: var(--ring-wide); stroke-width: 22; }
+.ring.shadow { stroke: var(--ring-shadow); stroke-width: 7; }
+.beam { stroke: url(#beamGrad); stroke-width: 1.8; }
+.gem-a { stop-color: #FFF8E6; } .gem-b { stop-color: #F2C46E; } .gem-c { stop-color: #B8741F; }
+.gemv-a { stop-color: #FFFFFF; } .gemv-b { stop-color: #B5B3FF; } .gemv-c { stop-color: #5B58E0; }
+
+/* 织幕 */
+.silk-drift { animation: silk ease-in-out infinite alternate; transform-origin: 50% 60%; }
+@keyframes silk { from { transform: translate(-1.5%, .8%) rotate(-1.2deg); } to { transform: translate(1.5%, -.8%) rotate(1.2deg); } }
+.rb-shadow { fill: var(--rb-shadow); }
+.sheen { fill: none; stroke: var(--sheen); stroke-width: 1.4; }
+.sheen.soft { stroke-width: 6; opacity: .25; }
+
+/* ---------- 内容 ---------- */
+.top { position: fixed; z-index: 4; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px; padding: 22px 32px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 8px 20px -8px rgba(20, 18, 70, .6); }
+.brand b { font-size: 16px; font-weight: 600; letter-spacing: .08em; display: block; }
+.brand span { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .36em; color: var(--t3); }
+.switch { margin-left: auto; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--chip); border: 1px solid var(--chip-line); backdrop-filter: blur(12px); box-shadow: var(--chip-shadow); }
+.switch button { border: 0; background: none; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; color: var(--t2); }
+.switch button[aria-pressed="true"] { background: var(--card); color: var(--t1); box-shadow: 0 1px 2px rgba(0, 0, 0, .12), inset 0 0 0 1px var(--chip-line); }
+.theme { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--chip-line); background: var(--chip); backdrop-filter: blur(12px); display: grid; place-items: center; box-shadow: var(--chip-shadow); }
+.theme svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+
+.main { position: relative; z-index: 2; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 420px; align-items: center; gap: 6vw; padding: 0 9vw 0 8vw; }
+.pitch { max-width: 600px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 12px; border-radius: 99px; font-size: 12px; color: var(--t2); background: var(--chip); border: 1px solid var(--chip-line); backdrop-filter: blur(10px); box-shadow: var(--chip-shadow); }
+.eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: #E9B45C; box-shadow: 0 0 10px #F2C46E; }
+.pitch h1 { margin: 22px 0 0; font-size: clamp(38px, 4.4vw, 64px); line-height: 1.16; font-weight: 700; letter-spacing: -.01em; }
+.pitch h1 .l2 { background: linear-gradient(100deg, var(--t1) 0%, var(--accent) 55%, #D9913A 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pitch p { margin: 20px 0 0; font-size: 15.5px; line-height: 1.85; color: var(--t2); max-width: 30em; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+.chip { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border-radius: 14px; background: var(--chip); border: 1px solid var(--chip-line); backdrop-filter: blur(12px); box-shadow: var(--chip-shadow); }
+.chip .ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(145deg, rgba(141, 139, 255, .28), rgba(141, 139, 255, .06)); color: var(--accent); }
+.chip .ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.chip b { display: block; font-size: 13px; font-weight: 600; }
+.chip span { font-size: 11.5px; color: var(--t3); }
+
+.card { position: relative; padding: 38px 34px 28px; border-radius: 24px; display: flex; flex-direction: column; gap: 16px;
+  border: 1px solid transparent; background: linear-gradient(var(--card), var(--card)) padding-box, linear-gradient(180deg, var(--edge-t), var(--edge-b) 60%) border-box;
+  backdrop-filter: blur(26px) saturate(160%); -webkit-backdrop-filter: blur(26px) saturate(160%); box-shadow: var(--card-shadow); }
+.card h2 { margin: 0; font-size: 24px; font-weight: 600; }
+.card .sub { margin: -8px 0 10px; font-size: 13.5px; color: var(--t3); }
+.pw { position: relative; display: flex; align-items: center; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--input); }
+.pw:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-ring); }
+.pw svg { position: absolute; left: 15px; width: 16px; height: 16px; fill: none; stroke: var(--t3); stroke-width: 1.7; stroke-linecap: round; }
+.pw input { flex: 1; height: 100%; border: 0; outline: 0; background: transparent; color: var(--t1); font: inherit; font-size: 14.5px; padding: 0 16px 0 43px; }
+.pw input::placeholder { color: var(--t3); }
+.go { height: 48px; border: 0; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--on-accent); display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 85%, #fff), var(--accent)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 12px 28px -12px var(--accent); }
+.go svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.forgot { border: 0; background: none; font-size: 12.5px; color: var(--t3); align-self: center; padding: 4px 8px; }
+.forgot:hover { color: var(--accent); }
+.foot { position: fixed; z-index: 4; left: 32px; bottom: 22px; font-size: 12px; color: var(--t3); }
+.note { position: fixed; z-index: 4; right: 32px; bottom: 20px; font-size: 12px; color: var(--t3); text-align: right; }
+.note a { color: var(--accent); }
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; padding: 90px 20px 40px; align-content: start; gap: 22px; overflow: auto; }
+  .pitch p, .chips, .eyebrow { display: none; }
+  .pitch h1 { font-size: 30px; margin: 0; }
+  .switch, .note { display: none; }
+  .theme { margin-left: auto; }
+  .front { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body data-bg="rings">
+<div class="bg" aria-hidden="true">
+  <div class="fields"><i class="f1"></i><i class="f2"></i><i class="f3"></i></div>
+  <!-- 背景层：织幕 + 冠环的后半圈 -->
+  <svg class="art" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" id="back">
+    <defs>
+      <linearGradient id="beamGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2C46E" stop-opacity="0"/><stop offset="1" stop-color="#F2C46E" stop-opacity=".9"/></linearGradient>
+      <radialGradient id="gem" cx=".35" cy=".3" r=".75"><stop offset="0" class="gem-a"/><stop offset=".6" class="gem-b"/><stop offset="1" class="gem-c"/></radialGradient>
+      <radialGradient id="gemv" cx=".35" cy=".3" r=".75"><stop offset="0" class="gemv-a"/><stop offset=".6" class="gemv-b"/><stop offset="1" class="gemv-c"/></radialGradient>
+      <radialGradient id="gemGlow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#F2C46E" stop-opacity=".55"/><stop offset="1" stop-color="#F2C46E" stop-opacity="0"/></radialGradient>
+      <linearGradient id="rb1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color: rgb(var(--rb1)); stop-opacity: 0"/><stop offset=".45" style="stop-color: rgb(var(--rb1)); stop-opacity: var(--rb1-a)"/><stop offset=".85" style="stop-color: rgb(var(--rb1)); stop-opacity: calc(var(--rb1-a) * .7)"/><stop offset="1" style="stop-color: rgb(var(--rb1)); stop-opacity: 0"/></linearGradient>
+      <linearGradient id="rb2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color: rgb(var(--rb2)); stop-opacity: 0"/><stop offset=".35" style="stop-color: rgb(var(--rb2)); stop-opacity: var(--rb2-a)"/><stop offset=".8" style="stop-color: rgb(var(--rb2)); stop-opacity: calc(var(--rb2-a) * .8)"/><stop offset="1" style="stop-color: rgb(var(--rb2)); stop-opacity: 0"/></linearGradient>
+      <linearGradient id="rb3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color: rgb(var(--rb3)); stop-opacity: 0"/><stop offset=".5" style="stop-color: rgb(var(--rb3)); stop-opacity: var(--rb3-a)"/><stop offset="1" style="stop-color: rgb(var(--rb3)); stop-opacity: 0"/></linearGradient>
+      <!-- 丝带的明暗：上沿亮、下沿暗，像布料的起伏 -->
+      <linearGradient id="fadeL" gradientUnits="userSpaceOnUse" x1="640" y1="0" x2="920" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff"/></linearGradient>
+      <mask id="ringMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1600" height="1000"><rect width="1600" height="1000" fill="url(#fadeL)"/></mask>
+      <linearGradient id="fold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".35" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>
+    </defs>
+    <g class="show-silk"><g class="silk-drift" style="animation-duration: 22s" id="silk"></g></g>
+    <g class="show-rings" id="ringsBack" mask="url(#ringMask)"></g>
+  </svg>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+</div>
+
+<!-- 前景层：冠环从卡片前面绕过的那半圈 -->
+<div class="front" aria-hidden="true">
+  <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice"><g class="show-rings" id="ringsFront" mask="url(#ringMask)"></g></svg>
+</div>
+
+<header class="top">
+  <div class="brand"><img src="assets/logo.svg" alt=""><span><b>星临</b><span>STARFALL</span></span></div>
+  <div class="switch" role="group" aria-label="背景方案（设计稿用）">
+    <button data-bg="rings">冠环</button><button data-bg="silk">织幕</button><button data-bg="combo">冠环 × 织幕</button>
+  </div>
+  <button class="theme" id="theme" aria-label="切换亮色 / 暗色"><svg viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 019.5 3.5a8.5 8.5 0 1011 11z"/></svg></button>
+</header>
+
+<main class="main">
+  <section class="pitch">
+    <span class="eyebrow"><i></i>B 站直播间进场特效</span>
+    <h1>让每一次进场，<br><span class="l2">都成为一场驾临。</span></h1>
+    <p>舰长登船、粉丝进场、专属用户驾到——星临认出每一位观众，自动播放为 TA 准备的特效。</p>
+    <div class="chips">
+      <div class="chip"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 18.5h18M4 16l-1-9 5.5 4L12 4l3.5 7L21 7l-1 9z"/></svg></span><span><b>身份识别</b><span>大航海 · 房管 · 粉丝牌</span></span></div>
+      <div class="chip"><span class="ic"><svg viewBox="0 0 24 24"><path d="M12 2c.6 4.8 2.2 6.4 7 7-4.8.6-6.4 2.2-7 7-.6-4.8-2.2-6.4-7-7 4.8-.6 6.4-2.2 7-7z"/></svg></span><span><b>专属特效</b><span>为重要的人单独准备</span></span></div>
+      <div class="chip"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="12" rx="2"/><path d="M8 20h8"/></svg></span><span><b>即插即用</b><span>直播姬 · OBS</span></span></div>
+    </div>
+  </section>
+
+  <form class="card" onsubmit="return false">
+    <h2>欢迎回来</h2>
+    <p class="sub">登录星临管理后台</p>
+    <label class="pw"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 018 0v3"/></svg><input type="password" placeholder="密码" aria-label="密码"></label>
+    <button class="go">登录<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    <button class="forgot" type="button">忘记密码？</button>
+  </form>
+</main>
+
+<footer class="foot">© 2026 星临 Starfall · v0.1.0</footer>
+<div class="note">设计稿第二版：顶部切换 冠环 / 织幕 / 组合，右上角切换亮 / 暗色 · <a href="login-v1.html">第一版</a></div>
+
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  // ---------- 冠环：每一圈拆成后半圈（在卡片后面）和前半圈（从卡片前面绕过） ----------
+  // 卡片中心约在画面的 (1222, 500)；圆环中心放在卡片上方一点，倾斜 -12°
+  // 几何经过计算：前半圈从卡片下沿之外绕过（y 689 ~ 814，卡片下沿 672），不会压到密码框和按钮
+  var C = { x: 1300, y: 560, rot: -10 * Math.PI / 180 };
+  var RINGS = [
+    { rx: 330, ry: 90, cls: 'dash', front: false },
+    { rx: 440, ry: 120, cls: '', front: false },
+    { rx: 540, ry: 150, cls: 'gold', front: true, gem: 'gem', dur: 18 },
+    { rx: 540, ry: 150, cls: 'wide', front: true },
+    { rx: 610, ry: 180, cls: '', front: true, gem: 'gemv', dur: 26 },
+    { rx: 720, ry: 225, cls: 'dash', front: true }
+  ];
+  function pts(r, t0, t1) {
+    var out = [], n = 90, c = Math.cos(C.rot), s = Math.sin(C.rot);
+    for (var i = 0; i <= n; i++) {
+      var t = t0 + (t1 - t0) * i / n, x = r.rx * Math.cos(t), y = r.ry * Math.sin(t);
+      out.push((C.x + x * c - y * s).toFixed(1) + ' ' + (C.y + x * s + y * c).toFixed(1));
+    }
+    return 'M' + out.join(' L');
+  }
+  function path(d, cls, dy) { return '<path class="ring ' + cls + '" d="' + d + '"' + (dy ? ' transform="translate(0 ' + dy + ')"' : '') + '/>'; }
+  function gem(d, fill, dur, delay) {
+    var id = 'p' + Math.random().toString(36).slice(2, 8);
+    return '<path id="' + id + '" d="' + d + '" fill="none"/>' +
+      '<g opacity="0"><circle r="16" fill="url(#gemGlow)"/><circle r="4.2" fill="url(#' + fill + ')"/><circle r="1.2" cx="-1.2" cy="-1.3" fill="#fff" opacity=".9"/>' +
+      '<animateMotion dur="' + dur + 's" begin="' + delay + 's" repeatCount="indefinite" rotate="0"><mpath href="#' + id + '"/></animateMotion>' +
+      '<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.88;1" dur="' + dur + 's" begin="' + delay + 's" repeatCount="indefinite"/></g>';
+  }
+  var back = '', front = '';
+  // 从天而降的金色光线，落在卡片顶部
+  back += '<path class="beam" d="M' + C.x + ' -10 V328"/>';
+  RINGS.forEach(function (r, i) {
+    var up = pts(r, Math.PI, Math.PI * 2), down = pts(r, 0, Math.PI);
+    if (r.cls !== 'wide' && r.cls !== 'dash') back += path(up, 'shadow', 8);
+    back += path(up, r.cls);
+    var target = r.front ? 'front' : 'back';
+    var html = (r.cls !== 'wide' && r.cls !== 'dash' ? path(down, 'shadow', 8) : '') + path(down, r.cls);
+    if (target === 'front') front += html; else back += html;
+    if (r.gem) {
+      back += gem(up, r.gem, r.dur / 2, -i * 3);
+      front += gem(down, r.gem, r.dur / 2, -i * 3 - r.dur / 4);
+    }
+  });
+  // 光线落点的小星
+  front += '<g transform="translate(' + C.x + ' 328)"><circle r="14" fill="url(#gemGlow)"/><path d="M0 -7 C.7 -2 2 -.7 7 0 C2 .7 .7 2 0 7 C-.7 2 -2 .7 -7 0 C-2 -.7 -.7 -2 0 -7Z" fill="url(#gem)"/></g>';
+  document.getElementById('ringsBack').innerHTML = back;
+  // 前景层也需要渐变定义
+  document.querySelector('.front svg').insertAdjacentHTML('afterbegin', '<defs>' + document.querySelector('#back defs').innerHTML + '</defs>');
+  document.getElementById('ringsFront').innerHTML = front;
+
+  // ---------- 织幕：三条有清晰边缘的丝带（后 / 中 / 前），只从下方和右侧流过，不挡左边的标语 ----------
+  var RIBBONS = [
+    { g: 'rb1', top: 'M -150 860 C 250 820, 650 760, 1000 560 S 1450 180, 1800 120', rest: 'L 1800 300 C 1500 360, 1250 560, 1060 700 S 450 1000, -150 1040 Z' },
+    { g: 'rb2', top: 'M -150 800 C 300 720, 700 900, 1100 770 S 1500 610, 1800 660', rest: 'L 1800 790 C 1500 750, 1250 910, 1080 910 S 400 890, -150 950 Z' },
+    { g: 'rb3', top: 'M 480 1030 C 800 910, 1100 870, 1350 730 S 1700 530, 1850 480', rest: 'L 1850 525 C 1700 585, 1450 800, 1360 812 S 820 975, 500 1070 Z' }
+  ];
+  var silk = '';
+  RIBBONS.forEach(function (r) {
+    var d = r.top + ' ' + r.rest;
+    silk += '<path class="rb-shadow" d="' + d + '" transform="translate(0 18)"/>';
+    silk += '<path d="' + d + '" fill="url(#' + r.g + ')"/>';
+    silk += '<path d="' + d + '" fill="url(#fold)" opacity=".8"/>';
+    silk += '<path class="sheen soft" d="' + r.top + '"/><path class="sheen" d="' + r.top + '" transform="translate(0 3)"/>';
+  });
+  document.getElementById('silk').innerHTML = silk;
+
+  // ---------- 切换 ----------
+  var q = new URLSearchParams(location.search);
+  if (q.get('bg')) document.body.dataset.bg = q.get('bg');
+  if (q.get('theme')) document.documentElement.dataset.theme = q.get('theme');
+  var sync = function () { document.querySelectorAll('.switch button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.bg === document.body.dataset.bg); }); };
+  document.querySelectorAll('.switch button').forEach(function (b) { b.onclick = function () { document.body.dataset.bg = b.dataset.bg; sync(); }; });
+  sync();
+  document.getElementById('theme').onclick = function () { var r = document.documentElement; r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark'; };
+})();
+</script>
+</body>
+</html>

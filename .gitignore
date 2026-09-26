@@ -25,8 +25,10 @@ pnpm-debug.log*
 .venv/
 __pycache__/
 
-# 设计预览的字体文件（从 Google 下载，可用 design/tools/fetch_fonts.py 重新获取）
-design/preview/**/fonts/*.woff2
+# 设计预览的生成物：字体（design/tools/fetch_fonts.py）、需求文档网页（design/tools/md2html.py）
+design/preview/assets/*
+!design/preview/assets/logo.svg
+design/preview/docs/
 
 # 编辑器与系统
 .vscode/*
@@ -34,3 +36,7 @@ design/preview/**/fonts/*.woff2
 .idea/
 .DS_Store
 Thumbs.db
+
+
+# 技术验证用的测试页（含 B 站礼物动画，不进仓库）
+design/preview/lab/

@@ -1,0 +1,17 @@
+{
+  "cmd": "ENTRY_EFFECT",
+  "data": {
+    "id": 381,
+    "uid": 10004,
+    "target_id": 20000,
+    "face": "https://example.invalid/face/10004.jpg",
+    "privilege_type": 0,
+    "copy_writing": "<%测试富%> 来了",
+    "business": 6,
+    "identities": 1,
+    "wealthy_info": {
+      "uid": 0,
+      "level": 37
+    }
+  }
+}

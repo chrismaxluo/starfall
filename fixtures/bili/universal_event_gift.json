@@ -1,0 +1,13 @@
+{
+  "cmd": "UNIVERSAL_EVENT_GIFT",
+  "data": {
+    "room_id": 30000,
+    "anchor_uid": 20000,
+    "info": {
+      "biz_session_id": "1",
+      "interact_template": {
+        "template_id": "multi_conn_grid"
+      }
+    }
+  }
+}

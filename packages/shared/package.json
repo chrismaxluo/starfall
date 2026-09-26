@@ -1,0 +1,19 @@
+{
+  "name": "@starfall/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "公共定义：常量、类型、Zod 模式、消息格式",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./overlay": "./src/overlay.ts",
+    "./labels": "./src/labels.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

@@ -1050,7 +1050,7 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
         <a href="overlay.html" target="_blank"><svg class="i"><use href="#i-spark"/></svg>特效页演示<svg class="i ext"><use href="#i-ext"/></svg></a>
         <a href="#settings" data-page="settings"><svg class="i"><use href="#i-gear"/></svg>设置</a>
         <a href="docs/requirements.html" target="_blank"><svg class="i"><use href="#i-list"/></svg>需求文档<svg class="i ext"><use href="#i-ext"/></svg></a>
-        <a href="v1/"><svg class="i"><use href="#i-list"/></svg>旧版预览 v1</a>
+        <a href="docs/architecture.html" target="_blank"><svg class="i"><use href="#i-list"/></svg>方案设计<svg class="i ext"><use href="#i-ext"/></svg></a>
       </nav>
     </div>
     <div class="side-foot">
@@ -2734,7 +2734,7 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
     landscape: [[1920, 1080, '推荐'], [1280, 720, '省性能'], [2560, 1440, '2K']]
   };
   var OUTS = [
-    { id: 1, name: '竖屏直播', app: 'livehime', orient: 'portrait', w: 1080, h: 1920, st: 12, sb: 32, safe: true, scale: 100, mx: 3, lite: 'auto', key: 'k7Qm2xVb9R', online: true }
+    { id: 1, name: '竖屏直播', app: 'livehime', orient: 'portrait', w: 1080, h: 1920, st: 12, sb: 40, safe: true, scale: 100, mx: 9, lite: 'auto', key: 'k7Qm2xVb9R', online: true }
   ];
   var curOut = 1, showKey = false, alphaBg = false;
   function OUT() { for (var i = 0; i < OUTS.length; i++) if (OUTS[i].id === curOut) return OUTS[i]; return OUTS[0]; }
@@ -2748,8 +2748,8 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
     root.style.setProperty('--mx', o.mx + '%');
   }
   function overlayUrl(o, real) {
-    return real ? 'overlay.html?o=' + o.orient + '&w=' + o.w + '&h=' + o.h + '&st=' + o.st + '&sb=' + o.sb + '&scale=' + o.scale + (o.lite === 'on' ? '&lite=1' : '')
-      : 'http://20.46.163.200:8080/overlay?out=' + o.id + '&key=' + (showKey ? o.key : '••••••••••');
+    return real ? 'overlay.html?o=' + o.orient + '&w=' + o.w + '&h=' + o.h + '&st=' + o.st + '&sb=' + o.sb + '&mx=' + o.mx + '&scale=' + o.scale + (o.lite === 'on' ? '&lite=1' : '')
+      : 'http://localhost:17520/overlay/?output=' + o.id + '&key=' + (showKey ? o.key : '••••••••••');
   }
   function renderObs() {
     var o = OUT();
@@ -2760,7 +2760,7 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
     document.querySelectorAll('#outs [data-out]').forEach(function (b) { b.onclick = function () { curOut = +b.dataset.out; renderObs(); }; });
     $('#addOut').onclick = function () {
       var id = OUTS.length + 1;
-      OUTS.push({ id: id, name: '横屏录播', app: 'obs', lite: 'auto', orient: 'landscape', w: 1920, h: 1080, st: 12, sb: 32, safe: false, scale: 100, mx: 3, key: 'n' + Math.random().toString(36).slice(2, 11), online: false });
+      OUTS.push({ id: id, name: '横屏录播', app: 'obs', lite: 'auto', orient: 'landscape', w: 1920, h: 1080, st: 12, sb: 40, safe: false, scale: 100, mx: 9, key: 'n' + Math.random().toString(36).slice(2, 11), online: false });
       curOut = id; renderObs(); toast('已新建输出：横屏录播');
     };
     document.querySelectorAll('#orients button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.o === o.orient); });

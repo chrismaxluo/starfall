@@ -1,0 +1,148 @@
+import { describe, expect, it } from 'vitest';
+import type { DanmuRule, GiftEvent, GiftRules, GuardEvent, GuardRules } from '@starfall/shared';
+import { GiftComboMerger, GuardDeduper } from './combo.ts';
+import { keywordClashes, matchDanmu, whoOk } from './danmu.ts';
+import { giftBandLabel, matchGift, sortedGiftBands, yuanText } from './gift.ts';
+import { matchGuard } from './guard.ts';
+import { ANCHOR, medal, viewer } from './testing.ts';
+
+const rule = (p: Partial<DanmuRule> = {}): DanmuRule => ({ id: 1, keywords: ['生日快乐'], mode: 'contains', who: 'all', effectId: 7, globalCdSec: 30, userCdMin: 10, enabled: true, ...p });
+
+describe('弹幕匹配', () => {
+  it('包含 / 完全一致', () => {
+    expect(matchDanmu('主播生日快乐！', viewer(), [rule()], ANCHOR)).toMatchObject({ ruleId: 1, effectId: 7, globalCdSec: 30, userCdMin: 10, label: '弹幕 · 「生日快乐」' });
+    expect(matchDanmu('上船', viewer(), [rule({ keywords: ['上船'], mode: 'exact' })], ANCHOR)).not.toBeNull();
+    expect(matchDanmu(' 上船 ', viewer(), [rule({ keywords: ['上船'], mode: 'exact' })], ANCHOR)).not.toBeNull();
+    expect(matchDanmu('我要上船', viewer(), [rule({ keywords: ['上船'], mode: 'exact' })], ANCHOR)).toBeNull();
+  });
+
+  it('从上到下，命中第一条即停；停用和没选素材的跳过', () => {
+    const rules = [rule({ id: 1, enabled: false }), rule({ id: 2, effectId: null }), rule({ id: 3, keywords: ['晚安', '生日'] }), rule({ id: 4 })];
+    expect(matchDanmu('生日快乐', viewer(), rules, ANCHOR)?.ruleId).toBe(3);
+    expect(matchDanmu('随便说说', viewer(), rules, ANCHOR)).toBeNull();
+  });
+
+  it('发送人条件', () => {
+    const plain = viewer();
+    const fan = viewer({ medal: medal(5) });
+    const fan12 = viewer({ medal: medal(12) });
+    const other = viewer({ medal: medal(30, 999) });
+    const cap = viewer({ guard: 3 });
+    const mod = viewer({ isMod: true });
+    expect([plain, fan, other, cap, mod].map((v) => whoOk('fan', v, ANCHOR))).toEqual([false, true, false, true, true]);
+    expect([fan, fan12, other].map((v) => whoOk('fan10', v, ANCHOR))).toEqual([false, true, false]);
+    expect([plain, cap].map((v) => whoOk('guard', v, ANCHOR))).toEqual([false, true]);
+    expect([plain, mod].map((v) => whoOk('mod', v, ANCHOR))).toEqual([false, true]);
+    expect(matchDanmu('生日快乐', plain, [rule({ who: 'guard' })], ANCHOR)).toBeNull();
+  });
+
+  it('关键词重复提示；标签最多显示 3 个关键词', () => {
+    expect(keywordClashes([rule({ keywords: ['晚安', '好梦'] }), rule({ keywords: ['生日'] }), rule({ keywords: ['好梦', '好梦'] })])).toEqual({ 好梦: [1, 3] });
+    expect(matchDanmu('d', viewer(), [rule({ keywords: ['a', 'b', 'c', 'd'] })], ANCHOR)?.label).toBe('弹幕 · 「a / b / c …」');
+  });
+});
+
+const gifts = (p: Partial<GiftRules> = {}): GiftRules => ({
+  specific: [{ giftId: 25, giftName: '小电视飞船', effectId: 1, enabled: true }],
+  bands: [{ fromGold: 10_000, effectId: 6, enabled: true }, { fromGold: 100_000, effectId: 1, enabled: true }, { fromGold: 1000, effectId: 8, enabled: false }],
+  comboEnabled: true,
+  comboSec: 3,
+  ...p,
+});
+const gift = (p: Partial<GiftEvent> = {}): GiftEvent => ({ kind: 'gift', id: 'g1', ts: 0, viewer: viewer(), giftId: 31036, giftName: '小花花', unitPrice: 100, count: 1, paid: true, ...p });
+
+describe('礼物匹配', () => {
+  it('免费礼物不触发', () => {
+    expect(matchGift(gift({ paid: false, unitPrice: 0 }), gifts())).toBeNull();
+  });
+  it('指定礼物优先（按礼物 ID）', () => {
+    expect(matchGift(gift({ giftId: 25, giftName: '小电视飞船', unitPrice: 1_245_000 }), gifts())).toEqual({ effectId: 1, key: 'gift:spec:25', label: '礼物 · 「小电视飞船」', valueGold: 1_245_000 });
+    // 指定礼物停用时按价值分档
+    expect(matchGift(gift({ giftId: 25, unitPrice: 1_245_000 }), gifts({ specific: [{ giftId: 25, giftName: '', effectId: 1, enabled: false }] }))?.key).toBe('gift:band:100000');
+  });
+  it('按单次价值（数量 × 单价）分档，高档优先；低于最低档、落在停用档都不播', () => {
+    expect(matchGift(gift({ unitPrice: 1000, count: 99 }), gifts())).toMatchObject({ key: 'gift:band:10000', label: '礼物 · 单次 10 – 100 元', valueGold: 99_000 });
+    expect(matchGift(gift({ unitPrice: 100_000, count: 1 }), gifts())).toMatchObject({ key: 'gift:band:100000', label: '礼物 · 单次 ≥ 100 元' });
+    expect(matchGift(gift({ unitPrice: 1000, count: 3 }), gifts())).toBeNull();
+    expect(matchGift(gift({ unitPrice: 100, count: 3 }), gifts())).toBeNull();
+    expect(matchGift(gift({ unitPrice: 100_000 }), gifts({ bands: [{ fromGold: 100_000, effectId: null, enabled: true }] }))).toBeNull();
+  });
+  it('金额显示', () => {
+    expect(yuanText(100)).toBe('0.1 元');
+    expect(yuanText(22_000)).toBe('22 元');
+    expect(yuanText(1_245_000)).toBe('1245 元');
+    expect(sortedGiftBands(gifts().bands).map((b) => [b.fromGold, b.toGold])).toEqual([[100_000, null], [10_000, 100_000], [1000, 10_000]]);
+    expect(giftBandLabel(1000, 10_000)).toBe('1 – 10 元');
+  });
+});
+
+const guardRules: GuardRules = {
+  gov: { openEffectId: 1, renewEffectId: 1, enabled: true },
+  adm: { openEffectId: 2, renewEffectId: null, enabled: true },
+  cap: { openEffectId: 3, renewEffectId: 6, enabled: false },
+};
+describe('上舰匹配', () => {
+  it('按等级 + 开通 / 续费；停用或没选素材不播', () => {
+    expect(matchGuard({ level: 1, op: 'open' }, guardRules)).toEqual({ effectId: 1, label: '上舰 · 开通总督' });
+    expect(matchGuard({ level: 1, op: 'renew' }, guardRules)).toEqual({ effectId: 1, label: '上舰 · 续费总督' });
+    expect(matchGuard({ level: 2, op: 'renew' }, guardRules)).toBeNull();
+    expect(matchGuard({ level: 3, op: 'open' }, guardRules)).toBeNull();
+  });
+});
+
+describe('礼物连击合并', () => {
+  it('窗口内连续送同一种礼物合并，数量相加；窗口结束后输出', () => {
+    const m = new GiftComboMerger(3000);
+    expect(m.push(gift({ id: 'a', count: 1 }), 0)).toEqual([]);
+    expect(m.push(gift({ id: 'b', count: 2 }), 1000)).toEqual([]);
+    expect(m.push(gift({ id: 'c', giftId: 1, count: 1 }), 1500)).toEqual([]);
+    expect(m.pendingCount).toBe(2);
+    expect(m.flush(3900)).toEqual([]);
+    const out = m.flush(4000);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: 'a', count: 3 });
+    expect(m.flush(4500)).toMatchObject([{ id: 'c', count: 1 }]);
+  });
+  it('不同人分开合并；一直连击最多合并 30 秒', () => {
+    const m = new GiftComboMerger(3000);
+    m.push(gift({ viewer: viewer({ uid: 1 }) }), 0);
+    m.push(gift({ viewer: viewer({ uid: 2 }) }), 0);
+    expect(m.pendingCount).toBe(2);
+    const m2 = new GiftComboMerger(3000);
+    let out: GiftEvent[] = [];
+    for (let t = 0; t <= 31_000 && !out.length; t += 1000) out = m2.push(gift(), t);
+    expect(out[0]?.count).toBe(31);
+    m2.push(gift(), 40_000);
+    expect(m2.flush(70_000)).toHaveLength(1);
+  });
+  it('关闭合并时立即输出', () => {
+    expect(new GiftComboMerger(3000, false).push(gift(), 0)).toHaveLength(1);
+  });
+});
+
+const guardEv = (p: Partial<GuardEvent> = {}): GuardEvent => ({ kind: 'guard', id: 'x', ts: 0, viewer: viewer({ uid: 5 }), level: 3, months: 1, op: 'open', source: 'toast', dedupeKey: 'pay1', ...p });
+describe('上舰去重', () => {
+  it('两条 toast（同一流水号）只保留一条；随后的 GUARD_BUY 丢弃', () => {
+    const d = new GuardDeduper(3000);
+    expect(d.push(guardEv(), 0)).toHaveLength(1);
+    expect(d.push(guardEv({ id: 'y' }), 100)).toHaveLength(0);
+    expect(d.push(guardEv({ source: 'guard_buy', dedupeKey: undefined }), 200)).toHaveLength(0);
+    expect(d.flush(5000)).toHaveLength(0);
+  });
+  it('GUARD_BUY 先到：等待期间 toast 到了就用 toast；只有 GUARD_BUY 时 3 秒后单独输出', () => {
+    const d = new GuardDeduper(3000);
+    expect(d.push(guardEv({ source: 'guard_buy', dedupeKey: undefined }), 0)).toHaveLength(0);
+    expect(d.push(guardEv(), 500)).toMatchObject([{ source: 'toast' }]);
+    expect(d.flush(4000)).toHaveLength(0);
+
+    const d2 = new GuardDeduper(3000);
+    d2.push(guardEv({ source: 'guard_buy', dedupeKey: undefined, viewer: viewer({ uid: 9 }) }), 0);
+    expect(d2.flush(2999)).toHaveLength(0);
+    expect(d2.flush(3000)).toMatchObject([{ source: 'guard_buy' }]);
+    // 之后 60 秒内同一人同等级的 toast（没有流水号）视为同一次
+    expect(d2.push(guardEv({ viewer: viewer({ uid: 9 }), dedupeKey: undefined }), 4000)).toHaveLength(0);
+    // 过期记录会被清理
+    expect(d2.flush(70_000)).toHaveLength(0);
+    expect(d2.push(guardEv({ viewer: viewer({ uid: 9 }), dedupeKey: undefined }), 70_001)).toHaveLength(1);
+  });
+});

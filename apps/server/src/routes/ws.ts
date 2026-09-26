@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { SESSION_COOKIE } from './auth.ts';
 import { statusSnapshot } from './bili.ts';
+import { PLAY_ACK_MS } from '../services/hub.ts';
 
 const PING_MS = 30_000;
 
@@ -55,8 +56,9 @@ function keepAlive(socket: WebSocket, onDead: () => void): () => void {
  * - 特效页定时报平安，太久没报就认为页面卡死（协议层的 pong 由浏览器网络层自动回复，页面卡死时照样会回）。
  *   只对报过平安的页面生效：更新前打开、还没刷新的旧页面不会报平安。
  */
-function overlayAlive(socket: WebSocket, onDead: () => void): { alive(): void; stop(): void } {
+function overlayAlive(socket: WebSocket, onDead: () => void, onTick: () => void): { alive(): void; stop(): void } {
   let aliveAt: number | null = null;
+  const tick = setInterval(onTick, 1000);
   const t = setInterval(() => {
     if (aliveAt !== null && Date.now() - aliveAt > OVERLAY_TIMING.aliveTimeoutMs) {
       socket.terminate();
@@ -65,7 +67,13 @@ function overlayAlive(socket: WebSocket, onDead: () => void): { alive(): void; s
     }
     socket.send(JSON.stringify({ type: 'ping' }));
   }, OVERLAY_TIMING.pingMs);
-  return { alive: () => (aliveAt = Date.now()), stop: () => clearInterval(t) };
+  return {
+    alive: () => (aliveAt = Date.now()),
+    stop: () => {
+      clearInterval(t);
+      clearInterval(tick);
+    },
+  };
 }
 
 export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -84,10 +92,16 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       reason ??= '收不到回应（网络断开）';
       ctx.hub.removeOverlay(client);
     });
-    const hb = overlayAlive(socket, () => {
-      reason ??= '页面长时间没有报平安（可能卡死）';
-      ctx.hub.removeOverlay(client);
-    });
+    const hb = overlayAlive(
+      socket,
+      () => {
+        reason ??= '页面长时间没有报平安（可能卡死）';
+        ctx.hub.removeOverlay(client);
+      },
+      () => {
+        for (const label of ctx.hub.playTimeouts(client)) log.warn(`特效页没有播放：${label}（${PLAY_ACK_MS / 1000} 秒内没有回应）`);
+      },
+    );
     socket.on('message', (data) => {
       let msg;
       try {
@@ -96,6 +110,10 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
         return;
       }
       if (msg.type === 'alive') hb.alive();
+      else if (msg.type === 'started') {
+        const r = ctx.hub.playStarted(client, msg.id);
+        if (r) log.info(`特效页已播放：${r.label}（${r.ms} ms）`);
+      }
       else if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
       else if (msg.type === 'error') {
         ctx.hub.report(client, { lastError: msg.message });

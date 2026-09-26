@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EnterEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
 import { room } from '../db/schema.ts';
 import { testApp } from '../testing.ts';
-import { Hub } from './hub.ts';
+import { Hub, PLAY_ACK_MS } from './hub.ts';
 import { Pipeline } from './pipeline.ts';
 import type { LiveStatus } from './live.ts';
 
@@ -477,5 +477,23 @@ describe('上舰', () => {
     t.ctx.guardRules.set({ ...t.ctx.guardRules.get(), adm: { openEffectId: null, renewEffectId: null, enabled: false } });
     t.live.emit(gd({ level: 2 }, { uid: 8, guard: 2 }));
     expect(t.events().at(-1)).toMatchObject({ status: 'no_rule' });
+  });
+});
+
+describe('播放确认', () => {
+  it('特效页回了"开始播放"算播出；超时没回的取出来报警', async () => {
+    const { live, hub, plays } = await setup();
+    const client = [...(hub as unknown as { overlays: Set<Parameters<Hub['playStarted']>[0]> }).overlays][0]!;
+    live.emit(enter({ guard: 3 }));
+    const [item] = plays();
+    const r = hub.playStarted(client, item!.id, Date.now() + 120);
+    expect(r).toEqual({ label: '门楼 · 小星', ms: 120 });
+    expect(hub.playStarted(client, item!.id)).toBeNull();
+
+    vi.advanceTimersByTime(10_000);
+    live.emit(enter({ uid: 10002, name: '小月', guard: 2 }));
+    expect(hub.playTimeouts(client)).toEqual([]);
+    expect(hub.playTimeouts(client, Date.now() + PLAY_ACK_MS)).toEqual(['亭阁 · 小月']);
+    expect(hub.playTimeouts(client, Date.now() + PLAY_ACK_MS)).toEqual([]);
   });
 });

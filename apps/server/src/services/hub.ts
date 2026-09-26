@@ -15,7 +15,12 @@ export interface OverlayClient {
   /** 特效页上报的运行环境（直播软件、内核版本、能力检测） */
   env: Record<string, unknown> | null;
   lastError: string | null;
+  /** 已发出、特效页还没回"开始播放"的特效：播放编号 → 发出时间、说明 */
+  pending: Map<string, { at: number; label: string }>;
 }
+
+/** 特效页收到播放指令后多久内应该回"开始播放" */
+export const PLAY_ACK_MS = 5000;
 
 export interface OverlayInfo {
   outputId: number;
@@ -54,7 +59,7 @@ export class Hub {
   }
 
   addOverlay(sock: Sock, output: OutputRow, preload: string[], now = Date.now()): OverlayClient {
-    const c: OverlayClient = { sock, outputId: output.id, since: now, env: null, lastError: null };
+    const c: OverlayClient = { sock, outputId: output.id, since: now, env: null, lastError: null, pending: new Map() };
     this.overlays.add(c);
     send(sock, { type: 'hello', config: overlayConfig(output), preload });
     this.overlaysChanged();
@@ -79,8 +84,30 @@ export class Hub {
   }
 
   /** 发给所有特效页（所有输出同步播放） */
-  toOverlays(msg: ServerToOverlay): void {
-    for (const c of this.overlays) send(c.sock, msg);
+  toOverlays(msg: ServerToOverlay, now = Date.now()): void {
+    for (const c of this.overlays) {
+      send(c.sock, msg);
+      if (msg.type === 'play') c.pending.set(msg.item.id, { at: now, label: `${msg.item.effect.name} · ${msg.item.viewer.name}` });
+    }
+  }
+
+  /** 特效页回了"开始播放"：返回这次播放的说明和延迟；不是等待中的播放时返回 null */
+  playStarted(c: OverlayClient, id: string, now = Date.now()): { label: string; ms: number } | null {
+    const p = c.pending.get(id);
+    if (!p) return null;
+    c.pending.delete(id);
+    return { label: p.label, ms: now - p.at };
+  }
+
+  /** 取出超时还没回"开始播放"的播放（特效页可能卡住了） */
+  playTimeouts(c: OverlayClient, now = Date.now()): string[] {
+    const out: string[] = [];
+    for (const [id, p] of c.pending) {
+      if (now - p.at < PLAY_ACK_MS) continue;
+      c.pending.delete(id);
+      out.push(p.label);
+    }
+    return out;
   }
 
   /** 输出设置变了：更新配置，或（重置密钥、删除时）断开 */

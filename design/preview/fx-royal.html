@@ -87,7 +87,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .nmwrap { display: flex; align-items: center; gap: 22px; }
 .nm { font-family: var(--font-serif); font-weight: 900; line-height: 1.2; white-space: nowrap; max-width: 880px; overflow: hidden; text-overflow: ellipsis; padding: 0 .08em;
   filter: drop-shadow(0 1.5px 0 rgba(30,16,2,.95)) drop-shadow(0 6px 18px rgba(0,0,0,.6)); opacity: 0; animation: brush 1.2s var(--nd) cubic-bezier(.5,0,.2,1) forwards; }
-.t-cap .nm { font-size: 62px; } .t-adm .nm { font-size: 68px; } .t-gov .nm { font-size: 76px; }
+.t-cap .nm { font-size: 56px; } .t-adm .nm { font-size: 68px; } .t-gov .nm { font-size: 76px; }
 .t-cap .lab { font-size: 24px; } .t-adm .lab { font-size: 26px; }
 @keyframes brush { from { opacity: 1; clip-path: inset(0 100% 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
 .seal { width: var(--ss); height: var(--ss); flex: none; opacity: 0; animation: stamp .45s var(--sd) cubic-bezier(.3,1.6,.5,1) forwards; filter: drop-shadow(0 4px 10px rgba(0,0,0,.55)); }
@@ -117,6 +117,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes flash { 0% { opacity: 0; transform: scale(.2); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(2.2); } }
 .mist { transform-box: fill-box; transform-origin: center; opacity: 0; animation: fin 1.4s var(--d) forwards, mist 7s var(--d) ease-in-out infinite alternate; }
 @keyframes mist { from { transform: translate(-30px, 10px) scale(1); } to { transform: translate(30px, -16px) scale(1.12); } }
+.lglow { animation: lpulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes lpulse { 0%, 100% { opacity: .7; transform: scale(.95); } 50% { opacity: 1; transform: scale(1.06); } }
 .swp { animation: swp 1.6s var(--d) cubic-bezier(.45,0,.35,1) forwards; }
 @keyframes swp { from { transform: translateX(0); } to { transform: translateX(1900px); } }
 </style>
@@ -144,6 +146,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <radialGradient id="gFlash"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".3" stop-color="#FFF1CC" stop-opacity=".7"/><stop offset="1" stop-color="#F7D58B" stop-opacity="0"/></radialGradient>
     <radialGradient id="fade"><stop offset=".35" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient>
     <linearGradient id="pillar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5E1810"/><stop offset=".35" stop-color="#B3342A"/><stop offset=".55" stop-color="#E06A52"/><stop offset=".7" stop-color="#B3342A"/><stop offset="1" stop-color="#5E1810"/></linearGradient>
+    <linearGradient id="post" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#23103F"/><stop offset=".4" stop-color="#5A32A0"/><stop offset=".6" stop-color="#8A5FD0"/><stop offset=".75" stop-color="#5A32A0"/><stop offset="1" stop-color="#23103F"/></linearGradient>
+    <radialGradient id="lantern" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#FBE9FF"/><stop offset=".35" stop-color="#C58AF0"/><stop offset=".8" stop-color="#6E3AB8"/><stop offset="1" stop-color="#3E1F78"/></radialGradient>
+    <radialGradient id="lanGlow"><stop offset="0" stop-color="#D9A8FF" stop-opacity=".5"/><stop offset="1" stop-color="#D9A8FF" stop-opacity="0"/></radialGradient>
     <linearGradient id="roof" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A2608" stop-opacity=".85"/><stop offset="1" stop-color="#1E1404" stop-opacity=".75"/></linearGradient>
     <linearGradient id="tile" x1="0" y1="-280" x2="0" y2="-200" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFF1CC"/><stop offset=".5" stop-color="#E4B460"/><stop offset="1" stop-color="#9C6A24"/></linearGradient>
     <linearGradient id="band" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000"/><stop offset=".42" stop-color="#000"/><stop offset=".5" stop-color="#fff"/><stop offset=".58" stop-color="#000"/><stop offset="1" stop-color="#000"/></linearGradient>
@@ -181,13 +186,13 @@ const $ = (s) => document.querySelector(s);
 const FACE = 'https://i0.hdslb.com/bfs/face/3b1011461e9e74039c9cebae7dab6dfdf8f3711c.jpg';
 const NAMES = { short: '星临', mid: '吃喵放花椒的喵酱', long: '今天也要早点睡觉的超长昵称啊' };
 const TIER = {
-  cap: { zh: '舰长', seal: '登船', dur: 4, m: 'mCap', fl: 'fCap', cl: 'cCap', pe: 'pCap', dust: ['#CDEFFB', '#FFFFFF'], title: '舰长 · 青云' },
+  cap: { zh: '舰长', seal: '光临', dur: 4, m: 'mCap', fl: 'fCap', cl: 'cCap', pe: 'pCap', dust: ['#CDEFFB', '#FFFFFF'], title: '舰长 · 青云' },
   adm: { zh: '提督', seal: '驾到', dur: 6, m: 'mAdm', fl: 'fAdm', cl: 'cAdm', pe: 'pAdm', dust: ['#E6BF86', '#D9C2F5', '#FFFFFF'], title: '提督 · 紫气' },
   gov: { zh: '总督', seal: '驾临', dur: 8, m: 'mGov', fl: 'fGov', cl: 'cGov', pe: 'pGov', dust: ['#F6DFA8', '#FFF4D6'], title: '总督 · 金銮' },
 };
 const DESC = {
-  cap: '<b>舰长 · 青云</b>（4 秒）<br>青玉色的月洞门一笔画成，门框有金属的明暗和立体边，外面一圈细珠；顶上落下一个如意装饰，两朵祥云从两边托住。头像在门里展开，名字像毛笔写字一样出现，盖一枚「登船」印章，最后一道光从青玉门框上扫过。',
-  adm: '<b>提督 · 紫气</b>（6 秒）<br>取「紫气东来」：背后几团紫色云气慢慢飘动。紫金色的月洞门，门框内有一圈紫色光带；上方是一道弧形门楣，两端卷草纹，挂着紫色流苏，正中一颗紫色宝珠。四朵祥云飘进来，名字写出后盖「驾到」印章，一道光扫过所有金色部件。',
+  cap: '<b>舰长 · 青云</b>（4 秒）<br>一扇园林月洞门：青玉色的门框一笔画成，有金属的明暗和立体边；顶上落下一个如意装饰，两朵小祥云从两边托住。头像在门里展开，名字像毛笔写字一样出现，盖一枚「光临」印章，最后一道光从门框上扫过。',
+  adm: '<b>提督 · 紫气</b>（6 秒）<br>一座牌坊：取「紫气东来」，背后几团紫色云气慢慢飘动。两根紫漆立柱从地面升起，撑起一道弧形门楣（两端卷草纹，正中紫色宝珠），门楣下挂一对<b>会发光的紫色宫灯</b>，轻轻摇晃。中间是双层紫金月洞门，带珠串和紫色光带。四朵祥云飘进来，名字写出后盖「驾到」印章，一道光扫过所有金色部件。',
   gov: '<b>总督 · 金銮</b>（8 秒）<br>背后一层淡淡的云纹暖光。两根朱红宫柱从地面升起（金色柱头、雀替和柱础），金色月洞门画成，回纹横梁从中间展开；金色屋顶落下，<b>一片片琉璃瓦和圆形瓦当</b>，屋脊宝珠接住从天而降的星星；屋檐两角的红流苏轻轻摆动，四朵祥云飘进来，金粉慢慢往上飘。名字写出后盖「驾临」印章，最后一道光从整座宫门上扫过。',
 };
 const state = { tier: 'gov', event: 'enter', pos: '40', face: '1', name: 'mid', bg: 'alpha', safe: '1', auto: false };
@@ -206,12 +211,13 @@ const RUYI = 'M0 -12 C8 -12 12 -4 6 2 C12 6 6 14 0 10 C-6 14 -12 6 -6 2 C-12 -4 
 
 // ---------- 部件 ----------
 // 月洞门：主框（金属渐变 + 一圈高光，像有厚度）、外细框、珠串、四个如意
-function moonGate(T, r, d0, extra = '') {
+function moonGate(T, r, d0, extra = '', simple = false) {
   const half = (rr, side, dd, sw, stroke) => P(`M0 ${-rr} A${rr} ${rr} 0 0 ${side < 0 ? 0 : 1} 0 ${rr}`, dd, 1.2, stroke, sw);
   let s = `<circle r="${r}" fill="rgba(14,8,2,.55)" class="f" style="--d:${d0 + .3}s"/>`;
   s += extra;
   s += half(r, -1, d0, 5, `url(#${T.m})`) + half(r, 1, d0, 5, `url(#${T.m})`);
   s += half(r - 3, -1, d0 + .05, 1, 'rgba(255,250,235,.55)') + half(r - 3, 1, d0 + .05, 1, 'rgba(255,250,235,.55)');
+  if (simple) return s;
   s += half(r + 17, -1, d0 + .15, 1.6, `url(#${T.m})`) + half(r + 17, 1, d0 + .15, 1.6, `url(#${T.m})`);
   s += `<circle r="${r + 9}" fill="none" stroke="url(#${T.m})" stroke-width="3.6" stroke-dasharray="0 11.4" stroke-linecap="round" class="f" style="--d:${d0 + .9}s"/>`;
   s += [[0, -(r + 17)], [r + 17, 0], [0, r + 17], [-(r + 17), 0]].map(([x, y], i) => `<g transform="translate(${x} ${y}) rotate(${i * 90}) scale(1.15)" class="f" style="--d:${d0 + 1}s"><path d="${RUYI}" fill="url(#${T.fl})" stroke="rgba(255,250,235,.7)" stroke-width=".9"/><circle r="2.2" cy="-2" fill="rgba(60,30,4,.6)"/></g>`).join('');
@@ -237,6 +243,24 @@ function seal(text, size) {
     `<rect x="9" y="9" width="62" height="62" rx="4" fill="none" stroke="#FFE3D2" stroke-width="2.4" opacity=".85"/>` +
     `<text x="40" y="36" text-anchor="middle" font-family="Noto Serif SC, serif" font-weight="900" font-size="27" fill="#FFEBDD">${a}</text><text x="40" y="66" text-anchor="middle" font-family="Noto Serif SC, serif" font-weight="900" font-size="27" fill="#FFEBDD">${b}</text></g>`;
   return h('div', 'seal', { '--ss': size + 'px' }, s);
+}
+// 提督牌坊：紫漆立柱，金柱头、柱础
+function post(side) {
+  const x = side < 0 ? -241 : 227, cx = x + 7;
+  return `<g class="pillar" style="--d:.3s"><rect x="${x}" y="-188" width="14" height="394" fill="url(#post)"/><path d="M${x + 4} -180 V200" stroke="#E9D6FF" stroke-width="1" opacity=".35"/>` +
+    `<rect x="${x - 6}" y="-198" width="26" height="12" rx="2" fill="url(#fAdm)"/><rect x="${x - 3}" y="-150" width="20" height="5" rx="1" fill="url(#fAdm)"/>` +
+    `<path d="M${cx - 15} 206 h30 l4 12 h-38z" fill="url(#fAdm)"/></g>`;
+}
+// 宫灯：金色灯顶灯座、紫色灯罩透光、流苏
+function lantern(x, y, d) {
+  const b = y + 26, e = y + 86;
+  return `<g class="tassel" style="--d:${d}s"><g><circle cx="${x}" cy="${y + 56}" r="62" fill="url(#lanGlow)" class="lglow"/><path d="M${x} ${y} V${y + 16}" stroke="url(#mAdm)" stroke-width="1.6"/>` +
+    `<path d="M${x - 12} ${y + 16} h24 l7 10 h-38z" fill="url(#fAdm)"/>` +
+    `<path d="M${x - 20} ${b} C${x - 35} ${b + 18} ${x - 35} ${e - 18} ${x - 20} ${e} H${x + 20} C${x + 35} ${e - 18} ${x + 35} ${b + 18} ${x + 20} ${b} Z" fill="url(#lantern)" stroke="url(#mAdm)" stroke-width="1.6"/>` +
+    `<path d="M${x - 9} ${b} C${x - 16} ${b + 20} ${x - 16} ${e - 20} ${x - 9} ${e} M${x} ${b} V${e} M${x + 9} ${b} C${x + 16} ${b + 20} ${x + 16} ${e - 20} ${x + 9} ${e}" fill="none" stroke="#E6BF86" stroke-width="1" opacity=".7"/>` +
+    `<path d="M${x - 24} ${b + 30} H${x + 24}" stroke="#E6BF86" stroke-width="1.2" opacity=".6"/>` +
+    `<path d="M${x - 20} ${e} h40 l-7 9 h-26z" fill="url(#fAdm)"/><circle cx="${x}" cy="${e + 14}" r="4.5" fill="url(#pAdm)"/>` +
+    [-6, -3, 0, 3, 6].map((o) => `<path d="M${x + o * .8} ${e + 18} L${x + o * 1.5} ${e + 52}" stroke="#8B55D6" stroke-width="1.5" opacity=".9"/>`).join('') + `</g></g>`;
 }
 // 一道光扫过：把金色部件复制一份涂成白色，只在移动的光带里露出来
 let uid = 0;
@@ -271,18 +295,18 @@ function texts(root, T, key, name, y, times) {
 function cap(name) {
   const T = TIER.cap, root = h('div', 'hero t-cap', { '--dur': T.dur + 's' });
   root.append(h('div', 'dim'));
-  const halo = `<circle r="360" fill="url(#haloCap)" class="f" style="--d:.1s"/>`;
-  const gate = moonGate(T, 138, .15);
-  const cl2 = cloud(T, 150, 132, 1.05, 1, .85, -1.6);
-  const crest = `<g class="drop" style="--d:.95s"><g transform="translate(0 -176) scale(2.1)"><path d="${RUYI}" fill="url(#fCap)" stroke="rgba(255,255,255,.8)" stroke-width=".6"/><circle r="2.4" cy="-2" fill="#1E4A6A"/></g>` +
-    `<path d="M-60 -176 C-40 -168 -24 -170 -18 -178 M60 -176 C40 -168 24 -170 18 -178" fill="none" stroke="url(#mCap)" stroke-width="3" stroke-linecap="round"/><circle cx="-64" cy="-176" r="4" fill="url(#pCap)"/><circle cx="64" cy="-176" r="4" fill="url(#pCap)"/></g>`;
+  const halo = `<circle r="300" fill="url(#haloCap)" class="f" style="--d:.1s"/>`;
+  const gate = moonGate(T, 124, .15, '', true);
+  const cl1 = cloud(T, -132, 112, .85, -1, .75, 0), cl2 = cloud(T, 132, 112, .85, 1, .85, -1.6);
+  const crest = `<g class="drop" style="--d:.95s"><g transform="translate(0 -146) scale(1.8)"><path d="${RUYI}" fill="url(#fCap)" stroke="rgba(255,255,255,.8)" stroke-width=".6"/><circle r="2.4" cy="-2" fill="#1E4A6A"/></g>` +
+    `<path d="M-52 -146 C-34 -139 -21 -141 -16 -148 M52 -146 C34 -139 21 -141 16 -148" fill="none" stroke="url(#mCap)" stroke-width="3" stroke-linecap="round"/><circle cx="-56" cy="-146" r="3.5" fill="url(#pCap)"/><circle cx="56" cy="-146" r="3.5" fill="url(#pCap)"/></g>`;
   const gold = gate + crest;
-  root.append(lay(`${halo}${cloud(T, -150, 132, 1.05, -1, .75, 0)}${cl2}${gate}`));
-  root.append(avatarEl(name, 244, .55, 2.2));
-  root.append(lay(`${crest}${sweep(gold + cloud(T, -150, 132, 1.05, -1, .75, 0) + cl2, 2.1)}`));
-  [[0, -214, 24, 2.3], [-240, 120, 18, 2.6], [240, 120, 18, 2.8]].forEach((g) => root.append(glintEl(g)));
-  root.append(...dusts(8, T.dust, 240, .8, 2));
-  texts(root, T, 'cap', name, 212, { lab: 1, nm: 1.25, seal: 2.05 });
+  root.append(lay(`${halo}${cl1}${cl2}${gate}`));
+  root.append(avatarEl(name, 228, .55, 2.2));
+  root.append(lay(`${crest}${sweep(gold + cl1 + cl2, 2.1)}`));
+  [[0, -180, 22, 2.3], [-210, 110, 16, 2.6], [210, 110, 16, 2.8]].forEach((g) => root.append(glintEl(g)));
+  root.append(...dusts(6, T.dust, 200, .8, 2));
+  texts(root, T, 'cap', name, 186, { lab: 1, nm: 1.25, seal: 2.05 });
   return root;
 }
 
@@ -301,13 +325,14 @@ function adm(name) {
     `<path d="M-232 -188 Q0 -242 232 -188" fill="none" stroke="#F6E0BC" stroke-width="3" stroke-dasharray="0 12" stroke-linecap="round"/>` +
     `<path d="M-238 -196 c-18 2 -26 20 -14 30 c10 8 22 -2 14 -10 M238 -196 c18 2 26 20 14 30 c-10 8 -22 -2 -14 -10" fill="none" stroke="url(#mAdm)" stroke-width="3.2" stroke-linecap="round"/>` +
     `<path d="M0 -226 C-9 -238 -6 -252 0 -262 C6 -252 9 -238 0 -226Z" fill="url(#pAdm)" opacity=".9"/><circle cx="0" cy="-232" r="12" fill="url(#pAdm)" stroke="#F6E0BC" stroke-width="1.2"/></g>`;
-  const cl = cloud(T, -300, 96, 1.2, -1, 1.2, 0) + cloud(T, 300, 96, 1.2, 1, 1.3, -1.4) + cloud(T, -400, -64, .75, 1, 1.5, -.7) + cloud(T, 400, -64, .75, -1, 1.6, -2.1);
-  root.append(lay(`${mist}${cl}${gate}`));
+  const cl = cloud(T, -330, 96, 1.2, -1, 1.2, 0) + cloud(T, 330, 96, 1.2, 1, 1.3, -1.4) + cloud(T, -420, -80, .75, 1, 1.5, -.7) + cloud(T, 420, -80, .75, -1, 1.6, -2.1);
+  const posts = post(-1) + post(1) + [[222, 262, 2.2], [236, 290, 1.4]].map(([y, w, sw], i) => P(`M0 ${y} H${-w}`, .45 + i * .08, .9, 'url(#mAdm)', sw) + P(`M0 ${y} H${w}`, .45 + i * .08, .9, 'url(#mAdm)', sw)).join('');
+  root.append(lay(`${mist}${cl}${posts}${gate}`));
   root.append(avatarEl(name, 252, .9, 3));
-  root.append(lay(`${lintel}${tassel(-252, -170, 44, '#8B55D6', 1.5, 'pAdm')}${tassel(252, -170, 44, '#8B55D6', 1.5, 'pAdm')}${sweep(gate + lintel + cl, 3.1)}`));
-  [[0, -272, 24, 3.3], [-420, 60, 20, 2.8], [420, 60, 20, 3], [-250, -120, 16, 3.6], [250, -120, 16, 3.9]].forEach((g) => root.append(glintEl(g)));
+  root.append(lay(`${lintel}${lantern(-192, -206, 1.6)}${lantern(192, -206, 1.75)}${sweep(posts + gate + lintel + cl, 3.1)}`));
+  [[0, -272, 24, 3.3], [-440, 60, 20, 2.8], [440, 60, 20, 3], [-192, -60, 16, 3.6], [192, -60, 16, 3.9]].forEach((g) => root.append(glintEl(g)));
   root.append(...dusts(14, T.dust, 300, 1, 3.5));
-  texts(root, T, 'adm', name, 228, { lab: 1.7, nm: 2, seal: 3 });
+  texts(root, T, 'adm', name, 270, { lab: 1.7, nm: 2, seal: 3 });
   return root;
 }
 
@@ -377,6 +402,7 @@ function play() {
   const T = TIER[state.tier], el = BUILD[state.tier](NAMES[state.name]);
   st.append(el);
   $('#capline').textContent = `${T.title} · ${T.dur} 秒`;
+  if (q.has('shot')) return;
   timer = setTimeout(() => { if (state.auto) { const o = ['cap', 'adm', 'gov']; state.tier = o[(o.indexOf(state.tier) + 1) % 3]; save(); sync(); play(); } else el.remove(); }, T.dur * 1000 + 400);
 }
 function fit() {

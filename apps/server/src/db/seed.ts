@@ -23,6 +23,8 @@ export const BUILTIN_EFFECTS: BuiltinEffect[] = [
   { name: '礼物感谢', style: 'gift', position: 'bl', durationMs: 4000, texts: { enter: ['感谢 {name} 送出 {gift} ×{count}'], guard: ['感谢 {name} {op}{guard} {months} 个月'] } },
   { name: '弹幕回应', style: 'bubble', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'] } },
   { name: '一行字', style: 'line', position: 'bl', durationMs: 2400, texts: { enter: ['{name} 进入直播间'], gift: ['{name} 送出 {gift} ×{count}'] } },
+  // 普通观众：和粉丝牌进场同一个样子（霜玻），时间短一些；默认关闭
+  { name: '霜玻·简', style: 'frost', position: 'bl', durationMs: 2400, texts: { enter: ['{name} 来了'] } },
   // 大航海 · 东方宫廷：上面一行小字是欢迎语去掉昵称的部分，昵称单独写大字
   { name: '金銮', style: 'royal-gov', position: 'center', durationMs: 8000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
   { name: '亭阁', style: 'royal-adm', position: 'center', durationMs: 6000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
@@ -70,7 +72,7 @@ export function seed(db: Db): void {
       { tier: 'adm', effectId: id('亭阁'), cooldownMin: 5, enabled: true },
       { tier: 'cap', effectId: id('门楼'), cooldownMin: 5, enabled: true },
       { tier: 'mod', effectId: id('巡场'), cooldownMin: 10, enabled: true },
-      { tier: 'nor', effectId: id('一行字'), cooldownMin: 30, enabled: false },
+      { tier: 'nor', effectId: id('霜玻·简'), cooldownMin: 30, enabled: false },
     ] as const;
     for (const t of tiers) tx.insert(ruleEnterTiers).values(t).onConflictDoNothing().run();
     if (!tx.select().from(ruleEnterBands).limit(1).get()) {

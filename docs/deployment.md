@@ -189,10 +189,10 @@ systemctl start starfall
 - 忘记密码：在服务器上运行下面的命令，会生成新的随机密码并显示出来（也写入 `data/initial-password.txt`），原来的登录全部失效，服务不需要重启。
 
 ```bash
-cd /opt/starfall && runuser -u starfall -- node apps/server/src/cli/reset-password.ts
+cd /opt/starfall && pnpm reset-password
 ```
 
-请用 `starfall` 账号运行（如上）。用 root 直接运行 `pnpm reset-password` 可能让数据库的临时文件变成 root 所有，服务随后无法写入；万一发生，执行 `chown -R starfall:starfall /opt/starfall/data` 即可。
+用 root 运行时，命令会把改动过的数据库文件交还给服务账号 `starfall`，服务可以继续正常写入。
 
 ## 10. 常见问题
 

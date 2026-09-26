@@ -214,11 +214,7 @@
 
 ## 10. 部署与运维变化
 
-1. **运行账号**：服务改为以 `starfall` 账号运行，数据目录 `/opt/starfall/data` 归它所有。重置后台密码的命令改为：
-   ```bash
-   cd /opt/starfall && runuser -u starfall -- node apps/server/src/cli/reset-password.ts
-   ```
-   用 root 直接运行可能让数据库的临时文件变成 root 所有，服务随后无法写入；万一发生，执行 `chown -R starfall:starfall /opt/starfall/data`。
+1. **运行账号**：服务改为以 `starfall` 账号运行，数据目录 `/opt/starfall/data` 归它所有。重置后台密码仍然是 `cd /opt/starfall && pnpm reset-password`：用 root 运行时，命令会把改动过的数据库文件交还给 `starfall`（v1.0.1 起）。如果用其他方式以 root 改过数据目录，执行 `chown -R starfall:starfall /opt/starfall/data` 即可。
 2. **新设置** `STARFALL_TRUST_PROXY`：放在 HTTPS 反向代理后面时填代理地址（同一台机器填 `127.0.0.1`）。部署指南已补充，Nginx 示例加上了 `X-Forwarded-Proto`。
 3. **数据库升级** `0003_events_page_index`：新增两个事件索引，启动时自动执行。
 4. **备份文件名**：手动备份形如 `starfall-20260926-153012-m.db`，与自动备份分开保留。

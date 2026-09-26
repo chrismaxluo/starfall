@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fitSize } from './media.ts';
-import { textWithoutName } from './parts.ts';
+import { textWithoutName, thumb } from './parts.ts';
 import { DEFAULT_CONFIG, metrics } from './stage.ts';
 
 describe('画布尺寸', () => {
@@ -32,5 +32,14 @@ describe('欢迎语', () => {
     expect(textWithoutName('总督 长夜未央 驾临', '长夜未央')).toBe('总督 驾临');
     expect(textWithoutName('长夜未央', '长夜未央')).toBe('');
     expect(textWithoutName('欢迎回来', '')).toBe('欢迎回来');
+  });
+});
+
+describe('头像缩略图', () => {
+  it('B 站头像按 2 倍像素取缩略图（32 的倍数，最大 512）；其他地址、已经带参数的原样返回', () => {
+    expect(thumb('https://i0.hdslb.com/bfs/face/a.jpg', 72)).toBe('https://i0.hdslb.com/bfs/face/a.jpg@160w_160h.webp');
+    expect(thumb('https://i2.hdslb.com/bfs/face/a.jpg', 400)).toBe('https://i2.hdslb.com/bfs/face/a.jpg@512w_512h.webp');
+    expect(thumb('https://i0.hdslb.com/bfs/face/a.jpg@100w.webp', 72)).toBe('https://i0.hdslb.com/bfs/face/a.jpg@100w.webp');
+    expect(thumb('https://example.invalid/a.jpg', 72)).toBe('https://example.invalid/a.jpg');
   });
 });

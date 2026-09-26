@@ -82,9 +82,14 @@ export function connect(url: string, h: { onMessage: (m: ServerToOverlay) => voi
   }, 5000);
   const alive = setInterval(() => send({ type: 'alive' }), OVERLAY_TIMING.aliveMs);
 
-  // 页面重新可见、网络恢复时，如果正在等待重连，立即重连
+  // 页面重新可见、网络恢复时：正在等待重连就立即重连；连接还挂着但已经 15 秒没有消息（多半已经断了）就丢掉重连
   const wake = () => {
-    if (closed || ws || !timer) return;
+    if (closed) return;
+    if (ws) {
+      if (Date.now() - lastMsg > 15_000) drop();
+      return;
+    }
+    if (!timer) return;
     clearTimeout(timer);
     timer = null;
     attempt = 0;

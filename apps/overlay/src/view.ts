@@ -69,6 +69,8 @@ export function startView(): ViewBar {
       received++;
       count.textContent = `本页已收到 ${received} 个`;
       names.set(item.id, `${item.effect.name} · ${item.viewer.name}`);
+      // 只需要记住最近的几条（长时间开着不累积）
+      if (names.size > 20) names.delete(names.keys().next().value!);
       playing = item.id;
       now.textContent = `正在播放：${names.get(item.id)}`;
       now.classList.add('on');

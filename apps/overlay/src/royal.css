@@ -76,6 +76,8 @@
 .rx-swp { animation: rxSwp 1.6s var(--d) cubic-bezier(.45,0,.35,1) forwards; }
 @keyframes rxSwp { from { transform: translateX(0); } to { transform: translateX(1900px); } }
 
-/* 省资源模式、减少动态效果：不放金粉和闪光 */
-.lite .rx-dust, .lite .rx-glint { display: none; }
+/* 省资源模式、减少动态效果：不放金粉和闪光；祥云、流苏不循环浮动；去掉纹理滤镜和扫光
+  （SVG 里有部件在动时整张图每帧都要重画，滤镜也跟着重算，弱显卡上会卡） */
+.lite .rx-dust, .lite .rx-glint, .lite .rx-tex, .lite .rx-sweep { display: none; }
+.lite .rx-cloud > g, .lite .rx-tassel > g { animation: none; }
 @media (prefers-reduced-motion: reduce) { .rx-dust, .rx-glint { display: none; } }

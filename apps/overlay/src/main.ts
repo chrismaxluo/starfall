@@ -66,11 +66,30 @@ function notice(title: string, detail: string): void {
   stage.append(h('div', { class: 'notice' }, title, h('small', {}, detail)));
 }
 
-/** 预加载本输出会用到的文件（逐个下载，避免直播时抢带宽）；用到 SVGA / Lottie 时提前加载播放库 */
-async function preload(urls: string[]): Promise<void> {
+/**
+ * 预加载本输出会用到的文件（逐个下载，避免直播时抢带宽），放进浏览器缓存；用到 SVGA / Lottie 时提前加载播放库。
+ * 每个文件只预加载一次（重连后不重复），同一时间只有一轮在跑；读的时候边读边丢，不把整个文件留在内存里
+ */
+const preloaded = new Set<string>();
+let preloading: Promise<void> = Promise.resolve();
+function preload(urls: string[]): Promise<void> {
   if (urls.some((u) => u.endsWith('.svga'))) void import('svgaplayerweb').catch(() => undefined);
   if (urls.some((u) => u.endsWith('.json'))) void import('lottie-web/build/player/lottie_light').catch(() => undefined);
-  for (const u of urls) await fetch(u).then((r) => r.blob()).catch(() => undefined);
+  preloading = preloading.then(async () => {
+    for (const u of urls) {
+      if (preloaded.has(u)) continue;
+      preloaded.add(u);
+      try {
+        const reader = (await fetch(u)).body?.getReader();
+        while (reader && !(await reader.read()).done) {
+          /* 只为了下载进缓存 */
+        }
+      } catch {
+        preloaded.delete(u);
+      }
+    }
+  });
+  return preloading;
 }
 
 function onMessage(m: ServerToOverlay): void {

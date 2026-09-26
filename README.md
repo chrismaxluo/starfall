@@ -14,19 +14,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-266%20passed-0E8C7A?style=flat-square)](#质量保障)
 
-[快速开始](#快速开始) · [部署指南](docs/deployment.md) · [使用手册](docs/user-guide.md) · [更新记录](CHANGELOG.md)
+[界面预览](#界面预览) · [快速开始](#快速开始) · [部署指南](docs/deployment.md) · [使用手册](docs/user-guide.md) · [更新记录](CHANGELOG.md)
 
 </div>
 
 <br>
-
-<p align="center">
-  <img src="docs/images/overview-dark.png" alt="管理后台 · 总览" width="100%">
-</p>
-
-<p align="center"><sub>管理后台 · 总览（截图中的账号、主播、房间号、直播标题与观众信息均已模糊处理）</sub></p>
-
----
 
 ## 简介
 
@@ -39,11 +31,57 @@
     <td width="33%" valign="top"><b>统一调度</b><br><sub>按优先级排队播放，高价值事件插队，冷却、合并、去重，一键紧急暂停</sub></td>
   </tr>
   <tr>
-    <td width="33%" valign="top"><b>宫廷特效</b><br><sub>内置「门楼 · 亭阁 · 金銮」大航海三级特效，支持上传 WebM、SVGA、Lottie 等素材</sub></td>
+    <td width="33%" valign="top"><b>特效素材</b><br><sub>内置多款动画特效，支持上传透明 WebM、MP4、图片、SVGA、Lottie，可搭配音效</sub></td>
     <td width="33%" valign="top"><b>直播软件</b><br><sub>兼容 B 站直播姬与 OBS，竖屏优先并自动避开安全区，支持多路输出</sub></td>
     <td width="33%" valign="top"><b>管理后台</b><br><sub>实时动态、播放队列、直播数据、事件记录、模拟验证、备份与导入导出</sub></td>
   </tr>
 </table>
+
+## 界面预览
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/overview-dark.png" alt="总览 · 暗色"><br><sub><b>总览 · 暗色</b>：直播间状态、本场数据、实时动态与播放队列</sub></td>
+    <td width="50%"><img src="docs/images/overview-light.png" alt="总览 · 亮色"><br><sub><b>总览 · 亮色</b>：默认跟随系统，可随时切换</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/rules.png" alt="触发规则"><br><sub><b>触发规则</b>：每条规则一句话，按身份依次匹配</sub></td>
+    <td width="50%"><img src="docs/images/login.jpg" alt="登录页"><br><sub><b>登录页</b></sub></td>
+  </tr>
+</table>
+
+<p align="center"><sub>截图中的账号、主播、房间号、直播标题与观众信息均已模糊处理。</sub></p>
+
+## 快速开始
+
+**环境要求**：Linux 服务器（已在 Debian 12 验证）、Node.js 24+、可访问 B 站；推荐安装 ffmpeg，用于检测上传视频的透明通道与时长。
+
+```bash
+git clone https://github.com/chrismaxluo/starfall.git /opt/starfall
+cd /opt/starfall
+corepack enable && pnpm install
+pnpm build
+pnpm --filter @starfall/server start
+```
+
+启动后访问 `http://<服务器地址>:17520/`，使用日志中显示的初始密码登录（同时保存在 `data/initial-password.txt`），按新手引导完成：
+
+1. 扫码登录 B 站账号（仅用于读取直播间消息，建议使用小号）
+2. 填写直播间房间号
+3. 将特效页地址添加为直播软件的浏览器源
+
+作为系统服务运行、更新、HTTPS 与备份恢复，请参阅 **[部署指南](docs/deployment.md)**；规则配置与直播中的操作，请参阅 **[使用手册](docs/user-guide.md)**。
+
+## 配置
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `STARFALL_PORT` | `17520` | 服务端口 |
+| `STARFALL_HOST` | `0.0.0.0` | 监听地址 |
+| `STARFALL_DATA` | `./data` | 数据目录：数据库、素材文件、加密密钥、备份 |
+| `STARFALL_TZ` | `Asia/Shanghai` | 主播所在时区，用于「今天」的统计与专属用户有效期 |
+
+连接时机、未开播时的处理、排队上限、黑名单、事件保留天数、自动备份等，均在管理后台「设置」中调整。
 
 ## 系统架构
 
@@ -102,7 +140,7 @@ sequenceDiagram
     S->>S: 匹配规则：专属 → 大航海 → 房管 → 粉丝牌 → 其他
     S->>S: 检查冷却、黑名单、开播状态
     S-->>A: 实时动态：命中规则与播放状态
-    S->>O: 播放「门楼」（昵称、头像、欢迎语）
+    S->>O: 播放舰长进场特效（昵称、头像、欢迎语）
     O-->>S: 播放开始 / 结束
     S->>O: 播放队列中的下一个
 ```
@@ -119,54 +157,6 @@ sequenceDiagram
 | 部署 | systemd（开机自启、崩溃自动重启）· 可选 HTTPS 反向代理 |
 
 服务端由 Node.js 直接运行 TypeScript 源码，无需编译；管理后台与特效页由 Vite 构建为静态文件，由服务端提供。
-
-## 界面预览
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/images/overview-light.png" alt="亮色主题"><br><sub><b>亮色主题</b>：默认跟随系统，可随时切换</sub></td>
-    <td width="50%"><img src="docs/images/login.jpg" alt="登录页"><br><sub><b>登录页</b></sub></td>
-  </tr>
-</table>
-
-<p align="center">
-  <img src="docs/images/effect-cap.png" alt="舰长 · 门楼" width="32%">
-  <img src="docs/images/effect-adm.png" alt="提督 · 亭阁" width="32%">
-  <img src="docs/images/effect-gov.png" alt="总督 · 金銮" width="32%">
-  <br>
-  <sub>内置大航海进场特效：舰长 · 门楼、提督 · 亭阁、总督 · 金銮</sub>
-</p>
-
-## 快速开始
-
-**环境要求**：Linux 服务器（已在 Debian 12 验证）、Node.js 24+、可访问 B 站；推荐安装 ffmpeg，用于检测上传视频的透明通道与时长。
-
-```bash
-git clone https://github.com/chrismaxluo/starfall.git /opt/starfall
-cd /opt/starfall
-corepack enable && pnpm install
-pnpm build
-pnpm --filter @starfall/server start
-```
-
-启动后访问 `http://<服务器地址>:17520/`，使用日志中显示的初始密码登录（同时保存在 `data/initial-password.txt`），按新手引导完成：
-
-1. 扫码登录 B 站账号（仅用于读取直播间消息，建议使用小号）
-2. 填写直播间房间号
-3. 将特效页地址添加为直播软件的浏览器源
-
-作为系统服务运行、更新、HTTPS 与备份恢复，请参阅 **[部署指南](docs/deployment.md)**；规则配置与直播中的操作，请参阅 **[使用手册](docs/user-guide.md)**。
-
-## 配置
-
-| 环境变量 | 默认值 | 说明 |
-|---|---|---|
-| `STARFALL_PORT` | `17520` | 服务端口 |
-| `STARFALL_HOST` | `0.0.0.0` | 监听地址 |
-| `STARFALL_DATA` | `./data` | 数据目录：数据库、素材文件、加密密钥、备份 |
-| `STARFALL_TZ` | `Asia/Shanghai` | 主播所在时区，用于「今天」的统计与专属用户有效期 |
-
-连接时机、未开播时的处理、排队上限、黑名单、事件保留天数、自动备份等，均在管理后台「设置」中调整。
 
 ## 项目结构
 

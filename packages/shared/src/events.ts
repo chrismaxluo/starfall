@@ -73,7 +73,12 @@ export interface GuardEvent extends EventBase {
   viewer: Viewer;
   level: Exclude<GuardLevel, 0>;
   months: number;
+  /** 开通 / 续费（按 B 站的提示文案判断） */
   op: 'open' | 'renew';
+  /** 来源：toast 为 USER_TOAST_MSG(_V2)（信息完整），guard_buy 为 GUARD_BUY（没有开通 / 续费信息） */
+  source: 'toast' | 'guard_buy';
+  /** 同一次购买的几条消息共用的编号（B 站的支付流水号），用于去重 */
+  dedupeKey?: string;
 }
 
 export interface LiveEvent extends EventBase {

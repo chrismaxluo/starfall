@@ -10,6 +10,7 @@ import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
 import { biliRoutes } from './routes/bili.ts';
+import { eventRuleRoutes } from './routes/event-rules.ts';
 import { eventRoutes } from './routes/events.ts';
 import { libraryRoutes } from './routes/library.ts';
 import { outputRoutes } from './routes/outputs.ts';
@@ -90,6 +91,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   biliRoutes(app, ctx);
   libraryRoutes(app, ctx);
   ruleRoutes(app, ctx);
+  eventRuleRoutes(app, ctx);
   outputRoutes(app, ctx);
   playbackRoutes(app, ctx);
   eventRoutes(app, ctx);

@@ -39,9 +39,9 @@ onMounted(() => addEventListener('message', onMessage));
 onBeforeUnmount(() => removeEventListener('message', onMessage));
 
 /** 播放一个素材（draft：还没保存的修改） */
-async function play(effect: EffectDto | number, viewer?: SampleViewer, draft?: object, kind: TriggerKind = 'enter'): Promise<void> {
+async function play(effect: EffectDto | number, viewer?: SampleViewer, draft?: object, kind: TriggerKind = 'enter', vars?: object): Promise<void> {
   try {
-    const item = await post('/api/preview', { effectId: typeof effect === 'number' ? effect : effect.id, kind, ...(viewer ? { viewer } : {}), ...(draft ? { draft } : {}) });
+    const item = await post('/api/preview', { effectId: typeof effect === 'number' ? effect : effect.id, kind, ...(viewer ? { viewer } : {}), ...(draft ? { draft } : {}), ...(vars ? { vars } : {}) });
     const msg = { type: 'play', item };
     if (ready) send(msg);
     else pending = msg;

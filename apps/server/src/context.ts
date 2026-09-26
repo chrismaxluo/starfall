@@ -11,7 +11,9 @@ import { AdminAuth } from './services/auth.ts';
 import { BlacklistStore } from './services/blacklist.ts';
 import { BiliAccount } from './services/bili-account.ts';
 import { EffectStore } from './services/effects.ts';
+import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-rules.ts';
 import { EventLog } from './services/events.ts';
+import { GiftCatalog } from './services/gifts.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
 import type { LiveDeps } from './services/live.ts';
@@ -36,6 +38,10 @@ export interface AppContext {
   effects: EffectStore;
   viewers: ViewerStore;
   enterRules: EnterRuleStore;
+  danmuRules: DanmuRuleStore;
+  giftRules: GiftRuleStore;
+  guardRules: GuardRuleStore;
+  gifts: GiftCatalog;
   outputs: OutputStore;
   blacklist: BlacklistStore;
   log: EventLog;
@@ -61,10 +67,14 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const viewers = new ViewerStore(db, () => account.anon);
   const enterRules = new EnterRuleStore(db, settings, viewers);
   const outputs = new OutputStore(db);
+  const danmuRules = new DanmuRuleStore(db);
+  const giftRules = new GiftRuleStore(db, settings);
+  const guardRules = new GuardRuleStore(db);
+  const gifts = new GiftCatalog(room, () => account.anon);
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
   const hub = new Hub();
-  const pipeline = new Pipeline({ live, room, settings, enterRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const pipeline = new Pipeline({ live, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
   // 把变化推给在线的特效页和管理后台
   outputs.onChange((o, change) => hub.outputChanged(o, change));
@@ -73,7 +83,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   pipeline.onQueueChange((queue) => hub.toAdmins({ type: 'queue', queue, paused: settings.get('paused') }));
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
 
-  return { config, db, secret, settings, auth, account, room, live, assets, effects, viewers, enterRules, outputs, blacklist, log, hub, pipeline, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, pipeline, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;

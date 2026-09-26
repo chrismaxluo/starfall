@@ -1,7 +1,7 @@
 // 全局状态：登录后加载一次，之后由实时连接（/ws/admin）和各页面的修改保持最新
 import { reactive } from 'vue';
 import { get } from './api.ts';
-import type { EffectDto, EnterBase, EventDto, ExclusiveDto, OutputDto, OverlayInfo, QueueSnapshot, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+import type { DanmuRule, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
 export const state = reactive({
   /** null：还没检查 */
@@ -12,6 +12,9 @@ export const state = reactive({
   sounds: [] as SoundDto[],
   enter: null as EnterBase | null,
   exclusives: [] as ExclusiveDto[],
+  danmu: [] as DanmuRule[],
+  gift: null as GiftRules | null,
+  guard: null as GuardRules | null,
   outputs: [] as OutputDto[],
   overlays: [] as OverlayInfo[],
   queue: { playing: null, items: [] } as QueueSnapshot,
@@ -38,9 +41,18 @@ export async function refreshEffects(): Promise<void> {
   state.sounds = s.sounds;
 }
 export async function refreshRules(): Promise<void> {
-  const [r, x] = await Promise.all([get<EnterBase>('/api/rules/enter'), get<{ exclusives: ExclusiveDto[] }>('/api/rules/exclusive')]);
+  const [r, x, d, g, u] = await Promise.all([
+    get<EnterBase>('/api/rules/enter'),
+    get<{ exclusives: ExclusiveDto[] }>('/api/rules/exclusive'),
+    get<{ rules: DanmuRule[] }>('/api/rules/danmu'),
+    get<GiftRules>('/api/rules/gift'),
+    get<GuardRules>('/api/rules/guard'),
+  ]);
   state.enter = r;
   state.exclusives = x.exclusives;
+  state.danmu = d.rules;
+  state.gift = g;
+  state.guard = u;
 }
 export async function refreshOutputs(): Promise<void> {
   state.outputs = (await get<{ outputs: OutputDto[] }>('/api/outputs')).outputs;

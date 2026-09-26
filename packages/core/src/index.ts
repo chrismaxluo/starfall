@@ -4,3 +4,7 @@ export * from './cooldown.ts';
 export * from './decide.ts';
 export * from './queue.ts';
 export * from './text.ts';
+export * from './danmu.ts';
+export * from './gift.ts';
+export * from './guard.ts';
+export * from './combo.ts';

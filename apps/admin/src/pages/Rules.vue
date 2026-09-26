@@ -10,6 +10,11 @@ import Medal from '../components/Medal.vue';
 import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
+import RulesDanmu from '../components/RulesDanmu.vue';
+import RulesGift from '../components/RulesGift.vue';
+import RulesGuard from '../components/RulesGuard.vue';
+import Simulate from '../components/Simulate.vue';
+import type { PreviewRequest } from '../lib/preview.ts';
 import { ApiError, del, get, post, put } from '../lib/api.ts';
 import { today } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
@@ -17,10 +22,11 @@ import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { route } from '../lib/route.ts';
 import { effectById, refreshEffects, refreshRules, refreshSettings, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
-import type { EnterBase, ExclusiveDto, MedalBand, SimulateResult, Tier, TierRule, Viewer } from '../lib/types.ts';
+import type { EnterBase, ExclusiveDto, MedalBand, Tier, TierRule, Viewer } from '../lib/types.ts';
 
 type Ev = 'enter' | 'danmu' | 'gift' | 'guard';
-const ev = ref<Ev>('enter');
+const EVS: Ev[] = ['enter', 'danmu', 'gift', 'guard'];
+const ev = ref<Ev>(EVS.includes(route.value.sub as Ev) ? (route.value.sub as Ev) : 'enter');
 const tab = ref<'tiers' | 'excl'>(route.value.sub === 'exclusive' ? 'excl' : 'tiers');
 const stage = ref<InstanceType<typeof PreviewStage> | null>(null);
 const prevLabel = ref('点任意一行的 ▶ 预览');
@@ -62,12 +68,13 @@ const GUARDS: Array<{ tier: Tier; cond: string }> = [
 function tierSample(t: Tier): SampleViewer {
   return SAMPLES[t as Identity];
 }
-function preview(effectId: number | null, viewer: SampleViewer, label: string): void {
+function preview(effectId: number | null, viewer: SampleViewer, label: string, kind: PreviewRequest['kind'] = 'enter', vars?: PreviewRequest['vars']): void {
   if (!effectId) return toast('这条规则还没有选素材', 'info');
   prevEffect.value = effectId;
   prevLabel.value = `${label} · ${effectById(effectId)?.name ?? ''}`;
-  void stage.value?.play(effectId, viewer);
+  void stage.value?.play(effectId, viewer, undefined, kind, vars);
 }
+const onPreview = (p: PreviewRequest) => preview(p.effectId, p.viewer, p.label, p.kind, p.vars);
 async function sendLive(): Promise<void> {
   if (!prevEffect.value) return;
   await attempt(() => post('/api/playback/test', { effectId: prevEffect.value }), '已发送到直播画面');
@@ -191,7 +198,13 @@ const todayStr = today();
 
 watch(
   () => route.value.sub,
-  (sub) => sub === 'exclusive' && (tab.value = 'excl'),
+  (sub) => {
+    if (sub === 'exclusive') {
+      ev.value = 'enter';
+      tab.value = 'excl';
+    }
+    else if (EVS.includes(sub as Ev)) ev.value = sub as Ev;
+  },
 );
 
 // 从其他页面跳过来添加（例如事件记录里的"设为专属"）
@@ -204,15 +217,6 @@ watch(
   },
   { immediate: true },
 );
-
-// ---------- 模拟 ----------
-const sim = ref({ identity: 'cap' as Identity, medal: 0, own: true });
-const simRes = ref<SimulateResult | null>(null);
-async function simulate(): Promise<void> {
-  const s = sim.value;
-  const viewer = { guard: s.identity === 'gov' ? 1 : s.identity === 'adm' ? 2 : s.identity === 'cap' ? 3 : 0, isMod: s.identity === 'mod', medal: s.medal > 0 ? { level: s.medal, own: s.own } : null };
-  simRes.value = (await attempt(() => post<SimulateResult>('/api/simulate', { viewer }))) ?? null;
-}
 
 // ---------- 队列 ----------
 async function saveSetting(patch: object, msg: string): Promise<void> {
@@ -376,7 +380,9 @@ onMounted(() => void refreshRules());
             </div>
           </div>
         </template>
-        <div v-else-if="ev !== 'enter'" class="soon-box"><b>{{ { danmu: '弹幕', gift: '礼物', guard: '上舰' }[ev] }}规则在下一个版本（v0.2.0）开放</b>事件已经在记录了，可以在「事件记录」里看到</div>
+        <RulesDanmu v-else-if="ev === 'danmu'" @preview="onPreview" />
+        <RulesGift v-else-if="ev === 'gift'" @preview="onPreview" />
+        <RulesGuard v-else-if="ev === 'guard'" @preview="onPreview" />
       </div>
 
       <aside class="side-prev">
@@ -385,30 +391,11 @@ onMounted(() => void refreshRules());
           <PreviewStage ref="stage" :label="prevLabel" />
           <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" style="width: 100%; justify-content: center; margin-top: 12px" :disabled="!prevEffect" @confirm="sendLive" />
         </div>
-        <div class="card" style="margin-top: 16px">
-          <div class="card-h"><h2>模拟一次进场</h2><span class="aside">看看会命中哪条规则</span></div>
-          <div id="simBox">
-            <div class="row">
-              <select v-model="sim.identity" class="sel" aria-label="身份">
-                <option value="gov">总督</option><option value="adm">提督</option><option value="cap">舰长</option><option value="mod">房管</option><option value="nor">普通观众</option>
-              </select>
-              <div class="suffix"><input v-model.number="sim.medal" class="inp num" type="number" min="0" max="60" aria-label="粉丝牌等级" /><span>级牌子</span></div>
-            </div>
-            <label class="toggle-line" style="font-size: 12.5px"><input v-model="sim.own" type="checkbox" style="accent-color: var(--accent)" />牌子是本直播间的（0 级表示没戴牌子）</label>
-            <button class="btn primary" style="justify-content: center" @click="simulate">模拟进场</button>
-          </div>
-          <div class="simres">
-            <template v-if="simRes">
-              <template v-if="simRes.rule">命中 <b>{{ simRes.rule }}</b> → {{ simRes.effect?.name }}<br /></template>
-              <span v-else class="miss">没有命中任何规则<br /></span>
-              结果：{{ simRes.status === 'played' ? '会播放' : `不会播放（${simRes.statusText}）` }}
-            </template>
-          </div>
-        </div>
+        <Simulate :kind="ev" />
         <div v-if="state.settings" class="card" style="margin-top: 16px">
           <div class="card-h"><h2>播放队列</h2><span class="aside">所有事件共用</span></div>
           <ol class="qorder"><li><b>上舰</b></li><li><b>礼物</b></li><li><b>进场</b></li><li><b>弹幕</b></li></ol>
-          <div class="toggle-line" style="margin-top: 12px">高价值插队 <span class="hint">上舰和 ≥ 100 元礼物立即播放（v0.2.0 生效）</span>
+          <div class="toggle-line" style="margin-top: 12px">高价值插队 <span class="hint">上舰和 ≥ 100 元礼物立即播放</span>
             <Switch v-model="state.settings.queueJump" label="高价值插队" @change="(v) => saveSetting({ queueJump: v }, v ? '已开启高价值插队' : '已关闭高价值插队')" />
           </div>
           <div class="slider-row" style="margin-top: 10px">

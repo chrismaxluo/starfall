@@ -1,7 +1,7 @@
 // 接口返回的数据格式（与服务端 apps/server 的返回值一致）
-import type { Effect, EnterRules, Exclusive, GuardLevel, Medal, MedalBand, OverlayConfig, PlayStatus, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GuardLevel, GuardRules, Medal, MedalBand, OverlayConfig, PlayStatus, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
 
-export type { Tier, TierRule, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig };
+export type { Tier, TierRule, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules };
 
 export interface AssetDto {
   id: number;
@@ -21,7 +21,7 @@ export interface AssetDto {
 export interface EffectDto extends Effect {
   asset: AssetDto | null;
   sound: AssetDto | null;
-  usedBy: Array<{ page: 'enter'; label: string }>;
+  usedBy: Array<{ page: 'enter' | 'danmu' | 'gift' | 'guard'; label: string }>;
   createdAt: number;
   updatedAt: number;
 }
@@ -92,6 +92,19 @@ export interface Settings {
   blockAnchor: boolean;
   blockAccount: boolean;
   retentionDays: 0 | 30 | 90 | 180;
+  giftComboEnabled: boolean;
+  giftComboSec: number;
+}
+
+/** 本直播间礼物面板里的一种礼物 */
+export interface GiftConfig {
+  id: number;
+  name: string;
+  /** 单价（金瓜子） */
+  price: number;
+  paid: boolean;
+  icon: string;
+  gif?: string;
 }
 
 export interface EventDto {

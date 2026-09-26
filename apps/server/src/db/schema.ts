@@ -96,6 +96,43 @@ export const ruleExclusive = sqliteTable('rule_exclusive', {
   createdAt: integer('created_at').notNull().default(now),
 });
 
+/** 弹幕规则（按 sort 从小到大匹配） */
+export const ruleDanmu = sqliteTable('rule_danmu', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sort: integer('sort').notNull(),
+  keywords: text('keywords', { mode: 'json' }).$type<string[]>().notNull(),
+  mode: text('mode', { enum: ['contains', 'exact'] }).notNull(),
+  who: text('who', { enum: ['all', 'fan', 'fan10', 'guard', 'mod'] }).notNull(),
+  effectId: integer('effect_id').references(() => effects.id, { onDelete: 'restrict' }),
+  globalCdSec: integer('global_cd_sec').notNull(),
+  userCdMin: integer('user_cd_min').notNull(),
+  enabled: bool('enabled').notNull(),
+});
+
+/** 指定礼物（按礼物 ID） */
+export const ruleGiftSpecific = sqliteTable('rule_gift_specific', {
+  giftId: integer('gift_id').primaryKey(),
+  giftName: text('gift_name').notNull().default(''),
+  effectId: integer('effect_id').references(() => effects.id, { onDelete: 'restrict' }),
+  enabled: bool('enabled').notNull(),
+  sort: integer('sort').notNull().default(0),
+});
+
+/** 礼物按单次价值分档：只存起始价值（金瓜子） */
+export const ruleGiftBands = sqliteTable('rule_gift_bands', {
+  fromGold: integer('from_gold').primaryKey(),
+  effectId: integer('effect_id').references(() => effects.id, { onDelete: 'restrict' }),
+  enabled: bool('enabled').notNull(),
+});
+
+/** 上舰（固定 3 行：gov / adm / cap） */
+export const ruleGuard = sqliteTable('rule_guard', {
+  tier: text('tier', { enum: ['gov', 'adm', 'cap'] }).primaryKey(),
+  openEffectId: integer('open_effect_id').references(() => effects.id, { onDelete: 'restrict' }),
+  renewEffectId: integer('renew_effect_id').references(() => effects.id, { onDelete: 'restrict' }),
+  enabled: bool('enabled').notNull(),
+});
+
 export const blacklist = sqliteTable('blacklist', {
   uid: integer('uid').primaryKey(),
   name: text('name').notNull().default(''),

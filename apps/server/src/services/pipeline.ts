@@ -1,13 +1,15 @@
 // 事件处理管道（方案设计第 5 节）：
 // B 站事件 → 进场合并 → 匹配规则 → 判断能不能播 → 入队 → 播放循环 → 推送给所有在线特效页。
 // 每个事件都写进事件记录，带上命中的规则和最终的播放状态。
-// 第一期只有进场会播放；弹幕、礼物、上舰先照常记录（第二期接入规则）。
-import { Cooldowns, EnterMerger, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchEnter, pickText } from '@starfall/core';
-import type { EnterMatch, QueueItem } from '@starfall/core';
-import type { EnterEvent, PlayItem, PlayStatus, StdEvent, TriggerKind, Viewer } from '@starfall/shared';
+// 四种事件共用同一套判断（黑名单 → 匹配规则 → 暂停 → 开播 → 冷却 → 特效页在线），只有匹配规则、冷却、欢迎语变量、是否插队不同。
+import { Cooldowns, EnterMerger, GiftComboMerger, GuardDeduper, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchDanmu, matchEnter, matchGift, matchGuard, pickText } from '@starfall/core';
+import type { QueueItem, TextVars } from '@starfall/core';
+import { JUMP_GOLD } from '@starfall/shared';
+import type { PlayItem, PlayStatus, StdEvent, TriggerKind, Viewer } from '@starfall/shared';
 import { HttpError } from '../http.ts';
 import type { BlacklistStore } from './blacklist.ts';
 import type { EffectDto, EffectStore } from './effects.ts';
+import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rules.ts';
 import type { EventLog } from './events.ts';
 import type { Hub } from './hub.ts';
 import type { LiveService } from './live.ts';
@@ -16,7 +18,27 @@ import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
 import type { ViewerStore } from './viewers.ts';
 
-type TriggerEvent = Exclude<StdEvent, { kind: 'live' }>;
+export type TriggerEvent = Exclude<StdEvent, { kind: 'live' }>;
+/** 欢迎语变量（除观众以外） */
+export type Vars = Omit<TextVars, 'viewer'>;
+
+/** 预览时各事件的示例内容 */
+const SAMPLE_VARS: Record<TriggerKind, Vars> = {
+  enter: {},
+  danmu: { text: '主播晚上好！' },
+  gift: { gift: '小花花', count: 10, valueGold: 1000 },
+  guard: { months: 1, guardLevel: 3 },
+};
+
+interface Judgement {
+  hit: { label: string; effectId: number } | null;
+  effect: EffectDto | null;
+  status: PlayStatus;
+  /** 真正入队时更新冷却等状态（模拟时不调用） */
+  commit: () => void;
+  vars: Vars;
+  jump: boolean;
+}
 
 /** 两次播放之间的间隔 */
 export const PLAY_GAP_MS = 300;
@@ -45,6 +67,9 @@ export interface PipelineDeps {
   room: RoomStore;
   settings: SettingsStore;
   enterRules: EnterRuleStore;
+  danmuRules: DanmuRuleStore;
+  giftRules: GiftRuleStore;
+  guardRules: GuardRuleStore;
   effects: EffectStore;
   blacklist: BlacklistStore;
   viewers: ViewerStore;
@@ -60,6 +85,8 @@ export class Pipeline {
   private readonly now: () => number;
   private readonly rng: () => number;
   private readonly merger = new EnterMerger();
+  private readonly combo = new GiftComboMerger();
+  private readonly guards = new GuardDeduper();
   private readonly cooldowns = new Cooldowns();
   private readonly once = new OncePerLive();
   private readonly queue = new PlayQueue<Queued>();
@@ -110,18 +137,32 @@ export class Pipeline {
     const now = this.now();
     if (raw !== undefined) this.raws.set(ev.id, { raw, at: now });
     this.remember(ev.viewer);
-    if (ev.kind === 'enter') {
-      for (const e of this.merger.push(ev, now)) this.processEnter(e);
-    } else {
-      // 第二期接入弹幕、礼物、上舰规则
-      this.record(ev, null, 'no_rule');
+    switch (ev.kind) {
+      case 'enter':
+        for (const e of this.merger.push(ev, now)) this.process(e);
+        break;
+      case 'gift': {
+        const g = this.d.giftRules.get();
+        this.combo.windowMs = g.comboSec * 1000;
+        this.combo.enabled = g.comboEnabled;
+        for (const e of this.combo.push(ev, now)) this.process(e);
+        break;
+      }
+      case 'guard':
+        for (const e of this.guards.push(ev, now)) this.process(e);
+        break;
+      case 'danmu':
+        this.process(ev);
+        break;
     }
   }
 
-  /** 取出等待超时的进场（定时调用） */
+  /** 取出等待超时的进场、连击结束的礼物、单独到达的 GUARD_BUY（定时调用） */
   flush(): void {
     const now = this.now();
-    for (const e of this.merger.flush(now)) this.processEnter(e);
+    for (const e of this.merger.flush(now)) this.process(e);
+    for (const e of this.combo.flush(now)) this.process(e);
+    for (const e of this.guards.flush(now)) this.process(e);
     for (const [id, r] of this.raws) if (now - r.at > RAW_TTL_MS) this.raws.delete(id);
   }
 
@@ -132,42 +173,92 @@ export class Pipeline {
     this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '' });
   }
 
-  private record(ev: TriggerEvent, match: EnterMatch | null, status: PlayStatus): number {
+  private record(ev: TriggerEvent, hit: Judgement['hit'], status: PlayStatus): number {
     const raw = this.raws.get(ev.id)?.raw;
     this.raws.delete(ev.id);
-    return this.d.log.record(ev, { sessionId: this.d.live.status().sessionId, rule: match?.label ?? null, effectId: match?.effectId ?? null, status, raw }).id;
+    return this.d.log.record(ev, { sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
   }
 
   // ---------- 判断 ----------
 
-  /** 判断一次进场的结果；commit 为假时只判断（模拟），不改变冷却等状态 */
-  private judgeEnter(ev: EnterEvent): { match: EnterMatch | null; status: PlayStatus; effect: EffectDto | null } {
-    const room = this.d.room.get();
-    const rules = this.d.enterRules.full();
-    const match = matchEnter(ev.viewer, { rules, anchorUid: room?.anchorUid ?? 0, today: this.today() });
-    const live = this.d.live.status();
-    const oncePerLive = rules.cooldownMode === 'oncePerLive';
-    this.syncOnceSession(live.sessionId);
+  /** 判断一个事件能不能播（不改变任何状态；入队时再调用 commit） */
+  private judge(ev: TriggerEvent): Judgement {
     const now = this.now();
+    const live = this.d.live.status();
+    const anchorUid = this.d.room.get()?.anchorUid ?? 0;
+    const uid = ev.viewer.uid;
+    let hit: Judgement['hit'] = null;
+    let inCooldown = false;
+    let playedThisLive = false;
+    let commit = () => undefined as void;
+    let vars: Vars = {};
+    let jump = false;
+    const queueJump = this.d.settings.get('queueJump');
+
+    switch (ev.kind) {
+      case 'enter': {
+        const rules = this.d.enterRules.full();
+        const m = matchEnter(ev.viewer, { rules, anchorUid, today: this.today() });
+        const once = rules.cooldownMode === 'oncePerLive';
+        this.syncOnceSession(live.sessionId);
+        if (m) {
+          const key = `${enterRuleKey(m.rule)}:${uid}`;
+          hit = m;
+          inCooldown = !once && this.cooldowns.active(key, now);
+          playedThisLive = once && this.once.has(uid);
+          commit = () => (once ? this.once.mark(uid) : this.cooldowns.hit(key, now, m.cooldownMin));
+        }
+        break;
+      }
+      case 'danmu': {
+        const m = matchDanmu(ev.text, ev.viewer, this.d.danmuRules.list(), anchorUid);
+        vars = { text: ev.text };
+        if (m) {
+          const g = `danmu:${m.ruleId}`;
+          const u = `danmu:${m.ruleId}:${uid}`;
+          hit = m;
+          inCooldown = this.cooldowns.active(g, now) || this.cooldowns.active(u, now);
+          commit = () => {
+            this.cooldowns.hit(g, now, m.globalCdSec / 60);
+            this.cooldowns.hit(u, now, m.userCdMin);
+          };
+        }
+        break;
+      }
+      case 'gift': {
+        const m = matchGift(ev, this.d.giftRules.get());
+        vars = { gift: ev.giftName, count: ev.count, valueGold: ev.unitPrice * ev.count };
+        hit = m;
+        jump = queueJump && ev.unitPrice * ev.count >= JUMP_GOLD;
+        break;
+      }
+      case 'guard': {
+        hit = matchGuard(ev, this.d.guardRules.get());
+        vars = { months: ev.months, guardLevel: ev.level };
+        jump = queueJump;
+        break;
+      }
+    }
+
     let effect: EffectDto | null = null;
-    if (match) {
+    if (hit) {
       try {
-        effect = this.d.effects.get(match.effectId);
+        effect = this.d.effects.get(hit.effectId);
       } catch {
         effect = null;
       }
     }
     const result = decide({
-      blocked: this.d.blacklist.reason(ev.viewer.uid) !== null,
-      matched: Boolean(match && effect),
+      blocked: this.d.blacklist.reason(uid) !== null,
+      matched: Boolean(hit && effect),
       paused: this.d.settings.get('paused'),
       live: live.live,
       playWhenOffline: this.d.settings.get('offlinePolicy') === 'play',
-      inCooldown: !oncePerLive && match !== null && this.cooldowns.active(`${enterRuleKey(match.rule)}:${ev.viewer.uid}`, now),
-      playedThisLive: oncePerLive && this.once.has(ev.viewer.uid),
+      inCooldown,
+      playedThisLive,
       overlayOnline: this.d.hub.overlayCount() > 0,
     });
-    return { match, status: result.play ? 'queued' : result.status, effect };
+    return { hit, effect, status: result.play ? 'queued' : result.status, commit, vars, jump };
   }
 
   /** 换了一场直播："每场一次"重新计算；服务重启后从事件记录恢复本场已播放的人 */
@@ -178,25 +269,23 @@ export class Pipeline {
     else this.once.restore(String(sessionId), this.d.log.playedEnterUids(sessionId));
   }
 
-  private processEnter(ev: EnterEvent): void {
-    const { match, status, effect } = this.judgeEnter(ev);
-    const eventId = this.record(ev, match, status);
-    if (status !== 'queued' || !match || !effect) return;
-    const now = this.now();
-    if (this.d.enterRules.base().cooldownMode === 'oncePerLive') this.once.mark(ev.viewer.uid);
-    else this.cooldowns.hit(`${enterRuleKey(match.rule)}:${ev.viewer.uid}`, now, match.cooldownMin);
-    this.enqueue(this.playItem(effect, ev.viewer, 'enter'), eventId, false);
+  private process(ev: TriggerEvent): void {
+    const j = this.judge(ev);
+    const eventId = this.record(ev, j.hit, j.status);
+    if (j.status !== 'queued' || !j.hit || !j.effect) return;
+    j.commit();
+    this.enqueue(this.playItem(j.effect, ev.viewer, ev.kind, j.vars), eventId, j.jump);
   }
 
-  /** 模拟一次进场：只判断，不入队、不记录、不影响冷却（F-RU-05） */
-  simulate(viewer: Viewer): SimulateResult {
-    const { match, status, effect } = this.judgeEnter({ kind: 'enter', id: 'sim', ts: this.now(), viewer, source: 'interact' });
-    return { rule: match?.label ?? null, effect: effect ? { id: effect.id, name: effect.name } : null, status: status === 'queued' ? 'played' : status };
+  /** 模拟一次事件：只判断，不入队、不记录、不影响冷却（F-RU-05） */
+  simulate(ev: TriggerEvent): SimulateResult {
+    const j = this.judge(ev);
+    return { rule: j.hit?.label ?? null, effect: j.effect ? { id: j.effect.id, name: j.effect.name } : null, status: j.status === 'queued' ? 'played' : j.status };
   }
 
   // ---------- 播放 ----------
 
-  private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, test = false): PlayItem {
+  private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {
     const a = effect.asset;
     return {
       id: `p${this.now()}-${++this.seq}`,
@@ -214,7 +303,7 @@ export class Pipeline {
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },
-      text: fillText(pickText(effect.texts, kind, this.rng), { viewer }),
+      text: fillText(pickText(effect.texts, kind, this.rng), { viewer, ...vars }),
       viewer: {
         name: viewer.name,
         ...(viewer.face ? { face: viewer.face } : {}),
@@ -290,15 +379,15 @@ export class Pipeline {
     if (this.d.hub.overlayCount() === 0) throw new HttpError(409, 'no_overlay', '特效页不在线：请先把特效页地址加到直播软件的浏览器源里');
     const effect = this.d.effects.get(effectId);
     const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
-    const item = this.playItem(effect, v, 'enter', true);
+    const item = this.playItem(effect, v, 'enter', {}, true);
     this.enqueue(item, null, true);
     return { id: item.id };
   }
 
   /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
-  preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter'): PlayItem {
+  preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): PlayItem {
     const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
-    return this.playItem(effect, v, kind, true);
+    return this.playItem(effect, v, kind, vars ?? SAMPLE_VARS[kind], true);
   }
 
   snapshot(): QueueSnapshot {

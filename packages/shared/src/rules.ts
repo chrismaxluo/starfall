@@ -84,3 +84,71 @@ export const EnterRulesSchema = z
     if (new Set(uids).size !== uids.length) ctx.addIssue({ code: 'custom', path: ['exclusives'], message: '同一个 UID 只能设一条专属规则' });
   });
 export type EnterRules = z.infer<typeof EnterRulesSchema>;
+
+// ---------- 弹幕规则（需求 F-DM-01 ~ 04） ----------
+
+/** 发送人条件 */
+export const DANMU_WHO = ['all', 'fan', 'fan10', 'guard', 'mod'] as const;
+export type DanmuWho = (typeof DANMU_WHO)[number];
+
+export const DanmuRuleSchema = z.object({
+  id: z.number().int().positive(),
+  keywords: z.array(z.string().trim().min(1).max(30)).min(1).max(20),
+  /** 包含 / 完全一致 */
+  mode: z.enum(['contains', 'exact']),
+  who: z.enum(DANMU_WHO),
+  effectId: z.number().int().positive().nullable(),
+  /** 全局冷却（秒）：这条规则播放后，任何人再触发都要等 */
+  globalCdSec: z.number().int().min(0).max(3600),
+  /** 每人冷却（分钟） */
+  userCdMin: z.number().int().min(0).max(1440),
+  enabled: z.boolean(),
+});
+export type DanmuRule = z.infer<typeof DanmuRuleSchema>;
+
+// ---------- 礼物规则（需求 F-GF-01 ~ 05） ----------
+
+export const GiftSpecificSchema = z.object({
+  giftId: z.number().int().positive(),
+  giftName: z.string().max(40),
+  effectId: z.number().int().positive().nullable(),
+  enabled: z.boolean(),
+});
+export type GiftSpecific = z.infer<typeof GiftSpecificSchema>;
+
+/** 按单次价值分档：只存起始价值（金瓜子），区间由相邻两档推出 */
+export const GiftBandSchema = z.object({
+  fromGold: z.number().int().min(1).max(100_000_000),
+  effectId: z.number().int().positive().nullable(),
+  enabled: z.boolean(),
+});
+export type GiftBand = z.infer<typeof GiftBandSchema>;
+
+export const GiftRulesSchema = z
+  .object({
+    specific: z.array(GiftSpecificSchema).max(200),
+    bands: z.array(GiftBandSchema).min(1).max(20),
+    /** 连击合并：同一人在 comboSec 秒内连续送同一种礼物，合并为一次 */
+    comboEnabled: z.boolean(),
+    comboSec: z.number().int().min(1).max(15),
+  })
+  .superRefine((r, ctx) => {
+    const ids = r.specific.map((x) => x.giftId);
+    if (new Set(ids).size !== ids.length) ctx.addIssue({ code: 'custom', path: ['specific'], message: '同一种礼物只能设一条规则' });
+    const golds = r.bands.map((b) => b.fromGold);
+    if (new Set(golds).size !== golds.length) ctx.addIssue({ code: 'custom', path: ['bands'], message: '礼物分档的起始价值不能重复' });
+  });
+export type GiftRules = z.infer<typeof GiftRulesSchema>;
+
+// ---------- 上舰规则（需求 F-GD-01 ~ 02） ----------
+
+export const GuardRuleSchema = z.object({
+  openEffectId: z.number().int().positive().nullable(),
+  renewEffectId: z.number().int().positive().nullable(),
+  enabled: z.boolean(),
+});
+export type GuardRule = z.infer<typeof GuardRuleSchema>;
+
+export const GuardRulesSchema = z.object({ gov: GuardRuleSchema, adm: GuardRuleSchema, cap: GuardRuleSchema });
+export type GuardRules = z.infer<typeof GuardRulesSchema>;
+

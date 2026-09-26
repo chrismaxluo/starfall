@@ -136,6 +136,17 @@ describe('管理后台 WebSocket', () => {
     expect(await a.waitFor('queue')).toMatchObject({ queue: { playing: { viewerName: '小星' } } });
     expect(await o.waitFor('play')).toMatchObject({ item: { text: '恭迎舰长 小星' } });
   });
+
+  it('规则、设置改动成功后通知所有打开的后台重新读取；失败的不通知', async () => {
+    const t = await setup();
+    const a = await t.connect('/ws/admin', { cookie: `sf_session=${t.session}` });
+    await a.waitFor('hello');
+    await t.req({ method: 'PUT', url: '/api/settings', payload: { retentionDays: 30 } });
+    expect(await a.waitFor('changed')).toEqual({ type: 'changed', what: 'settings' });
+    await t.req({ method: 'PUT', url: '/api/settings', payload: { retentionDays: 'bad' } });
+    await t.req({ method: 'PUT', url: '/api/rules/gift', payload: (await t.req({ method: 'GET', url: '/api/rules/gift' })).json() });
+    expect(await a.waitFor('changed')).toEqual({ type: 'changed', what: 'rules' });
+  });
 });
 
 describe('播放控制接口', () => {

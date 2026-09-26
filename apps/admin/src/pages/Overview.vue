@@ -128,7 +128,9 @@ async function removeItem(id: string, name: string): Promise<void> {
   await attempt(() => del(`/api/playback/queue/${encodeURIComponent(id)}`), `已移出队列：${name}，这次不播放`);
 }
 async function saveSetting(patch: object, msg: string): Promise<void> {
-  if (await attempt(() => put('/api/settings', patch), msg)) await refreshSettings();
+  // 成功失败都重新读取：失败时开关要回到原来的状态
+  await attempt(() => put('/api/settings', patch), msg);
+  await refreshSettings().catch(() => undefined);
 }
 </script>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
+import { MAX_UPLOAD_BYTES } from '@starfall/shared/labels';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import { del, upload } from '../lib/api.ts';
@@ -45,6 +46,11 @@ async function handleFiles(files: FileList | File[]): Promise<void> {
   let anim = false;
   let snd = false;
   for (const f of list) {
+    // 先在浏览器里检查大小：超过上限的文件上传到一半才被拒绝，看到的会是"连不上服务"
+    if (f.size > MAX_UPLOAD_BYTES) {
+      toast(`「${f.name}」太大了（${fileSize(f.size)}），单个文件不能超过 ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`, 'err', 5000);
+      continue;
+    }
     const u = { id: ++upSeq, name: f.name, pct: 0 };
     uploads.push(u);
     const isAudio = AUDIO.test(f.name);
@@ -107,6 +113,11 @@ async function removeSound(s: SoundDto): Promise<void> {
   if (await attempt(() => del(`/api/assets/${s.id}`), `已删除音效：${s.filename}`)) await refreshEffects();
 }
 const bars = (id: number) => Array.from({ length: 28 }, (_, i) => 20 + Math.abs(Math.sin((id + 1) * 7.3 + i * 1.7)) * 70);
+// 离开素材库时停掉正在试听的音效
+onBeforeUnmount(() => {
+  audio?.pause();
+  audio = null;
+});
 </script>
 
 <template>

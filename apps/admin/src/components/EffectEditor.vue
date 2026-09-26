@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 素材设置（F-AS-06 ~ 12）：左边预览，右边 ① 画面 ② 头像和欢迎语 ③ 音效 ④ 位置与时长
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
 import type { EffectTexts, Position } from '@starfall/shared';
 import { del, post, put, upload } from '../lib/api.ts';
@@ -125,6 +125,11 @@ async function save(): Promise<void> {
 
 async function copy(): Promise<void> {
   if (!eff.value) return;
+  // 复制的是已保存的版本，会切到副本：没保存的修改先提醒一次
+  if (dirty.value && !confirmCopy.value) {
+    confirmCopy.value = true;
+    return toast('有修改还没保存，复制出的副本不包含这些修改；再点一次「复制」会放弃修改', 'info', 4000);
+  }
   const used = eff.value.usedBy.length > 0;
   const r = await attempt(() => post<EffectDto>(`/api/effects/${eff.value!.id}/copy`, { replaceRefs: eff.value!.builtin && used && replaceRefs.value }));
   if (!r) return;
@@ -193,6 +198,18 @@ function close(): void {
   emit('close');
 }
 const confirmLeave = ref(false);
+const confirmCopy = ref(false);
+// 有没保存的修改时，刷新或关闭浏览器标签页前提醒
+const beforeUnload = (e: BeforeUnloadEvent) => {
+  if (dirty.value) e.preventDefault();
+};
+addEventListener('beforeunload', beforeUnload);
+onBeforeUnmount(() => {
+  removeEventListener('beforeunload', beforeUnload);
+  // 不管怎么关掉的（保存、切换、复制），试听的音效都停掉
+  audio?.pause();
+  audio = null;
+});
 </script>
 
 <template>

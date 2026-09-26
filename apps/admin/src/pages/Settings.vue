@@ -30,9 +30,19 @@ async function logoutBili(): Promise<void> {
 
 const roomIn = ref('');
 const roomBusy = ref(false);
+// 已经设置了直播间时，更换要确认一次（回车太容易误触；换了之后本场数据、特效页都会切到新直播间）
+let armedFor: number | null = null;
+let armTimer: ReturnType<typeof setTimeout> | null = null;
 async function setRoom(): Promise<void> {
   const id = Number(roomIn.value.trim());
   if (!Number.isInteger(id) || id <= 0) return toast('房间号只能是数字', 'err');
+  if (room.value && armedFor !== id) {
+    armedFor = id;
+    if (armTimer) clearTimeout(armTimer);
+    armTimer = setTimeout(() => (armedFor = null), 5000);
+    return toast(`确定要换到直播间 ${id} 吗？5 秒内再点一次「更换」（或再按一次回车）确认`, 'info', 5000);
+  }
+  armedFor = null;
   roomBusy.value = true;
   const r = await attempt(() => put<{ room: RoomRecord }>('/api/room', { id }));
   roomBusy.value = false;
@@ -43,10 +53,10 @@ async function setRoom(): Promise<void> {
 }
 
 async function saveSetting(patch: Partial<Settings>, msg: string): Promise<void> {
-  if (await attempt(() => put('/api/settings', patch), msg)) {
-    await refreshSettings();
-    void refreshStatus();
-  }
+  // 成功失败都重新读取：失败时开关要回到原来的状态
+  const ok = await attempt(() => put('/api/settings', patch), msg);
+  await refreshSettings().catch(() => undefined);
+  if (ok) void refreshStatus();
 }
 
 const bl = ref<BlacklistEntry[]>([]);

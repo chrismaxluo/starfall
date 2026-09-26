@@ -80,6 +80,8 @@ export interface StatusSnapshot {
   paused: boolean;
   queue: { playing: boolean; size: number };
   overlays: number;
+  /** 主播所在时区（服务端设置） */
+  timeZone?: string;
 }
 
 export interface Settings {

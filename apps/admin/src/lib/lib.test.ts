@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { describe as describeEvent, statusCls } from './events.ts';
-import { bigNum, fileSize, gcd, hms, seconds, when } from './format.ts';
+import { bigNum, clock, dateTime, fileSize, gcd, hms, seconds, setTimeZone, today, when } from './format.ts';
 import { identityOf, medalColors } from './identity.ts';
 import type { EventDto, Viewer } from './types.ts';
 
@@ -57,5 +57,20 @@ describe('格式化', () => {
     expect(when(new Date(2026, 8, 25, 23, 40).getTime(), now)).toBe('昨天 23:40');
     expect(when(new Date(2026, 8, 20, 9, 5).getTime(), now)).toBe('9月20日 09:05');
     expect(hms((2 * 3600 + 14 * 60 + 37) * 1000)).toBe('2:14:37');
+  });
+});
+
+describe('时间按主播所在时区显示', () => {
+  it('北京时间：UTC 2026-09-26 20:00 显示为 09-27 04:00:00，"今天"也按这个时区', () => {
+    setTimeZone('Asia/Shanghai');
+    const ts = Date.UTC(2026, 8, 26, 20, 0, 0);
+    expect(dateTime(ts)).toBe('09-27 04:00:00');
+    expect(clock(ts)).toBe('04:00:00');
+    expect(today()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    setTimeZone('America/New_York');
+    expect(dateTime(ts)).toBe('09-26 16:00:00');
+    setTimeZone('Not/AZone');
+    expect(dateTime(ts)).toMatch(/^\d{2}-\d{2} \d{2}:00:00$/);
+    setTimeZone(undefined);
   });
 });

@@ -6,13 +6,14 @@ import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import type { Readable } from 'node:stream';
 import { eq, or } from 'drizzle-orm';
+import { MAX_UPLOAD_BYTES } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
 import { assets, effects } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 import { ALLOWED, probe, sniff } from './probe.ts';
 import type { AssetKind } from './probe.ts';
 
-export const MAX_UPLOAD = 100 * 1024 * 1024;
+export const MAX_UPLOAD = MAX_UPLOAD_BYTES;
 /** 超过这个大小在界面提示"加载慢"（F-AS-04） */
 export const LARGE_FILE = 10 * 1024 * 1024;
 

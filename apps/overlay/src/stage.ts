@@ -51,8 +51,11 @@ export function fit(stage: HTMLElement, c: OverlayConfig): void {
     stage.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
     return;
   }
+  // 浏览器源大小和画布不一致时，等比缩放后居中（一致时就是原样铺满）
   const s = Math.min(innerWidth / c.width, innerHeight / c.height) || 1;
-  stage.style.transform = Math.abs(s - 1) < 0.001 ? '' : `scale(${s})`;
+  const x = Math.max(0, (innerWidth - c.width * s) / 2);
+  const y = Math.max(0, (innerHeight - c.height * s) / 2);
+  stage.style.transform = x < 0.5 && y < 0.5 && Math.abs(s - 1) < 0.001 ? '' : `translate(${x}px, ${y}px) scale(${s})`;
 }
 
 /** 调试用：显示安全区 */

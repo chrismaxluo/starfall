@@ -201,6 +201,10 @@ html.view #stage {
 .vb-sound.on { background: rgba(61,214,140,.16); color: #3DD68C; cursor: default; }
 @media (max-width: 720px) { .vbar > b, .vbar .vb-mute { display: none; } }
 
-/* 普通浏览器里查看正式地址：两侧用不到的区域涂深色，画布本身保持原样（见 main.ts 里的 seen） */
+/* 普通浏览器里查看正式地址：两侧用不到的区域涂深色，画布用灰白格子表示透明（见 main.ts 里的 seen） */
 html.seen:not(.view), html.seen:not(.view) body { background: #0B0B10; }
-html.seen:not(.view) #stage { background: #FFFFFF; }
+html.seen:not(.view) #stage {
+  background-color: #FFFFFF;
+  background-image: linear-gradient(45deg, #E6E6EA 25%, transparent 25%, transparent 75%, #E6E6EA 75%), linear-gradient(45deg, #E6E6EA 25%, transparent 25%, transparent 75%, #E6E6EA 75%);
+  background-size: 64px 64px; background-position: 0 0, 32px 32px;
+}

@@ -25,13 +25,13 @@ async function save(msg?: string): Promise<void> {
 }
 function preview(row: (typeof ROWS)[number], op: 'open' | 'renew'): void {
   const g = state.guard![row.key];
-  emit('preview', { effectId: op === 'open' ? g.openEffectId : g.renewEffectId, viewer: SAMPLES[row.key], label: `${op === 'open' ? '开通' : '续费'}${row.name}`, kind: 'guard', vars: { months: op === 'open' ? 1 : 3, guardLevel: row.level } });
+  emit('preview', { effectId: op === 'open' ? g.openEffectId : g.renewEffectId, viewer: SAMPLES[row.key], label: `${op === 'open' ? '开通' : '续费'}${row.name}`, kind: 'guard', vars: { months: op === 'open' ? 1 : 3, guardLevel: row.level, op } });
 }
 </script>
 
 <template>
   <div v-if="state.guard">
-    <div class="subbar"><span class="subhint">有人开通或续费大航海时播放，欢迎语里可以用 {months} 显示月数。</span></div>
+    <div class="subbar"><span class="subhint">有人开通或续费大航海时播放，欢迎语里可以用 {months} 显示月数、{op} 显示「开通」或「续费」。</span></div>
     <div class="tlist">
       <div class="grow head"><span>身份</span><span>开通</span><span>续费</span><span>启用</span><span /></div>
       <div v-for="row in ROWS" :key="row.key" class="grow" :class="{ off: !state.guard[row.key].enabled }">

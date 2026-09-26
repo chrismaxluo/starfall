@@ -18,10 +18,10 @@ function setup(opts: { loggedIn?: boolean; room?: boolean; live?: boolean } = {}
   const secret = new Secret(crypto.randomBytes(32));
   if (opts.loggedIn ?? true) db.insert(account).values({ id: 1, uid: 10001, cookiesEnc: secret.encrypt(JSON.stringify({ SESSDATA: 's', DedeUserID: '10001', bili_jct: 'c', buvid3: 'B3' })) }).run();
   if (opts.room ?? true) db.insert(room).values({ id: 1, roomId: 30000, anchorUid: 20000 }).run();
-  const state = { live: opts.live ?? false, pollCookies: [] as string[], clients: [] as Array<{ opts: LiveClientOptions; stopped: boolean }> };
+  const state = { live: opts.live ?? false, liveSince: null as number | null, pollCookies: [] as string[], clients: [] as Array<{ opts: LiveClientOptions; stopped: boolean }> };
   let t = 1_000_000;
   const deps: LiveDeps = {
-    getRoomInit: async (http) => { state.pollCookies.push(JSON.stringify(http.cookies)); return { roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus: state.live ? 1 : 0, isPortrait: true }; },
+    getRoomInit: async (http) => { state.pollCookies.push(JSON.stringify(http.cookies)); return { roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus: state.live ? 1 : 0, isPortrait: true, liveSince: state.liveSince }; },
     getRoomAdmins: async () => [{ uid: 555, name: '房管', face: '' }],
     getDanmuInfo: async () => ({ token: 't', hosts: [{ host: 'h', wssPort: 443 }] }),
     createClient: (o) => { const c = { opts: o, stopped: false }; state.clients.push(c); return { start: () => {}, stop: () => { c.stopped = true; }, state: 'connected' as const }; },
@@ -106,6 +106,29 @@ describe('只在开播时连接（F-BL-10）', () => {
     await svc.start(); svc.stop();
     expect(svc.status()).toMatchObject({ sessionId: 1, liveSince: 123 });
     expect(db.select().from(liveSessions).all()).toHaveLength(1);
+  });
+
+  it('服务重启时有没结束的场次，但比这一场的开播时间早：是上一场，关掉后新建', async () => {
+    const { svc, db, state } = setup({ live: true });
+    db.insert(liveSessions).values({ startedAt: 123 }).run();
+    state.liveSince = 500_000;
+    await svc.start(); svc.stop();
+    const rows = db.select().from(liveSessions).all();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.endedAt).toBe(500_000);
+    expect(svc.status()).toMatchObject({ sessionId: 2 });
+  });
+
+  it('同时触发两次连接检查：只建一个连接；停止后不再连接', async () => {
+    const { svc, state, active } = setup({ live: true });
+    await svc.start();
+    expect(active()).toHaveLength(1);
+    state.live = true;
+    await Promise.all([svc.reconcile(), svc.reconcile(), svc.poll()]);
+    expect(active()).toHaveLength(1);
+    svc.stop();
+    await svc.reconcile();
+    expect(active()).toHaveLength(0);
   });
 
   it('服务重启时已经下播：把没结束的场次关掉', async () => {

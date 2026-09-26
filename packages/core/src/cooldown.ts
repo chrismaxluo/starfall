@@ -11,11 +11,19 @@ export class Cooldowns {
     return t !== undefined && now < t;
   }
 
-  /** 记下一次播放，从 now 起冷却 minutes 分钟；0 分钟表示不冷却 */
-  hit(key: string, now: number, minutes: number): void {
-    if (minutes <= 0) return;
-    this.until.set(key, now + minutes * 60_000);
+  /** 记下一次播放，从 now 起冷却 minutes 分钟；0 分钟表示不冷却。返回撤销函数（排队后没播出来时用） */
+  hit(key: string, now: number, minutes: number): () => void {
+    if (minutes <= 0) return () => undefined;
+    const prev = this.until.get(key);
+    const next = now + minutes * 60_000;
+    this.until.set(key, next);
     if (this.until.size > 20_000) this.prune(now);
+    return () => {
+      // 之后又被别的播放更新过就不动
+      if (this.until.get(key) !== next) return;
+      if (prev === undefined) this.until.delete(key);
+      else this.until.set(key, prev);
+    };
   }
 
   clear(): void {
@@ -42,8 +50,14 @@ export class OncePerLive {
     return this.played.has(uid);
   }
 
-  mark(uid: number): void {
+  /** 记下已播放；返回撤销函数（排队后没播出来时用） */
+  mark(uid: number): () => void {
+    if (this.played.has(uid)) return () => undefined;
     this.played.add(uid);
+    const session = this.session;
+    return () => {
+      if (this.session === session) this.played.delete(uid);
+    };
   }
 
   /** 服务重启时，用本场事件记录里已播放的 UID 恢复 */

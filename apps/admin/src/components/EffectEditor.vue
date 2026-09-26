@@ -31,7 +31,7 @@ const TEXT_TABS: Array<{ value: TextKey; label: string }> = [
   { value: 'guard', label: '上舰时' },
   { value: 'danmu', label: '弹幕时' },
 ];
-const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{text}', '{gift}', '{count}', '{value}', '{months}'];
+const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{text}', '{gift}', '{count}', '{value}', '{months}', '{op}'];
 
 function snapshot(e: EffectDto) {
   return {
@@ -237,7 +237,7 @@ const confirmLeave = ref(false);
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
               <div class="vars"><button v-for="v in VARS" :key="v" type="button" @click="insertVar(v)">{{ v }}</button></div>
-              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：{months}</span>
+              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：月数 {months}、开通 / 续费 {op}</span>
             </template>
           </div>
 

@@ -1,6 +1,6 @@
 // 首次启动时写入的初始数据（需求文档附录 B）。可以重复执行：已有的数据不会被覆盖。
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { EffectTexts, Position } from '@starfall/shared';
 import type { Db } from './index.ts';
 import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleGiftBands, ruleGuard, settings } from './schema.ts';
@@ -15,12 +15,12 @@ interface BuiltinEffect {
 
 /** 内置素材（界面与设计预览一致；样式由特效页实现，这里只存名称和参数） */
 export const BUILTIN_EFFECTS: BuiltinEffect[] = [
-  { name: '星冕', style: 'star', position: 'center', durationMs: 6800, texts: { enter: ['{guard} {name} 驾临'], gift: ['感谢 {name} 送出 {gift}，星光加冕'], guard: ['{name} 开通{guard}，驾临'] } },
-  { name: '流星', style: 'meteor', position: 'bl', durationMs: 5200, texts: { enter: ['欢迎{guard} {name} 登船'], gift: ['感谢 {name} 送出 {gift}'], guard: ['欢迎新{guard} {name} 登船'] } },
-  { name: '流光', style: 'flow', position: 'bl', durationMs: 4200, texts: { enter: ['欢迎{guard} {name} 登船'], guard: ['欢迎新{guard} {name} 登船'], danmu: ['{name}：{text}'] } },
+  { name: '星冕', style: 'star', position: 'center', durationMs: 6800, texts: { enter: ['{guard} {name} 驾临'], gift: ['感谢 {name} 送出 {gift}，星光加冕'], guard: ['{name} {op}{guard} {months} 个月，驾临'] } },
+  { name: '流星', style: 'meteor', position: 'bl', durationMs: 5200, texts: { enter: ['欢迎{guard} {name} 登船'], gift: ['感谢 {name} 送出 {gift}'], guard: ['欢迎 {name} {op}{guard} {months} 个月'] } },
+  { name: '流光', style: 'flow', position: 'bl', durationMs: 4200, texts: { enter: ['欢迎{guard} {name} 登船'], guard: ['欢迎 {name} {op}{guard} {months} 个月'], danmu: ['{name}：{text}'] } },
   { name: '巡场', style: 'patrol', position: 'bl', durationMs: 3600, texts: { enter: ['{name} 前来巡场'] } },
   { name: '霜玻', style: 'frost', position: 'bl', durationMs: 3200, texts: { enter: ['{name} 来了'] } },
-  { name: '礼物感谢', style: 'gift', position: 'bl', durationMs: 4000, texts: { enter: ['感谢 {name} 送出 {gift} ×{count}'], guard: ['感谢 {name} 续费{guard} {months} 个月'] } },
+  { name: '礼物感谢', style: 'gift', position: 'bl', durationMs: 4000, texts: { enter: ['感谢 {name} 送出 {gift} ×{count}'], guard: ['感谢 {name} {op}{guard} {months} 个月'] } },
   { name: '弹幕回应', style: 'bubble', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'] } },
   { name: '一行字', style: 'line', position: 'bl', durationMs: 2400, texts: { enter: ['{name} 进入直播间'], gift: ['{name} 送出 {gift} ×{count}'] } },
 ];
@@ -57,6 +57,8 @@ export function seed(db: Db): void {
   db.transaction((tx) => {
     for (const e of BUILTIN_EFFECTS) {
       tx.insert(effects).values({ name: e.name, builtin: true, style: e.style, texts: e.texts, position: e.position, durationMs: e.durationMs, showText: true }).onConflictDoNothing().run();
+      // 内置素材在后台是只读的：升级后同步成新版本的文案（用户要改只能复制一份）
+      tx.update(effects).set({ texts: e.texts }).where(and(eq(effects.name, e.name), eq(effects.builtin, true))).run();
     }
     const id = (name: string) => tx.select({ id: effects.id }).from(effects).where(eq(effects.name, name)).get()!.id;
     const tiers = [

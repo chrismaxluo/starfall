@@ -128,7 +128,8 @@ describe('模拟与预览', () => {
     const pv = (payload: object) => t.req({ method: 'POST', url: '/api/preview', payload }).then((r) => r.json());
     expect((await pv({ effectId: gift, kind: 'gift', viewer: { name: '半糖' } })).text).toBe('感谢 半糖 送出 小花花 ×10');
     expect((await pv({ effectId: gift, kind: 'gift', viewer: { name: '半糖' }, vars: { gift: '告白花束', count: 2 } })).text).toBe('感谢 半糖 送出 告白花束 ×2');
-    expect((await pv({ effectId: gift, kind: 'guard', viewer: { name: '半糖' }, vars: { months: 3, guardLevel: 3 } })).text).toBe('感谢 半糖 续费舰长 3 个月');
+    expect((await pv({ effectId: gift, kind: 'guard', viewer: { name: '半糖' }, vars: { months: 3, guardLevel: 3, op: 'renew' } })).text).toBe('感谢 半糖 续费舰长 3 个月');
+    expect((await pv({ effectId: gift, kind: 'guard', viewer: { name: '半糖' }, vars: { months: 12 } })).text).toBe('感谢 半糖 开通舰长 12 个月');
     expect((await pv({ effectId: t.effectId('弹幕回应'), kind: 'danmu', viewer: { name: '半糖' } })).text).toBe('半糖：主播晚上好！');
   });
 });

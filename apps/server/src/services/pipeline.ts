@@ -27,15 +27,15 @@ const SAMPLE_VARS: Record<TriggerKind, Vars> = {
   enter: {},
   danmu: { text: '主播晚上好！' },
   gift: { gift: '小花花', count: 10, valueGold: 1000 },
-  guard: { months: 1, guardLevel: 3 },
+  guard: { months: 1, guardLevel: 3, op: 'open' },
 };
 
 interface Judgement {
   hit: { label: string; effectId: number } | null;
   effect: EffectDto | null;
   status: PlayStatus;
-  /** 真正入队时更新冷却等状态（模拟时不调用） */
-  commit: () => void;
+  /** 真正入队时更新冷却等状态（模拟时不调用）；返回撤销函数：排队后没播出来（被挤掉、清空、暂停、特效页掉线）时撤销 */
+  commit: () => () => void;
   vars: Vars;
   jump: boolean;
 }
@@ -49,6 +49,8 @@ const RAW_TTL_MS = 10_000;
 interface Queued {
   item: PlayItem;
   eventId: number | null;
+  /** 没播出来时撤销冷却 / 每场一次的记录 */
+  undo?: () => void;
 }
 
 export interface QueueSnapshot {
@@ -194,7 +196,7 @@ export class Pipeline {
     let hit: Judgement['hit'] = null;
     let inCooldown = false;
     let playedThisLive = false;
-    let commit = () => undefined as void;
+    let commit = (): (() => void) => () => undefined;
     let vars: Vars = {};
     let jump = false;
     const queueJump = this.d.settings.get('queueJump');
@@ -223,8 +225,12 @@ export class Pipeline {
           hit = m;
           inCooldown = this.cooldowns.active(g, now) || this.cooldowns.active(u, now);
           commit = () => {
-            this.cooldowns.hit(g, now, m.globalCdSec / 60);
-            this.cooldowns.hit(u, now, m.userCdMin);
+            const undoG = this.cooldowns.hit(g, now, m.globalCdSec / 60);
+            const undoU = this.cooldowns.hit(u, now, m.userCdMin);
+            return () => {
+              undoG();
+              undoU();
+            };
           };
         }
         break;
@@ -238,7 +244,7 @@ export class Pipeline {
       }
       case 'guard': {
         hit = matchGuard(ev, this.d.guardRules.get());
-        vars = { months: ev.months, guardLevel: ev.level };
+        vars = { months: ev.months, guardLevel: ev.level, op: ev.op };
         jump = queueJump;
         break;
       }
@@ -277,8 +283,8 @@ export class Pipeline {
     const j = this.judge(ev);
     const eventId = this.record(ev, j.hit, j.status);
     if (j.status !== 'queued' || !j.hit || !j.effect) return;
-    j.commit();
-    this.enqueue(this.playItem(j.effect, ev.viewer, ev.kind, j.vars), eventId, j.jump);
+    const undo = j.commit();
+    this.enqueue(this.playItem(j.effect, ev.viewer, ev.kind, j.vars), eventId, j.jump, undo);
   }
 
   /** 模拟一次事件：只判断，不入队、不记录、不影响冷却（F-RU-05） */
@@ -326,10 +332,10 @@ export class Pipeline {
     };
   }
 
-  private enqueue(item: PlayItem, eventId: number | null, jump: boolean): void {
+  private enqueue(item: PlayItem, eventId: number | null, jump: boolean, undo?: () => void): void {
     this.queue.max = this.d.settings.get('queueMax');
-    const { dropped } = this.queue.enqueue({ id: item.id, kind: item.kind, enqueuedAt: this.now(), jump, payload: { item, eventId } });
-    if (dropped?.payload.eventId) this.d.log.setStatus(dropped.payload.eventId, 'dropped');
+    const { dropped } = this.queue.enqueue({ id: item.id, kind: item.kind, enqueuedAt: this.now(), jump, payload: { item, eventId, ...(undo ? { undo } : {}) } });
+    if (dropped) this.unplayed(dropped, 'dropped');
     this.pump();
     this.emitQueue();
   }
@@ -341,7 +347,7 @@ export class Pipeline {
       const { item, eventId } = q.payload;
       // 排队期间特效页全部掉线：不积压（F-OU-12）
       if (this.d.hub.overlayCount() === 0) {
-        if (eventId) this.d.log.setStatus(eventId, 'no_overlay');
+        this.unplayed(q, 'no_overlay');
         continue;
       }
       this.d.hub.toOverlays({ type: 'play', item });
@@ -356,11 +362,17 @@ export class Pipeline {
     }
   }
 
+  /** 排队的特效没播出来：写明原因，并撤销冷却 / 每场一次的记录（下次还能播） */
+  private unplayed(q: QueueItem<Queued>, status: PlayStatus): void {
+    q.payload.undo?.();
+    if (q.payload.eventId) this.d.log.setStatus(q.payload.eventId, status);
+  }
+
   /** 紧急暂停：立即停止画面、清空队列；暂停期间的事件照常记录（F-PL-05） */
   pause(): void {
     this.d.settings.set('paused', true);
     this.stopCurrent();
-    for (const q of this.queue.clear()) if (q.payload.eventId) this.d.log.setStatus(q.payload.eventId, 'paused');
+    for (const q of this.queue.clear()) this.unplayed(q, 'paused');
     this.emitQueue();
   }
 
@@ -372,7 +384,7 @@ export class Pipeline {
   /** 清空待播放的特效（正在播的播完）（F-PL-06） */
   clear(): number {
     const items = this.queue.clear();
-    for (const q of items) if (q.payload.eventId) this.d.log.setStatus(q.payload.eventId, 'cleared');
+    for (const q of items) this.unplayed(q, 'cleared');
     this.emitQueue();
     return items.length;
   }
@@ -400,7 +412,7 @@ export class Pipeline {
   /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
   preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): PlayItem {
     const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
-    return this.playItem(effect, v, kind, vars ?? SAMPLE_VARS[kind], true);
+    return this.playItem(effect, v, kind, { ...SAMPLE_VARS[kind], ...vars }, true);
   }
 
   snapshot(): QueueSnapshot {

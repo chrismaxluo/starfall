@@ -59,8 +59,12 @@ describe('B 站接口', () => {
 
 describe('接口字段转换', () => {
   it('房间号换算与开播状态', async () => {
-    mockFetch([{ body: { code: 0, data: { room_id: 30000, short_id: 1, uid: 20000, live_status: 1, is_portrait: true } } }]);
-    expect(await getRoomInit(new BiliHttp(), 1)).toEqual({ roomId: 30000, shortId: 1, anchorUid: 20000, liveStatus: 1, isPortrait: true });
+    mockFetch([
+      { body: { code: 0, data: { room_id: 30000, short_id: 1, uid: 20000, live_status: 1, is_portrait: true, live_time: 1790380800 } } },
+      { body: { code: 0, data: { room_id: 30000, short_id: 1, uid: 20000, live_status: 0, live_time: -62170012800 } } },
+    ]);
+    expect(await getRoomInit(new BiliHttp(), 1)).toEqual({ roomId: 30000, shortId: 1, anchorUid: 20000, liveStatus: 1, isPortrait: true, liveSince: 1790380800_000 });
+    expect(await getRoomInit(new BiliHttp(), 1)).toMatchObject({ liveStatus: 0, liveSince: null });
   });
 
   it('直播间信息', async () => {

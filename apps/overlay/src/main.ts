@@ -19,6 +19,7 @@ import { detect } from './env.ts';
 import { Player } from './player.ts';
 import { DEFAULT_CONFIG, applyConfig, fit, metrics, setViewInset, showSafeAreas } from './stage.ts';
 import { VIEW_BAR, startView } from './view.ts';
+import { warmUp } from './warm.ts';
 
 const q = new URLSearchParams(location.search);
 const preview = q.get('preview') === '1';
@@ -63,8 +64,10 @@ function notice(title: string, detail: string): void {
   stage.append(h('div', { class: 'notice' }, title, h('small', {}, detail)));
 }
 
-/** 预加载本输出会用到的文件（逐个下载，避免直播时抢带宽） */
+/** 预加载本输出会用到的文件（逐个下载，避免直播时抢带宽）；用到 SVGA / Lottie 时提前加载播放库 */
 async function preload(urls: string[]): Promise<void> {
+  if (urls.some((u) => u.endsWith('.svga'))) void import('svgaplayerweb').catch(() => undefined);
+  if (urls.some((u) => u.endsWith('.json'))) void import('lottie-web/build/player/lottie_light').catch(() => undefined);
   for (const u of urls) await fetch(u).then((r) => r.blob()).catch(() => undefined);
 }
 
@@ -77,6 +80,7 @@ function onMessage(m: ServerToOverlay): void {
       view?.setConfig(config);
       conn?.send({ type: 'report', env: { ...detect(), lite: lite(), canvas: `${config.width}×${config.height}`, ...(view ? { view: true } : {}) } });
       void preload(m.preload);
+      warmUp(stage, () => metrics(config), () => player.playing !== null);
       break;
     case 'config':
       config = m.config;

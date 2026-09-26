@@ -237,6 +237,19 @@ describe('播放队列', () => {
     expect(() => t.p.test(star)).toThrow('特效页不在线');
   });
 
+  it('正在播测试特效时再测试：直接换成新的；正在播真实特效时不打断', async () => {
+    const t = await setup();
+    const [a, b] = t.ctx.effects.list();
+    t.p.test(a!.id);
+    t.p.test(b!.id);
+    expect(t.sock.sent.slice(-2)).toMatchObject([{ type: 'stop' }, { type: 'play', item: { test: true, effect: { name: b!.name } } }]);
+    expect(t.p.snapshot().playing).toMatchObject({ test: true, effectName: b!.name });
+    vi.advanceTimersByTime(30_000);
+    t.live.emit(enter({ uid: 1, guard: 3 }));
+    t.p.test(a!.id);
+    expect(t.p.snapshot()).toMatchObject({ playing: { test: false }, items: [{ test: true }] });
+  });
+
   it('上传的素材：推送文件地址、音效；播放用入队时的快照', async () => {
     const t = await setup();
     const e = t.ctx.effects.list().find((x) => x.name === '流光')!;

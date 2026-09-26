@@ -21,6 +21,7 @@ import { DEFAULT_CONFIG, applyConfig, fit, metrics, setViewInset, showSafeAreas 
 import { VIEW_BAR, startView } from './view.ts';
 
 const q = new URLSearchParams(location.search);
+const preview = q.get('preview') === '1';
 const stage = document.getElementById('stage')!;
 const env = detect();
 
@@ -30,9 +31,20 @@ if (q.get('o') === 'landscape') config = { ...config, orient: 'landscape', width
 if (Number(q.get('w')) && Number(q.get('h'))) config = { ...config, width: Number(q.get('w')), height: Number(q.get('h')) };
 
 // 浏览器查看模式（&view=1）：深色背景、安全区、顶部状态栏
-const view = q.get('view') === '1' && q.get('preview') !== '1' ? startView() : null;
+const view = q.get('view') === '1' && !preview ? startView() : null;
 if (view) setViewInset(VIEW_BAR);
 const showSafe = q.get('debug') === '1' || view !== null;
+
+// 用普通浏览器打开时，画布两侧（或上下）用不到的区域涂成深色，方便看清画布在哪。
+// 只在有人动鼠标或按键后才涂：直播姬 / OBS 里的浏览器源收不到这些操作，两侧保持透明，
+// 即使浏览器源宽高填错了，直播画面上也不会出现色块。OBS 能准确识别，直接不启用。
+if (!(window as unknown as { obsstudio?: unknown }).obsstudio && !preview) {
+  const seen = () => {
+    document.documentElement.classList.add('seen');
+    for (const t of ['pointermove', 'pointerdown', 'keydown'] as const) removeEventListener(t, seen, true);
+  };
+  for (const t of ['pointermove', 'pointerdown', 'keydown'] as const) addEventListener(t, seen, true);
+}
 
 const lite = () => q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
 const apply = () => applyConfig(stage, config, lite());
@@ -86,7 +98,6 @@ function onMessage(m: ServerToOverlay): void {
 }
 
 // 预览模式（管理后台里的 iframe）：只接收同源页面发来的消息，只在本地播放，不连服务端
-const preview = q.get('preview') === '1';
 if (preview) {
   addEventListener('message', (e: MessageEvent<ServerToOverlay | { type: 'config'; config: OverlayConfig }>) => {
     if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;

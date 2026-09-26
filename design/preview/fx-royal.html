@@ -136,6 +136,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <linearGradient id="mCap" x1="0" y1="-330" x2="0" y2="330" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#F2FBFF"/><stop offset=".16" stop-color="#A9DDF0"/><stop offset=".32" stop-color="#4F8FB5"/><stop offset=".48" stop-color="#E4F6FC"/><stop offset=".66" stop-color="#7FBAD6"/><stop offset=".84" stop-color="#3D7399"/><stop offset="1" stop-color="#BFE6F4"/></linearGradient>
     <linearGradient id="fGov" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF6DC"/><stop offset=".4" stop-color="#E9C27A"/><stop offset=".75" stop-color="#B07A2E"/><stop offset="1" stop-color="#7A4E16"/></linearGradient>
     <linearGradient id="fAdm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF3E2"/><stop offset=".4" stop-color="#E6BF86"/><stop offset=".75" stop-color="#A8733E"/><stop offset="1" stop-color="#6E4A26"/></linearGradient>
+    <linearGradient id="fJade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F4FBF7"/><stop offset=".5" stop-color="#C9E2D7"/><stop offset="1" stop-color="#7FA79A"/></linearGradient>
     <linearGradient id="fCap" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F4FCFF"/><stop offset=".4" stop-color="#A9DDF0"/><stop offset=".75" stop-color="#4F8FB5"/><stop offset="1" stop-color="#2A5A7E"/></linearGradient>
     <linearGradient id="cGov" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6DFA8" stop-opacity=".34"/><stop offset="1" stop-color="#B8843A" stop-opacity=".04"/></linearGradient>
     <linearGradient id="cAdm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9C2F5" stop-opacity=".32"/><stop offset="1" stop-color="#7E4FC4" stop-opacity=".04"/></linearGradient>
@@ -150,6 +151,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <radialGradient id="gFlash"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".3" stop-color="#FFF1CC" stop-opacity=".7"/><stop offset="1" stop-color="#F7D58B" stop-opacity="0"/></radialGradient>
     <radialGradient id="fade"><stop offset=".35" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient>
     <linearGradient id="pillar" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5E1810"/><stop offset=".35" stop-color="#B3342A"/><stop offset=".55" stop-color="#E06A52"/><stop offset=".7" stop-color="#B3342A"/><stop offset="1" stop-color="#5E1810"/></linearGradient>
+    <filter id="jadeVein" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".012 .05" numOctaves="3" seed="11" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -7 3.6" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in"/></filter>
+    <filter id="jadeCloud" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="2" seed="4" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 3 -1.3" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in"/></filter>
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
     <radialGradient id="gemCyan" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#E6FFFB"/><stop offset=".45" stop-color="#6FD6CC"/><stop offset="1" stop-color="#1F6F6A"/></radialGradient>
     <radialGradient id="gemAmethyst" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#F6EAFF"/><stop offset=".45" stop-color="#A874F2"/><stop offset="1" stop-color="#3E1C80"/></radialGradient>
     <radialGradient id="gemPearl" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#EDE3F2"/><stop offset="1" stop-color="#A89AB6"/></radialGradient>
@@ -200,8 +204,8 @@ const TIER = {
   gov: { zh: '总督', seal: '驾临', dur: 8, m: 'mGov', fl: 'fGov', cl: 'cGov', pe: 'pGov', dust: ['#F6DFA8', '#FFF4D6'], title: '总督 · 金銮' },
 };
 const DESC = {
-  cap: '<b>舰长 · 青云</b>（4 秒）<br>一扇园林月洞门：青玉色的门框一笔画成，有金属的明暗和立体边；顶上落下一个如意装饰，两朵小祥云从两边托住。头像在门里展开，名字像毛笔写字一样出现，盖一枚「光临」印章，最后一道光从门框上扫过。',
-  adm: '<b>提督 · 紫气</b>（6 秒）<br>一座牌坊：取「紫气东来」，背后几团紫色云气慢慢飘动。两根紫漆立柱从地面升起，撑起一道弧形门楣（两端卷草纹，正中紫色宝珠），门楣下挂一对<b>会发光的紫色宫灯</b>，轻轻摇晃。中间是双层紫金月洞门，带珠串和紫色光带。四朵祥云飘进来，名字写出后盖「驾到」印章，一道光扫过所有金色部件。',
+  cap: '<b>舰长 · 青云</b>（4 秒）<br>一扇园林月洞门：头像外是一块<b>青白玉璧</b>，有天然玉纹、微微透光，表面浅雕一粒粒谷纹，内外细银边；顶上落下一个如意装饰，两朵小祥云从两边托住。头像在门里展开，名字像毛笔写字一样出现，盖一枚「光临」印章，最后一道光从门框上扫过。',
+  adm: '<b>提督 · 紫气</b>（6 秒）<br>一座牌坊：取「紫气东来」，背后几团紫色云气慢慢飘动。两根紫漆立柱从地面升起，撑起一道弧形门楣（两端卷草纹，正中紫色宝珠），门楣下挂一对<b>会发光的紫色宫灯</b>，轻轻摇晃。头像外是<b>紫漆描金</b>圆环：深紫漆面，极细金线描云雷纹，双金边，外沿一圈扁平金如意云头。四朵祥云飘进来，名字写出后盖「驾到」印章，一道光扫过所有金色部件。',
   gov: '<b>总督 · 金銮</b>（8 秒）<br>背后一层淡淡的云纹暖光。两根朱红宫柱从地面升起（金色柱头、雀替和柱础），金色月洞门画成，回纹横梁从中间展开；金色屋顶落下，<b>一片片琉璃瓦和圆形瓦当</b>，屋脊宝珠接住从天而降的星星；屋檐两角的红流苏轻轻摆动，四朵祥云飘进来，金粉慢慢往上飘。名字写出后盖「驾临」印章，最后一道光从整座宫门上扫过。',
 };
 const state = { tier: 'gov', event: 'enter', pos: '40', face: '1', name: 'mid', bg: 'alpha', safe: '1', auto: false };
@@ -262,6 +266,8 @@ const RING = {
 const pol = (deg, r) => { const a = (deg - 90) * Math.PI / 180; return [r * Math.cos(a), r * Math.sin(a)]; };
 const pp = (deg, r) => pol(deg, r).map(f1).join(' ');
 function royalRing(key, R, d0) {
+  if (key === 'cap') return jadeRing(R, d0);
+  if (key === 'adm') return lacquerRing(R, d0);
   const C = RING[key], rin = R + 3, rout = rin + C.w, mid = (rin + rout) / 2, id = 'rg' + (++uid);
   let s = `<defs><radialGradient id="${id}" cx="0" cy="0" r="${rout}" gradientUnits="userSpaceOnUse"><stop offset="${(rin / rout).toFixed(3)}" stop-color="${C.enamel[2]}"/><stop offset="${(mid / rout).toFixed(3)}" stop-color="${C.enamel[1]}"/><stop offset="1" stop-color="${C.enamel[0]}"/></radialGradient></defs>`;
   const ann = (a, b) => `M${b} 0 A${b} ${b} 0 1 0 ${-b} 0 A${b} ${b} 0 1 0 ${b} 0 Z M${a} 0 A${a} ${a} 0 1 1 ${-a} 0 A${a} ${a} 0 1 1 ${a} 0 Z`;
@@ -309,13 +315,67 @@ function royalRing(key, R, d0) {
       s += `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${f1(a)})"><g class="bloom" style="--d:${(d0 + .9 + layer * .15 + (i % N) * .012).toFixed(3)}s"><path d="M${f1(-ww / 2)} 0 C${f1(-ww / 2)} ${f1(-hh * .6)} ${f1(-ww * .16)} ${-hh} 0 ${-hh} C${f1(ww * .16)} ${-hh} ${f1(ww / 2)} ${f1(-hh * .6)} ${f1(ww / 2)} 0 Z" fill="url(#${C.fill})" stroke="rgba(255,244,214,.7)" stroke-width=".8" opacity="${op}"/>${layer ? `<path d="M0 -2 V${f1(-hh * .7)}" stroke="rgba(90,52,8,.55)" stroke-width="1"/>` : ''}</g></g>`;
     }
   }
-  // 宝石：金色包边 + 宝石 + 高光
-  for (const [g, angs] of C.gems) for (const [k, a] of angs.entries()) {
-    const [x, y] = pol(a, mid), r = g === 'gemPearl' ? C.w * .3 : C.w * .42;
-    s += `<g class="gem" style="--d:${(d0 + 1.1 + k * .08 + (g === 'gemPearl' || g === 'gemJade' ? .3 : 0)).toFixed(2)}s" transform="translate(${f1(x)} ${f1(y)})"><circle r="${f1(r + 3)}" fill="url(#${C.fill})"/><circle r="${f1(r)}" fill="url(#${g})"/><ellipse cx="${f1(-r * .3)}" cy="${f1(-r * .35)}" rx="${f1(r * .35)}" ry="${f1(r * .2)}" fill="#fff" opacity=".75"/></g>`;
-  }
+  // 錾金团花（金子本身刻出来的花，不镶宝石）
+  for (const [k, a] of [0, 90, 180, 270].entries()) s += rosette(pol(a, mid), C.w * .5, C.fill, d0 + 1.1 + k * .08);
   s += `</g>`;
   return { s, rout };
+}
+
+// 錾金团花：八瓣扁平金花 + 刻线
+function rosette([x, y], r, fill, d) {
+  let petals = '';
+  for (let i = 0; i < 8; i++) petals += `<path d="M0 0 C${f1(r * .25)} ${f1(-r * .3)} ${f1(r * .2)} ${f1(-r * .85)} 0 ${f1(-r)} C${f1(-r * .2)} ${f1(-r * .85)} ${f1(-r * .25)} ${f1(-r * .3)} 0 0Z" transform="rotate(${i * 45})"/>`;
+  return `<g class="gem" style="--d:${d.toFixed(2)}s" transform="translate(${f1(x)} ${f1(y)})"><g fill="url(#${fill})" stroke="rgba(70,40,6,.55)" stroke-width=".7">${petals}</g><circle r="${f1(r * .28)}" fill="url(#${fill})" stroke="rgba(70,40,6,.6)" stroke-width=".7"/><circle r="${f1(r * .1)}" fill="rgba(70,40,6,.6)"/></g>`;
+}
+const annulus = (a, b) => `M${b} 0 A${b} ${b} 0 1 0 ${-b} 0 A${b} ${b} 0 1 0 ${b} 0 Z M${a} 0 A${a} ${a} 0 1 1 ${-a} 0 A${a} ${a} 0 1 1 ${a} 0 Z`;
+const ringHalf = (rr, side, dd, sw, stroke) => P(`M0 ${-rr} A${rr} ${rr} 0 0 ${side < 0 ? 0 : 1} 0 ${rr}`, dd, 1.1, stroke, sw);
+const ringLine = (rr, dd, sw, stroke) => ringHalf(rr, -1, dd, sw, stroke) + ringHalf(rr, 1, dd, sw, stroke);
+
+// 舰长 · 玉璧：青白玉（温润渐变 + 天然玉纹 + 透光），浅雕谷纹（每粒都有高光和阴影），细银边
+function jadeRing(R, d0) {
+  const rin = R + 3, w = 22, rout = rin + w, mid = rin + w / 2, id = 'jd' + (++uid);
+  let s = `<defs><radialGradient id="${id}" cx="0" cy="0" r="${rout}" gradientUnits="userSpaceOnUse"><stop offset="${(rin / rout).toFixed(3)}" stop-color="#5F8F7F"/><stop offset="${((rin + w * .35) / rout).toFixed(3)}" stop-color="#BFDCCD"/><stop offset="${((rin + w * .6) / rout).toFixed(3)}" stop-color="#DCEEE4"/><stop offset="1" stop-color="#6E9E8D"/></radialGradient></defs>`;
+  s += `<g class="ringIn" style="--d:${d0}s">`;
+  s += `<path d="${annulus(rin, rout)}" fill="url(#${id})" fill-rule="evenodd"/>`;
+  s += `<path d="${annulus(rin, rout)}" fill="#F6FFF9" fill-rule="evenodd" filter="url(#jadeVein)" opacity=".3"/>`;
+  s += `<path d="${annulus(rin, rout)}" fill="#3E6F62" fill-rule="evenodd" filter="url(#jadeCloud)" opacity=".28"/>`;
+  // 谷纹：两圈交错的小卷
+  let lo = '', hi = '';
+  for (const [row, n, off] of [[.33, 34, 0], [.7, 34, .5]]) for (let i = 0; i < n; i++) {
+    const a = (i + off) * 360 / n, [x, y] = pol(a, rin + row * w);
+    const g = `M0 -2.6 A2.6 2.6 0 1 1 -2.6 0 C-2.6 1.8 -1 3.2 1.4 3.6`;
+    lo += `<path d="${g}" transform="translate(${f1(x + .7)} ${f1(y + .8)}) rotate(${f1(a)})"/>`;
+    hi += `<path d="${g}" transform="translate(${f1(x - .4)} ${f1(y - .5)}) rotate(${f1(a)})"/>`;
+  }
+  s += `<g class="f" style="--d:${d0 + .5}s;--t:1s"><g fill="none" stroke="rgba(40,80,68,.5)" stroke-width="1.5" stroke-linecap="round">${lo}</g><g fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1" stroke-linecap="round">${hi}</g></g>`;
+  // 透光：上方一道柔和的亮
+  s += `<path d="M${pp(-70, mid)} A${mid} ${mid} 0 0 1 ${pp(20, mid)}" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="${f1(w * .4)}" stroke-linecap="round" filter="url(#softBlur)"/>`;
+  s += ringLine(rin, d0, 2, 'url(#mCap)') + ringLine(rout, d0, 2.2, 'url(#mCap)') + ringLine(rout + 5, d0 + .15, .9, 'url(#mCap)');
+  s += `</g>`;
+  return { s, rout: rout + 5 };
+}
+
+// 提督 · 紫漆描金：深紫漆面（有漆的光泽），极细金线描云雷纹，双金边，外沿一圈扁平金如意云头
+function lacquerRing(R, d0) {
+  const rin = R + 3, w = 24, rout = rin + w, mid = rin + w / 2, id = 'lq' + (++uid);
+  let s = `<defs><radialGradient id="${id}" cx="0" cy="0" r="${rout}" gradientUnits="userSpaceOnUse"><stop offset="${(rin / rout).toFixed(3)}" stop-color="#12071F"/><stop offset="${(mid / rout).toFixed(3)}" stop-color="#3A1C63"/><stop offset="1" stop-color="#140822"/></radialGradient></defs>`;
+  s += `<g class="ringIn" style="--d:${d0}s">`;
+  // 外沿如意云头（先画，压在漆圈下面）
+  for (let i = 0; i < 8; i++) { const a = i * 45 + 22.5, [x, y] = pol(a, rout + 8);
+    s += `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${a})"><g class="bloom" style="--d:${(d0 + .9 + i * .05).toFixed(2)}s"><path d="M0 -15 C11 -15 16 -5 8 3 C16 8 8 19 0 13 C-8 19 -16 8 -8 3 C-16 -5 -11 -15 0 -15Z" fill="url(#fAdm)" stroke="rgba(60,34,8,.55)" stroke-width=".8"/><path d="M0 -9 C6 -9 8 -3 4 1 M0 -9 C-6 -9 -8 -3 -4 1" fill="none" stroke="rgba(60,34,8,.5)" stroke-width=".9"/></g></g>`; }
+  s += `<path d="${annulus(rin, rout)}" fill="url(#${id})" fill-rule="evenodd"/>`;
+  s += `<path d="M${pp(-64, mid)} A${mid} ${mid} 0 0 1 ${pp(26, mid)}" fill="none" stroke="rgba(255,240,255,.2)" stroke-width="${f1(w * .3)}" stroke-linecap="round"/>`;
+  // 云雷纹：方回旋（雷纹）与圆卷（云纹）交替
+  const N = 28, ua = 360 / N; let d = '';
+  const at = (i, u, v) => pp(i * ua + u * ua, rin + v * w);
+  for (let i = 0; i < N; i++) {
+    if (i % 2 === 0) d += ` M${at(i, .12, .2)} L${at(i, .12, .8)} L${at(i, .88, .8)} L${at(i, .88, .32)} L${at(i, .36, .32)} L${at(i, .36, .62)} L${at(i, .64, .62)} L${at(i, .64, .48)}`;
+    else { const [cx, cy] = pol(i * ua + ua / 2, mid), rr = w * .3; d += ` M${f1(cx + rr)} ${f1(cy)} A${f1(rr)} ${f1(rr)} 0 1 1 ${f1(cx)} ${f1(cy - rr)} A${f1(rr * .6)} ${f1(rr * .6)} 0 1 1 ${f1(cx - rr * .6)} ${f1(cy)} A${f1(rr * .3)} ${f1(rr * .3)} 0 1 1 ${f1(cx)} ${f1(cy + rr * .3)}`; }
+  }
+  s += `<path d="${d}" fill="none" stroke="url(#mAdm)" stroke-width="1.15" stroke-linejoin="round" stroke-linecap="round" pathLength="1" class="draw" style="--d:${d0 + .25}s;--t:1.6s"/>`;
+  s += ringLine(rin, d0, 2, 'url(#mAdm)') + ringLine(rin + 3.5, d0 + .1, .8, 'url(#mAdm)') + ringLine(rout, d0, 2.4, 'url(#mAdm)') + ringLine(rout - 3.5, d0 + .1, .8, 'url(#mAdm)');
+  s += `</g>`;
+  return { s, rout: rout + 20 };
 }
 // 提督牌坊：紫漆立柱，金柱头、柱础
 function post(side) {
@@ -371,7 +431,7 @@ function cap(name) {
   const halo = `<circle r="300" fill="url(#haloCap)" class="f" style="--d:.1s"/>`;
   const gate = royalRing('cap', 114, .15).s;
   const cl1 = cloud(T, -132, 112, .85, -1, .75, 0), cl2 = cloud(T, 132, 112, .85, 1, .85, -1.6);
-  const crest = `<g class="drop" style="--d:.95s"><g transform="translate(0 -158) scale(1.8)"><path d="${RUYI}" fill="url(#fCap)" stroke="rgba(255,255,255,.8)" stroke-width=".6"/><circle r="2.4" cy="-2" fill="#1E4A6A"/></g>` +
+  const crest = `<g class="drop" style="--d:.95s"><g transform="translate(0 -158) scale(1.8)"><path d="${RUYI}" fill="url(#fJade)" stroke="rgba(255,255,255,.8)" stroke-width=".6"/><circle r="2.2" cy="-2" fill="rgba(40,80,68,.6)"/></g>` +
     `<path d="M-52 -158 C-34 -151 -21 -153 -16 -160 M52 -158 C34 -151 21 -153 16 -160" fill="none" stroke="url(#mCap)" stroke-width="3" stroke-linecap="round"/><circle cx="-56" cy="-158" r="3.5" fill="url(#pCap)"/><circle cx="56" cy="-158" r="3.5" fill="url(#pCap)"/></g>`;
   const gold = gate + crest;
   root.append(lay(`${halo}${cl1}${cl2}${gate}`));

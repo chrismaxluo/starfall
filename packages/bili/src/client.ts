@@ -14,6 +14,8 @@ export interface LiveClientOptions {
   getDanmuInfo: () => Promise<DanmuInfo>;
   onMessage: (raw: { cmd?: string; [k: string]: unknown }) => void;
   onState?: (state: ClientState, detail?: string) => void;
+  /** 丢掉的坏数据包、处理出错的消息（写日志用） */
+  onWarn?: (msg: string) => void;
   /** 测试用：替换连接地址 */
   urlFor?: (host: { host: string; wssPort: number }) => string;
   heartbeatMs?: number;
@@ -25,12 +27,16 @@ export interface LiveClientOptions {
   random?: () => number;
 }
 
+const STABLE_MS = 60_000;
+
 export class LiveClient {
-  private readonly o: Required<Omit<LiveClientOptions, 'onState' | 'urlFor' | 'random'>> & Pick<LiveClientOptions, 'onState' | 'urlFor'> & { random: () => number };
+  private readonly o: Required<Omit<LiveClientOptions, 'onState' | 'onWarn' | 'urlFor' | 'random'>> & Pick<LiveClientOptions, 'onState' | 'onWarn' | 'urlFor'> & { random: () => number };
   private ws: WebSocket | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 连上并稳定一段时间后才把重连次数清零，避免"认证成功后马上被断开"时每秒重连 */
+  private stableTimer: ReturnType<typeof setTimeout> | null = null;
   private attempt = 0;
   private hostIndex = 0;
   private _state: ClientState = 'idle';
@@ -75,7 +81,8 @@ export class LiveClient {
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.idleTimer) clearTimeout(this.idleTimer);
     if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.heartbeat = this.idleTimer = this.retryTimer = null;
+    if (this.stableTimer) clearTimeout(this.stableTimer);
+    this.heartbeat = this.idleTimer = this.retryTimer = this.stableTimer = null;
     const ws = this.ws;
     this.ws = null;
     if (ws) {
@@ -100,7 +107,12 @@ export class LiveClient {
     if (this.isStopped()) return;
     const host = info.hosts[this.hostIndex % info.hosts.length]!;
     const url = this.o.urlFor ? this.o.urlFor(host) : `wss://${host.host}:${host.wssPort}/sub`;
-    const ws = new WebSocket(url);
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch (e) {
+      return this.scheduleRetry(`连接地址无效：${(e as Error).message}`);
+    }
     ws.binaryType = 'arraybuffer';
     this.ws = ws;
 
@@ -110,7 +122,10 @@ export class LiveClient {
     };
     ws.onmessage = (e) => {
       this.touch();
-      for (const p of decodePackets(Buffer.from(e.data as ArrayBuffer))) {
+      const bad = { count: 0 };
+      const packets = decodePackets(Buffer.from(e.data as ArrayBuffer), bad);
+      if (bad.count) this.o.onWarn?.(`丢掉 ${bad.count} 个无法解析的数据包`);
+      for (const p of packets) {
         if (p.op === OP.AUTH_REPLY) this.onAuth(p.body.toString());
         else if (p.op === OP.MESSAGE) {
           let raw: { cmd?: string };
@@ -121,8 +136,9 @@ export class LiveClient {
           }
           try {
             this.o.onMessage(raw);
-          } catch {
-            /* 单条消息处理出错不影响连接 */
+          } catch (err) {
+            // 单条消息处理出错不影响连接
+            this.o.onWarn?.(`处理消息 ${raw.cmd ?? '?'} 出错：${(err as Error).message}`);
           }
         }
       }
@@ -139,7 +155,8 @@ export class LiveClient {
       /* 保持 -1 */
     }
     if (code !== 0) return this.onDisconnect(`认证失败（code ${code}）`);
-    this.attempt = 0;
+    if (this.stableTimer) clearTimeout(this.stableTimer);
+    this.stableTimer = setTimeout(() => (this.attempt = 0), STABLE_MS);
     this.setState('connected');
     if (this.heartbeat) clearInterval(this.heartbeat);
     const beat = () => this.ws?.readyState === WebSocket.OPEN && this.ws.send(encodePacket(OP.HEARTBEAT, '[object Object]'));

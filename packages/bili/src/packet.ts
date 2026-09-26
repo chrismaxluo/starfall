@@ -20,7 +20,11 @@ export interface Packet {
   body: Buffer;
 }
 
-export function decodePackets(buf: Buffer): Packet[] {
+/**
+ * 拆包。不会抛出异常：长度不对的包（包括长度为 0，否则会原地打转）直接丢掉剩下的部分；
+ * 解压失败的包跳过，其余照常处理。bad 用来统计丢掉的包。
+ */
+export function decodePackets(buf: Buffer, bad: { count: number } = { count: 0 }, depth = 0): Packet[] {
   const out: Packet[] = [];
   let off = 0;
   while (off + 16 <= buf.length) {
@@ -28,12 +32,22 @@ export function decodePackets(buf: Buffer): Packet[] {
     const headLen = buf.readUInt16BE(off + 4);
     const ver = buf.readUInt16BE(off + 6);
     const op = buf.readUInt32BE(off + 8);
-    if (len < headLen || off + len > buf.length) break; // 不完整的包直接丢弃
+    if (headLen < 16 || len < headLen || off + len > buf.length) {
+      bad.count++;
+      break;
+    }
     const body = buf.subarray(off + headLen, off + len);
-    if (op === OP.MESSAGE && ver === 2) out.push(...decodePackets(zlib.inflateSync(body)));
-    else if (op === OP.MESSAGE && ver === 3) out.push(...decodePackets(zlib.brotliDecompressSync(body)));
-    else out.push({ op, ver, body });
     off += len;
+    if (op === OP.MESSAGE && (ver === 2 || ver === 3) && depth < 2) {
+      let inner: Buffer;
+      try {
+        inner = ver === 2 ? zlib.inflateSync(body) : zlib.brotliDecompressSync(body);
+      } catch {
+        bad.count++;
+        continue;
+      }
+      out.push(...decodePackets(inner, bad, depth + 1));
+    } else out.push({ op, ver, body });
   }
   return out;
 }

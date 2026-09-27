@@ -64,6 +64,11 @@ export const effects = sqliteTable('effects', {
   volume: integer('volume').notNull().default(70),
   position: text('position').$type<Position>().notNull().default('center'),
   durationMs: integer('duration_ms').notNull().default(5000),
+  /** 有时长的素材手动设置时长（关着时跟随素材） */
+  durationCustom: bool('duration_custom').notNull().default(false),
+  /** 上传的素材开头淡入、结尾淡出（升级前的素材保持开启，新上传的默认关闭） */
+  fadeIn: bool('fade_in').notNull().default(true),
+  fadeOut: bool('fade_out').notNull().default(true),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

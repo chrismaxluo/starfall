@@ -22,7 +22,7 @@ export function demoItem(style: string): PlayItem {
   return {
     id: `demo-${++seq}`,
     kind: 'enter',
-    effect: { id: 0, name: d.style, visual: { type: 'builtin_style', style: d.style }, showText: true, position: d.position, durationMs: d.durationMs, sound: null, volume: 70 },
+    effect: { id: 0, name: d.style, visual: { type: 'builtin_style', style: d.style }, showText: true, position: d.position, durationMs: d.durationMs, fadeIn: false, fadeOut: false, sound: null, volume: 70 },
     text: d.text,
     viewer: d.viewer,
     ...(d.gift ? { gift: d.gift } : {}),

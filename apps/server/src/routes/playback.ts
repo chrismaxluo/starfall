@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { HttpError, parseBody } from '../http.ts';
 import { assetDto } from '../services/assets.ts';
-import { EffectPatchSchema } from '../services/effects.ts';
+import { EffectPatchSchema, playDuration } from '../services/effects.ts';
 import type { TriggerEvent } from '../services/pipeline.ts';
 
 const SimViewerSchema = z
@@ -88,6 +88,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
       sound = a && a.kind === 'audio' ? assetDto(a) : null;
     }
     const effect = { ...saved, ...d, sound };
+    if (d.durationMs !== undefined || d.durationCustom !== undefined) effect.durationMs = playDuration(saved.asset?.durationMs, effect.durationCustom, effect.durationMs);
     const v = b.viewer ?? {};
     const medal = v.medalLevel === null ? { medal: undefined } : v.medalLevel ? { medal: { name: '星临', level: v.medalLevel, anchorUid: 0 } } : {};
     const { medalLevel: _m, ...rest } = v;

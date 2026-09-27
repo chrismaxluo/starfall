@@ -87,6 +87,10 @@ const EffectPart = z.object({
   volume: z.number().int().min(0).max(100),
   position: z.enum(POSITIONS),
   durationMs: z.number().int().min(500).max(30_000),
+  durationCustom: z.boolean().default(false),
+  // 旧版本导出的文件没有这两项：保持以前的淡入淡出
+  fadeIn: z.boolean().default(true),
+  fadeOut: z.boolean().default(true),
 });
 
 const TierPart = z.object({ effect: effectRef, cooldownMin, enabled: z.boolean() });
@@ -236,6 +240,9 @@ export class ConfigIO {
         volume: e.volume,
         position: e.position,
         durationMs: e.durationMs,
+        durationCustom: e.durationCustom,
+        fadeIn: e.fadeIn,
+        fadeOut: e.fadeOut,
       })),
       rules: {
         enter: {
@@ -462,7 +469,7 @@ export class ConfigIO {
       for (const e of file.effects) {
         const c = local.get(e.name);
         const assetId = idOfSha(e.asset);
-        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, updatedAt: Date.now() };
+        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, updatedAt: Date.now() };
         if (c) {
           if (c.builtin || e.builtin) continue;
           // 新文件缺失时保留本机的画面

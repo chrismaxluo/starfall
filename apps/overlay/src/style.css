@@ -58,7 +58,6 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 /* ---- 上传的素材 ---- */
 /* 淡入淡出加在素材和昵称条各自身上：外层做透明度动画会让昵称条的毛玻璃失效 */
 .fx-asset { display: flex; flex-direction: column; align-items: inherit; gap: 18px; }
-.fx-asset > * { animation: assetLife var(--dur) linear forwards; }
 .slot.pos-center .fx-asset, .slot.full .fx-asset { position: absolute; inset: 0; display: grid; place-items: center; }
 .media { display: block; }
 .media video, .media img, .media canvas, .media svg { width: 100% !important; height: 100% !important; object-fit: contain; display: block; }
@@ -67,7 +66,6 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 .fx-asset .card .name { font-size: 28px; font-weight: 500; }
 .fx-asset .card .say { font-size: 24px; opacity: .75; margin: 0 6px; }
 .slot.pos-center .fx-asset .card, .slot.full .fx-asset .card { position: absolute; left: 50%; bottom: calc(var(--sb) + 60px); transform: translateX(-50%); }
-@keyframes assetLife { 0% { opacity: 0; } 5% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
 /* 头像和欢迎语：动画放在毛玻璃元素自身上（祖先有透明度动画会让毛玻璃失效）；用 translate 不和定位用的 transform 冲突（旧内核不认 translate 时只淡入淡出） */
 .fx-asset > .card { animation: cardLife var(--cd) ease forwards; }
 @keyframes cardLife { 0% { opacity: 0; translate: 0 14px; } 10% { opacity: 1; translate: 0 0; } 85% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 -6px; } }

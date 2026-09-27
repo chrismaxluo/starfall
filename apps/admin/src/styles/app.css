@@ -239,6 +239,7 @@ svg.i { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: n
   font-size: 12px; font-weight: 500; white-space: nowrap;
 }
 .tag svg { width: 12px; height: 12px; }
+.tag img.badge { width: 18px; height: 18px; margin: 0 -2px 0 -4px; object-fit: contain; }
 .tag.gov { color: var(--gov); background: var(--gov-soft); }
 .tag.adm { color: var(--adm); background: var(--adm-soft); }
 .tag.cap { color: var(--cap); background: var(--cap-soft); }

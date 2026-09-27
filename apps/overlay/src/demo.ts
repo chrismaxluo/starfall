@@ -8,13 +8,7 @@ const DEMOS: Array<{ style: string; position: Position; durationMs: number; text
   { style: 'royal-gov', position: 'center', durationMs: 8000, text: '恭迎总督 长夜未央', viewer: { name: '长夜未央', guard: 1, isMod: false, medal: { name: '星临', level: 41 } } },
   { style: 'royal-adm', position: 'center', durationMs: 6000, text: '恭迎提督 月下独酌', viewer: { name: '月下独酌', guard: 2, isMod: false, medal: { name: '星临', level: 38 } } },
   { style: 'royal-cap', position: 'center', durationMs: 4000, text: '恭迎舰长 星河漫步', viewer: { name: '星河漫步', guard: 3, isMod: false, medal: { name: '星临', level: 27 } } },
-  { style: 'star', position: 'center', durationMs: 6800, text: '总督 长夜未央 驾临', viewer: { name: '长夜未央', guard: 1, isMod: false, medal: { name: '星临', level: 41 } } },
-  { style: 'meteor', position: 'bl', durationMs: 5200, text: '欢迎提督 月下独酌 登船', viewer: { name: '月下独酌', guard: 2, isMod: false, medal: { name: '星临', level: 38 } } },
-  { style: 'flow', position: 'bl', durationMs: 4200, text: '欢迎舰长 星河漫步 登船', viewer: { name: '星河漫步', guard: 3, isMod: false, medal: { name: '星临', level: 27 } } },
-  { style: 'patrol', position: 'bl', durationMs: 3600, text: '青柠汽水 前来巡场', viewer: { name: '青柠汽水', guard: 0, isMod: true } },
   { style: 'frost', position: 'bl', durationMs: 3200, text: '晚风与你 来了', viewer: { name: '晚风与你', guard: 0, isMod: false, medal: { name: '星临', level: 27 } } },
-  { style: 'gift', position: 'bl', durationMs: 4000, text: '感谢 半糖主义 送出 小花花 ×10', viewer: { name: '半糖主义', guard: 0, isMod: false, medal: { name: '星临', level: 8 } } },
-  { style: 'bubble', position: 'top', durationMs: 3000, text: '路过的猫：主播晚上好！', viewer: { name: '路过的猫', guard: 0, isMod: false } },
   { style: 'line', position: 'bl', durationMs: 2400, text: '路过的猫 进入直播间', viewer: { name: '路过的猫', guard: 0, isMod: false } },
   { style: 'glass-gift', position: 'bl', durationMs: 4000, text: '半糖主义 送出 小花花', viewer: { name: '半糖主义', guard: 0, isMod: false, medal: { name: '星临', level: 8 } }, gift: { name: '小花花', count: 200, img: 'https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png' } },
   { style: 'glass-big', position: 'bl', durationMs: 6000, text: '晚风与星河漫步 送出 星愿水晶球', viewer: { name: '晚风与星河漫步', guard: 0, isMod: false }, gift: { name: '星愿水晶球', count: 1, img: 'https://s1.hdslb.com/bfs/live/f26242d5dc86bbc695336383e2ac4ba50ec033eb.png' } },
@@ -24,7 +18,7 @@ const DEMOS: Array<{ style: string; position: Position; durationMs: number; text
 
 let seq = 0;
 export function demoItem(style: string): PlayItem {
-  const d = DEMOS.find((x) => x.style === style) ?? DEMOS.find((x) => x.style === 'flow')!;
+  const d = DEMOS.find((x) => x.style === style) ?? DEMOS.find((x) => x.style === 'frost')!;
   return {
     id: `demo-${++seq}`,
     kind: 'enter',
@@ -78,7 +72,7 @@ export function showCheck(stage: HTMLElement, player: Player, canvas: string): v
   play.onclick = () => {
     panel.hidden = true;
     beep();
-    player.play(demoItem('flow'));
+    player.play(demoItem('frost'));
   };
   close.onclick = () => (panel.hidden = true);
   stage.append(panel);
@@ -94,7 +88,7 @@ export function startLoop(stage: HTMLElement, player: Player): void {
     n++;
     const ok = st === 'running';
     badge.replaceChildren(`声音测试 #${n} · 音频状态：`, h('b', { style: { color: ok ? '#3DD68C' : '#F0B45A' } }, ok ? '正在播放' : st === 'suspended' ? '被拦截（需要点击）' : st));
-    player.play(demoItem('flow'));
+    player.play(demoItem('frost'));
   };
   tick();
   setInterval(tick, 8000);

@@ -8,14 +8,14 @@ import type { StageSize } from './builtin.ts';
 import { h } from './dom.ts';
 
 /** 默认欢迎语、身份标签里的常用字 */
-const COMMON = '欢迎感谢送出开通续费驾临登船前来巡场来了进入直播间星光加冕总督提督舰长房管粉丝新个月礼物主播观众恭迎上舰光临驾到谢赏 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz ·×：，';
+const COMMON = '欢迎感谢送出开通续费驾临前来巡场来了进入直播间总督提督舰长房管粉丝新个月礼物主播观众恭迎上舰光临驾到谢赏 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz ·×：，';
 const FONTS: Array<[string, number[]]> = [
   ['Geist Sans', [400, 500, 600, 700]],
   ['Noto Sans SC', [400, 500, 600, 700]],
   ['Geist Mono', [500, 600]],
   ['Noto Serif SC', [600, 900]],
 ];
-const STYLES = ['line', 'frost', 'patrol', 'flow', 'gift', 'meteor', 'star', 'bubble', 'royal-cap', 'royal-adm', 'royal-gov', 'glass-gift', 'glass-big', 'glass-mod', 'glass-dm'];
+const STYLES = ['line', 'frost', 'royal-cap', 'royal-adm', 'royal-gov', 'glass-gift', 'glass-big', 'glass-mod', 'glass-dm'];
 const WARM_MS = 600;
 
 export async function warmFonts(): Promise<void> {

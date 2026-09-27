@@ -54,13 +54,7 @@ export const STYLES: Record<string, { name: string; grad: string; edge: string }
   'glass-big': { name: '晶耀', grad: 'linear-gradient(135deg,#FFE0A8,#7A5A40)', edge: 'rgba(255,195,122,.75)' },
   'glass-mod': { name: '晶巡', grad: 'linear-gradient(135deg,#B8F2E8,#2F5A62)', edge: 'rgba(61,214,193,.6)' },
   'glass-dm': { name: '晶语', grad: 'linear-gradient(135deg,#CFE9FF,#3E5C8A)', edge: 'rgba(124,199,255,.6)' },
-  star: { name: '星冕', grad: IDENTITY.gov.grad, edge: 'rgba(240,180,90,.75)' },
-  meteor: { name: '流星', grad: IDENTITY.adm.grad, edge: 'rgba(183,148,255,.7)' },
-  flow: { name: '流光', grad: IDENTITY.cap.grad, edge: 'rgba(111,168,255,.7)' },
-  patrol: { name: '巡场', grad: IDENTITY.mod.grad, edge: 'rgba(79,209,188,.55)' },
   frost: { name: '霜玻', grad: 'linear-gradient(135deg,#3FB4F6,#2B2F5E)', edge: 'rgba(255,255,255,.2)' },
   line: { name: '一行字', grad: IDENTITY.nor.grad, edge: 'transparent' },
-  gift: { name: '礼物', grad: 'linear-gradient(135deg,#FFB38A,#E0568F)', edge: 'rgba(255,150,170,.7)' },
-  bubble: { name: '气泡', grad: 'linear-gradient(135deg,#7FD8F5,#4C6FE0)', edge: 'rgba(127,216,245,.6)' },
 };
 export const ASSET_SWATCH = 'linear-gradient(135deg,#2A2B3A,#15161F)';

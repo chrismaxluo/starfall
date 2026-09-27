@@ -435,8 +435,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 .pstage { aspect-ratio: 16 / 9; border-radius: var(--r-md); position: relative; overflow: hidden; border: 1px solid var(--line);
   background: radial-gradient(60% 50% at 75% 10%, rgba(111,110,255,.28), transparent 70%), linear-gradient(160deg, #1A1B2E, #0C0D16); }
 .pstage .stage-label { font-size: 10.5px; }
-.mini.tpl-star { padding: 10px 22px 10px 10px; background: rgba(30, 20, 8, .6); }
-.mini.tpl-star b { background: linear-gradient(180deg, #FFF6DE, #F2C46E); -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 15px; font-weight: 700; }
 .mini.tpl-line { background: none; box-shadow: none; backdrop-filter: none; padding: 0; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
 .mini.tpl-line .avatar { display: none; }
 .mini .say { opacity: .75; font-size: 12.5px; margin-left: 4px; }

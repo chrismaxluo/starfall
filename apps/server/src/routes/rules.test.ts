@@ -26,7 +26,7 @@ describe('进场规则', () => {
     const { req, ctx, effectId } = await setup();
     const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();
     r.tiers.nor = { effectId: await effectId('一行字'), cooldownMin: 60, enabled: true };
-    r.bands = [{ fromLevel: 1, effectId: null, cooldownMin: 15, enabled: true }, { fromLevel: 30, effectId: await effectId('流光'), cooldownMin: 5, enabled: true }, { fromLevel: 10, effectId: await effectId('霜玻'), cooldownMin: 10, enabled: false }];
+    r.bands = [{ fromLevel: 1, effectId: null, cooldownMin: 15, enabled: true }, { fromLevel: 30, effectId: await effectId('门楼'), cooldownMin: 5, enabled: true }, { fromLevel: 10, effectId: await effectId('霜玻'), cooldownMin: 10, enabled: false }];
     r.cooldownMode = 'oncePerLive';
     const saved = (await req({ method: 'PUT', url: '/api/rules/enter', payload: r })).json();
     expect(saved.bands.map((b: { fromLevel: number }) => b.fromLevel)).toEqual([30, 10, 1]);
@@ -58,7 +58,7 @@ describe('专属用户', () => {
     const { req, effectId } = await setup();
     const fetchMock = vi.fn(async () => card(10001, '小星'));
     vi.stubGlobal('fetch', fetchMock);
-    const star = await effectId('星冕');
+    const star = await effectId('晶耀');
     const x = { uid: 10001, effectId: star, cooldownMin: 0, until: '2026-10-01', enabled: true };
     const added = await req({ method: 'POST', url: '/api/rules/exclusive', payload: x });
     expect(added.statusCode).toBe(200);
@@ -83,7 +83,7 @@ describe('专属用户', () => {
   it('查不到昵称也能添加', async () => {
     const { req, effectId } = await setup();
     vi.stubGlobal('fetch', async () => { throw new Error('network down'); });
-    const res = await req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10003, effectId: await effectId('流星'), cooldownMin: 5, until: null, enabled: true } });
+    const res = await req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10003, effectId: await effectId('亭阁'), cooldownMin: 5, until: null, enabled: true } });
     expect(res.json()).toMatchObject({ uid: 10003, name: null });
   });
 });

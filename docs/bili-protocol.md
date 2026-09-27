@@ -181,6 +181,21 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 - **去重**：两条 toast 按 `payflow_id` 去重；`GUARD_BUY` 先等 3 秒，同一人同等级的 toast 到了就丢弃（见 `packages/core/src/combo.ts`）。
 - 样本已脱敏为 `fixtures/bili/user_toast_msg_v2.cap-open.json` 等。
 
+### 5.6.2 大航海图标（船锚）✅ 舰长、提督 / ⏳ 总督高清版
+
+B 站的大航海图标是一个船锚，蓝色舰长、紫色提督、红金色总督。版权归哔哩哔哩所有：只在运行时引用 B 站的地址，不放进项目。
+
+| 等级 | 60 × 60（消息里的 `medal.guard_icon`） | 30 × 30（直播间网页脚本里的 `guardResource`） |
+|---|---|---|
+| 总督 `guard_1` | ⏳ 还没收到过样本 | `https://i0.hdslb.com/bfs/live/0d2b29717af2e7b1bbdc21a4fba8619636f82517.png` |
+| 提督 `guard_2` | `https://i0.hdslb.com/bfs/live/62ac06fd72b05fe22be26426b9e1a8e1fc2c6b89.png` | `https://i0.hdslb.com/bfs/live/405bffdfd78bb562e0394dd828f8bf69ea01f400.png` |
+| 舰长 `guard_3` | `https://i0.hdslb.com/bfs/live/48360c8f3b7de8031e86ff1ef4a2dfc0ec2a61c2.png` | `https://i0.hdslb.com/bfs/live/00749d246e2b49b2328cb981de02142fb6aeceba.png` |
+
+- 60 × 60 的来源：弹幕 `DANMU_MSG` 的 `info[0][15].user.medal.guard_icon`、进场 `ENTRY_EFFECT` 的 `data.uinfo.medal.guard_icon`，和同一对象里的 `guard_level` 对应（2026-09-26 统计：舰长 417 次、提督 250 次，没有总督）。
+- 30 × 30 的来源：直播间网页脚本 `bilibili.*.js` 里 `guardResource`：`{ guard_1, guard_2, guard_3 }`。
+- 总督高清版的找法：总督很少，未登录连到热门直播间听弹幕（不需要账号），等总督发言时取 `medal.guard_icon`。两次共听 8 个热门直播间约 5 分钟，没有遇到总督。
+- 不登录时「最近弹幕」接口（`dM/gethistory`）已经返回空列表，不能用。
+
 ### 5.7 开播 / 下播
 
 - ✅ `PREPARING`（下播）：`{"cmd":"PREPARING","roomid":"<房间号>","send_time":<毫秒>,…}`，注意 `roomid` 是字符串。

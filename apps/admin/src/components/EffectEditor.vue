@@ -69,7 +69,9 @@ function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  return { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, durationMs: Math.round(Math.min(30, Math.max(0.5, v.seconds)) * 1000) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position };
+  // 有时长的素材按素材本身时长播放，不提交时长
+  return timed.value ? base : { ...base, durationMs: Math.round(Math.min(30, Math.max(0.5, v.seconds)) * 1000) };
 }
 
 /** 示例观众：按这个素材用在哪条规则选（总督规则用总督观众） */
@@ -187,6 +189,8 @@ function playSound(): void {
 }
 
 const a = computed<AssetDto | null>(() => eff.value?.asset ?? null);
+/** 视频、SVGA、Lottie、动图有自己的时长 */
+const timed = computed(() => Boolean(a.value?.durationMs));
 const meta = computed(() => (a.value ? `${a.value.ext.toUpperCase()}${a.value.width ? ` · ${a.value.width}×${a.value.height}` : ''} · ${seconds(a.value.durationMs)} · ${fileSize(a.value.size)}` : ''));
 const o = computed(() => output());
 function close(): void {
@@ -285,7 +289,8 @@ onBeforeUnmount(() => {
             <h3><span class="n">4</span>位置与时长</h3>
             <div class="row2">
               <Seg v-model="d.position" label="位置" :options="positionOptions" />
-              <div class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" max="30" step="0.1" aria-label="时长" /><span>秒</span></div>
+              <span v-if="timed" class="hint" style="font-size: 13px; color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
+              <div v-else class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" max="30" step="0.1" aria-label="时长" /><span>秒</span></div>
             </div>
             <span v-if="o?.orient === 'portrait'" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>

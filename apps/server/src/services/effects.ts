@@ -100,7 +100,8 @@ export class EffectStore {
       soundAssetId: r.soundAssetId,
       volume: r.volume,
       position: r.position,
-      durationMs: r.durationMs,
+      // 有时长的素材（视频、SVGA、Lottie、动图）按素材本身的时长播放，不受时长设置限制；静态图片才用设置的时长
+      durationMs: asset?.durationMs ?? r.durationMs,
       asset: asset ? assetDto(asset) : null,
       sound: sound ? assetDto(sound) : null,
       usedBy,

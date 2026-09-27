@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EvIcon from '../components/EvIcon.vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import Icon from '../components/Icon.vue';
@@ -6,7 +7,7 @@ import IdTag from '../components/IdTag.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
 import Seg from '../components/Seg.vue';
 import { get } from '../lib/api.ts';
-import { EV_ICON, describe, statusCls, statusText } from '../lib/events.ts';
+import { describe, statusCls, statusText } from '../lib/events.ts';
 import { dateTime } from '../lib/format.ts';
 import { onLiveEvent, onLiveEventStatus, onResync } from '../lib/live.ts';
 import { effectById, state } from '../lib/store.ts';
@@ -135,7 +136,7 @@ function setExclusive(e: EventDto): void {
                 <IdTag :viewer="e.viewer" />
               </span>
             </td>
-            <td><span class="evchip"><span class="ev" :style="{ background: EV_ICON[e.kind].bg }">{{ EV_ICON[e.kind].text }}</span>{{ describe(e) }}</span></td>
+            <td><span class="evchip"><EvIcon :kind="e.kind" :img="e.payload?.icon" />{{ describe(e) }}</span></td>
             <td><template v-if="e.rule">{{ e.rule }}<template v-if="e.effectId"> → {{ effectById(e.effectId)?.name ?? '（素材已删除）' }}</template></template><span v-else style="color: var(--t3)">—</span></td>
             <td><span class="st" :class="statusCls(e.status)">{{ statusText(e.status) }}</span></td>
             <td class="row-act" style="white-space: nowrap"><button v-if="e.kind === 'enter' && e.uid > 0" class="btn" @click="setExclusive(e)">{{ isExcl(e.uid) ? '修改专属' : '设为专属' }}</button></td>

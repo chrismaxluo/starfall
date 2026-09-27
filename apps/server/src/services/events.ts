@@ -33,7 +33,7 @@ function payloadOf(ev: TriggerEvent): unknown {
     case 'danmu':
       return { text: ev.text };
     case 'gift':
-      return { giftId: ev.giftId, giftName: ev.giftName, unitPrice: ev.unitPrice, count: ev.count, paid: ev.paid };
+      return { giftId: ev.giftId, giftName: ev.giftName, unitPrice: ev.unitPrice, count: ev.count, paid: ev.paid, ...(ev.icon ? { icon: ev.icon } : {}) };
     case 'guard':
       return { level: ev.level, months: ev.months, op: ev.op };
   }

@@ -472,6 +472,11 @@ describe('礼物', () => {
     vi.advanceTimersByTime(10);
     const last = t.plays().at(-1)!;
     expect(last.gift).toEqual({ name: '别的礼物', count: 1 });
+    // 消息自带官方图标时优先用它（礼物面板里没有这个礼物也有图）
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ giftId: 2, giftName: '盲盒礼物', unitPrice: 20_000, icon: 'https://s1.hdslb.com/bfs/live/box.png' }, { uid: 6 }));
+    vi.advanceTimersByTime(10);
+    expect(t.plays().at(-1)!.gift).toEqual({ name: '盲盒礼物', count: 1, img: 'https://s1.hdslb.com/bfs/live/box.png' });
   });
 
   it('≥ 100 元的礼物插队；关闭插队后按优先级排（礼物仍然排在进场前面）', async () => {

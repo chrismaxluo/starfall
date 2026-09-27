@@ -33,6 +33,8 @@ export interface PlayItem {
     showText: boolean;
     position: Position;
     durationMs: number;
+    fadeIn: boolean;
+    fadeOut: boolean;
     sound: { url: string } | null;
     volume: number;
   };

@@ -146,6 +146,35 @@ describe('修改素材', () => {
     expect((await req({ method: 'PUT', url: `/api/effects/${still.id}`, payload: { durationMs: 2500 } })).json().durationMs).toBe(2500);
   });
 
+  it('手动设置时长：打开后按设置的时长播放，不超过素材本身；关掉恢复跟随素材；换文件后恢复跟随', async () => {
+    const { req, upload, ctx } = await setup();
+    const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
+    ctx.db.update(assets).set({ durationMs: 30_733 }).where(eq(assets.id, effect.visual.assetId)).run();
+    const put = async (payload: object) => (await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload })).json();
+    expect(effect.durationCustom).toBe(false);
+    expect(await put({ durationCustom: true, durationMs: 8000 })).toMatchObject({ durationCustom: true, durationMs: 8000 });
+    // 预览用还没保存的设置
+    const p = (await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { durationCustom: false } } })).json();
+    expect(p.effect.durationMs).toBe(30_733);
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { durationMs: 3000 } } })).json().effect.durationMs).toBe(3000);
+    expect(await put({ durationCustom: false })).toMatchObject({ durationCustom: false, durationMs: 30_733 });
+    // 设置的比素材长时按素材
+    ctx.db.update(assets).set({ durationMs: 1200 }).where(eq(assets.id, effect.visual.assetId)).run();
+    expect(await put({ durationCustom: true, durationMs: 8000 })).toMatchObject({ durationCustom: true, durationMs: 1200 });
+    const replaced = (await upload(`/api/effects/${effect.id}/file`, 'b.webm', media('alpha.webm'), 'PUT')).json();
+    expect(replaced.durationCustom).toBe(false);
+  });
+
+  it('渐入渐出：新上传的素材默认关闭，可以分别打开，预览和播放内容带上设置', async () => {
+    const { req, upload } = await setup();
+    const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
+    expect(effect).toMatchObject({ fadeIn: false, fadeOut: false });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeIn: true } })).json()).toMatchObject({ fadeIn: true, fadeOut: false });
+    const p = (await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { fadeOut: true } } })).json();
+    expect(p.effect).toMatchObject({ fadeIn: true, fadeOut: true });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeIn: 'yes' } })).statusCode).toBe(400);
+  });
+
   it('音效：上传、选用、被使用时不能删除', async () => {
     const { req, upload } = await setup();
     const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();

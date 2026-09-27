@@ -51,6 +51,9 @@ function snapshot(e: EffectDto) {
     volume: e.volume,
     position: e.position,
     seconds: e.durationMs / 1000,
+    durationCustom: e.durationCustom,
+    fadeIn: e.fadeIn,
+    fadeOut: e.fadeOut,
   };
 }
 const d = ref(eff.value ? snapshot(eff.value) : null);
@@ -69,9 +72,11 @@ function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position };
-  // 有时长的素材按素材本身时长播放，不提交时长
-  return timed.value ? base : { ...base, durationMs: Math.round(Math.min(30, Math.max(0.5, v.seconds)) * 1000) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut };
+  // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
+  if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
+  const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
+  return timed.value ? { ...base, durationCustom: true, durationMs } : { ...base, durationMs };
 }
 
 /** 示例观众：按这个素材用在哪条规则选（总督规则用总督观众） */
@@ -87,7 +92,7 @@ function replay(): void {
 }
 let replayTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId],
+  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom],
   () => replay(),
 );
 watch(
@@ -191,6 +196,14 @@ function playSound(): void {
 const a = computed<AssetDto | null>(() => eff.value?.asset ?? null);
 /** 视频、SVGA、Lottie、动图有自己的时长 */
 const timed = computed(() => Boolean(a.value?.durationMs));
+/** 时长上限：30 秒，有时长的素材不超过素材本身 */
+const maxSeconds = computed(() => (a.value?.durationMs ? Math.min(30, Math.floor(a.value.durationMs / 100) / 10) : 30));
+watch(
+  () => d.value?.durationCustom,
+  (on) => {
+    if (on && d.value && d.value.seconds > maxSeconds.value) d.value.seconds = maxSeconds.value;
+  },
+);
 const meta = computed(() => (a.value ? `${a.value.ext.toUpperCase()}${a.value.width ? ` · ${a.value.width}×${a.value.height}` : ''} · ${seconds(a.value.durationMs)} · ${fileSize(a.value.size)}` : ''));
 const o = computed(() => output());
 function close(): void {
@@ -289,9 +302,14 @@ onBeforeUnmount(() => {
             <h3><span class="n">4</span>位置与时长</h3>
             <div class="row2">
               <Seg v-model="d.position" label="位置" :options="positionOptions" />
-              <span v-if="timed" class="hint" style="font-size: 13px; color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
-              <div v-else class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" max="30" step="0.1" aria-label="时长" /><span>秒</span></div>
+              <span v-if="timed && !d.durationCustom" class="hint" style="font-size: 13px; color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
+              <div v-else class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div>
             </div>
+            <template v-if="a">
+              <div v-if="timed" class="toggle-line">手动设置时长 <span class="hint">{{ d.durationCustom ? `最长 ${maxSeconds} 秒，到时间就结束` : '关着时按素材完整播放' }}</span><Switch v-model="d.durationCustom" label="手动设置时长" /></div>
+              <div class="toggle-line">开头渐入 <span class="hint">关掉后第一帧直接出现</span><Switch v-model="d.fadeIn" label="开头渐入" /></div>
+              <div class="toggle-line">结尾渐出 <span class="hint">关掉后播完直接消失</span><Switch v-model="d.fadeOut" label="结尾渐出" /></div>
+            </template>
             <span v-if="o?.orient === 'portrait'" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>
         </div>

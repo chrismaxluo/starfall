@@ -383,6 +383,8 @@ export class Pipeline {
         showText: effect.showText,
         position: effect.position,
         durationMs: effect.durationMs,
+        fadeIn: effect.fadeIn,
+        fadeOut: effect.fadeOut,
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },

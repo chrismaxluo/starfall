@@ -32,6 +32,11 @@ export const EffectSchema = z.object({
   volume: z.number().int().min(0).max(100),
   position: z.enum(POSITIONS),
   durationMs: z.number().int().min(500).max(30_000),
+  /** 有时长的素材（视频、SVGA、Lottie、动图）：手动设置时长（最长到素材本身的长度）；关着时按素材时长完整播放 */
+  durationCustom: z.boolean(),
+  /** 上传的素材：开头淡入 / 结尾淡出（内置样式有自己的动画，不用这两项） */
+  fadeIn: z.boolean(),
+  fadeOut: z.boolean(),
 });
 export type Effect = z.infer<typeof EffectSchema>;
 

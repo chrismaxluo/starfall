@@ -9,6 +9,10 @@ import type { StageMetrics } from './stage.ts';
 
 /** 素材上的头像和欢迎语显示多久（素材更短时跟素材一起结束） */
 const CAPTION_MS = 4500;
+/** 素材开头淡入、结尾淡出的时长 */
+const FADE_MS = 300;
+/** 设置的时长和视频实际长度差这么多以内算播到结尾（素材时长是上传时测的，可能差一点） */
+const END_SLACK_MS = 250;
 /** 视频晚开始时最多多等这么久 */
 const VIDEO_GRACE_MS = 3000;
 
@@ -17,7 +21,8 @@ interface Current {
   slot: HTMLElement;
   media: Media | null;
   audio: HTMLAudioElement | null;
-  timer: ReturnType<typeof setTimeout>;
+  timer?: ReturnType<typeof setTimeout>;
+  fadeTimer?: ReturnType<typeof setTimeout>;
 }
 
 export class Player {
@@ -42,6 +47,7 @@ export class Player {
     const m = this.metrics();
     const slot = h('div', { class: 'slot', style: { '--dur': `${e.durationMs}ms` } });
     let media: Media | null = null;
+    let wrap: HTMLElement | null = null;
 
     if (e.visual.type === 'builtin_style') {
       const full = isFullStage(e.visual.style);
@@ -55,7 +61,8 @@ export class Player {
       const box = center ? { w: m.width, h: m.height } : { w: m.width - 2 * m.marginX - 48, h: m.height * 0.45 };
       const size = fitSize(e.visual, box, center ? Infinity : m.fxz);
       media = buildMedia(e.visual, e.volume);
-      const wrap = h('div', { class: 'media', style: { width: `${size.w}px`, height: `${size.h}px` } }, media.el);
+      wrap = h('div', { class: 'media', style: { width: `${size.w}px`, height: `${size.h}px` } }, media.el);
+      if (e.fadeIn) wrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS, easing: 'ease-out', fill: 'backwards' });
       const fx = h('div', { class: 'fx fx-asset' }, wrap);
       // 头像和欢迎语只显示几秒，不跟着素材一直挂着
       if (e.showText) fx.append(h('div', { class: 'card glass', style: { '--cd': `${Math.min(e.durationMs, CAPTION_MS)}ms` } }, avatar(item.viewer), textLine(item.text, item.viewer.name)));
@@ -77,11 +84,32 @@ export class Player {
       this.stop();
       this.send({ type: 'ended', id: item.id });
     };
-    // 视频放完就结束；加载慢、开始晚了也要播完整，不按时间提前切掉（下一个特效来了照常停止）
+    // 视频按真正开始播放的时间算：加载慢、开始晚了也不提前切掉（下一个特效来了照常停止）
+    // 跟随素材时放完（ended）就结束；手动设置了更短的时长时到点结束
     const vid = media?.el instanceof HTMLVideoElement ? media.el : null;
     vid?.addEventListener('ended', finish, { once: true });
-    const timer = setTimeout(finish, e.durationMs + (vid ? VIDEO_GRACE_MS : 0));
-    this.current = { id: item.id, slot, media, audio, timer };
+    const w = e.fadeOut ? wrap : null;
+    /** 从现在起 ms 毫秒后结束（结尾渐出在最后 0.3 秒） */
+    const schedule = (ms: number, grace: number) => {
+      const c = this.current;
+      if (c?.id !== item.id) return;
+      clearTimeout(c.timer);
+      clearTimeout(c.fadeTimer);
+      c.timer = setTimeout(finish, ms + grace);
+      if (w) c.fadeTimer = setTimeout(() => w.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: 'ease-in', fill: 'forwards' }), Math.max(0, ms - FADE_MS));
+    };
+    this.current = { id: item.id, slot, media, audio };
+    schedule(e.durationMs, vid ? VIDEO_GRACE_MS : 0);
+    vid?.addEventListener(
+      'playing',
+      () => {
+        const full = Number.isFinite(vid.duration) ? vid.duration * 1000 : Infinity;
+        const end = Math.min(e.durationMs, full);
+        // 播到结尾的交给 ended，定时只兜底
+        schedule(Math.max(0, end - vid.currentTime * 1000), end >= full - END_SLACK_MS ? 500 : 0);
+      },
+      { once: true },
+    );
     this.send({ type: 'started', id: item.id });
   }
 
@@ -90,6 +118,7 @@ export class Player {
     if (!c) return;
     this.current = null;
     clearTimeout(c.timer);
+    clearTimeout(c.fadeTimer);
     c.media?.stop();
     if (c.audio) {
       c.audio.pause();

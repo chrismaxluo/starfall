@@ -5,7 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { get, post } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
-import { yuan } from '../lib/preview.ts';
+import { battery, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
 import { attempt } from '../lib/toast.ts';
 import type { GiftConfig, SimulateResult, TriggerKind } from '../lib/types.ts';
@@ -15,7 +15,7 @@ const emit = defineEmits<{ preview: [PreviewRequest] }>();
 const who = ref({ identity: 'cap' as Identity, medal: 0, own: true });
 const text = ref('生日快乐');
 const giftPick = ref<number | ''>('');
-const customYuan = ref(1);
+const customBattery = ref(10);
 const count = ref(10);
 const guard = ref({ level: 3 as 1 | 2 | 3, op: 'open' as 'open' | 'renew', months: 1 });
 const catalog = ref<GiftConfig[]>([]);
@@ -35,7 +35,7 @@ async function run(): Promise<void> {
   }
   if (props.kind === 'gift') {
     const g = catalog.value.find((x) => x.id === Number(giftPick.value));
-    const unitPrice = g ? g.price : Math.round(customYuan.value * 1000);
+    const unitPrice = g ? g.price : Math.round(customBattery.value) * 100;
     body = g ? { kind: 'gift', viewer, giftId: g.id, giftName: g.name, unitPrice, count: count.value } : { kind: 'gift', viewer, giftName: '礼物', unitPrice, count: count.value };
     vars = { gift: g?.name ?? '礼物', count: count.value, valueGold: unitPrice * count.value };
   }
@@ -67,9 +67,9 @@ onMounted(async () => {
         <div class="row">
           <select v-model="giftPick" class="sel" aria-label="礼物">
             <option value="">自定义单价</option>
-            <option v-for="g in paidGifts" :key="g.id" :value="g.id">{{ g.name }}（{{ yuan(g.price) }}）</option>
+            <option v-for="g in paidGifts" :key="g.id" :value="g.id">{{ g.name }}（{{ battery(g.price) }} · {{ yuan(g.price) }}）</option>
           </select>
-          <div v-if="giftPick === ''" class="suffix"><input v-model.number="customYuan" class="inp num" type="number" min="0" step="0.1" aria-label="单价" /><span>元</span></div>
+          <div v-if="giftPick === ''" class="suffix"><input v-model.number="customBattery" class="inp num" type="number" min="0" step="1" aria-label="单价（电池）" /><span>电池（{{ yuan(Math.round(Number(customBattery) || 0) * 100) }}）</span></div>
         </div>
         <div class="suffix"><input v-model.number="count" class="inp num" type="number" min="1" aria-label="数量" /><span>个</span></div>
       </template>

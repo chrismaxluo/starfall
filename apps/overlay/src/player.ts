@@ -7,6 +7,8 @@ import type { Media } from './media.ts';
 import { avatar, textLine } from './parts.ts';
 import type { StageMetrics } from './stage.ts';
 
+/** 素材上的头像和欢迎语显示多久（素材更短时跟素材一起结束） */
+const CAPTION_MS = 4500;
 /** 视频晚开始时最多多等这么久 */
 const VIDEO_GRACE_MS = 3000;
 
@@ -55,7 +57,8 @@ export class Player {
       media = buildMedia(e.visual, e.volume);
       const wrap = h('div', { class: 'media', style: { width: `${size.w}px`, height: `${size.h}px` } }, media.el);
       const fx = h('div', { class: 'fx fx-asset' }, wrap);
-      if (e.showText) fx.append(h('div', { class: 'card glass' }, avatar(item.viewer), textLine(item.text, item.viewer.name)));
+      // 头像和欢迎语只显示几秒，不跟着素材一直挂着
+      if (e.showText) fx.append(h('div', { class: 'card glass', style: { '--cd': `${Math.min(e.durationMs, CAPTION_MS)}ms` } }, avatar(item.viewer), textLine(item.text, item.viewer.name)));
       slot.append(fx);
     }
 

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
+import { assets } from '../db/schema.ts';
 import { formFile, media, testApp } from '../testing.ts';
 
 let close: Array<() => Promise<unknown>> = [];
@@ -125,12 +127,23 @@ describe('修改素材', () => {
     const { req, upload } = await setup();
     const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
     const ok = await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 4000 } });
-    expect(ok.json()).toMatchObject({ name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 4000 });
+    // 视频有自己的时长：按素材时长播放，设置的时长不起作用
+    expect(ok.json()).toMatchObject({ name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 1200 });
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '晶耀' } })).statusCode).toBe(409);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { builtin: true } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { durationMs: 100 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: '/api/effects/9999', payload: { volume: 1 } })).statusCode).toBe(404);
     expect((await req({ method: 'PUT', url: '/api/effects/abc', payload: { volume: 1 } })).statusCode).toBe(400);
+  });
+
+  it('时长：有时长的素材按素材时长（不受 30 秒限制），静态图片用设置的时长', async () => {
+    const { req, upload, ctx } = await setup();
+    const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
+    ctx.db.update(assets).set({ durationMs: 30_733 }).where(eq(assets.id, effect.visual.assetId)).run();
+    expect((await req({ method: 'GET', url: `/api/effects/${effect.id}` })).json().durationMs).toBe(30_733);
+    const still = (await upload('/api/assets', 's.png', media('still.png'))).json().effect;
+    expect(still.durationMs).toBe(5000);
+    expect((await req({ method: 'PUT', url: `/api/effects/${still.id}`, payload: { durationMs: 2500 } })).json().durationMs).toBe(2500);
   });
 
   it('音效：上传、选用、被使用时不能删除', async () => {

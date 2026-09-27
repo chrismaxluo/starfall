@@ -7,6 +7,9 @@ import type { Media } from './media.ts';
 import { avatar, textLine } from './parts.ts';
 import type { StageMetrics } from './stage.ts';
 
+/** 视频晚开始时最多多等这么久 */
+const VIDEO_GRACE_MS = 3000;
+
 interface Current {
   id: string;
   slot: HTMLElement;
@@ -66,10 +69,15 @@ export class Player {
     }
     media?.start().catch((err: Error) => this.current?.id === item.id && err.name !== 'AbortError' && this.send({ type: 'error', id: item.id, message: `素材播放失败：${err.message}` }));
 
-    const timer = setTimeout(() => {
+    const finish = () => {
+      if (this.current?.id !== item.id) return;
       this.stop();
       this.send({ type: 'ended', id: item.id });
-    }, e.durationMs);
+    };
+    // 视频放完就结束；加载慢、开始晚了也要播完整，不按时间提前切掉（下一个特效来了照常停止）
+    const vid = media?.el instanceof HTMLVideoElement ? media.el : null;
+    vid?.addEventListener('ended', finish, { once: true });
+    const timer = setTimeout(finish, e.durationMs + (vid ? VIDEO_GRACE_MS : 0));
     this.current = { id: item.id, slot, media, audio, timer };
     this.send({ type: 'started', id: item.id });
   }

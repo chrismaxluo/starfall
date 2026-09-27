@@ -263,7 +263,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
           <ConfirmButton v-if="upcoming.length" label="清空排队" confirm-label="确认清空" cls="btn" @confirm="clearQueue" />
         </div>
         <div v-if="showQueueSet && state.settings" class="ov-qset">
-          <div class="toggle-line">高价值插队 <span class="hint">上舰和 100 元以上的礼物排到最前面</span>
+          <div class="toggle-line">高价值插队 <span class="hint">上舰和 1000 电池（100 元）以上的礼物排到最前面</span>
             <Switch v-model="state.settings.queueJump" label="高价值插队" @change="(v) => saveSetting({ queueJump: v }, v ? '已开启高价值插队' : '已关闭高价值插队')" />
           </div>
           <div class="slider-row">

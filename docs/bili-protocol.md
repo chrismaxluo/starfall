@@ -157,8 +157,20 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 
 | 接口 | 内容 |
 |---|---|
-| `GET /xlive/web-room/v1/giftPanel/roomGiftList?platform=pc&room_id=<长号>` | **本直播间的礼物面板**（实测 96 个），每种礼物一个版本 |
-| `GET /xlive/web-room/v1/giftPanel/giftConfig?platform=pc&room_id=<长号>` | 全站礼物（实测 913 个），同名礼物有多个版本 |
+| `GET /xlive/web-room/v1/giftPanel/roomGiftList?platform=pc&room_id=<长号>` | **本直播间的礼物面板**（2026-09-27 实测合并后 101 个），每种礼物一个版本 |
+| `GET /xlive/web-room/v1/giftPanel/giftConfig?platform=pc` | 全站礼物（实测 905 ~ 913 个），同名礼物有多个版本。项目里只用来给面板里查不到的礼物找图，一天读一次 |
+| `GET /xlive/web-room/v1/giftPanel/tabRoomGiftList?tab_id=<页号>&room_id=…&ruid=…` | 面板某一页的礼物（网页切换分页时用）。内容和下面的 `tab_list` 一样，项目里不用 |
+
+`roomGiftList` 的 `data` 里（2026-09-27，本直播间，匿名访问）：
+
+| 字段 | 内容 |
+|---|---|
+| `gift_config.base_config.list` | 本直播间可送的礼物（96 个），带图 |
+| `gift_config.room_config` | 本直播间特有的礼物（6 个：发红包、舰长一号、提督一号、总督一号、人气票等），带图，和上面有重复 |
+| `gift_data.room_gift_list.gold_list` | 面板「礼物」页**实际显示的礼物和顺序**（61 个，只有 `gift_id`）。和网页上面板的顺序一致 |
+| `gift_data.tab_list` | 其余几页：`tab_id`、`tab_name`、`position`、`list`（只有 `gift_id`）。实测「粉丝团」（tab_id 9，11 个）、「航海」（tab_id 2，9 个） |
+
+两份 `config` 按 ID 合并去重后 101 个：面板三页一共 81 个，另外 20 个不在面板上显示（包裹、活动、特效版本等）。三页里的礼物在 `config` 里都能找到图。「包裹」「权益中心」两页是个人的，要登录，项目里不用。
 
 字段：`id`、`name`、`price`（金瓜子）、`coin_type`（gold / silver）、`img_basic`、`gif`、`webp` 等。
 

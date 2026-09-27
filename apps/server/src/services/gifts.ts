@@ -1,21 +1,28 @@
 // 本直播间的礼物面板（选择"指定礼物"用；F-GF-01、F-GF-05）。公开接口，缓存 1 小时。
-import { getRoomGifts } from '@starfall/bili';
+import { getAllGifts, getRoomGifts } from '@starfall/bili';
 import type { BiliHttp, GiftConfig } from '@starfall/bili';
 import { HttpError } from '../http.ts';
 import type { RoomStore } from './room.ts';
 
 const TTL_MS = 3600_000;
+/** 全站礼物列表变化很慢，一天读一次 */
+const ALL_TTL_MS = 24 * 3600_000;
 
 export class GiftCatalog {
   private readonly room: RoomStore;
   private readonly http: () => BiliHttp;
   private readonly fetchGifts: typeof getRoomGifts;
+  private readonly fetchAll: typeof getAllGifts;
   private cache: { roomId: number; at: number; gifts: GiftConfig[] } | null = null;
+  private all: { at: number; icons: Map<number, string> } | null = null;
+  private loadingAll: Promise<void> | null = null;
+  private allTriedAt = 0;
 
-  constructor(room: RoomStore, http: () => BiliHttp, fetchGifts: typeof getRoomGifts = getRoomGifts) {
+  constructor(room: RoomStore, http: () => BiliHttp, fetchGifts: typeof getRoomGifts = getRoomGifts, fetchAll: typeof getAllGifts = getAllGifts) {
     this.room = room;
     this.http = http;
     this.fetchGifts = fetchGifts;
+    this.fetchAll = fetchAll;
   }
 
   /**
@@ -29,7 +36,22 @@ export class GiftCatalog {
     if (this.autoRefresh && !hit && room && !this.refreshing && (!c || c.roomId !== room.roomId || Date.now() - c.at > 60_000)) {
       this.refreshing = this.list(true).then(() => undefined, () => undefined).finally(() => (this.refreshing = null));
     }
-    return hit?.icon || undefined;
+    if (hit?.icon) return hit.icon;
+    // 面板里没有（别的直播间的礼物、下架的活动礼物等）：查全站礼物列表
+    const any = this.all?.icons.get(giftId);
+    if (this.autoRefresh && !any) this.loadAll();
+    return any;
+  }
+
+  /** 读全站礼物列表（只留图）；失败时最多 10 分钟再试一次 */
+  private loadAll(): void {
+    const now = Date.now();
+    if (this.loadingAll || (this.all && now - this.all.at < ALL_TTL_MS) || now - this.allTriedAt < 600_000) return;
+    this.allTriedAt = now;
+    this.loadingAll = this.fetchAll(this.http())
+      .then((gifts) => void (this.all = { at: Date.now(), icons: new Map(gifts.filter((g) => g.icon).map((g) => [g.id, g.icon])) }))
+      .catch(() => undefined)
+      .finally(() => (this.loadingAll = null));
   }
 
   private refreshing: Promise<void> | null = null;
@@ -39,6 +61,7 @@ export class GiftCatalog {
   start(): void {
     this.autoRefresh = true;
     if (this.room.get()) void this.list().catch(() => undefined);
+    this.loadAll();
   }
 
   async list(refresh = false): Promise<GiftConfig[]> {

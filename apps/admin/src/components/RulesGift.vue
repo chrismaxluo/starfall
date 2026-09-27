@@ -26,7 +26,17 @@ const bandMsg = ref<{ text: string; err: boolean }>({ text: '分出来的新一�
 const rules = computed(() => state.gift);
 const bands = computed(() => [...(rules.value?.bands ?? [])].sort((a, b) => b.fromGold - a.fromGold));
 const giftOf = (id: number) => catalog.value.find((g) => g.id === id);
-const available = computed(() => catalog.value.filter((g) => g.paid && !rules.value?.specific.some((s) => s.giftId === g.id) && (!giftQ.value || g.name.includes(giftQ.value))).sort((a, b) => a.price - b.price));
+const available = computed(() => catalog.value.filter((g) => g.paid && !rules.value?.specific.some((s) => s.giftId === g.id) && (!giftQ.value || g.name.includes(giftQ.value))));
+// 按礼物面板分页（礼物、粉丝团、航海……）、页内顺序列出；不在面板上显示的（包裹、活动等）按价格排在最后
+const groups = computed(() => {
+  const tabs = new Map<string, GiftConfig[]>();
+  const off: GiftConfig[] = [];
+  for (const g of catalog.value) if (g.tab && !tabs.has(g.tab)) tabs.set(g.tab, []);
+  for (const g of available.value) (g.tab ? tabs.get(g.tab)! : off).push(g);
+  const out = [...tabs].filter(([, list]) => list.length).map(([tab, list]) => ({ title: `${tab}（${list.length}）`, list: list.sort((a, b) => a.panel! - b.panel!) }));
+  if (off.length) out.push({ title: `面板上不显示的礼物（包裹、活动、特效版本等，${off.length}），按价格从低到高`, list: off.sort((a, b) => a.price - b.price) });
+  return out;
+});
 
 /** 第 i 档（从高到低）的金额范围：100 元以上、10 – 100 元 */
 function bandLabel(i: number): string {
@@ -129,9 +139,12 @@ onMounted(async () => {
       <button class="rl-gift add" :disabled="!!catalogErr" @click="picking = !picking"><span><Icon name="i-plus" />{{ catalogErr ? '读取礼物面板失败' : '从礼物列表里选' }}</span></button>
     </div>
     <div v-if="picking" class="rl-gpick">
-      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，按价格从低到高</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
+      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
       <div class="grid">
-        <button v-for="g in available" :key="g.id" type="button" @click="addSpecific(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ yuan(g.price) }}</span></button>
+        <template v-for="grp in groups" :key="grp.title">
+          <div class="sep">{{ grp.title }}</div>
+          <button v-for="g in grp.list" :key="g.id" type="button" @click="addSpecific(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ yuan(g.price) }}</span></button>
+        </template>
         <span v-if="!available.length" class="hint">没有可选的礼物</span>
       </div>
     </div>

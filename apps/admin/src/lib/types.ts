@@ -132,6 +132,10 @@ export interface GiftConfig {
   paid: boolean;
   icon: string;
   gif?: string;
+  /** 在礼物面板上的哪一页（礼物、粉丝团、航海……）；不在面板上显示的礼物没有 */
+  tab?: string;
+  /** 在这一页里的位置 */
+  panel?: number;
 }
 
 export interface EventDto {

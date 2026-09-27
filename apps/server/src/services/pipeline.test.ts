@@ -184,7 +184,7 @@ describe('进场 → 播放', () => {
 
   it('专属用户：有效期内优先；过期后按身份档位（按主播时区算今天）', async () => {
     const t = await setup();
-    const special = t.ctx.effects.list().find((e) => e.name === '星冕')!.id;
+    const special = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
     // 北京时间 2026-09-25 12:00，UTC 同一天；把时间调到北京时间 26 日 01:00（UTC 还是 25 日）
     vi.setSystemTime(new Date('2026-09-26T01:00:00+08:00'));
     t.ctx.enterRules.addExclusive({ uid: 10001, effectId: special, cooldownMin: 0, until: '2026-09-25', enabled: true });
@@ -282,13 +282,13 @@ describe('播放队列', () => {
 
   it('测试播放插到队首，不写事件记录；特效页不在线、已暂停时拒绝', async () => {
     const t = await setup();
-    const star = t.ctx.effects.list().find((e) => e.name === '星冕')!.id;
+    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 3 }));
     t.p.test(star);
     expect(t.p.snapshot().items.map((i) => i.test)).toEqual([true, false]);
     vi.advanceTimersByTime(4500);
-    expect(t.plays().at(-1)).toMatchObject({ test: true, text: '舰长 测试观众 驾临', effect: { name: '星冕' } });
+    expect(t.plays().at(-1)).toMatchObject({ test: true, text: '测试观众 来了', effect: { name: '晶耀' } });
     expect(t.events()).toHaveLength(2);
     t.p.pause();
     expect(() => t.p.test(star)).toThrow('已暂停');
@@ -403,9 +403,9 @@ const eff = (t: Awaited<ReturnType<typeof setup>>, name: string) => t.ctx.effect
 describe('弹幕', () => {
   it('命中关键词：播放素材，欢迎语里有弹幕内容；全局冷却内其他人不重复播，每人冷却内同一人不重复播', async () => {
     const t = await setup();
-    t.ctx.danmuRules.create({ keywords: ['生日快乐'], mode: 'contains', who: 'all', effectId: eff(t, '弹幕回应'), globalCdSec: 30, userCdMin: 10, enabled: true });
+    t.ctx.danmuRules.create({ keywords: ['生日快乐'], mode: 'contains', who: 'all', effectId: eff(t, '晶语'), globalCdSec: 30, userCdMin: 10, enabled: true });
     t.live.emit(dm('主播生日快乐！'));
-    expect(t.plays()[0]).toMatchObject({ kind: 'danmu', text: '小星：主播生日快乐！', effect: { name: '弹幕回应' } });
+    expect(t.plays()[0]).toMatchObject({ kind: 'danmu', text: '小星：主播生日快乐！', effect: { name: '晶语' } });
     vi.advanceTimersByTime(5000);
     t.live.emit(dm('生日快乐呀', { uid: 2, name: '小月' }));
     vi.advanceTimersByTime(30_000);
@@ -421,7 +421,7 @@ describe('弹幕', () => {
 
   it('发送人条件、从上到下命中第一条、调整顺序', async () => {
     const t = await setup();
-    const a = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'exact', who: 'guard', effectId: eff(t, '流光'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    const a = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'exact', who: 'guard', effectId: eff(t, '门楼'), globalCdSec: 0, userCdMin: 0, enabled: true });
     const b = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'contains', who: 'all', effectId: eff(t, '一行字'), globalCdSec: 0, userCdMin: 0, enabled: true });
     t.live.emit(dm('上船', { guard: 3 }));
     vi.advanceTimersByTime(5000);
@@ -436,7 +436,7 @@ describe('弹幕', () => {
 describe('礼物', () => {
   it('连击合并成一次：数量相加，窗口结束后才判断；欢迎语显示礼物和数量', async () => {
     const t = await setup();
-    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), bands: [{ fromGold: 1000, effectId: eff(t, '礼物感谢'), enabled: true }] });
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), bands: [{ fromGold: 1000, effectId: eff(t, '晶礼'), enabled: true }] });
     for (let i = 0; i < 5; i++) {
       t.live.emit(gf({ count: 2 }));
       vi.advanceTimersByTime(1000);
@@ -444,12 +444,12 @@ describe('礼物', () => {
     expect(t.events()).toHaveLength(0);
     vi.advanceTimersByTime(3200);
     expect(t.events()).toMatchObject([{ kind: 'gift', status: 'played', rule: '礼物 · 单次 ≥ 1 元', payload: { giftName: '小花花', count: 10 } }]);
-    expect(t.plays()[0]!.text).toBe('感谢 小星 送出 小花花 ×10');
+    expect(t.plays()[0]).toMatchObject({ text: '小星 送出 小花花', gift: { name: '小花花', count: 10 } });
   });
 
   it('指定礼物优先；按价值分档；低于最低档、免费礼物不播', async () => {
     const t = await setup();
-    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false, specific: [{ giftId: 25, giftName: '小电视飞船', effectId: eff(t, '流星'), enabled: true }] });
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false, specific: [{ giftId: 25, giftName: '小电视飞船', effectId: eff(t, '亭阁'), enabled: true }] });
     t.live.emit(gf({ giftId: 25, giftName: '小电视飞船', unitPrice: 1_245_000 }, { uid: 1 }));
     t.live.emit(gf({ unitPrice: 1000, count: 20 }, { uid: 2 }));
     t.live.emit(gf({ unitPrice: 100, count: 5 }, { uid: 3 }));
@@ -489,7 +489,7 @@ describe('礼物', () => {
 describe('上舰', () => {
   it('同一次上舰的三条消息只播一次；开通 / 续费用不同素材；欢迎语显示月数；插队', async () => {
     const t = await setup();
-    t.ctx.guardRules.set({ ...t.ctx.guardRules.get(), cap: { ...t.ctx.guardRules.get().cap, renewEffectId: t.ctx.effects.list().find((x) => x.name === '礼物感谢')!.id } });
+    t.ctx.guardRules.set({ ...t.ctx.guardRules.get(), cap: { ...t.ctx.guardRules.get().cap, renewEffectId: t.ctx.effects.list().find((x) => x.name === '晶礼')!.id } });
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 3 }));
     t.live.emit(gd({ dedupeKey: 'p1' }, { uid: 5 }));
@@ -499,12 +499,12 @@ describe('上舰', () => {
     vi.advanceTimersByTime(3500);
     const guards = t.events().filter((e) => e.kind === 'guard');
     expect(guards.map((e) => [e.uid, e.rule])).toEqual([[5, '上舰 · 开通舰长'], [6, '上舰 · 续费舰长']]);
-    // 两次上舰都插到进场前面，按先后顺序：先开通（门楼），再续费（礼物感谢）
-    expect(t.p.snapshot().items.map((i) => [i.kind, i.effectName])).toEqual([['guard', '门楼'], ['guard', '礼物感谢'], ['enter', '门楼']]);
+    // 两次上舰都插到进场前面，按先后顺序：先开通（门楼），再续费（晶礼）
+    expect(t.p.snapshot().items.map((i) => [i.kind, i.effectName])).toEqual([['guard', '门楼'], ['guard', '晶礼'], ['enter', '门楼']]);
     vi.advanceTimersByTime(1000);
     expect(t.plays().at(-1)).toMatchObject({ kind: 'guard', guardOp: 'open', text: '舰长·上舰 小星' });
     vi.advanceTimersByTime(5000);
-    expect(t.plays().at(-1)).toMatchObject({ guardOp: 'renew', text: '感谢 小星 续费舰长 3 个月' });
+    expect(t.plays().at(-1)).toMatchObject({ guardOp: 'renew', text: '小星 来了' });
   });
 
   it('只有 GUARD_BUY 时 3 秒后按开通处理；停用上舰规则时不播', async () => {

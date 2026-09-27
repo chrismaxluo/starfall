@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { openDb } from './index.ts';
-import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleExclusive, settings } from './schema.ts';
-import { BUILTIN_EFFECTS, seed } from './seed.ts';
+import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGuard, settings } from './schema.ts';
+import { BUILTIN_EFFECTS, RETIRED_EFFECTS, seed } from './seed.ts';
 
 describe('数据库', () => {
   it('事件记录翻页（按直播间、按类型，按编号倒序）走索引，不需要把整个直播间的事件取出来再排序', () => {
@@ -44,11 +44,33 @@ describe('数据库', () => {
   it('内置素材的文案升级后同步成新版本（内置素材在后台只读）；复制出来的素材不受影响', () => {
     const db = openDb(':memory:');
     seed(db);
-    db.update(effects).set({ texts: { enter: ['旧文案'] } }).where(eq(effects.name, '星冕')).run();
-    db.insert(effects).values({ name: '我的星冕', builtin: false, style: 'star', texts: { enter: ['我自己的'] } }).run();
+    db.update(effects).set({ texts: { enter: ['旧文案'] } }).where(eq(effects.name, '晶耀')).run();
+    db.insert(effects).values({ name: '我的星冕', builtin: false, style: 'glass-big', texts: { enter: ['我自己的'] } }).run();
     seed(db);
-    expect(db.select().from(effects).where(eq(effects.name, '星冕')).get()?.texts).toEqual(BUILTIN_EFFECTS[0]!.texts);
+    expect(db.select().from(effects).where(eq(effects.name, '晶耀')).get()?.texts).toEqual(BUILTIN_EFFECTS.find((e) => e.name === '晶耀')!.texts);
     expect(db.select().from(effects).where(eq(effects.name, '我的星冕')).get()?.texts).toEqual({ enter: ['我自己的'] });
+  });
+
+  it('升级：下线的内置素材在规则里换成替代素材后删除；以前复制的副本保留、换成替代样式', () => {
+    const db = openDb(':memory:');
+    seed(db);
+    // 模拟旧版本的数据：还有星冕、巡场，规则在用它们；还有一个星冕的副本
+    const star = db.insert(effects).values({ name: '星冕', builtin: true, style: 'star', texts: { enter: ['x'] } }).returning().get();
+    const patrol = db.insert(effects).values({ name: '巡场', builtin: true, style: 'patrol', texts: { enter: ['x'] } }).returning().get();
+    db.insert(effects).values({ name: '我的星冕', builtin: false, style: 'star', texts: { enter: ['我的'] } }).run();
+    db.update(ruleGiftBands).set({ effectId: star.id }).where(eq(ruleGiftBands.fromGold, 100_000)).run();
+    db.update(ruleEnterTiers).set({ effectId: patrol.id }).where(eq(ruleEnterTiers.tier, 'mod')).run();
+    db.update(ruleGuard).set({ renewEffectId: star.id }).where(eq(ruleGuard.tier, 'gov')).run();
+    seed(db);
+    const byName = (n: string) => db.select().from(effects).where(eq(effects.name, n)).get();
+    expect(byName('星冕')).toBeUndefined();
+    expect(byName('巡场')).toBeUndefined();
+    expect(db.select().from(ruleGiftBands).where(eq(ruleGiftBands.fromGold, 100_000)).get()?.effectId).toBe(byName('晶耀')!.id);
+    expect(db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'mod')).get()?.effectId).toBe(byName('晶巡')!.id);
+    expect(db.select().from(ruleGuard).where(eq(ruleGuard.tier, 'gov')).get()?.renewEffectId).toBe(byName('晶耀')!.id);
+    expect(byName('我的星冕')).toMatchObject({ builtin: false, style: 'glass-big', texts: { enter: ['我的'] } });
+    // 替代素材都是现有的内置素材
+    for (const r of RETIRED_EFFECTS) expect(BUILTIN_EFFECTS.some((e) => e.name === r.replacedBy)).toBe(true);
   });
 
   it('被规则引用的素材不能删除（F-AS-14）', () => {

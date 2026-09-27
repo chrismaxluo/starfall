@@ -16,10 +16,10 @@ const setup = async (opts?: { maxUpload?: number }) => {
 };
 
 describe('素材列表', () => {
-  it('内置 16 个素材，带"用于哪些规则"', async () => {
+  it('内置 10 个素材，带"用于哪些规则"', async () => {
     const { effects, byName } = await setup();
     const list = await effects();
-    expect(list.map((e) => e.name)).toEqual(['星冕', '流星', '流光', '巡场', '霜玻', '礼物感谢', '弹幕回应', '一行字', '霜玻·简', '金銮', '亭阁', '门楼', '晶礼', '晶耀', '晶巡', '晶语']);
+    expect(list.map((e) => e.name)).toEqual(['霜玻', '一行字', '霜玻·简', '金銮', '亭阁', '门楼', '晶礼', '晶耀', '晶巡', '晶语']);
     expect(list.every((e) => e.builtin)).toBe(true);
     expect((await byName('金銮')).usedBy).toEqual([
       { page: 'enter', label: '进场 · 总督' },
@@ -29,7 +29,6 @@ describe('素材列表', () => {
     expect((await byName('晶耀')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 100 元' }]);
     expect((await byName('晶礼')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 10 – 100 元' }]);
     expect((await byName('晶巡')).usedBy).toEqual([{ page: 'enter', label: '进场 · 房管' }]);
-    expect((await byName('星冕')).usedBy).toEqual([]);
     expect((await byName('霜玻')).usedBy.map((u) => u.label)).toEqual(['进场 · 粉丝牌 21 级及以上', '进场 · 粉丝牌 1 – 20 级']);
     // 普通观众档默认关闭，但仍然引用了"一行字"
     expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['礼物 · 单次 1 – 10 元']);
@@ -115,7 +114,7 @@ describe('上传即素材', () => {
 describe('修改素材', () => {
   it('内置素材只读', async () => {
     const { req, byName } = await setup();
-    const star = await byName('星冕');
+    const star = await byName('晶耀');
     const res = await req({ method: 'PUT', url: `/api/effects/${star.id}`, payload: { volume: 10 } });
     expect(res.statusCode).toBe(403);
     expect(res.json().error.message).toContain('复制');
@@ -127,7 +126,7 @@ describe('修改素材', () => {
     const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
     const ok = await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 4000 } });
     expect(ok.json()).toMatchObject({ name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 4000 });
-    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '星冕' } })).statusCode).toBe(409);
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '晶耀' } })).statusCode).toBe(409);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { builtin: true } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { durationMs: 100 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: '/api/effects/9999', payload: { volume: 1 } })).statusCode).toBe(404);
@@ -175,9 +174,8 @@ describe('复制与删除', () => {
     const b = (await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { replaceRefs: true } })).json();
     expect(b).toMatchObject({ name: '晶耀 副本 2' });
     expect(b.usedBy.map((u: { label: string }) => u.label)).toEqual(['礼物 · 单次 ≥ 100 元']);
-    expect((await byName('晶耀')).usedBy).toEqual([]);
     expect((await req({ method: 'PUT', url: `/api/effects/${b.id}`, payload: { volume: 20 } })).statusCode).toBe(200);
-    expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '流星' } })).statusCode).toBe(409);
+    expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '亭阁' } })).statusCode).toBe(409);
   });
 
   it('被规则使用的素材不能删除，并返回使用位置；删除没人用的素材时文件一并删除', async () => {

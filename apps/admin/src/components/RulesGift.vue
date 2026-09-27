@@ -58,7 +58,7 @@ async function save(msg?: string): Promise<void> {
 
 function addSpecific(g: GiftConfig): void {
   if (!rules.value) return;
-  const eff = (state.effects.find((e) => e.name === '晶礼') ?? state.effects.find((e) => e.name === '礼物感谢'))?.id ?? null;
+  const eff = state.effects.find((e) => e.name === '晶礼')?.id ?? null;
   rules.value.specific.push({ giftId: g.id, giftName: g.name, effectId: eff, enabled: true });
   picking.value = false;
   giftQ.value = '';

@@ -17,8 +17,8 @@ const dmRule = (effectId: number, p: object = {}) => ({ keywords: ['生日快乐
 describe('弹幕规则接口', () => {
   it('新建、修改（关键词去重去空格）、调整顺序、删除', async () => {
     const t = await setup();
-    const a = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('弹幕回应')) })).json();
-    const b = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('流光'), { keywords: [' 晚安 ', '晚安', '好梦'], who: 'fan' }) })).json();
+    const a = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('晶语')) })).json();
+    const b = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('门楼'), { keywords: [' 晚安 ', '晚安', '好梦'], who: 'fan' }) })).json();
     expect(b).toMatchObject({ keywords: ['晚安', '好梦'], who: 'fan' });
     const u = (await t.req({ method: 'PUT', url: `/api/rules/danmu/${a.id}`, payload: { mode: 'exact', enabled: false } })).json();
     expect(u).toMatchObject({ mode: 'exact', enabled: false, keywords: ['生日快乐'] });
@@ -31,7 +31,7 @@ describe('弹幕规则接口', () => {
 
   it('参数校验：至少一个关键词、素材必须存在、顺序要完整', async () => {
     const t = await setup();
-    const a = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('弹幕回应')) })).json();
+    const a = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('晶语')) })).json();
     expect((await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(1, { keywords: [] }) })).statusCode).toBe(400);
     expect((await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(9999) })).json().error.message).toContain('9999');
     expect((await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(1, { who: 'vip' }) })).statusCode).toBe(400);
@@ -51,7 +51,7 @@ describe('礼物规则接口', () => {
 
   it('保存指定礼物、分档、连击；校验重复和素材', async () => {
     const t = await setup();
-    const body = { specific: [{ giftId: 25, giftName: '小电视飞船', effectId: t.effectId('星冕'), enabled: true }], bands: [{ fromGold: 50_000, effectId: t.effectId('流星'), enabled: true }], comboEnabled: false, comboSec: 5 };
+    const body = { specific: [{ giftId: 25, giftName: '小电视飞船', effectId: t.effectId('晶耀'), enabled: true }], bands: [{ fromGold: 50_000, effectId: t.effectId('亭阁'), enabled: true }], comboEnabled: false, comboSec: 5 };
     const r = (await t.req({ method: 'PUT', url: '/api/rules/gift', payload: body })).json();
     expect(r).toMatchObject(body);
     expect(t.ctx.settings.get('giftComboSec')).toBe(5);
@@ -83,10 +83,10 @@ describe('上舰规则接口', () => {
     const t = await setup();
     const g = (await t.req({ method: 'GET', url: '/api/rules/guard' })).json();
     expect(g.cap).toEqual({ openEffectId: t.effectId('门楼'), renewEffectId: t.effectId('门楼'), enabled: true });
-    g.cap.renewEffectId = t.effectId('礼物感谢');
+    g.cap.renewEffectId = t.effectId('晶礼');
     g.gov.enabled = false;
     const r = (await t.req({ method: 'PUT', url: '/api/rules/guard', payload: g })).json();
-    expect(r).toMatchObject({ cap: { renewEffectId: t.effectId('礼物感谢') }, gov: { enabled: false } });
+    expect(r).toMatchObject({ cap: { renewEffectId: t.effectId('晶礼') }, gov: { enabled: false } });
     expect((await t.req({ method: 'PUT', url: '/api/rules/guard', payload: { ...g, adm: { ...g.adm, openEffectId: 9999 } } })).statusCode).toBe(400);
   });
 });
@@ -94,7 +94,7 @@ describe('上舰规则接口', () => {
 describe('素材的使用位置、删除保护、复制替换', () => {
   it('弹幕、礼物、上舰规则引用的素材不能删；复制时可以一起换成副本', async () => {
     const t = await setup();
-    const copy = (await t.req({ method: 'POST', url: `/api/effects/${t.effectId('弹幕回应')}/copy`, payload: {} })).json();
+    const copy = (await t.req({ method: 'POST', url: `/api/effects/${t.effectId('晶语')}/copy`, payload: {} })).json();
     await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(copy.id, { keywords: ['晚安'] }) });
     const got = (await t.req({ method: 'GET', url: `/api/effects/${copy.id}` })).json();
     expect(got.usedBy).toEqual([{ page: 'danmu', label: '弹幕 · 「晚安」' }]);
@@ -110,10 +110,10 @@ describe('素材的使用位置、删除保护、复制替换', () => {
 describe('模拟与预览', () => {
   it('模拟弹幕、礼物、上舰', async () => {
     const t = await setup();
-    await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('弹幕回应')) });
+    await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('晶语')) });
     t.ctx.settings.set('offlinePolicy', 'play');
     const sim = (payload: object) => t.req({ method: 'POST', url: '/api/simulate', payload }).then((r) => r.json());
-    expect(await sim({ kind: 'danmu', viewer: {}, text: '生日快乐' })).toMatchObject({ rule: '弹幕 · 「生日快乐」', effect: { name: '弹幕回应' }, status: 'played', notes: ['特效页现在不在线，直播画面里看不到'] });
+    expect(await sim({ kind: 'danmu', viewer: {}, text: '生日快乐' })).toMatchObject({ rule: '弹幕 · 「生日快乐」', effect: { name: '晶语' }, status: 'played', notes: ['特效页现在不在线，直播画面里看不到'] });
     expect(await sim({ kind: 'danmu', viewer: {}, text: '随便' })).toMatchObject({ rule: null, status: 'no_rule' });
     expect(await sim({ kind: 'gift', viewer: {}, giftName: '告白花束', unitPrice: 22_000, count: 5 })).toMatchObject({ rule: '礼物 · 单次 ≥ 100 元', effect: { name: '晶耀' } });
     expect(await sim({ kind: 'gift', viewer: {}, unitPrice: 0, count: 5 })).toMatchObject({ rule: null, statusText: '未命中规则' });
@@ -124,12 +124,13 @@ describe('模拟与预览', () => {
 
   it('预览：按事件用示例内容填欢迎语，也可以自己指定', async () => {
     const t = await setup();
-    const gift = t.effectId('礼物感谢');
+    const gift = t.effectId('晶礼');
     const pv = (payload: object) => t.req({ method: 'POST', url: '/api/preview', payload }).then((r) => r.json());
-    expect((await pv({ effectId: gift, kind: 'gift', viewer: { name: '半糖' } })).text).toBe('感谢 半糖 送出 小花花 ×10');
-    expect((await pv({ effectId: gift, kind: 'gift', viewer: { name: '半糖' }, vars: { gift: '告白花束', count: 2 } })).text).toBe('感谢 半糖 送出 告白花束 ×2');
-    expect((await pv({ effectId: gift, kind: 'guard', viewer: { name: '半糖' }, vars: { months: 3, guardLevel: 3, op: 'renew' } })).text).toBe('感谢 半糖 续费舰长 3 个月');
-    expect((await pv({ effectId: gift, kind: 'guard', viewer: { name: '半糖' }, vars: { months: 12 } })).text).toBe('感谢 半糖 开通舰长 12 个月');
-    expect((await pv({ effectId: t.effectId('弹幕回应'), kind: 'danmu', viewer: { name: '半糖' } })).text).toBe('半糖：主播晚上好！');
+    expect((await pv({ effectId: gift, kind: 'gift', viewer: { name: '半糖' } })).text).toBe('半糖 送出 小花花');
+    expect((await pv({ effectId: gift, kind: 'gift', viewer: { name: '半糖' }, vars: { gift: '告白花束', count: 2 } })).text).toBe('半糖 送出 告白花束');
+    expect((await pv({ effectId: gift, kind: 'guard', viewer: { name: '半糖' }, vars: { months: 3, guardLevel: 3, op: 'renew' } })).text).toBe('半糖 来了');
+    expect((await pv({ effectId: gift, kind: 'guard', viewer: { name: '半糖' }, vars: { months: 12 } })).text).toBe('半糖 来了');
+    expect((await pv({ effectId: t.effectId('门楼'), kind: 'guard', viewer: { name: '半糖' }, vars: { months: 12 } })).text).toBe('舰长·上舰 半糖');
+    expect((await pv({ effectId: t.effectId('晶语'), kind: 'danmu', viewer: { name: '半糖' } })).text).toBe('半糖：主播晚上好！');
   });
 });

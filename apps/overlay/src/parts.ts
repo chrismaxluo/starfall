@@ -47,15 +47,6 @@ export function medal(v: PlayViewer): HTMLElement | null {
   return h('span', { class: 'medal', style: { '--mc': c.bg, '--ml': c.level, '--mb': c.border, '--mt': c.text } }, h('span', {}, m.name), h('b', {}, String(m.level)));
 }
 
-export function identityLabel(v: PlayViewer): string {
-  if (v.guard === 1) return 'Governor · 总督';
-  if (v.guard === 2) return 'Admiral · 提督';
-  if (v.guard === 3) return 'Captain · 舰长';
-  if (v.isMod) return 'Moderator · 房管';
-  if (v.medal) return `Fan · ${v.medal.name}`;
-  return 'Welcome · 欢迎';
-}
-
 /** 把欢迎语按昵称切开：昵称加粗放大，其余部分用小字 */
 export function textLine(text: string, name: string): HTMLElement {
   const line = h('span', { class: 'line' });
@@ -72,7 +63,7 @@ export function textLine(text: string, name: string): HTMLElement {
   return line;
 }
 
-/** 去掉昵称后剩下的文字（星冕把昵称单独放大显示） */
+/** 去掉昵称后剩下的文字（宫廷、玻璃特效把昵称单独放大显示） */
 export function textWithoutName(text: string, name: string): string {
   return (name ? text.replace(name, ' ') : text).replace(/\s+/g, ' ').trim();
 }

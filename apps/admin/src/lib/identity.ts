@@ -3,10 +3,14 @@ import type { Tier, Viewer } from './types.ts';
 
 export type Identity = Tier | 'fan';
 
-export const IDENTITY: Record<Identity, { name: string; icon: string | null; color: string; grad: string }> = {
-  gov: { name: '总督', icon: 'g-gov', color: 'var(--gov)', grad: 'linear-gradient(135deg,#F7D58B,#C8612A)' },
-  adm: { name: '提督', icon: 'g-adm', color: 'var(--adm)', grad: 'linear-gradient(135deg,#C9A8FF,#6A3FD1)' },
-  cap: { name: '舰长', icon: 'g-cap', color: 'var(--cap)', grad: 'linear-gradient(135deg,#9CC4FF,#2F63D9)' },
+// B 站官方大航海图标（200×200，直播间「大航海」页的静态资源）。版权归哔哩哔哩：只在运行时引用，不放进项目；
+// 地址带构建哈希，B 站改版后可能失效，加载失败时退回自绘的 g-xxx 图标。见 docs/bili-protocol.md §5.6.2
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+
+export const IDENTITY: Record<Identity, { name: string; icon: string | null; badge?: string; color: string; grad: string }> = {
+  gov: { name: '总督', icon: 'g-gov', badge: `${BADGE}governor-DpDXKEdA.png`, color: 'var(--gov)', grad: 'linear-gradient(135deg,#F7D58B,#C8612A)' },
+  adm: { name: '提督', icon: 'g-adm', badge: `${BADGE}supervisor-u43ElIjU.png`, color: 'var(--adm)', grad: 'linear-gradient(135deg,#C9A8FF,#6A3FD1)' },
+  cap: { name: '舰长', icon: 'g-cap', badge: `${BADGE}captain-Bjw5Byb5.png`, color: 'var(--cap)', grad: 'linear-gradient(135deg,#9CC4FF,#2F63D9)' },
   mod: { name: '房管', icon: 'g-mod', color: 'var(--mod)', grad: 'linear-gradient(135deg,#8FE6D6,#0E8C7A)' },
   fan: { name: '粉丝牌', icon: null, color: '#C770A4', grad: 'linear-gradient(135deg,#6B6F9E,#2D3059)' },
   nor: { name: '普通', icon: null, color: 'var(--nor)', grad: 'linear-gradient(135deg,#6C7080,#3A3D48)' },

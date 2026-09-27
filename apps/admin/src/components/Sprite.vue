@@ -1,5 +1,5 @@
 <template>
-  <!-- 图标（从设计预览移植；大航海图标暂用自绘，之后换成 B 站官方图标） -->
+  <!-- 图标（从设计预览移植）。g-gov / g-adm / g-cap 是官方大航海图标加载失败时的替代（见 IdTag.vue） -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 1.8l2.3 7.2 7.5.1-6 4.5 2.2 7.2L12 16.5l-6 4.3 2.2-7.2-6-4.5 7.5-.1z"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2c.6 4.8 2.2 6.4 7 7-4.8.6-6.4 2.2-7 7-.6-4.8-2.2-6.4-7-7 4.8-.6 6.4-2.2 7-7z"/></symbol>

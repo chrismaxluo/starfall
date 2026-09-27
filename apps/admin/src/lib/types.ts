@@ -141,7 +141,7 @@ export interface EventDto {
   uid: number;
   uname: string;
   viewer: Viewer;
-  payload: { source?: string; text?: string; giftName?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string } | null;
+  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string } | null;
   rule: string | null;
   effectId: number | null;
   status: PlayStatus;
@@ -153,6 +153,7 @@ export interface QueueBrief {
   effectName: string;
   viewerName: string;
   viewerFace: string | null;
+  giftImg?: string | null;
   /** 一句话说明，例如「舰长进场」「告白花束 ×1」 */
   detail: string;
   durationMs: number;

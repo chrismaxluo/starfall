@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // 总览：正在监控的直播间（标题、分区、主播、开播时间）、本场 / 今天的数据、实时动态、播放队列
+import EvIcon from '../components/EvIcon.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
@@ -9,7 +10,7 @@ import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
 import { del, get, post, put } from '../lib/api.ts';
-import { EV_ICON, describe, statusText } from '../lib/events.ts';
+import { describe, statusText } from '../lib/events.ts';
 import { bigNum, clock, duration, hms, when } from '../lib/format.ts';
 import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
@@ -218,7 +219,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
             <Avatar :name="e.uname" :face="e.viewer.face" />
             <span class="who">
               <b>{{ e.uname }}</b>
-              <span><span v-if="e.kind !== 'enter'" class="ev" :style="{ background: EV_ICON[e.kind].bg }">{{ EV_ICON[e.kind].text }}</span>{{ rowText(e) }}</span>
+              <span><EvIcon v-if="e.kind !== 'enter'" :kind="e.kind" :img="e.payload?.icon" />{{ rowText(e) }}</span>
             </span>
             <IdTag :viewer="e.viewer" />
             <time class="num">{{ clock(e.ts) }}</time>
@@ -239,7 +240,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
           <Avatar :name="playing.viewerName" :face="playing.viewerFace" />
           <div style="min-width: 0">
             <b>{{ playing.viewerName }}</b>
-            <div class="what"><span v-if="playing.kind !== 'enter'" class="ev" :style="{ background: EV_ICON[playing.kind].bg }">{{ EV_ICON[playing.kind].text }}</span>{{ playing.detail }} · 播放 <b>{{ playing.effectName }}</b></div>
+            <div class="what"><EvIcon v-if="playing.kind !== 'enter'" :kind="playing.kind" :img="playing.giftImg" />{{ playing.detail }} · 播放 <b>{{ playing.effectName }}</b></div>
           </div>
           <span class="left num">还剩 {{ (left / 1000).toFixed(1) }} 秒</span>
           <div class="bar"><i :style="{ width: `${progress}%` }" /></div>
@@ -248,7 +249,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
           <div v-for="(q, i) in upcoming.slice(0, Q_SHOW)" :key="q.id" class="qrow">
             <span class="n num">{{ i + 1 }}</span>
             <Avatar :name="q.viewerName" :face="q.viewerFace" />
-            <span class="who"><b>{{ q.viewerName }}</b><span><span v-if="q.kind !== 'enter'" class="ev" :style="{ background: EV_ICON[q.kind].bg }">{{ EV_ICON[q.kind].text }}</span>{{ q.detail }} · {{ q.effectName }}</span></span>
+            <span class="who"><b>{{ q.viewerName }}</b><span><EvIcon v-if="q.kind !== 'enter'" :kind="q.kind" :img="q.giftImg" />{{ q.detail }} · {{ q.effectName }}</span></span>
             <span class="eta num">{{ eta(q.eta) }}</span>
             <button class="x" :aria-label="`把 ${q.viewerName} 移出队列`" title="移出队列（这次不播）" @click="removeItem(q.id, q.viewerName)"><Icon name="i-x" /></button>
           </div>

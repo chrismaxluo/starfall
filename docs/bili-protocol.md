@@ -148,7 +148,7 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 | 10.14 | **连击累计价值**（金瓜子） |
 | 10.18 | 动作文案（"投喂"） |
 | 10.29 / 10.33 | 收礼人（主播）昵称和 UID / 用户信息 |
-| 10.35 | 礼物图标地址（静态、动态） |
+| 10.35 | **礼物图标**（2026-09-27 实测 22 条全都有）：.1 静态 png（= 礼物配置接口的 `img_basic`）、.2 webp 动图、.5 gif。播放礼物特效优先用 .1，没有时再查礼物面板 |
 | 15 | 送礼人用户信息（新结构），与 `INTERACT_WORD_V2` 的 22 相同：.1 UID，.2 昵称头像，.3 粉丝牌和新版颜色 |
 
 另有 `COMBO_SEND`（JSON）：连击汇总，字段 `gift_id`、`gift_name`、`combo_num`、`combo_total_coin`、`batch_combo_id`、`coin_type`、`sender_uinfo` 等。**合并连击时以 `SEND_GIFT_V2` 的批次号为准**，`COMBO_SEND` 作为补充。

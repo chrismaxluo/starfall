@@ -66,6 +66,8 @@ export interface GiftEvent extends EventBase {
   paid: boolean;
   /** 连击批次号，用于合并连击 */
   comboKey?: string;
+  /** B 站官方礼物图标（消息里自带的静态图） */
+  icon?: string;
 }
 
 export interface GuardEvent extends EventBase {

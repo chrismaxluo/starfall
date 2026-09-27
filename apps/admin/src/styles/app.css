@@ -810,6 +810,8 @@ body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
 .logtable td:first-child { white-space: nowrap; font-family: var(--font-mono); font-size: 12px; color: var(--t3); }
 .evchip { display: inline-flex; align-items: center; gap: 6px; }
 .evchip .ev { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; font-size: 10.5px; color: #fff; flex-shrink: 0; }
+/* 官方礼物图：比字块大一点、不加底色 */
+img.ev.gimg { object-fit: contain; border-radius: 0; background: none; transform: scale(1.25); }
 .st { font-size: 12px; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
 .st.ok { color: var(--ok); background: var(--ok-soft); }
 .st.skip { color: var(--t3); background: var(--hover); }

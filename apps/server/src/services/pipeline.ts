@@ -66,6 +66,8 @@ interface QueueBrief {
   viewerName: string;
   viewerFace: string | null;
   detail: string;
+  /** 礼物图（礼物特效才有） */
+  giftImg: string | null;
   durationMs: number;
   test: boolean;
 }
@@ -293,7 +295,8 @@ export class Pipeline {
         const m = matchGift(ev, this.d.giftRules.get());
         vars = { gift: ev.giftName, count: ev.count, valueGold: ev.unitPrice * ev.count };
         {
-          const img = this.d.gifts?.iconFor(ev.giftId);
+          // 优先用送礼消息里自带的官方图标，没有时再查礼物面板
+          const img = ev.icon || this.d.gifts?.iconFor(ev.giftId);
           if (img) vars.giftImg = img;
         }
         hit = m;
@@ -338,6 +341,11 @@ export class Pipeline {
   }
 
   private process(ev: TriggerEvent): void {
+    // 消息没带礼物图时用礼物面板里的图补上（事件记录里也显示）
+    if (ev.kind === 'gift' && !ev.icon) {
+      const icon = this.d.gifts?.iconFor(ev.giftId);
+      if (icon) ev = { ...ev, icon };
+    }
     const j = this.judge(ev);
     const eventId = this.record(ev, j.hit, j.status);
     if (j.status !== 'queued' || !j.hit || !j.effect) return;
@@ -498,7 +506,7 @@ export class Pipeline {
   snapshot(): QueueSnapshot {
     const brief = (q: QueueItem<Queued>): QueueBrief => {
       const it = q.payload.item;
-      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, detail: q.payload.detail, durationMs: it.effect.durationMs, test: Boolean(it.test) };
+      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test) };
     };
     const c = this.current;
     return {

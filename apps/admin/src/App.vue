@@ -129,6 +129,11 @@ onBeforeUnmount(() => {
   if (clock) clearInterval(clock);
   if (poll) clearInterval(poll);
 });
+
+/** 刷新后台页面（有没保存的修改时浏览器会先确认） */
+function reloadPage(): void {
+  location.reload();
+}
 </script>
 
 <template>
@@ -190,6 +195,10 @@ onBeforeUnmount(() => {
           </button>
           <button class="icon-btn" aria-label="退出后台登录" title="退出后台登录" @click="logout"><Icon name="i-logout" /></button>
         </header>
+        <div v-if="ui.newVersion && ui.newVersion !== ui.dismissedVersion" class="verbar" role="status">
+          <Icon name="i-spark" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>
+          <button class="btn" @click="ui.dismissedVersion = ui.newVersion">稍后</button><button class="btn primary" @click="reloadPage">刷新</button>
+        </div>
         <div v-if="paused" class="pausebar">
           <Icon name="i-pause" /><b>所有特效已暂停</b><span>观众暂时看不到任何特效，事件照常记录。</span>
           <ConfirmButton label="清空队列" @confirm="clearQueue" /><button class="btn primary" @click="togglePause">恢复播放</button>

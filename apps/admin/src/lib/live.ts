@@ -1,10 +1,13 @@
 // 管理后台的实时连接：事件、队列、连接状态、特效页上下线
 import { setTimeZone } from './format.ts';
-import { refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state } from './store.ts';
+import { OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
+import { refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
-  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null }
+  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null }
+  /** 服务端的后台重新构建了 */
+  | { type: 'version'; build: string }
   | { type: 'room_info'; info: RoomInfo | null }
   | { type: 'status'; status: { live: LiveStatus; paused: boolean; overlays: number } }
   | { type: 'queue'; queue: QueueSnapshot; paused: boolean }
@@ -34,6 +37,12 @@ export function onResync(fn: () => void): () => void {
   return () => resyncListeners.delete(fn);
 }
 
+/** 这个页面的版本（入口脚本名，和特效页用同样的规则）；开发模式下没有，不提示 */
+const MY_BUILD = Array.from(document.scripts).map((s) => s.src.match(OVERLAY_BUILD_RE)?.[0]).find(Boolean) ?? null;
+function checkBuild(b: string | null | undefined): void {
+  if (MY_BUILD && b && b !== MY_BUILD) ui.newVersion = b;
+}
+
 let ws: WebSocket | null = null;
 let hellos = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -43,6 +52,7 @@ let stopped = true;
 function handle(m: Msg): void {
   switch (m.type) {
     case 'hello':
+      checkBuild(m.build);
       state.status = m.status;
       setTimeZone(m.status.timeZone);
       state.queue = m.queue;
@@ -59,6 +69,9 @@ function handle(m: Msg): void {
       void Promise.all(jobs.map((f) => f())).catch(() => undefined);
       break;
     }
+    case 'version':
+      checkBuild(m.build);
+      break;
     case 'room_info':
       // 换了直播间：实时动态也换成新直播间的
       if (!m.info || (state.roomInfo && m.info.roomId !== state.roomInfo.roomId)) void refreshFeed();

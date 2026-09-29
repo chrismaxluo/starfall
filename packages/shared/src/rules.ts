@@ -23,6 +23,9 @@ export const FADE_MAX_MS = 5000;
 export const FADE_DEFAULT_MS = 500;
 /** 上传的素材在选好的位置上再挪动多少：画面宽、高的百分比（正数往右、往下） */
 export const OFFSET_MAX = 100;
+/** 上传的素材显示大小：程序自动算出的大小的百分比 */
+export const SIZE_MIN = 20;
+export const SIZE_MAX = 200;
 
 export const EffectSchema = z.object({
   id: z.number().int().positive(),
@@ -50,6 +53,8 @@ export const EffectSchema = z.object({
   /** 上传的素材：在「位置」的基础上左右、上下挪动（画面宽、高的百分比，正数往右、往下） */
   offsetX: z.number().min(-OFFSET_MAX).max(OFFSET_MAX),
   offsetY: z.number().min(-OFFSET_MAX).max(OFFSET_MAX),
+  /** 上传的素材：大小（自动大小的百分比，100 = 不变） */
+  sizePct: z.number().int().min(SIZE_MIN).max(SIZE_MAX),
 });
 export type Effect = z.infer<typeof EffectSchema>;
 

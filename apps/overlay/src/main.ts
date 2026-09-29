@@ -123,7 +123,7 @@ function onMessage(m: ServerToOverlay): void {
 }
 
 /** 只有预览模式用的消息 */
-type PreviewOnly = { type: 'nudge'; x: number; y: number } | { type: 'hold' };
+type PreviewOnly = { type: 'nudge'; x: number; y: number; size: number } | { type: 'hold' };
 
 // 预览模式（管理后台里的 iframe）：只接收同源页面发来的消息，只在本地播放，不连服务端
 if (preview) {
@@ -131,7 +131,7 @@ if (preview) {
     if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
     const d = e.data as PreviewOnly;
     // 后台拖动素材、调位置滑块：直接挪正在播放的素材
-    if (d.type === 'nudge') return void player.nudge(Number(d.x) || 0, Number(d.y) || 0);
+    if (d.type === 'nudge') return void player.nudge(Number(d.x) || 0, Number(d.y) || 0, Number(d.size) || 100);
     if (d.type === 'hold') return player.hold();
     onMessage(e.data as ServerToOverlay);
   });

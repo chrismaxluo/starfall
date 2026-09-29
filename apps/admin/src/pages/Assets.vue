@@ -3,7 +3,7 @@ import { MAX_UPLOAD_BYTES } from '@starfall/shared/labels';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
-import { del, upload } from '../lib/api.ts';
+import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { route } from '../lib/route.ts';
 import { STYLES } from '../lib/identity.ts';
@@ -109,8 +109,41 @@ function playSound(s: SoundDto): void {
   void audio.play().catch(() => (playing.value = null));
 }
 async function removeSound(s: SoundDto): Promise<void> {
-  if (s.usedBy.length) return toast(`「${s.filename}」正在被 ${s.usedBy.map((u) => u.name).join('、')} 使用，请先在素材设置里换掉`, 'err');
-  if (await attempt(() => del(`/api/assets/${s.id}`), `已删除音效：${s.filename}`)) await refreshEffects();
+  if (s.usedBy.length) return toast(`「${baseName(s.filename)}」正在被 ${s.usedBy.map((u) => u.name).join('、')} 使用，请先在素材设置里换掉`, 'err');
+  if (await attempt(() => del(`/api/assets/${s.id}`), `已删除音效：${baseName(s.filename)}`)) await refreshEffects();
+}
+// 卡片上的操作：改名（同一时间只改一个）、复制、删除
+const renameKey = ref('');
+const renameText = ref('');
+const vFocus = { mounted: (el: HTMLInputElement) => (el.focus(), el.select()) };
+const baseName = (f: string) => f.replace(/\.[^.]+$/, '');
+function startRename(key: string, name: string): void {
+  renameKey.value = key;
+  renameText.value = name;
+}
+async function commitRename(): Promise<void> {
+  const key = renameKey.value;
+  if (!key) return;
+  renameKey.value = '';
+  const name = renameText.value.trim();
+  const id = Number(key.slice(2));
+  const isSound = key.startsWith('s:');
+  const old = isSound ? baseName(state.sounds.find((x) => x.id === id)?.filename ?? '') : state.effects.find((x) => x.id === id)?.name;
+  if (!name || name === old) return;
+  if (await attempt(() => put(isSound ? `/api/sounds/${id}` : `/api/effects/${id}`, { name }), `已改名为「${name}」`)) await refreshEffects();
+}
+async function copyEffect(e: EffectDto): Promise<void> {
+  const r = await attempt(() => post<EffectDto>(`/api/effects/${e.id}/copy`, {}));
+  if (!r) return;
+  await refreshEffects();
+  toast(`已复制为「${r.name}」`);
+}
+async function removeEffect(e: EffectDto): Promise<void> {
+  if (e.usedBy.length) return toast(`「${e.name}」正在用于 ${e.usedBy.map((u) => u.label).join('、')}，请先在触发规则里换成其他素材`, 'err');
+  if (await attempt(() => del(`/api/effects/${e.id}`), `已删除素材：${e.name}`)) await refreshEffects();
+}
+function openEditor(id: number): void {
+  if (!renameKey.value) ui.editorId = id;
 }
 const bars = (id: number) => Array.from({ length: 28 }, (_, i) => 20 + Math.abs(Math.sin((id + 1) * 7.3 + i * 1.7)) * 70);
 // 离开素材库时停掉正在试听的音效
@@ -162,7 +195,7 @@ onBeforeUnmount(() => {
           <div class="ethumb"><div class="prog"><i :style="{ width: `${u.pct}%` }" /></div></div>
           <div class="meta"><b>{{ u.name }}</b><span class="used">上传中 {{ u.pct }}%</span></div>
         </div>
-        <button v-for="e in mine" :key="e.id" class="ecard" @click="ui.editorId = e.id" @mouseenter="(ev) => hoverVideo(ev, true)" @mouseleave="(ev) => hoverVideo(ev, false)">
+        <div v-for="e in mine" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)" @mouseenter="(ev) => hoverVideo(ev, true)" @mouseleave="(ev) => hoverVideo(ev, false)">
           <div class="ethumb" :class="{ alpha: e.asset?.hasAlpha }">
             <template v-if="e.asset">
               <video v-if="e.asset.kind === 'video'" class="thumb-media" :src="e.asset.url" muted loop playsinline preload="metadata" />
@@ -177,14 +210,22 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="meta">
-            <b>{{ e.name }}</b><span>{{ meta(e) }}</span>
+            <input v-if="renameKey === `e:${e.id}`" v-model="renameText" v-focus class="inp rn" maxlength="40" aria-label="新名字" @click.stop @keydown.enter.prevent="commitRename" @keydown.esc.prevent="renameKey = ''" @blur="commitRename" />
+            <b v-else>{{ e.name }}</b>
+            <span>{{ meta(e) }}</span>
             <span :class="{ used: e.usedBy.length }">{{ e.usedBy.length ? `用于 ${e.usedBy.map((u) => u.label).join('、')}` : '未使用 · 在触发规则里选它' }}</span>
           </div>
-        </button>
+          <div class="card-acts" @click.stop @keydown.stop>
+            <button type="button" :aria-label="`重命名 ${e.name}`" @click="startRename(`e:${e.id}`, e.name)"><Icon name="i-pen" />重命名</button>
+            <button type="button" :aria-label="`复制 ${e.name}`" @click="copyEffect(e)"><Icon name="i-dup" />复制</button>
+            <button v-if="e.usedBy.length" type="button" class="off" :title="`正在用于 ${e.usedBy.map((u) => u.label).join('、')}，先在触发规则里换掉才能删除`" @click="removeEffect(e)"><Icon name="i-trash" />删除</button>
+            <ConfirmButton v-else label="删除" confirm-label="确认删除？" cls="danger" armed-cls="delb" @confirm="removeEffect(e)"><Icon name="i-trash" />删除</ConfirmButton>
+          </div>
+        </div>
       </div>
       <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span></div>
       <div class="ecards">
-        <button v-for="e in builtin" :key="e.id" class="ecard" @click="ui.editorId = e.id">
+        <div v-for="e in builtin" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)">
           <div class="ethumb">
             <div class="mpos pos-center">
               <div class="mini" :class="`tpl-${e.visual.type === 'builtin_style' ? e.visual.style : 'line'}`" :style="{ '--edge': STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.edge }">
@@ -196,7 +237,10 @@ onBeforeUnmount(() => {
             <b>{{ e.name }}<em>内置</em></b><span>{{ meta(e) }}</span>
             <span :class="{ used: e.usedBy.length }">{{ e.usedBy.length ? `用于 ${e.usedBy.map((u) => u.label).join('、')}` : '未使用' }}</span>
           </div>
-        </button>
+          <div class="card-acts" @click.stop @keydown.stop>
+            <button type="button" :aria-label="`复制 ${e.name}`" @click="copyEffect(e)"><Icon name="i-dup" />复制一份来改</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -204,15 +248,20 @@ onBeforeUnmount(() => {
       <div v-for="s in sounds" :key="s.id" class="acard" style="cursor: default">
         <div class="thumb">
           <div class="wave"><i v-for="(h, i) in bars(s.id)" :key="i" :class="{ on: playing === s.id }" :style="{ height: `${h}%` }" /></div>
-          <button class="playb" :aria-label="`试听 ${s.filename}`" @click="playSound(s)"><svg><use :href="playing === s.id ? '#i-pause' : '#i-play'" /></svg></button>
+          <button class="playb" :aria-label="`试听 ${baseName(s.filename)}`" @click="playSound(s)"><svg><use :href="playing === s.id ? '#i-pause' : '#i-play'" /></svg></button>
           <span class="dur">{{ seconds(s.durationMs) }}</span>
         </div>
         <div class="ameta">
-          <b>{{ s.filename }}</b>
+          <input v-if="renameKey === `s:${s.id}`" v-model="renameText" v-focus class="inp rn" maxlength="60" aria-label="新名字" @keydown.enter.prevent="commitRename" @keydown.esc.prevent="renameKey = ''" @blur="commitRename" />
+          <b v-else>{{ baseName(s.filename) }}</b>
           <span>{{ s.ext.toUpperCase() }} · {{ fileSize(s.size) }}</span>
           <span :class="s.usedBy.length ? 'used' : 'unused'">{{ s.usedBy.length ? `用于 ${s.usedBy.map((u) => u.name).join('、')}` : '未使用' }}</span>
         </div>
-        <div class="del-row"><ConfirmButton label="删除" cls="btn" style="height: 28px; font-size: 12px" @confirm="removeSound(s)" /></div>
+        <div class="card-acts">
+          <button type="button" :aria-label="`重命名 ${baseName(s.filename)}`" @click="startRename(`s:${s.id}`, baseName(s.filename))"><Icon name="i-pen" />重命名</button>
+          <button v-if="s.usedBy.length" type="button" class="off" :title="`正在被 ${s.usedBy.map((u) => u.name).join('、')} 使用，先在素材设置里换掉才能删除`" @click="removeSound(s)"><Icon name="i-trash" />删除</button>
+          <ConfirmButton v-else label="删除" confirm-label="确认删除？" cls="danger" armed-cls="delb" @confirm="removeSound(s)"><Icon name="i-trash" />删除</ConfirmButton>
+        </div>
       </div>
       <div v-if="!sounds.length" class="soon-box" style="grid-column: 1 / -1"><b>还没有音效</b>把 MP3 / WAV / OGG 拖到上面就能添加，然后在素材设置的「音效」里选用</div>
     </div>

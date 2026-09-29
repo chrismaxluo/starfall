@@ -64,7 +64,11 @@ export class Player {
       const box = center ? { w: m.width, h: m.height } : { w: m.width - 2 * m.marginX - 48, h: m.height * 0.45 };
       const size = fitSize(e.visual, box, center ? Infinity : m.fxz);
       media = buildMedia(e.visual, e.volume);
-      wrap = h('div', { class: 'media', style: { width: `${size.w}px`, height: `${size.h}px` } }, media.el);
+      // 自动算出的大小记在 data 上，预览里调大小时按它缩放
+      wrap = h('div', { class: 'media' }, media.el);
+      wrap.dataset.w = String(size.w);
+      wrap.dataset.h = String(size.h);
+      resize(wrap, e.sizePct);
       // 渐入渐出最多各占一半时长
       if (e.fadeIn) wrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: Math.min(e.fadeInMs, e.durationMs / 2), easing: 'ease-out', fill: 'backwards' });
       const fx = h('div', { class: 'fx fx-asset' }, wrap);
@@ -118,11 +122,13 @@ export class Player {
     this.send({ type: 'started', id: item.id });
   }
 
-  /** 预览里拖动、调滑块时：把正在播放的素材挪到新位置（不重新播放） */
-  nudge(x: number, y: number): boolean {
+  /** 预览里拖动、调滑块时：把正在播放的素材挪到新位置、改成新大小（不重新播放） */
+  nudge(x: number, y: number, sizePct: number): boolean {
     const c = this.current;
     if (!c?.asset) return false;
     place(c.slot, x, y, this.metrics());
+    const wrap = c.slot.querySelector<HTMLElement>('.media');
+    if (wrap) resize(wrap, sizePct);
     return true;
   }
 
@@ -156,4 +162,12 @@ export class Player {
 /** 上传的素材：在位置的基础上挪动（画面宽、高的百分比，正数往右、往下） */
 function place(slot: HTMLElement, x: number, y: number, m: StageMetrics): void {
   slot.style.translate = x || y ? `${(m.width * x) / 100}px ${(m.height * y) / 100}px` : '';
+}
+
+/** 上传的素材：按自动大小的百分比显示 */
+function resize(wrap: HTMLElement, sizePct: number): void {
+  const k = (sizePct || 100) / 100;
+  wrap.dataset.k = String(k);
+  wrap.style.width = `${Math.round(Number(wrap.dataset.w) * k)}px`;
+  wrap.style.height = `${Math.round(Number(wrap.dataset.h) * k)}px`;
 }

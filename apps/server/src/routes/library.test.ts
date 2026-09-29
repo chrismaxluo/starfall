@@ -184,6 +184,12 @@ describe('修改素材', () => {
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { offsetX: -12.5, offsetY: 30 } })).json()).toMatchObject({ offsetX: -12.5, offsetY: 30 });
     expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { offsetY: -8 } } })).json().effect).toMatchObject({ offsetX: -12.5, offsetY: -8 });
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { offsetX: 101 } })).statusCode).toBe(400);
+    // 大小：默认 100%，20% ~ 200%
+    expect(effect).toMatchObject({ sizePct: 100 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 150 } })).json()).toMatchObject({ sizePct: 150 });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { sizePct: 60 } } })).json().effect).toMatchObject({ sizePct: 60 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 10 } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 201 } })).statusCode).toBe(400);
   });
 
   it('音效：上传、选用、被使用时不能删除', async () => {
@@ -201,6 +207,12 @@ describe('修改素材', () => {
     const del = await req({ method: 'DELETE', url: `/api/assets/${sound.id}` });
     expect(del.statusCode).toBe(409);
     expect(del.json().error.details.usedBy).toHaveLength(1);
+    // 改名：只改名字，扩展名不变；画面文件不能从这里改
+    const ren = await req({ method: 'PUT', url: `/api/sounds/${sound.id}`, payload: { name: '  叮咚/提示  ' } });
+    expect(ren.json().sound).toMatchObject({ id: sound.id, filename: '叮咚提示.wav', usedBy: [{ id: effect.id }] });
+    expect((await req({ method: 'GET', url: `/api/effects/${effect.id}` })).json().sound).toMatchObject({ filename: '叮咚提示.wav' });
+    expect((await req({ method: 'PUT', url: `/api/sounds/${sound.id}`, payload: { name: '   ' } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/sounds/${effect.visual.assetId}`, payload: { name: 'x' } })).statusCode).toBe(404);
     await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { soundAssetId: null } });
     expect((await req({ method: 'DELETE', url: `/api/assets/${sound.id}` })).statusCode).toBe(200);
   });

@@ -56,6 +56,13 @@ export function libraryRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/sounds', async () => ({ sounds: ctx.assets.list('audio').map((a) => ({ ...assetDto(a), usedBy: ctx.assets.users(a.id) })) }));
 
+  app.put('/api/sounds/:id', async (req) => {
+    const id = idOf(req);
+    const { name } = parseBody(z.object({ name: z.string().trim().min(1).max(60) }).strict(), req.body);
+    if (ctx.assets.get(id)?.kind !== 'audio') throw new HttpError(404, 'not_found', '音效不存在');
+    return { sound: { ...assetDto(ctx.assets.rename(id, name)), usedBy: ctx.assets.users(id) } };
+  });
+
   app.delete('/api/assets/:id', async (req) => {
     ctx.assets.remove(idOf(req));
     return { ok: true };

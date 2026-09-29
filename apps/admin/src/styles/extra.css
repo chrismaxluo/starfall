@@ -38,7 +38,6 @@
 .ecard .thumb-icon svg { width: 28px; height: 28px; }
 .ethumb .mpos .mini { animation: none; opacity: 1; }
 .ethumb .mpos .mini::after { animation: none; }
-.acard .del-row { display: flex; gap: 6px; padding: 0 13px 12px; }
 .sel.sm { height: 32px; font-size: 12.5px; width: auto; }
 .inline-hint { font-size: 12px; color: var(--t3); }
 .tag.excl { color: var(--accent); background: var(--accent-soft); }

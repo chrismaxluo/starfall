@@ -199,6 +199,15 @@ export class AssetStore {
     fs.rmSync(this.path(a), { force: true });
   }
 
+  /** 改名：只改显示的名字，扩展名不变 */
+  rename(id: number, name: string): AssetRow {
+    const a = this.get(id);
+    if (!a) throw new HttpError(404, 'not_found', '文件不存在');
+    const base = cleanName(name.replaceAll('/', '').replaceAll('\\', ''));
+    this.db.update(assets).set({ filename: `${base}.${a.ext}` }).where(eq(assets.id, id)).run();
+    return this.get(id)!;
+  }
+
   /** 没有素材使用时删除（替换文件、删除素材后调用） */
   removeIfUnused(id: number | null): void {
     if (id !== null && this.get(id) && this.users(id).length === 0) this.remove(id);

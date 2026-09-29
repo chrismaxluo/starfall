@@ -100,7 +100,7 @@ describe('数据库', () => {
     expect(by('视频')).toMatchObject({ fadeInMs: 1500, fadeOutMs: 2400 });
     expect(by('图片')).toMatchObject({ fadeInMs: 200, fadeOutMs: 320 });
     // 以前的素材不挪位置
-    expect(by('视频')).toMatchObject({ offsetX: 0, offsetY: 0 });
+    expect(by('视频')).toMatchObject({ offsetX: 0, offsetY: 0, sizePct: 100 });
     db.$client.close();
     fs.rmSync(dir, { recursive: true, force: true });
   });

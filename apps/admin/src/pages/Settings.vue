@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import DataCard from '../components/DataCard.vue';
+import FeatherCard from '../components/FeatherCard.vue';
 import Icon from '../components/Icon.vue';
 import QrLogin from '../components/QrLogin.vue';
 import Seg from '../components/Seg.vue';
@@ -159,6 +160,8 @@ onMounted(() => {
           <span v-if="!bl.length" class="inline-hint">还没有。事件记录、实时动态里点观众也可以直接加入黑名单。</span>
         </div>
       </div>
+
+      <FeatherCard />
 
       <div class="card">
         <div class="card-h"><h2>管理后台</h2></div>

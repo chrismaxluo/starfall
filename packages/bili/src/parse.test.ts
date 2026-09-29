@@ -75,6 +75,11 @@ describe('送礼 SEND_GIFT_V2', () => {
   it('免费礼物标记为非付费', () => {
     expect(parseMessage(fixture('send_gift_v2.free'), ctx)).toMatchObject({ giftName: '辣条', paid: false });
   });
+
+  it('读出消息里自带的官方礼物图标（10.35.1），没有时不带这个字段', () => {
+    expect(parseMessage(fixture('send_gift_v2.combo'), ctx)).toMatchObject({ icon: 'https://s1.hdslb.com/bfs/live/e051dfd4557678f8edcac4993ed00a0935cbd9cc.png' });
+    expect(parseMessage(fixture('send_gift_v2.free'), ctx)).not.toHaveProperty('icon');
+  });
 });
 
 describe('其他消息', () => {

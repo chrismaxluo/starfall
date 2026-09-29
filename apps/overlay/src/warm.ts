@@ -8,14 +8,14 @@ import type { StageSize } from './builtin.ts';
 import { h } from './dom.ts';
 
 /** 默认欢迎语、身份标签里的常用字 */
-const COMMON = '欢迎感谢送出开通续费驾临登船前来巡场来了进入直播间星光加冕总督提督舰长房管粉丝新个月礼物主播观众恭迎上舰光临驾到谢赏 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz ·×：，';
+const COMMON = '欢迎感谢送出开通续费驾临前来巡场来了进入直播间总督提督舰长房管粉丝新个月礼物主播观众恭迎上舰光临驾到谢赏 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz ·×：，';
 const FONTS: Array<[string, number[]]> = [
   ['Geist Sans', [400, 500, 600, 700]],
   ['Noto Sans SC', [400, 500, 600, 700]],
   ['Geist Mono', [500, 600]],
   ['Noto Serif SC', [600, 900]],
 ];
-const STYLES = ['line', 'frost', 'patrol', 'flow', 'gift', 'meteor', 'star', 'bubble', 'royal-cap', 'royal-adm', 'royal-gov'];
+const STYLES = ['line', 'frost', 'royal-cap', 'royal-adm', 'royal-gov', 'glass-gift', 'glass-big', 'glass-mod', 'glass-dm'];
 const WARM_MS = 600;
 
 export async function warmFonts(): Promise<void> {
@@ -28,7 +28,7 @@ export async function warmFonts(): Promise<void> {
 const sample = (style: string): PlayItem => ({
   id: `warm-${style}`,
   kind: 'enter',
-  effect: { id: 0, name: '', visual: { type: 'builtin_style', style }, showText: true, position: 'center', durationMs: WARM_MS, sound: null, volume: 0 },
+  effect: { id: 0, name: '', visual: { type: 'builtin_style', style }, showText: true, position: 'center', durationMs: WARM_MS, fadeIn: false, fadeOut: false, fadeInMs: 500, fadeOutMs: 500, offsetX: 0, offsetY: 0, sizePct: 100, featherPct: 0, sound: null, volume: 0 },
   text: '欢迎舰长 星临观众 登船',
   viewer: { name: '星临观众', guard: 3, isMod: false, medal: { name: '星临', level: 21 } },
 });

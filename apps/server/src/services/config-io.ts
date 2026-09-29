@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO, EffectTextsSchema, POSITIONS, TIERS } from '@starfall/shared';
+import { DANMU_WHO, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, TIERS } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -29,7 +29,7 @@ export const CONFIG_VERSION = 1;
 export const CONFIG_ENTRY = 'starfall-config.json';
 
 /** 导出的设置项（不含暂停状态这类运行时状态） */
-const SETTING_KEYS = ['connectMode', 'offlinePolicy', 'cooldownMode', 'queueMax', 'queueJump', 'blockAnchor', 'blockAccount', 'retentionDays', 'giftComboEnabled', 'giftComboSec', 'autoBackup'] as const;
+const SETTING_KEYS = ['connectMode', 'offlinePolicy', 'cooldownMode', 'queueMax', 'queueJump', 'blockAnchor', 'blockAccount', 'retentionDays', 'giftComboEnabled', 'giftComboSec', 'autoBackup', 'featherOn', 'featherPct'] as const;
 const SETTING_NAMES: Record<(typeof SETTING_KEYS)[number], string> = {
   connectMode: '连接直播间的时机',
   offlinePolicy: '未开播时是否播放',
@@ -42,6 +42,8 @@ const SETTING_NAMES: Record<(typeof SETTING_KEYS)[number], string> = {
   giftComboEnabled: '礼物连击合并',
   giftComboSec: '连击合并时间',
   autoBackup: '每天自动备份',
+  featherOn: '素材上下羽化',
+  featherPct: '上下羽化宽度',
 };
 
 const sha = z.string().regex(/^[0-9a-f]{64}$/);
@@ -61,6 +63,8 @@ const SettingsPart = z
     giftComboEnabled: z.boolean(),
     giftComboSec: z.number().int().min(1).max(15),
     autoBackup: z.boolean(),
+    featherOn: z.boolean(),
+    featherPct: z.number().int().min(0).max(FEATHER_MAX),
   })
   .partial();
 
@@ -87,6 +91,17 @@ const EffectPart = z.object({
   volume: z.number().int().min(0).max(100),
   position: z.enum(POSITIONS),
   durationMs: z.number().int().min(500).max(30_000),
+  durationCustom: z.boolean().default(false),
+  // 旧版本导出的文件没有这两项：保持以前的淡入淡出
+  fadeIn: z.boolean().default(true),
+  fadeOut: z.boolean().default(true),
+  fadeInMs: z.number().int().min(FADE_MIN_MS).max(FADE_MAX_MS).default(FADE_DEFAULT_MS),
+  fadeOutMs: z.number().int().min(FADE_MIN_MS).max(FADE_MAX_MS).default(FADE_DEFAULT_MS),
+  offsetX: z.number().min(-OFFSET_MAX).max(OFFSET_MAX).default(0),
+  offsetY: z.number().min(-OFFSET_MAX).max(OFFSET_MAX).default(0),
+  sizePct: z.number().int().min(SIZE_MIN).max(SIZE_MAX).default(100),
+  feather: z.enum(FEATHER_MODES).default('global'),
+  featherPct: z.number().int().min(0).max(FEATHER_MAX).default(FEATHER_DEFAULT),
 });
 
 const TierPart = z.object({ effect: effectRef, cooldownMin, enabled: z.boolean() });
@@ -236,6 +251,16 @@ export class ConfigIO {
         volume: e.volume,
         position: e.position,
         durationMs: e.durationMs,
+        durationCustom: e.durationCustom,
+        fadeIn: e.fadeIn,
+        fadeOut: e.fadeOut,
+        fadeInMs: e.fadeInMs,
+        fadeOutMs: e.fadeOutMs,
+        offsetX: e.offsetX,
+        offsetY: e.offsetY,
+        sizePct: e.sizePct,
+        feather: e.feather,
+        featherPct: e.featherPct,
       })),
       rules: {
         enter: {
@@ -462,7 +487,7 @@ export class ConfigIO {
       for (const e of file.effects) {
         const c = local.get(e.name);
         const assetId = idOfSha(e.asset);
-        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, updatedAt: Date.now() };
+        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, fadeInMs: e.fadeInMs, fadeOutMs: e.fadeOutMs, offsetX: e.offsetX, offsetY: e.offsetY, sizePct: e.sizePct, feather: e.feather, featherPct: e.featherPct, updatedAt: Date.now() };
         if (c) {
           if (c.builtin || e.builtin) continue;
           // 新文件缺失时保留本机的画面

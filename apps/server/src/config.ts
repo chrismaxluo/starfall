@@ -24,8 +24,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: Number(env.STARFALL_PORT) || DEFAULT_PORT,
     host: env.STARFALL_HOST || '0.0.0.0',
     dataDir,
-    adminDist: path.join(REPO_ROOT, 'apps/admin/dist'),
-    overlayDist: path.join(REPO_ROOT, 'apps/overlay/dist'),
+    adminDist: path.resolve(env.STARFALL_ADMIN_DIST || path.join(REPO_ROOT, 'apps/admin/dist')),
+    overlayDist: path.resolve(env.STARFALL_OVERLAY_DIST || path.join(REPO_ROOT, 'apps/overlay/dist')),
     timeZone: env.STARFALL_TZ || 'Asia/Shanghai',
     trustProxy: env.STARFALL_TRUST_PROXY || false,
   };

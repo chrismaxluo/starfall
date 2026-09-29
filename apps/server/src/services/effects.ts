@@ -28,12 +28,21 @@ export interface EffectDto extends Effect {
   updatedAt: number;
 }
 
-export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true })
+export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true, durationCustom: true, fadeIn: true, fadeOut: true, fadeInMs: true, fadeOutMs: true, offsetX: true, offsetY: true, sizePct: true, feather: true, featherPct: true })
   .partial()
   .strict();
 export type EffectPatch = z.infer<typeof EffectPatchSchema>;
 
 const clampDuration = (ms: number | null, fallback: number) => (ms ? Math.min(30_000, Math.max(500, ms)) : fallback);
+
+/**
+ * 实际播放时长：有时长的素材（视频、SVGA、Lottie、动图）默认按素材本身的时长完整播放，不受 30 秒上限限制；
+ * 手动设置时用设置的时长，但不超过素材本身；静态图片和内置样式用设置的时长
+ */
+export function playDuration(assetMs: number | null | undefined, custom: boolean, durationMs: number): number {
+  if (!assetMs) return durationMs;
+  return custom ? Math.min(durationMs, assetMs) : assetMs;
+}
 
 export class EffectStore {
   private readonly db: Db;
@@ -100,7 +109,17 @@ export class EffectStore {
       soundAssetId: r.soundAssetId,
       volume: r.volume,
       position: r.position,
-      durationMs: r.durationMs,
+      durationMs: playDuration(asset?.durationMs, r.durationCustom, r.durationMs),
+      durationCustom: r.durationCustom,
+      fadeIn: r.fadeIn,
+      fadeOut: r.fadeOut,
+      fadeInMs: r.fadeInMs,
+      fadeOutMs: r.fadeOutMs,
+      offsetX: r.offsetX,
+      offsetY: r.offsetY,
+      sizePct: r.sizePct,
+      feather: r.feather,
+      featherPct: r.featherPct,
       asset: asset ? assetDto(asset) : null,
       sound: sound ? assetDto(sound) : null,
       usedBy,
@@ -155,12 +174,12 @@ export class EffectStore {
     if (!a || a.kind !== 'audio') throw new HttpError(400, 'invalid_sound', '所选的音效不存在');
   }
 
-  /** 上传动画文件后自动生成素材：名称取文件名，居中，默认不叠加文字（F-AS-02、F-AS-08） */
+  /** 上传动画文件后自动生成素材：名称取文件名，居中，默认不叠加文字、不淡入淡出（F-AS-02、F-AS-08） */
   createFromAsset(a: AssetRow): EffectDto {
     const name = this.uniqueName(path.parse(a.filename).name);
     const r = this.db
       .insert(effects)
-      .values({ name, assetId: a.id, showText: false, texts: { enter: ['{name} 来了'] }, position: 'center', durationMs: clampDuration(a.durationMs, 5000) })
+      .values({ name, assetId: a.id, showText: false, texts: { enter: ['{name} 来了'] }, position: 'center', durationMs: clampDuration(a.durationMs, 5000), fadeIn: false, fadeOut: false })
       .returning()
       .get();
     return this.get(r.id);
@@ -186,7 +205,7 @@ export class EffectStore {
     const { asset } = await this.assets.ingest(stream, filename, ['video', 'image', 'fx']);
     this.db
       .update(effects)
-      .set({ assetId: asset.id, style: null, durationMs: clampDuration(asset.durationMs, r.durationMs), updatedAt: Date.now() })
+      .set({ assetId: asset.id, style: null, durationMs: clampDuration(asset.durationMs, r.durationMs), durationCustom: false, updatedAt: Date.now() })
       .where(eq(effects.id, id))
       .run();
     if (r.assetId !== asset.id) this.assets.removeIfUnused(r.assetId);

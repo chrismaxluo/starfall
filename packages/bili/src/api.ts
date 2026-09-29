@@ -126,22 +126,56 @@ export interface GiftConfig {
   paid: boolean;
   icon: string;
   gif?: string;
+  /** 在直播间礼物面板上的哪一页（礼物、粉丝团、航海……）；不在面板上显示的礼物没有 */
+  tab?: string;
+  /** 在这一页里的位置（从 1 开始） */
+  panel?: number;
 }
 
-/** 本直播间礼物面板（每种礼物一个版本，用于"指定礼物"的选择） */
+type RawGift = { id: number; name: string; price: number; coin_type: string; img_basic: string; gif?: string };
+const toGift = (g: RawGift): GiftConfig => ({
+  id: g.id,
+  name: g.name,
+  price: g.price,
+  paid: g.coin_type === 'gold',
+  icon: g.img_basic,
+  ...(g.gif ? { gif: g.gif } : {}),
+});
+
+/**
+ * 本直播间礼物面板（每种礼物一个版本，用于"指定礼物"的选择）。
+ * base_config 是本直播间可送的礼物，room_config 是本直播间特有的（发红包、舰长一号等）；
+ * gift_data.room_gift_list.gold_list 是面板「礼物」页实际显示的礼物和顺序，
+ * gift_data.tab_list 是其余几页（粉丝团、航海等）；同一个礼物出现在多页时记第一页
+ */
 export async function getRoomGifts(http: BiliHttp, roomId: number): Promise<GiftConfig[]> {
-  const d = await http.getData<{ gift_config?: { base_config?: { list?: Array<{ id: number; name: string; price: number; coin_type: string; img_basic: string; gif?: string }> } } }>(
+  type PanelItem = { gift_id?: number };
+  const d = await http.getData<{
+    gift_config?: { base_config?: { list?: RawGift[] }; room_config?: RawGift[] };
+    gift_data?: { room_gift_list?: { gold_list?: PanelItem[] }; tab_list?: Array<{ tab_name?: string; position?: number; list?: PanelItem[] }> };
+  }>(
     `${LIVE}/xlive/web-room/v1/giftPanel/roomGiftList?platform=pc&room_id=${roomId}&area_parent_id=0&area_id=0`,
     { auth: false },
   );
-  return (d.gift_config?.base_config?.list ?? []).map((g) => ({
-    id: g.id,
-    name: g.name,
-    price: g.price,
-    paid: g.coin_type === 'gold',
-    icon: g.img_basic,
-    ...(g.gif ? { gif: g.gif } : {}),
-  }));
+  const byId = new Map<number, GiftConfig>();
+  for (const g of [...(d.gift_config?.base_config?.list ?? []), ...(d.gift_config?.room_config ?? [])]) if (g?.id && !byId.has(g.id)) byId.set(g.id, toGift(g));
+  const tabs = [
+    { name: '礼物', list: d.gift_data?.room_gift_list?.gold_list },
+    ...[...(d.gift_data?.tab_list ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((t) => ({ name: t.tab_name || '其他', list: t.list })),
+  ];
+  for (const t of tabs) {
+    (t.list ?? []).forEach((p, i) => {
+      const g = p?.gift_id ? byId.get(p.gift_id) : undefined;
+      if (g && g.tab === undefined) Object.assign(g, { tab: t.name, panel: i + 1 });
+    });
+  }
+  return [...byId.values()];
+}
+
+/** 全站礼物（约 900 个，同名礼物有多个版本）：本直播间面板里查不到的礼物从这里找图 */
+export async function getAllGifts(http: BiliHttp): Promise<GiftConfig[]> {
+  const d = await http.getData<{ list?: RawGift[] }>(`${LIVE}/xlive/web-room/v1/giftPanel/giftConfig?platform=pc`, { auth: false });
+  return (d.list ?? []).filter((g) => g?.id).map(toGift);
 }
 
 export interface UserCard {

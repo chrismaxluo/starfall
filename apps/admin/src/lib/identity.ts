@@ -3,10 +3,14 @@ import type { Tier, Viewer } from './types.ts';
 
 export type Identity = Tier | 'fan';
 
-export const IDENTITY: Record<Identity, { name: string; icon: string | null; color: string; grad: string }> = {
-  gov: { name: '总督', icon: 'g-gov', color: 'var(--gov)', grad: 'linear-gradient(135deg,#F7D58B,#C8612A)' },
-  adm: { name: '提督', icon: 'g-adm', color: 'var(--adm)', grad: 'linear-gradient(135deg,#C9A8FF,#6A3FD1)' },
-  cap: { name: '舰长', icon: 'g-cap', color: 'var(--cap)', grad: 'linear-gradient(135deg,#9CC4FF,#2F63D9)' },
+// B 站官方大航海图标（200×200，直播间「大航海」页的静态资源）。版权归哔哩哔哩：只在运行时引用，不放进项目；
+// 地址带构建哈希，B 站改版后可能失效，加载失败时退回自绘的 g-xxx 图标。见 docs/bili-protocol.md §5.6.2
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+
+export const IDENTITY: Record<Identity, { name: string; icon: string | null; badge?: string; color: string; grad: string }> = {
+  gov: { name: '总督', icon: 'g-gov', badge: `${BADGE}governor-DpDXKEdA.png`, color: 'var(--gov)', grad: 'linear-gradient(135deg,#F7D58B,#C8612A)' },
+  adm: { name: '提督', icon: 'g-adm', badge: `${BADGE}supervisor-u43ElIjU.png`, color: 'var(--adm)', grad: 'linear-gradient(135deg,#C9A8FF,#6A3FD1)' },
+  cap: { name: '舰长', icon: 'g-cap', badge: `${BADGE}captain-Bjw5Byb5.png`, color: 'var(--cap)', grad: 'linear-gradient(135deg,#9CC4FF,#2F63D9)' },
   mod: { name: '房管', icon: 'g-mod', color: 'var(--mod)', grad: 'linear-gradient(135deg,#8FE6D6,#0E8C7A)' },
   fan: { name: '粉丝牌', icon: null, color: '#C770A4', grad: 'linear-gradient(135deg,#6B6F9E,#2D3059)' },
   nor: { name: '普通', icon: null, color: 'var(--nor)', grad: 'linear-gradient(135deg,#6C7080,#3A3D48)' },
@@ -50,13 +54,11 @@ export const STYLES: Record<string, { name: string; grad: string; edge: string }
   'royal-gov': { name: '金銮', grad: 'linear-gradient(135deg,#F2C46E,#B3342A)', edge: 'rgba(233,194,122,.8)' },
   'royal-adm': { name: '亭阁', grad: 'linear-gradient(135deg,#E6BF86,#4A1C54)', edge: 'rgba(230,191,134,.75)' },
   'royal-cap': { name: '门楼', grad: 'linear-gradient(135deg,#A9DDF0,#1F4F86)', edge: 'rgba(169,221,240,.7)' },
-  star: { name: '星冕', grad: IDENTITY.gov.grad, edge: 'rgba(240,180,90,.75)' },
-  meteor: { name: '流星', grad: IDENTITY.adm.grad, edge: 'rgba(183,148,255,.7)' },
-  flow: { name: '流光', grad: IDENTITY.cap.grad, edge: 'rgba(111,168,255,.7)' },
-  patrol: { name: '巡场', grad: IDENTITY.mod.grad, edge: 'rgba(79,209,188,.55)' },
+  'glass-gift': { name: '晶礼', grad: 'linear-gradient(135deg,#FFD2B8,#6B5A7E)', edge: 'rgba(255,179,138,.7)' },
+  'glass-big': { name: '晶耀', grad: 'linear-gradient(135deg,#FFE0A8,#7A5A40)', edge: 'rgba(255,195,122,.75)' },
+  'glass-mod': { name: '晶巡', grad: 'linear-gradient(135deg,#B8F2E8,#2F5A62)', edge: 'rgba(61,214,193,.6)' },
+  'glass-dm': { name: '晶语', grad: 'linear-gradient(135deg,#CFE9FF,#3E5C8A)', edge: 'rgba(124,199,255,.6)' },
   frost: { name: '霜玻', grad: 'linear-gradient(135deg,#3FB4F6,#2B2F5E)', edge: 'rgba(255,255,255,.2)' },
   line: { name: '一行字', grad: IDENTITY.nor.grad, edge: 'transparent' },
-  gift: { name: '礼物', grad: 'linear-gradient(135deg,#FFB38A,#E0568F)', edge: 'rgba(255,150,170,.7)' },
-  bubble: { name: '气泡', grad: 'linear-gradient(135deg,#7FD8F5,#4C6FE0)', edge: 'rgba(127,216,245,.6)' },
 };
 export const ASSET_SWATCH = 'linear-gradient(135deg,#2A2B3A,#15161F)';

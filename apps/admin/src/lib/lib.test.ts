@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { describe as describeEvent, statusCls } from './events.ts';
 import { bigNum, clock, dateTime, fileSize, gcd, hms, seconds, setTimeZone, today, when } from './format.ts';
 import { identityOf, medalColors } from './identity.ts';
+import { placeWarnings, scaleRect } from './place.ts';
 import type { EventDto, Viewer } from './types.ts';
 
 const v = (p: Partial<Viewer> = {}): Viewer => ({ uid: 1, name: '小星', guard: 0, isMod: false, mystery: false, ...p });
@@ -72,5 +73,30 @@ describe('时间按主播所在时区显示', () => {
     setTimeZone('Not/AZone');
     expect(dateTime(ts)).toMatch(/^\d{2}-\d{2} \d{2}:00:00$/);
     setTimeZone(undefined);
+  });
+});
+
+describe('素材位置和大小', () => {
+  const stage = { x: 0, y: 0, w: 1080, h: 1920 };
+  const safe = { safeTop: 12, safeBottom: 40 };
+  it('缩放时按位置固定一个点', () => {
+    const r = { x: 100, y: 1000, w: 400, h: 200 };
+    expect(scaleRect(r, 2, 'bl')).toEqual({ x: 100, y: 800, w: 800, h: 400 });
+    expect(scaleRect(r, 2, 'br')).toEqual({ x: -300, y: 800, w: 800, h: 400 });
+    expect(scaleRect(r, 2, 'top')).toEqual({ x: -100, y: 1000, w: 800, h: 400 });
+    expect(scaleRect(r, 0.5, 'center')).toEqual({ x: 200, y: 1050, w: 200, h: 100 });
+  });
+  it('只提醒比原来多盖住的部分', () => {
+    // 居中的全屏素材本来就盖满画面：不挪、不缩放时不提醒
+    const full = { x: 0, y: 0, w: 1080, h: 1920 };
+    expect(placeWarnings(full, stage, safe, 'center', 0, 0, 100)).toEqual({ into: [], out: false });
+    expect(placeWarnings(full, stage, safe, 'center', 0, 0, 80)).toEqual({ into: [], out: false });
+    expect(placeWarnings(full, stage, safe, 'center', 0, 0, 150).out).toBe(true);
+    // 顶部的素材往上挪进信息栏、放大后往下盖住弹幕区
+    const top = { x: 297, y: 290, w: 486, h: 864 };
+    expect(placeWarnings(top, stage, safe, 'top', 0, -5, 100).into).toEqual(['顶部信息栏']);
+    expect(placeWarnings(top, stage, safe, 'top', 0, 0, 100).into).toEqual([]);
+    expect(placeWarnings(top, stage, safe, 'top', 0, 0, 150).into).toEqual(['底部弹幕区']);
+    expect(placeWarnings(top, stage, safe, 'top', 60, 0, 100).out).toBe(true);
   });
 });

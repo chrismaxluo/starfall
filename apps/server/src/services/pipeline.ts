@@ -13,6 +13,7 @@ import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rule
 import type { EventLog } from './events.ts';
 import type { Hub } from './hub.ts';
 import type { LiveService } from './live.ts';
+import type { GiftCatalog } from './gifts.ts';
 import type { RoomStore } from './room.ts';
 import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
@@ -20,13 +21,16 @@ import type { ViewerStore } from './viewers.ts';
 
 export type TriggerEvent = Exclude<StdEvent, { kind: 'live' }>;
 /** 欢迎语变量（除观众以外） */
-export type Vars = Omit<TextVars, 'viewer'>;
+export type Vars = Omit<TextVars, 'viewer'> & {
+  /** 礼物图（不进欢迎语，放进播放内容给礼物特效用） */
+  giftImg?: string;
+};
 
 /** 预览时各事件的示例内容 */
 const SAMPLE_VARS: Record<TriggerKind, Vars> = {
   enter: {},
   danmu: { text: '主播晚上好！' },
-  gift: { gift: '小花花', count: 10, valueGold: 1000 },
+  gift: { gift: '小花花', count: 10, valueGold: 1000, giftImg: 'https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png' },
   guard: { months: 1, guardLevel: 3, op: 'open' },
 };
 
@@ -62,6 +66,8 @@ interface QueueBrief {
   viewerName: string;
   viewerFace: string | null;
   detail: string;
+  /** 礼物图（礼物特效才有） */
+  giftImg: string | null;
   durationMs: number;
   test: boolean;
 }
@@ -96,6 +102,8 @@ export interface SimulateResult {
 
 export interface PipelineDeps {
   live: Pick<LiveService, 'onEvent' | 'status'>;
+  /** 查礼物图；测试里可以不传 */
+  gifts?: Pick<GiftCatalog, 'iconFor'>;
   room: RoomStore;
   settings: SettingsStore;
   enterRules: EnterRuleStore;
@@ -286,6 +294,11 @@ export class Pipeline {
       case 'gift': {
         const m = matchGift(ev, this.d.giftRules.get());
         vars = { gift: ev.giftName, count: ev.count, valueGold: ev.unitPrice * ev.count };
+        {
+          // 优先用送礼消息里自带的官方图标，没有时再查礼物面板
+          const img = ev.icon || this.d.gifts?.iconFor(ev.giftId);
+          if (img) vars.giftImg = img;
+        }
         hit = m;
         jump = queueJump && ev.unitPrice * ev.count >= JUMP_GOLD;
         break;
@@ -328,6 +341,11 @@ export class Pipeline {
   }
 
   private process(ev: TriggerEvent): void {
+    // 消息没带礼物图时用礼物面板里的图补上（事件记录里也显示）
+    if (ev.kind === 'gift' && !ev.icon) {
+      const icon = this.d.gifts?.iconFor(ev.giftId);
+      if (icon) ev = { ...ev, icon };
+    }
     const j = this.judge(ev);
     const eventId = this.record(ev, j.hit, j.status);
     if (j.status !== 'queued' || !j.hit || !j.effect) return;
@@ -350,6 +368,13 @@ export class Pipeline {
 
   // ---------- 播放 ----------
 
+  /** 上下羽化宽度：跟随全局时只对没有透明通道的素材生效 */
+  private featherOf(e: EffectDto): number {
+    if (e.visual.type !== 'asset' || !e.asset || e.feather === 'off') return 0;
+    if (e.feather === 'custom') return e.featherPct;
+    return !e.asset.hasAlpha && this.d.settings.get('featherOn') ? this.d.settings.get('featherPct') : 0;
+  }
+
   private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {
     const a = effect.asset;
     return {
@@ -365,6 +390,14 @@ export class Pipeline {
         showText: effect.showText,
         position: effect.position,
         durationMs: effect.durationMs,
+        fadeIn: effect.fadeIn,
+        fadeOut: effect.fadeOut,
+        fadeInMs: effect.fadeInMs,
+        fadeOutMs: effect.fadeOutMs,
+        offsetX: effect.offsetX,
+        offsetY: effect.offsetY,
+        sizePct: effect.sizePct,
+        featherPct: this.featherOf(effect),
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },
@@ -377,6 +410,7 @@ export class Pipeline {
         ...(viewer.medal ? { medal: { name: viewer.medal.name, level: viewer.medal.level, ...(viewer.medal.colors ? { colors: viewer.medal.colors } : {}) } } : {}),
       },
       ...(kind === 'guard' && vars.op ? { guardOp: vars.op } : {}),
+      ...(kind === 'gift' && vars.gift ? { gift: { name: vars.gift, count: vars.count ?? 1, ...(vars.giftImg ? { img: vars.giftImg } : {}) } } : {}),
       ...(test ? { test: true } : {}),
     };
   }
@@ -487,7 +521,7 @@ export class Pipeline {
   snapshot(): QueueSnapshot {
     const brief = (q: QueueItem<Queued>): QueueBrief => {
       const it = q.payload.item;
-      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, detail: q.payload.detail, durationMs: it.effect.durationMs, test: Boolean(it.test) };
+      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test) };
     };
     const c = this.current;
     return {

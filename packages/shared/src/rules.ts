@@ -1,4 +1,5 @@
 // 素材与规则的数据格式。用 Zod 定义，既做接口校验，也生成 TypeScript 类型，前后端共用。
+import { FEATHER_MAX } from './overlay.ts';
 import { z } from 'zod';
 
 export * from './labels.ts';
@@ -17,6 +18,20 @@ export const EffectTextsSchema = z.object({
 });
 export type EffectTexts = z.infer<typeof EffectTextsSchema>;
 
+/** 渐入、渐出时长的范围和默认值（毫秒） */
+export const FADE_MIN_MS = 100;
+export const FADE_MAX_MS = 5000;
+export const FADE_DEFAULT_MS = 500;
+/** 上传的素材在选好的位置上再挪动多少：画面宽、高的百分比（正数往右、往下） */
+export const OFFSET_MAX = 100;
+/** 上传的素材显示大小：程序自动算出的大小的百分比 */
+export const SIZE_MIN = 20;
+export const SIZE_MAX = 200;
+/** 上下羽化：跟随全局设置 / 这个素材自己设置 / 不羽化；宽度是素材高度的百分比 */
+export const FEATHER_MODES = ['global', 'custom', 'off'] as const;
+export type FeatherMode = (typeof FEATHER_MODES)[number];
+export const FEATHER_DEFAULT = 10;
+
 export const EffectSchema = z.object({
   id: z.number().int().positive(),
   name: z.string().min(1).max(40),
@@ -32,6 +47,23 @@ export const EffectSchema = z.object({
   volume: z.number().int().min(0).max(100),
   position: z.enum(POSITIONS),
   durationMs: z.number().int().min(500).max(30_000),
+  /** 有时长的素材（视频、SVGA、Lottie、动图）：手动设置时长（最长到素材本身的长度）；关着时按素材时长完整播放 */
+  durationCustom: z.boolean(),
+  /** 上传的素材：开头淡入 / 结尾淡出（内置样式有自己的动画，不用这两项） */
+  fadeIn: z.boolean(),
+  fadeOut: z.boolean(),
+  /** 渐入、渐出各用多久（毫秒） */
+  fadeInMs: z.number().int().min(FADE_MIN_MS).max(FADE_MAX_MS),
+  fadeOutMs: z.number().int().min(FADE_MIN_MS).max(FADE_MAX_MS),
+  /** 上传的素材：在「位置」的基础上左右、上下挪动（画面宽、高的百分比，正数往右、往下） */
+  offsetX: z.number().min(-OFFSET_MAX).max(OFFSET_MAX),
+  offsetY: z.number().min(-OFFSET_MAX).max(OFFSET_MAX),
+  /** 上传的素材：大小（自动大小的百分比，100 = 不变） */
+  sizePct: z.number().int().min(SIZE_MIN).max(SIZE_MAX),
+  /** 上传的素材：上下边缘羽化（跟随全局时只对没有透明通道的素材生效） */
+  feather: z.enum(FEATHER_MODES),
+  /** 自己设置时的羽化宽度（素材高度的百分比） */
+  featherPct: z.number().int().min(0).max(FEATHER_MAX),
 });
 export type Effect = z.infer<typeof EffectSchema>;
 

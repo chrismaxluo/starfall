@@ -2,6 +2,9 @@
 import type { GuardLevel, TriggerKind } from './events.ts';
 import type { Position } from './rules.ts';
 
+/** 上下羽化宽度上限（素材高度的百分比）；特效页也要用，所以放在这里 */
+export const FEATHER_MAX = 40;
+
 export interface OverlayConfig {
   outputId: number;
   name: string;
@@ -33,6 +36,17 @@ export interface PlayItem {
     showText: boolean;
     position: Position;
     durationMs: number;
+    fadeIn: boolean;
+    fadeOut: boolean;
+    fadeInMs: number;
+    fadeOutMs: number;
+    /** 在位置的基础上挪动（画面宽、高的百分比） */
+    offsetX: number;
+    offsetY: number;
+    /** 大小：自动大小的百分比 */
+    sizePct: number;
+    /** 上下羽化宽度（素材高度的百分比，0 为不羽化）：已经按全局设置算好 */
+    featherPct: number;
     sound: { url: string } | null;
     volume: number;
   };
@@ -47,12 +61,20 @@ export interface PlayItem {
   };
   /** 上舰事件：开通还是续费（宫廷特效的印章用） */
   guardOp?: 'open' | 'renew';
+  /** 礼物事件：礼物名称、数量（连击合并后的）、礼物图（从直播间礼物面板查，查不到时没有） */
+  gift?: { name: string; count: number; img?: string };
   /** 后台"测试播放"发出的 */
   test?: boolean;
 }
 
+/** 特效页的版本：构建出的入口脚本名（带哈希），重新构建后会变 */
+export const OVERLAY_BUILD_RE = /index-[\w-]+\.js/;
+
 export type ServerToOverlay =
-  | { type: 'hello'; config: OverlayConfig; preload: string[] }
+  /** build：服务端现在的特效页版本；和页面自己的不一样时，页面会在空闲时自动刷新 */
+  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null }
+  /** 特效页重新构建了（不用重启服务） */
+  | { type: 'version'; build: string }
   | { type: 'config'; config: OverlayConfig }
   | { type: 'preload'; preload: string[] }
   | { type: 'play'; item: PlayItem }

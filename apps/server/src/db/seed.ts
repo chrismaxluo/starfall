@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type { EffectTexts, Position } from '@starfall/shared';
 import type { Db } from './index.ts';
-import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleGiftBands, ruleGuard, settings } from './schema.ts';
+import { effects, outputs, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, settings } from './schema.ts';
 
 interface BuiltinEffect {
   name: string;
@@ -15,13 +15,7 @@ interface BuiltinEffect {
 
 /** 内置素材（界面与设计预览一致；样式由特效页实现，这里只存名称和参数） */
 export const BUILTIN_EFFECTS: BuiltinEffect[] = [
-  { name: '星冕', style: 'star', position: 'center', durationMs: 6800, texts: { enter: ['{guard} {name} 驾临'], gift: ['感谢 {name} 送出 {gift}，星光加冕'], guard: ['{name} {op}{guard} {months} 个月，驾临'] } },
-  { name: '流星', style: 'meteor', position: 'bl', durationMs: 5200, texts: { enter: ['欢迎{guard} {name} 登船'], gift: ['感谢 {name} 送出 {gift}'], guard: ['欢迎 {name} {op}{guard} {months} 个月'] } },
-  { name: '流光', style: 'flow', position: 'bl', durationMs: 4200, texts: { enter: ['欢迎{guard} {name} 登船'], guard: ['欢迎 {name} {op}{guard} {months} 个月'], danmu: ['{name}：{text}'] } },
-  { name: '巡场', style: 'patrol', position: 'bl', durationMs: 3600, texts: { enter: ['{name} 前来巡场'] } },
   { name: '霜玻', style: 'frost', position: 'bl', durationMs: 3200, texts: { enter: ['{name} 来了'] } },
-  { name: '礼物感谢', style: 'gift', position: 'bl', durationMs: 4000, texts: { enter: ['感谢 {name} 送出 {gift} ×{count}'], guard: ['感谢 {name} {op}{guard} {months} 个月'] } },
-  { name: '弹幕回应', style: 'bubble', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'] } },
   { name: '一行字', style: 'line', position: 'bl', durationMs: 2400, texts: { enter: ['{name} 进入直播间'], gift: ['{name} 送出 {gift} ×{count}'] } },
   // 普通观众：和粉丝牌进场同一个样子（霜玻），时间短一些；默认关闭
   { name: '霜玻·简', style: 'frost', position: 'bl', durationMs: 2400, texts: { enter: ['{name} 来了'] } },
@@ -29,6 +23,24 @@ export const BUILTIN_EFFECTS: BuiltinEffect[] = [
   { name: '金銮', style: 'royal-gov', position: 'center', durationMs: 8000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
   { name: '亭阁', style: 'royal-adm', position: 'center', durationMs: 6000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
   { name: '门楼', style: 'royal-cap', position: 'center', durationMs: 4000, texts: { enter: ['恭迎{guard} {name}'], gift: ['感谢送出 {gift} {name}'], guard: ['{guard}·{act} {name}'] } },
+  // 玻璃质感（大航海以外）：礼物 10 ~ 100 元、礼物 100 元以上、房管进场、弹幕回应。数量和礼物图由特效页单独显示，欢迎语里不用写
+  { name: '晶礼', style: 'glass-gift', position: 'bl', durationMs: 4000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
+  { name: '晶耀', style: 'glass-big', position: 'bl', durationMs: 6000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
+  { name: '晶巡', style: 'glass-mod', position: 'bl', durationMs: 3200, texts: { enter: ['{name} 前来巡场'] } },
+  { name: '晶语', style: 'glass-dm', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'], danmu: ['{name}：{text}'] } },
+];
+
+/**
+ * 已经下线的内置素材 → 替代它的素材。升级时：规则里用到它的换成替代的，删掉它；
+ * 以前复制出来的副本（不是内置的）保留，样式换成替代素材的样式
+ */
+export const RETIRED_EFFECTS: Array<{ name: string; style: string; replacedBy: string }> = [
+  { name: '星冕', style: 'star', replacedBy: '晶耀' },
+  { name: '流星', style: 'meteor', replacedBy: '亭阁' },
+  { name: '流光', style: 'flow', replacedBy: '门楼' },
+  { name: '巡场', style: 'patrol', replacedBy: '晶巡' },
+  { name: '礼物感谢', style: 'gift', replacedBy: '晶礼' },
+  { name: '弹幕回应', style: 'bubble', replacedBy: '晶语' },
 ];
 
 /** 默认设置 */
@@ -54,6 +66,9 @@ export const DEFAULT_SETTINGS = {
   giftComboSec: 3,
   /** 每天自动备份数据库和配置（F-DA-03） */
   autoBackup: true,
+  /** 素材上下羽化（全局）：只对没有透明通道的素材生效，素材里可以单独设置 */
+  featherOn: false,
+  featherPct: 10,
   /** 新手引导已完成或跳过（F-UI-06） */
   onboarded: false,
 };
@@ -67,11 +82,25 @@ export function seed(db: Db): void {
       tx.update(effects).set({ texts: e.texts }).where(and(eq(effects.name, e.name), eq(effects.builtin, true))).run();
     }
     const id = (name: string) => tx.select({ id: effects.id }).from(effects).where(eq(effects.name, name)).get()!.id;
+    // 下线的内置素材：规则换成替代素材后删除；副本换成替代素材的样式
+    for (const r of RETIRED_EFFECTS) {
+      const to = id(r.replacedBy);
+      const toStyle = BUILTIN_EFFECTS.find((e) => e.name === r.replacedBy)!.style;
+      tx.update(effects).set({ style: toStyle }).where(and(eq(effects.style, r.style), eq(effects.builtin, false))).run();
+      const old = tx.select({ id: effects.id }).from(effects).where(and(eq(effects.name, r.name), eq(effects.builtin, true))).get();
+      if (!old) continue;
+      for (const [table, col] of [[ruleEnterTiers, ruleEnterTiers.effectId], [ruleEnterBands, ruleEnterBands.effectId], [ruleExclusive, ruleExclusive.effectId], [ruleDanmu, ruleDanmu.effectId], [ruleGiftBands, ruleGiftBands.effectId], [ruleGiftSpecific, ruleGiftSpecific.effectId]] as const) {
+        tx.update(table).set({ effectId: to }).where(eq(col, old.id)).run();
+      }
+      tx.update(ruleGuard).set({ openEffectId: to }).where(eq(ruleGuard.openEffectId, old.id)).run();
+      tx.update(ruleGuard).set({ renewEffectId: to }).where(eq(ruleGuard.renewEffectId, old.id)).run();
+      tx.delete(effects).where(eq(effects.id, old.id)).run();
+    }
     const tiers = [
       { tier: 'gov', effectId: id('金銮'), cooldownMin: 5, enabled: true },
       { tier: 'adm', effectId: id('亭阁'), cooldownMin: 5, enabled: true },
       { tier: 'cap', effectId: id('门楼'), cooldownMin: 5, enabled: true },
-      { tier: 'mod', effectId: id('巡场'), cooldownMin: 10, enabled: true },
+      { tier: 'mod', effectId: id('晶巡'), cooldownMin: 10, enabled: true },
       { tier: 'nor', effectId: id('霜玻·简'), cooldownMin: 30, enabled: false },
     ] as const;
     for (const t of tiers) tx.insert(ruleEnterTiers).values(t).onConflictDoNothing().run();
@@ -81,11 +110,11 @@ export function seed(db: Db): void {
         { fromLevel: 1, effectId: id('霜玻'), cooldownMin: 15, enabled: true },
       ]).run();
     }
-    // 礼物：≥ 100 元星冕、10 ~ 100 元礼物感谢、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
+    // 礼物：≥ 100 元晶耀、10 ~ 100 元晶礼、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
     if (!tx.select().from(ruleGiftBands).limit(1).get()) {
       tx.insert(ruleGiftBands).values([
-        { fromGold: 100_000, effectId: id('星冕'), enabled: true },
-        { fromGold: 10_000, effectId: id('礼物感谢'), enabled: true },
+        { fromGold: 100_000, effectId: id('晶耀'), enabled: true },
+        { fromGold: 10_000, effectId: id('晶礼'), enabled: true },
         { fromGold: 1000, effectId: id('一行字'), enabled: false },
       ]).run();
     }

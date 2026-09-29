@@ -1,5 +1,4 @@
 /* 特效页样式：从 design/preview/overlay.html 移植。尺寸按 1080 宽的竖屏设计，由 --fxz 整体缩放。 */
-@property --ang { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Geist Mono", "Geist Sans", ui-monospace, monospace;
@@ -36,8 +35,6 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 .line { white-space: nowrap; }
 /* 昵称太长时截断加省略号（B 站昵称最长 16 个字；角落样式的宽度有限，超出会被画面边缘切掉） */
 .line .name { display: inline-block; max-width: 11em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
-.fx-star .line .name, .fx-star .name { max-width: none; }
-.fx-meteor .line .name { max-width: 8.5em; }
 .line .say { font-weight: 400; }
 .glass {
   background: rgba(14, 15, 24, 0.55);
@@ -58,90 +55,9 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 .fx-frost .line { display: flex; align-items: baseline; gap: 10px; }
 @keyframes fanLife { 0% { opacity: 0; transform: translateX(-30px); filter: blur(10px); } 14% { opacity: 1; transform: none; filter: blur(0); } 84% { opacity: 1; filter: blur(0); } 100% { opacity: 0; filter: blur(6px); } }
 
-/* ---- 巡场 ---- */
-.fx-patrol { display: flex; align-items: center; gap: 18px; padding: 16px 32px 16px 18px; border-radius: 18px;
-  box-shadow: inset 0 0 0 1px rgba(79,209,188,.35), 0 0 40px -10px rgba(79,209,188,.45), 0 20px 60px -20px rgba(0,0,0,.6);
-  animation: fanLife var(--dur) cubic-bezier(.2,.8,.2,1) forwards; }
-.fx-patrol > svg { width: 48px; height: 48px; color: #4FD1BC; flex-shrink: 0; }
-.fx-patrol .name { font-size: 32px; font-weight: 600; }
-.fx-patrol .say { font-size: 24px; opacity: .7; margin: 0 6px; }
-.fx-patrol .lbl { color: #8FE6D6; }
-
-/* ---- 流光 ---- */
-.fx-flow { display: flex; align-items: center; gap: 22px; padding: 16px 44px 16px 16px; border-radius: 22px; overflow: hidden; animation: capLife var(--dur) cubic-bezier(.2,.8,.2,1) forwards; }
-.fx-flow::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
-  background: linear-gradient(100deg, rgba(111,168,255,.95), rgba(111,168,255,.15) 45%, rgba(111,168,255,.6));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-.fx-flow::after { content: ""; position: absolute; top: 0; bottom: 0; width: 34%; left: -40%;
-  background: linear-gradient(90deg, transparent, rgba(180,210,255,.35), transparent); transform: skewX(-18deg); animation: sweep 1.4s .45s cubic-bezier(.3,.6,.3,1) forwards; }
-.fx-flow .badge { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; position: relative; flex-shrink: 0;
-  background: radial-gradient(circle at 35% 30%, #9CC4FF, #2F63D9 70%); box-shadow: 0 0 30px rgba(111,168,255,.6); }
-.fx-flow .badge svg { width: 38px; height: 38px; color: #fff; }
-.fx-flow .lbl { color: #A9CBFF; }
-.fx-flow .name { font-size: 42px; font-weight: 600; letter-spacing: -0.01em; }
-.fx-flow .say { font-size: 26px; opacity: .75; margin: 0 6px; }
-@keyframes capLife { 0% { opacity: 0; transform: translateX(-60px); } 11% { opacity: 1; transform: none; } 86% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(20px); } }
-@keyframes sweep { to { left: 130%; } }
-
-/* ---- 礼物（流光的暖色版本） ---- */
-.fx-gift::before { background: linear-gradient(100deg, rgba(255,160,170,.95), rgba(255,160,170,.15) 45%, rgba(255,179,138,.7)); }
-.fx-gift::after { background: linear-gradient(90deg, transparent, rgba(255,210,190,.35), transparent); }
-.fx-gift .badge { background: radial-gradient(circle at 35% 30%, #FFC9A8, #E0568F 70%); box-shadow: 0 0 30px rgba(240,120,150,.55); }
-.fx-gift .lbl { color: #FFC2B0; }
-
-/* ---- 流星 ---- */
-.fx-meteor { display: flex; align-items: center; gap: 26px; padding: 22px 56px 22px 22px; border-radius: 26px; animation: admLife var(--dur) cubic-bezier(.2,.8,.2,1) forwards; }
-.fx-meteor::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none;
-  background: conic-gradient(from var(--ang), #E9DDFF, #8E5CF0, #3D1F8C, #C9A8FF, #F7F1FF, #8E5CF0, #E9DDFF);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: spin 4s linear infinite; }
-.fx-meteor .badge { width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
-  background: conic-gradient(from 200deg, #F2EAFF, #9A6BE8, #4B2A99, #C9A8FF, #F2EAFF); box-shadow: 0 0 40px rgba(183,148,255,.55); }
-.fx-meteor .badge span { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: #1E1238; }
-.fx-meteor .badge svg { width: 42px; height: 42px; color: #E4D4FF; }
-.fx-meteor .lbl { color: #D2BCFF; }
-.fx-meteor .name { font-size: 50px; font-weight: 700; letter-spacing: -0.01em; background: linear-gradient(180deg, #FFFFFF 20%, #CDB6FF 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.fx-meteor .say { font-size: 28px; color: rgba(255,255,255,.75); margin: 0 8px; }
-.twk { position: absolute; color: #F1E8FF; animation: twk 1.8s ease-in-out infinite; }
-.twk svg { width: 100%; height: 100%; }
-@keyframes spin { to { --ang: 360deg; } }
-@keyframes twk { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
-@keyframes admLife { 0% { opacity: 0; transform: translateY(30px) scale(.96); filter: blur(8px); } 10% { opacity: 1; transform: none; filter: blur(0); } 88% { opacity: 1; filter: blur(0); } 100% { opacity: 0; transform: scale(1.02); filter: blur(6px); } }
-
-/* ---- 星冕（全屏居中） ---- */
-.fx-star { position: absolute; inset: 0; display: grid; place-items: center; animation: govLife var(--dur) ease forwards; will-change: opacity, transform; }
-.fx-star .vig { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 100%); }
-.fx-star .halo { position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(247,213,139,.28), rgba(247,213,139,0) 60%); animation: halo var(--dur) ease-out forwards; }
-.fx-star .core { position: relative; display: flex; flex-direction: column; align-items: center; gap: 20px; zoom: var(--fxz, 1); max-width: 100%; }
-.fx-star .crown { width: 120px; height: 90px; }
-.fx-star .crown path { fill: none; stroke: url(#goldStroke); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 260; stroke-dashoffset: 260; animation: draw 1.4s .2s cubic-bezier(.6,.1,.3,1) forwards; }
-.fx-star .rule { height: 1.5px; width: 0; background: linear-gradient(90deg, transparent, #F7D58B, transparent); animation: rule 1.2s .5s cubic-bezier(.2,.8,.2,1) forwards; }
-.fx-star .lbl { color: #F3D9A4; opacity: 0; animation: up .8s 1s ease-out forwards; font-size: 18px; letter-spacing: .5em; }
-.fx-star .name { font-size: 96px; font-weight: 700; line-height: 1.05; letter-spacing: .5em; opacity: 0; text-align: center; max-width: 960px; overflow-wrap: anywhere;
-  background: linear-gradient(180deg, #FFF6DE 10%, #F2C46E 55%, #B8742B 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 4px 24px rgba(240,180,90,.35)); animation: nameIn 1.6s 1.1s cubic-bezier(.2,.8,.2,1) forwards; }
-.fx-star .say { font-size: 30px; color: rgba(255,244,220,.8); letter-spacing: .3em; opacity: 0; animation: up .8s 1.9s ease-out forwards; }
-.dust { position: absolute; border-radius: 50%; background: #F7D58B; box-shadow: 0 0 8px #F7D58B; opacity: 0; animation: dust linear forwards; }
-@keyframes draw { to { stroke-dashoffset: 0; } }
-@keyframes rule { to { width: 640px; } }
-@keyframes up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes nameIn { from { opacity: 0; letter-spacing: .5em; filter: blur(12px) drop-shadow(0 4px 24px rgba(240,180,90,.35)); } to { opacity: 1; letter-spacing: .06em; filter: blur(0) drop-shadow(0 4px 24px rgba(240,180,90,.35)); } }
-@keyframes halo { 0% { transform: scale(.4); opacity: 0; } 25% { opacity: 1; } 100% { transform: scale(1.15); opacity: .6; } }
-@keyframes dust { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: .9; } 100% { opacity: 0; transform: translateY(-420px); } }
-/* 结尾不对整个画面做模糊（全屏模糊很耗性能，弱一点的电脑会卡），改为轻微放大 + 淡出 */
-@keyframes govLife { 0% { opacity: 0; } 6% { opacity: 1; } 90% { opacity: 1; transform: none; } 100% { opacity: 0; transform: scale(1.03); } }
-
-/* ---- 气泡（顶部） ---- */
-.fx-bubble { display: flex; align-items: center; gap: 14px; padding: 12px 26px 12px 12px; border-radius: 26px 26px 26px 8px; max-width: 900px;
-  box-shadow: inset 0 0 0 1px rgba(127,216,245,.45), 0 0 34px -12px rgba(127,216,245,.6), 0 20px 60px -20px rgba(0,0,0,.6);
-  animation: bubbleLife var(--dur) cubic-bezier(.2,.8,.2,1) forwards; }
-.fx-bubble .av { width: 48px; height: 48px; font-size: 20px; }
-.fx-bubble .line { font-size: 28px; white-space: normal; overflow-wrap: anywhere; }
-.fx-bubble .name { font-weight: 600; color: #BDEBFA; }
-@keyframes bubbleLife { 0% { opacity: 0; transform: translateY(-16px) scale(.94); } 12% { opacity: 1; transform: none; } 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-8px); } }
-
 /* ---- 上传的素材 ---- */
-.fx-asset { display: flex; flex-direction: column; align-items: inherit; gap: 18px; animation: assetLife var(--dur) linear forwards; }
+/* 淡入淡出加在素材和昵称条各自身上：外层做透明度动画会让昵称条的毛玻璃失效 */
+.fx-asset { display: flex; flex-direction: column; align-items: inherit; gap: 18px; }
 .slot.pos-center .fx-asset, .slot.full .fx-asset { position: absolute; inset: 0; display: grid; place-items: center; }
 .media { display: block; }
 .media video, .media img, .media canvas, .media svg { width: 100% !important; height: 100% !important; object-fit: contain; display: block; }
@@ -150,21 +66,16 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 .fx-asset .card .name { font-size: 28px; font-weight: 500; }
 .fx-asset .card .say { font-size: 24px; opacity: .75; margin: 0 6px; }
 .slot.pos-center .fx-asset .card, .slot.full .fx-asset .card { position: absolute; left: 50%; bottom: calc(var(--sb) + 60px); transform: translateX(-50%); }
-@keyframes assetLife { 0% { opacity: 0; } 5% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
+/* 头像和欢迎语：动画放在毛玻璃元素自身上（祖先有透明度动画会让毛玻璃失效）；用 translate 不和定位用的 transform 冲突（旧内核不认 translate 时只淡入淡出） */
+.fx-asset > .card { animation: cardLife var(--cd) ease forwards; }
+@keyframes cardLife { 0% { opacity: 0; translate: 0 14px; } 10% { opacity: 1; translate: 0 0; } 85% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 -6px; } }
 
 /* 兼容模式：去掉粒子、光晕和毛玻璃 */
-@media (prefers-reduced-motion: reduce) { .dust, .twk { display: none; } }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .glass { background: rgba(14, 15, 24, 0.86); } }
-.lite .dust, .lite .twk, .lite .halo { display: none; }
 .lite .glass { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(14, 15, 24, 0.86); }
-.lite .fx-meteor::before { animation: none; }
 /* 省资源模式：出入场只用透明度和位移，不做模糊（模糊每帧都要重算整块画面） */
-.lite .fx-frost, .lite .fx-patrol { animation-name: fanLifeLite; }
-.lite .fx-meteor { animation-name: admLifeLite; }
-.lite .fx-star .name { animation-name: nameInLite; }
+.lite .fx-frost { animation-name: fanLifeLite; }
 @keyframes fanLifeLite { 0% { opacity: 0; transform: translateX(-30px); } 14% { opacity: 1; transform: none; } 84% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes admLifeLite { 0% { opacity: 0; transform: translateY(30px) scale(.96); } 10% { opacity: 1; transform: none; } 88% { opacity: 1; } 100% { opacity: 0; transform: scale(1.02); } }
-@keyframes nameInLite { from { opacity: 0; } to { opacity: 1; } }
 
 /* 配置错误提示（地址不对时才显示，正常直播时不会出现） */
 .notice { position: absolute; left: 50%; top: calc(var(--st, 12%) + 40px); transform: translateX(-50%); z-index: 30; max-width: 90%; padding: 22px 32px; border-radius: 18px;

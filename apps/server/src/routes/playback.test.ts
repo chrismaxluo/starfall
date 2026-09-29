@@ -125,7 +125,10 @@ describe('管理后台 WebSocket', () => {
   it('连上后收到当前状态，之后实时收到事件、队列、特效页上下线', async () => {
     const t = await setup();
     const a = await t.connect('/ws/admin', { cookie: `sf_session=${t.session}` });
-    expect(await a.waitFor('hello')).toMatchObject({ status: { paused: false, overlays: 0, room: { roomId: 30000 } }, queue: { playing: null, items: [] } });
+    const aHello = await a.waitFor('hello');
+    expect(aHello).toMatchObject({ status: { paused: false, overlays: 0, room: { roomId: 30000 } }, queue: { playing: null, items: [] } });
+    // 后台的版本（没构建时为 null）：旧页面据此提示刷新
+    expect(aHello).toHaveProperty('build');
     const o = await t.overlay();
     await o.waitFor('hello');
     await a.waitFor('overlays');
@@ -156,14 +159,14 @@ describe('播放控制接口', () => {
     await o.waitFor('hello');
     expect((await t.req({ method: 'POST', url: '/api/playback/pause' })).json()).toEqual({ paused: true });
     expect((await t.req({ method: 'GET', url: '/api/status' })).json()).toMatchObject({ paused: true, overlays: 1, queue: { playing: false, size: 0 } });
-    const star = t.ctx.effects.list().find((e) => e.name === '星冕')!.id;
+    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
     const refused = await t.req({ method: 'POST', url: '/api/playback/test', payload: { effectId: star } });
     expect(refused.statusCode).toBe(409);
     expect(refused.json().error.message).toContain('暂停');
     await t.req({ method: 'POST', url: '/api/playback/resume' });
     const ok = await t.req({ method: 'POST', url: '/api/playback/test', payload: { effectId: star } });
     expect(ok.statusCode).toBe(200);
-    expect(await o.waitFor('play')).toMatchObject({ item: { test: true, effect: { name: '星冕' } } });
+    expect(await o.waitFor('play')).toMatchObject({ item: { test: true, effect: { name: '晶耀' } } });
     expect((await t.req({ method: 'POST', url: '/api/playback/clear' })).json()).toEqual({ cleared: 0 });
     expect((await t.req({ method: 'POST', url: '/api/playback/test', payload: { effectId: 9999 } })).statusCode).toBe(404);
   });
@@ -208,9 +211,9 @@ describe('播放控制接口', () => {
 describe('预览与统计', () => {
   it('预览：返回播放内容，不入队、不写记录', async () => {
     const t = await setup();
-    const star = t.ctx.effects.list().find((e) => e.name === '星冕')!.id;
+    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
     const r = (await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: star, viewer: { name: '长夜未央', guard: 1, medalLevel: null } } })).json();
-    expect(r).toMatchObject({ test: true, text: '总督 长夜未央 驾临', effect: { name: '星冕' }, viewer: { name: '长夜未央', guard: 1 } });
+    expect(r).toMatchObject({ test: true, text: '长夜未央 来了', effect: { name: '晶耀' }, viewer: { name: '长夜未央', guard: 1 } });
     expect(r.viewer.medal).toBeUndefined();
     expect(t.ctx.pipeline.snapshot().items).toHaveLength(0);
     expect(t.ctx.log.query({}).events).toHaveLength(0);
@@ -218,7 +221,7 @@ describe('预览与统计', () => {
     // 预览还没保存的修改
     const d = (await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: star, draft: { texts: { enter: ['改了 {name}'] }, position: 'top', durationMs: 2000 } } })).json();
     expect(d).toMatchObject({ text: '改了 测试观众', effect: { position: 'top', durationMs: 2000 } });
-    expect(t.ctx.effects.get(star).texts.enter).toEqual(['{guard} {name} 驾临']);
+    expect(t.ctx.effects.get(star).texts.enter).toEqual(['{name} 来了']);
     expect((await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: star, draft: { name: 'x' } } })).statusCode).toBe(400);
   });
 

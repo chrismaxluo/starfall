@@ -62,8 +62,11 @@ const root = protobuf.Root.fromJSON({
         comboIndex: { type: 'int32', id: 11 },
         batchComboId: { type: 'string', id: 12 },
         comboTotalCoin: { type: 'int64', id: 14 },
+        img: { type: 'GiftImg', id: 35 },
       },
     },
+    // 礼物图标：和礼物配置接口里的 img_basic / webp / gif 相同
+    GiftImg: { fields: { basic: { type: 'string', id: 1 }, webp: { type: 'string', id: 2 }, gif: { type: 'string', id: 5 } } },
     SendGift: {
       fields: {
         uid: { type: 'int64', id: 1 },
@@ -119,6 +122,7 @@ export interface PbSendGift {
     comboIndex?: number;
     batchComboId?: string;
     comboTotalCoin?: number;
+    img?: { basic?: string; webp?: string; gif?: string };
   };
   senderUinfo?: PbUserInfo;
 }

@@ -98,6 +98,9 @@ export interface Settings {
   giftComboSec: number;
   autoBackup: boolean;
   onboarded: boolean;
+  /** 素材上下羽化（全局） */
+  featherOn: boolean;
+  featherPct: number;
 }
 
 /** 一份自动备份（数据库 + 配置） */
@@ -132,6 +135,10 @@ export interface GiftConfig {
   paid: boolean;
   icon: string;
   gif?: string;
+  /** 在礼物面板上的哪一页（礼物、粉丝团、航海……）；不在面板上显示的礼物没有 */
+  tab?: string;
+  /** 在这一页里的位置 */
+  panel?: number;
 }
 
 export interface EventDto {
@@ -141,7 +148,7 @@ export interface EventDto {
   uid: number;
   uname: string;
   viewer: Viewer;
-  payload: { source?: string; text?: string; giftName?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string } | null;
+  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string } | null;
   rule: string | null;
   effectId: number | null;
   status: PlayStatus;
@@ -153,6 +160,7 @@ export interface QueueBrief {
   effectName: string;
   viewerName: string;
   viewerFace: string | null;
+  giftImg?: string | null;
   /** 一句话说明，例如「舰长进场」「告白花束 ×1」 */
   detail: string;
   durationMs: number;

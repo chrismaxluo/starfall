@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it } from 'vitest';
+import { assets } from '../db/schema.ts';
 import { formFile, media, testApp } from '../testing.ts';
 
 let close: Array<() => Promise<unknown>> = [];
@@ -16,17 +18,19 @@ const setup = async (opts?: { maxUpload?: number }) => {
 };
 
 describe('素材列表', () => {
-  it('内置 12 个素材，带"用于哪些规则"', async () => {
+  it('内置 10 个素材，带"用于哪些规则"', async () => {
     const { effects, byName } = await setup();
     const list = await effects();
-    expect(list.map((e) => e.name)).toEqual(['星冕', '流星', '流光', '巡场', '霜玻', '礼物感谢', '弹幕回应', '一行字', '霜玻·简', '金銮', '亭阁', '门楼']);
+    expect(list.map((e) => e.name)).toEqual(['霜玻', '一行字', '霜玻·简', '金銮', '亭阁', '门楼', '晶礼', '晶耀', '晶巡', '晶语']);
     expect(list.every((e) => e.builtin)).toBe(true);
     expect((await byName('金銮')).usedBy).toEqual([
       { page: 'enter', label: '进场 · 总督' },
       { page: 'guard', label: '上舰 · 开通总督' },
       { page: 'guard', label: '上舰 · 续费总督' },
     ]);
-    expect((await byName('星冕')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 100 元' }]);
+    expect((await byName('晶耀')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 100 元' }]);
+    expect((await byName('晶礼')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 10 – 100 元' }]);
+    expect((await byName('晶巡')).usedBy).toEqual([{ page: 'enter', label: '进场 · 房管' }]);
     expect((await byName('霜玻')).usedBy.map((u) => u.label)).toEqual(['进场 · 粉丝牌 21 级及以上', '进场 · 粉丝牌 1 – 20 级']);
     // 普通观众档默认关闭，但仍然引用了"一行字"
     expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['礼物 · 单次 1 – 10 元']);
@@ -112,7 +116,7 @@ describe('上传即素材', () => {
 describe('修改素材', () => {
   it('内置素材只读', async () => {
     const { req, byName } = await setup();
-    const star = await byName('星冕');
+    const star = await byName('晶耀');
     const res = await req({ method: 'PUT', url: `/api/effects/${star.id}`, payload: { volume: 10 } });
     expect(res.statusCode).toBe(403);
     expect(res.json().error.message).toContain('复制');
@@ -123,12 +127,90 @@ describe('修改素材', () => {
     const { req, upload } = await setup();
     const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
     const ok = await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 4000 } });
-    expect(ok.json()).toMatchObject({ name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 4000 });
-    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '星冕' } })).statusCode).toBe(409);
+    // 视频有自己的时长：按素材时长播放，设置的时长不起作用
+    expect(ok.json()).toMatchObject({ name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 1200 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '晶耀' } })).statusCode).toBe(409);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { builtin: true } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { durationMs: 100 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: '/api/effects/9999', payload: { volume: 1 } })).statusCode).toBe(404);
     expect((await req({ method: 'PUT', url: '/api/effects/abc', payload: { volume: 1 } })).statusCode).toBe(400);
+  });
+
+  it('时长：有时长的素材按素材时长（不受 30 秒限制），静态图片用设置的时长', async () => {
+    const { req, upload, ctx } = await setup();
+    const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
+    ctx.db.update(assets).set({ durationMs: 30_733 }).where(eq(assets.id, effect.visual.assetId)).run();
+    expect((await req({ method: 'GET', url: `/api/effects/${effect.id}` })).json().durationMs).toBe(30_733);
+    const still = (await upload('/api/assets', 's.png', media('still.png'))).json().effect;
+    expect(still.durationMs).toBe(5000);
+    expect((await req({ method: 'PUT', url: `/api/effects/${still.id}`, payload: { durationMs: 2500 } })).json().durationMs).toBe(2500);
+  });
+
+  it('手动设置时长：打开后按设置的时长播放，不超过素材本身；关掉恢复跟随素材；换文件后恢复跟随', async () => {
+    const { req, upload, ctx } = await setup();
+    const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
+    ctx.db.update(assets).set({ durationMs: 30_733 }).where(eq(assets.id, effect.visual.assetId)).run();
+    const put = async (payload: object) => (await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload })).json();
+    expect(effect.durationCustom).toBe(false);
+    expect(await put({ durationCustom: true, durationMs: 8000 })).toMatchObject({ durationCustom: true, durationMs: 8000 });
+    // 预览用还没保存的设置
+    const p = (await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { durationCustom: false } } })).json();
+    expect(p.effect.durationMs).toBe(30_733);
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { durationMs: 3000 } } })).json().effect.durationMs).toBe(3000);
+    expect(await put({ durationCustom: false })).toMatchObject({ durationCustom: false, durationMs: 30_733 });
+    // 设置的比素材长时按素材
+    ctx.db.update(assets).set({ durationMs: 1200 }).where(eq(assets.id, effect.visual.assetId)).run();
+    expect(await put({ durationCustom: true, durationMs: 8000 })).toMatchObject({ durationCustom: true, durationMs: 1200 });
+    const replaced = (await upload(`/api/effects/${effect.id}/file`, 'b.webm', media('alpha.webm'), 'PUT')).json();
+    expect(replaced.durationCustom).toBe(false);
+  });
+
+  it('渐入渐出：新上传的素材默认关闭，可以分别打开，预览和播放内容带上设置', async () => {
+    const { req, upload } = await setup();
+    const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();
+    expect(effect).toMatchObject({ fadeIn: false, fadeOut: false });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeIn: true } })).json()).toMatchObject({ fadeIn: true, fadeOut: false });
+    const p = (await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { fadeOut: true } } })).json();
+    expect(p.effect).toMatchObject({ fadeIn: true, fadeOut: true });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeIn: 'yes' } })).statusCode).toBe(400);
+    // 渐入渐出的秒数：默认 0.5 秒，0.1 ~ 5 秒
+    expect(effect).toMatchObject({ fadeInMs: 500, fadeOutMs: 500 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeInMs: 1500, fadeOutMs: 2400 } })).json()).toMatchObject({ fadeInMs: 1500, fadeOutMs: 2400 });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { fadeOutMs: 800 } } })).json().effect).toMatchObject({ fadeInMs: 1500, fadeOutMs: 800 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeInMs: 50 } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeOutMs: 6000 } })).statusCode).toBe(400);
+    // 位置微调：默认不挪，画面宽、高的 ±100%
+    expect(effect).toMatchObject({ offsetX: 0, offsetY: 0 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { offsetX: -12.5, offsetY: 30 } })).json()).toMatchObject({ offsetX: -12.5, offsetY: 30 });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { offsetY: -8 } } })).json().effect).toMatchObject({ offsetX: -12.5, offsetY: -8 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { offsetX: 101 } })).statusCode).toBe(400);
+    // 大小：默认 100%，20% ~ 200%
+    expect(effect).toMatchObject({ sizePct: 100 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 150 } })).json()).toMatchObject({ sizePct: 150 });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { sizePct: 60 } } })).json().effect).toMatchObject({ sizePct: 60 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 10 } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 201 } })).statusCode).toBe(400);
+  });
+
+  it('上下羽化：跟随全局时只对没有透明通道的素材生效，可以单独设置或关闭', async () => {
+    const { req, upload } = await setup();
+    const opaque = (await upload('/api/assets', 'o.mp4', media('opaque.mp4'))).json().effect;
+    const alpha = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json().effect;
+    expect(opaque).toMatchObject({ feather: 'global', featherPct: 10 });
+    const pct = async (id: number, draft?: object) => (await req({ method: 'POST', url: '/api/preview', payload: { effectId: id, ...(draft ? { draft } : {}) } })).json().effect.featherPct;
+    // 全局默认关闭
+    expect(await pct(opaque.id)).toBe(0);
+    expect((await req({ method: 'PUT', url: '/api/settings', payload: { featherOn: true, featherPct: 15 } })).json()).toMatchObject({ featherOn: true, featherPct: 15 });
+    expect(await pct(opaque.id)).toBe(15);
+    expect(await pct(alpha.id)).toBe(0);
+    // 单独设置：带透明通道的也生效；不羽化
+    expect(await pct(alpha.id, { feather: 'custom', featherPct: 20 })).toBe(20);
+    expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { feather: 'off' } })).json()).toMatchObject({ feather: 'off' });
+    expect(await pct(opaque.id)).toBe(0);
+    expect(await pct(opaque.id, { feather: 'global' })).toBe(15);
+    expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { feather: 'soft' } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { featherPct: 41 } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: '/api/settings', payload: { featherPct: 41 } })).statusCode).toBe(400);
   });
 
   it('音效：上传、选用、被使用时不能删除', async () => {
@@ -146,6 +228,12 @@ describe('修改素材', () => {
     const del = await req({ method: 'DELETE', url: `/api/assets/${sound.id}` });
     expect(del.statusCode).toBe(409);
     expect(del.json().error.details.usedBy).toHaveLength(1);
+    // 改名：只改名字，扩展名不变；画面文件不能从这里改
+    const ren = await req({ method: 'PUT', url: `/api/sounds/${sound.id}`, payload: { name: '  叮咚/提示  ' } });
+    expect(ren.json().sound).toMatchObject({ id: sound.id, filename: '叮咚提示.wav', usedBy: [{ id: effect.id }] });
+    expect((await req({ method: 'GET', url: `/api/effects/${effect.id}` })).json().sound).toMatchObject({ filename: '叮咚提示.wav' });
+    expect((await req({ method: 'PUT', url: `/api/sounds/${sound.id}`, payload: { name: '   ' } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/sounds/${effect.visual.assetId}`, payload: { name: 'x' } })).statusCode).toBe(404);
     await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { soundAssetId: null } });
     expect((await req({ method: 'DELETE', url: `/api/assets/${sound.id}` })).statusCode).toBe(200);
   });
@@ -166,15 +254,14 @@ describe('修改素材', () => {
 describe('复制与删除', () => {
   it('复制内置素材得到可编辑的副本；勾选替换时，原来用它的规则换成副本', async () => {
     const { req, byName } = await setup();
-    const star = await byName('星冕');
+    const star = await byName('晶耀');
     const a = (await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: {} })).json();
-    expect(a).toMatchObject({ name: '星冕 副本', builtin: false, visual: { type: 'builtin_style', style: 'star' }, usedBy: [] });
+    expect(a).toMatchObject({ name: '晶耀 副本', builtin: false, visual: { type: 'builtin_style', style: 'glass-big' }, usedBy: [] });
     const b = (await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { replaceRefs: true } })).json();
-    expect(b).toMatchObject({ name: '星冕 副本 2' });
+    expect(b).toMatchObject({ name: '晶耀 副本 2' });
     expect(b.usedBy.map((u: { label: string }) => u.label)).toEqual(['礼物 · 单次 ≥ 100 元']);
-    expect((await byName('星冕')).usedBy).toEqual([]);
     expect((await req({ method: 'PUT', url: `/api/effects/${b.id}`, payload: { volume: 20 } })).statusCode).toBe(200);
-    expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '流星' } })).statusCode).toBe(409);
+    expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '亭阁' } })).statusCode).toBe(409);
   });
 
   it('被规则使用的素材不能删除，并返回使用位置；删除没人用的素材时文件一并删除', async () => {

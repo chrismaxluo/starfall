@@ -4,7 +4,7 @@ import { computed, onMounted, ref } from 'vue';
 import { JUMP_GOLD } from '@starfall/shared/labels';
 import { get, put } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
-import { yuan } from '../lib/preview.ts';
+import { battery, batteryYuan, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
 import { effectById, refreshEffects, state } from '../lib/store.ts';
 import { attempt } from '../lib/toast.ts';
@@ -20,33 +20,50 @@ const catalog = ref<GiftConfig[]>([]);
 const catalogErr = ref('');
 const picking = ref(false);
 const giftQ = ref('');
-const addYuan = ref<number | null>(null);
+const addBattery = ref<number | null>(null);
 const bandMsg = ref<{ text: string; err: boolean }>({ text: '分出来的新一段先沿用原来的特效', err: false });
 
 const rules = computed(() => state.gift);
 const bands = computed(() => [...(rules.value?.bands ?? [])].sort((a, b) => b.fromGold - a.fromGold));
 const giftOf = (id: number) => catalog.value.find((g) => g.id === id);
-const available = computed(() => catalog.value.filter((g) => g.paid && !rules.value?.specific.some((s) => s.giftId === g.id) && (!giftQ.value || g.name.includes(giftQ.value))).sort((a, b) => a.price - b.price));
+const available = computed(() => catalog.value.filter((g) => g.paid && !rules.value?.specific.some((s) => s.giftId === g.id) && (!giftQ.value || g.name.includes(giftQ.value))));
+// 按礼物面板分页（礼物、粉丝团、航海……）、页内顺序列出；不在面板上显示的（包裹、活动等）按价格排在最后
+const groups = computed(() => {
+  const tabs = new Map<string, GiftConfig[]>();
+  const off: GiftConfig[] = [];
+  for (const g of catalog.value) if (g.tab && !tabs.has(g.tab)) tabs.set(g.tab, []);
+  for (const g of available.value) (g.tab ? tabs.get(g.tab)! : off).push(g);
+  const out = [...tabs].filter(([, list]) => list.length).map(([tab, list]) => ({ title: `${tab}（${list.length}）`, list: list.sort((a, b) => a.panel! - b.panel!) }));
+  if (off.length) out.push({ title: `面板上不显示的礼物（包裹、活动、特效版本等，${off.length}），按价格从低到高`, list: off.sort((a, b) => a.price - b.price) });
+  return out;
+});
 
-/** 第 i 档（从高到低）的金额范围：100 元以上、10 – 100 元 */
-function bandLabel(i: number): string {
-  const b = bands.value[i]!;
-  return i === 0 ? `${yuan(b.fromGold)}以上` : `${yuan(b.fromGold).replace(' 元', '')} – ${yuan(bands.value[i - 1]!.fromGold)}`;
+/** 价值范围：「1000电池以上」「100 – 1000电池」 */
+function range(lo: number, hi?: number): string {
+  return hi === undefined ? `${battery(lo)}以上` : `${battery(lo).replace('电池', '')} – ${battery(hi)}`;
 }
+/** 同一范围折合的金额：「100 元以上」「10 – 100 元」 */
+function yuanRange(lo: number, hi?: number): string {
+  return hi === undefined ? `${yuan(lo)}以上` : `${yuan(lo).replace(' 元', '')} – ${yuan(hi)}`;
+}
+const bandHi = (i: number) => (i === 0 ? undefined : bands.value[i - 1]!.fromGold);
+/** 第 i 档（从高到低）的价值范围 */
+const bandLabel = (i: number) => range(bands.value[i]!.fromGold, bandHi(i));
+const bandYuan = (i: number) => yuanRange(bands.value[i]!.fromGold, bandHi(i));
 const BAR_COLORS = ['#C8612A', '#E0568F', '#6E6BF2', '#3FB4F6', '#4FD1BC', '#6C7080'];
 /** 价值刻度条：从低到高，最左边一段是「不播放」 */
 const valueBar = computed(() => {
   const asc = [...bands.value].reverse();
   if (!asc.length) return [];
-  const segs: Array<{ key: string; range: string; name: string; color: string | null; off: boolean }> = [{ key: 'none', range: `${yuan(asc[0]!.fromGold)}以下`, name: '不播放', color: null, off: true }];
+  const segs: Array<{ key: string; range: string; name: string; color: string | null; off: boolean }> = [{ key: 'none', range: `${battery(asc[0]!.fromGold)}以下`, name: '不播放', color: null, off: true }];
   asc.forEach((b, i) => {
     const hi = asc[i + 1];
     const e = effectById(b.effectId);
-    segs.push({ key: String(b.fromGold), range: hi ? `${yuan(b.fromGold).replace(' 元', '')} – ${yuan(hi.fromGold)}` : `${yuan(b.fromGold)}以上`, name: b.enabled ? (e?.name ?? '未选择') : '已关闭', color: b.enabled ? BAR_COLORS[(asc.length - 1 - i) % BAR_COLORS.length]! : null, off: !b.enabled });
+    segs.push({ key: String(b.fromGold), range: range(b.fromGold, hi?.fromGold), name: b.enabled ? (e?.name ?? '未选择') : '已关闭', color: b.enabled ? BAR_COLORS[(asc.length - 1 - i) % BAR_COLORS.length]! : null, off: !b.enabled });
   });
   return segs;
 });
-const ticks = computed(() => [...bands.value].reverse().map((b, i, arr) => ({ key: b.fromGold, text: yuan(b.fromGold), left: ((i + 1) / (arr.length + 1)) * 100 })));
+const ticks = computed(() => [...bands.value].reverse().map((b, i, arr) => ({ key: b.fromGold, text: battery(b.fromGold), note: yuan(b.fromGold), left: ((i + 1) / (arr.length + 1)) * 100 })));
 
 async function save(msg?: string): Promise<void> {
   if (!rules.value) return;
@@ -58,7 +75,7 @@ async function save(msg?: string): Promise<void> {
 
 function addSpecific(g: GiftConfig): void {
   if (!rules.value) return;
-  const eff = state.effects.find((e) => e.name === '礼物感谢')?.id ?? null;
+  const eff = state.effects.find((e) => e.name === '晶礼')?.id ?? null;
   rules.value.specific.push({ giftId: g.id, giftName: g.name, effectId: eff, enabled: true });
   picking.value = false;
   giftQ.value = '';
@@ -71,20 +88,20 @@ function removeSpecific(id: number): void {
 }
 function addBand(): void {
   if (!rules.value) return;
-  const v = Number(addYuan.value);
-  if (!(v > 0)) return void (bandMsg.value = { text: '请输入大于 0 的金额', err: true });
-  const gold = Math.round(v * 1000);
-  if (rules.value.bands.some((b) => b.fromGold === gold)) return void (bandMsg.value = { text: `已经有 ${yuan(gold)} 这一档了`, err: true });
+  const v = Number(addBattery.value);
+  if (!(v >= 1)) return void (bandMsg.value = { text: '请输入至少 1 电池', err: true });
+  const gold = Math.round(v) * 100;
+  if (rules.value.bands.some((b) => b.fromGold === gold)) return void (bandMsg.value = { text: `已经有 ${batteryYuan(gold)}这一档了`, err: true });
   const parent = bands.value.find((b) => b.fromGold < gold) ?? bands.value[bands.value.length - 1]!;
   rules.value.bands.push({ fromGold: gold, effectId: parent.effectId, enabled: parent.enabled });
-  addYuan.value = null;
+  addBattery.value = null;
   bandMsg.value = { text: '低于最低一档的礼物不播特效', err: false };
-  void save(`已在 ${yuan(gold)}处分出一段`);
+  void save(`已在 ${batteryYuan(gold)}处分出一段`);
 }
 function removeBand(b: GiftBand): void {
   if (!rules.value || rules.value.bands.length <= 1) return;
   rules.value.bands = rules.value.bands.filter((x) => x.fromGold !== b.fromGold);
-  void save('已删除这一段，这些金额并入相邻的一段');
+  void save('已删除这一段，这段价值并入相邻的一段');
 }
 const jumps = (gold: number) => gold >= JUMP_GOLD && state.settings?.queueJump;
 function previewSpec(giftId: number, name: string, effectId: number | null): void {
@@ -107,7 +124,7 @@ onMounted(async () => {
 
 <template>
   <div v-if="rules">
-    <div class="rl-flow"><span>有人送礼时，先看是不是下面的<b>指定礼物</b>；不是的话，再按这次送的<b>总价值</b>（单价 × 数量）找对应的一段。免费礼物不播放。</span></div>
+    <div class="rl-flow"><span>有人送礼时，先看是不是下面的<b>指定礼物</b>；不是的话，再按这次送的<b>总价值</b>（单价 × 数量）找对应的一段。价值按 B 站礼物面板的电池计算（1 电池 = 0.1 元）。免费礼物不播放。</span></div>
 
     <div class="rl-sec"><h3>指定礼物</h3><span>送这些礼物时，用这里的特效（优先）</span></div>
     <div class="rl-gifts">
@@ -115,7 +132,7 @@ onMounted(async () => {
         <img v-if="giftOf(s.giftId)?.icon" :src="giftOf(s.giftId)!.icon" alt="" referrerpolicy="no-referrer" />
         <span v-else class="gico">{{ [...s.giftName][0] ?? '礼' }}</span>
         <div class="body">
-          <div class="nm">{{ s.giftName || `礼物 ${s.giftId}` }}<span v-if="giftOf(s.giftId)" class="pr">{{ yuan(giftOf(s.giftId)!.price) }} / 个</span></div>
+          <div class="nm">{{ s.giftName || `礼物 ${s.giftId}` }}<span v-if="giftOf(s.giftId)" class="pr">{{ battery(giftOf(s.giftId)!.price) }} / 个（{{ yuan(giftOf(s.giftId)!.price) }}）</span></div>
           <EffectPicker v-model="s.effectId" @change="(id) => save(`「${s.giftName}」改为播放「${effectById(id)?.name}」`)" />
         </div>
         <div class="side">
@@ -129,9 +146,12 @@ onMounted(async () => {
       <button class="rl-gift add" :disabled="!!catalogErr" @click="picking = !picking"><span><Icon name="i-plus" />{{ catalogErr ? '读取礼物面板失败' : '从礼物列表里选' }}</span></button>
     </div>
     <div v-if="picking" class="rl-gpick">
-      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，按价格从低到高</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
+      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
       <div class="grid">
-        <button v-for="g in available" :key="g.id" type="button" @click="addSpecific(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ yuan(g.price) }}</span></button>
+        <template v-for="grp in groups" :key="grp.title">
+          <div class="sep">{{ grp.title }}</div>
+          <button v-for="g in grp.list" :key="g.id" type="button" @click="addSpecific(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ battery(g.price) }}</span><i>{{ yuan(g.price) }}</i></button>
+        </template>
         <span v-if="!available.length" class="hint">没有可选的礼物</span>
       </div>
     </div>
@@ -141,25 +161,25 @@ onMounted(async () => {
       <div class="valbar">
         <div v-for="x in valueBar" :key="x.key" :class="{ none: !x.color }" :style="x.color ? { background: x.color } : {}"><b>{{ x.name }}</b><span>{{ x.range }}</span></div>
       </div>
-      <div class="valticks"><span v-for="t in ticks" :key="t.key" :style="{ left: `${t.left}%` }">{{ t.text }}</span></div>
+      <div class="valticks two"><span v-for="t in ticks" :key="t.key" :style="{ left: `${t.left}%` }">{{ t.text }}<i>{{ t.note }}</i></span></div>
       <div class="lvadd">
-        <Icon name="i-plus" />在 <input v-model.number="addYuan" class="inp num" type="number" min="0.1" step="0.1" placeholder="50" aria-label="在多少元处分一段" @keydown.enter="addBand" /> 元处再分一段
+        <Icon name="i-plus" />在 <input v-model.number="addBattery" class="inp num" type="number" min="1" step="1" placeholder="500" aria-label="在多少电池处分一段" @keydown.enter="addBand" /> 电池<span v-if="Number(addBattery) >= 1" class="hint">（{{ yuan(Math.round(Number(addBattery)) * 100) }}）</span>处再分一段
         <button class="btn" @click="addBand">分段</button>
         <span class="hint" :style="{ color: bandMsg.err ? '#D64545' : '' }">{{ bandMsg.text }}</span>
       </div>
     </div>
     <div class="rl-list" style="margin-top: 8px">
       <div v-for="(b, i) in bands" :key="b.fromGold" class="rl" :class="{ off: !b.enabled }">
-        <span class="who"><span class="tag">{{ yuan(b.fromGold).replace(' 元', '') }} 元+</span></span>
+        <span class="who"><span class="tag">{{ battery(b.fromGold) }}+</span></span>
         <span class="say">
-          一次送出 <b>{{ bandLabel(i) }}</b> 时，播放 <EffectPicker v-model="b.effectId" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" />
+          一次送出 <b>{{ bandLabel(i) }}</b><span class="hint">（{{ bandYuan(i) }}）</span> 时，播放 <EffectPicker v-model="b.effectId" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" />
           <span v-if="jumps(b.fromGold)" class="hint">· 会插队优先播放</span>
           <span v-if="!b.enabled" class="offnote">已关闭：{{ bandLabel(i) }}的礼物不播放特效</span>
         </span>
         <span class="acts">
           <ConfirmButton v-if="bands.length > 1" label="" confirm-label="删除" cls="playmini" armed-cls="delb" :aria-label="`删除 ${bandLabel(i)}这一段`" @confirm="removeBand(b)"><Icon name="i-x" /></ConfirmButton>
           <button class="playmini" :aria-label="`预览 ${bandLabel(i)}的礼物`" @click="previewBand(i)"><svg><use href="#i-play" /></svg></button>
-          <Switch v-model="b.enabled" :label="`${bandLabel(i)}的礼物特效`" @change="(v) => save(v ? `已打开 ${bandLabel(i)}` : `已关闭 ${bandLabel(i)}，这段金额的礼物不播放特效`)" />
+          <Switch v-model="b.enabled" :label="`${bandLabel(i)}的礼物特效`" @change="(v) => save(v ? `已打开 ${bandLabel(i)}` : `已关闭 ${bandLabel(i)}，这段价值的礼物不播放特效`)" />
         </span>
       </div>
     </div>

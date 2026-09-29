@@ -10,11 +10,13 @@ import { AssetStore } from './services/assets.ts';
 import { AdminAuth } from './services/auth.ts';
 import { BackupService } from './services/backup.ts';
 import { BlacklistStore } from './services/blacklist.ts';
+import { BuildVersion } from './services/build-version.ts';
 import { BiliAccount } from './services/bili-account.ts';
 import { ConfigIO } from './services/config-io.ts';
 import { EffectStore } from './services/effects.ts';
 import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-rules.ts';
 import { EventLog } from './services/events.ts';
+import type { getRoomGifts } from '@starfall/bili';
 import { GiftCatalog } from './services/gifts.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
@@ -51,6 +53,8 @@ export interface AppContext {
   blacklist: BlacklistStore;
   log: EventLog;
   hub: Hub;
+  overlayBuild: BuildVersion;
+  adminBuild: BuildVersion;
   pipeline: Pipeline;
   io: ConfigIO;
   backups: BackupService;
@@ -58,7 +62,7 @@ export interface AppContext {
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -78,11 +82,13 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const danmuRules = new DanmuRuleStore(db);
   const giftRules = new GiftRuleStore(db, settings);
   const guardRules = new GuardRuleStore(db);
-  const gifts = new GiftCatalog(room, () => account.anon);
+  const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
-  const hub = new Hub();
-  const pipeline = new Pipeline({ live, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const overlayBuild = new BuildVersion(config.overlayDist);
+  const adminBuild = new BuildVersion(config.adminDist);
+  const hub = new Hub({ build: () => overlayBuild.current() });
+  const pipeline = new Pipeline({ live, gifts, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
   const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
@@ -95,7 +101,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -117,12 +123,19 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   ctx.backups.cleanPartial();
   prune();
   const timer = setInterval(prune, PRUNE_MS);
+  ctx.gifts.start();
   ctx.pipeline.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));
+  // 重新构建了特效页：告诉在线的页面，旧页面会在空闲时自动刷新
+  const stopBuild = ctx.overlayBuild.watch((build) => ctx.hub.toOverlays({ type: 'version', build }));
+  // 重新构建了后台（不用重启服务）：打开着的旧后台页面顶部提示刷新
+  const stopAdminBuild = ctx.adminBuild.watch((build) => ctx.hub.toAdmins({ type: 'version', build }));
   await ctx.live.start();
   void ctx.roomInfo.start().catch((e: Error) => console.error('查询直播间信息失败', e.message));
   return () => {
     clearInterval(timer);
+    stopBuild();
+    stopAdminBuild();
     ctx.roomInfo.stop();
     ctx.backups.stop();
     ctx.pipeline.stop();

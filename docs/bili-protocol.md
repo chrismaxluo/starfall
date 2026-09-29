@@ -148,7 +148,7 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 | 10.14 | **连击累计价值**（金瓜子） |
 | 10.18 | 动作文案（"投喂"） |
 | 10.29 / 10.33 | 收礼人（主播）昵称和 UID / 用户信息 |
-| 10.35 | 礼物图标地址（静态、动态） |
+| 10.35 | **礼物图标**（2026-09-27 实测 22 条全都有）：.1 静态 png（= 礼物配置接口的 `img_basic`）、.2 webp 动图、.5 gif。播放礼物特效优先用 .1，没有时再查礼物面板 |
 | 15 | 送礼人用户信息（新结构），与 `INTERACT_WORD_V2` 的 22 相同：.1 UID，.2 昵称头像，.3 粉丝牌和新版颜色 |
 
 另有 `COMBO_SEND`（JSON）：连击汇总，字段 `gift_id`、`gift_name`、`combo_num`、`combo_total_coin`、`batch_combo_id`、`coin_type`、`sender_uinfo` 等。**合并连击时以 `SEND_GIFT_V2` 的批次号为准**，`COMBO_SEND` 作为补充。
@@ -157,8 +157,20 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 
 | 接口 | 内容 |
 |---|---|
-| `GET /xlive/web-room/v1/giftPanel/roomGiftList?platform=pc&room_id=<长号>` | **本直播间的礼物面板**（实测 96 个），每种礼物一个版本 |
-| `GET /xlive/web-room/v1/giftPanel/giftConfig?platform=pc&room_id=<长号>` | 全站礼物（实测 913 个），同名礼物有多个版本 |
+| `GET /xlive/web-room/v1/giftPanel/roomGiftList?platform=pc&room_id=<长号>` | **本直播间的礼物面板**（2026-09-27 实测合并后 101 个），每种礼物一个版本 |
+| `GET /xlive/web-room/v1/giftPanel/giftConfig?platform=pc` | 全站礼物（实测 905 ~ 913 个），同名礼物有多个版本。项目里只用来给面板里查不到的礼物找图，一天读一次 |
+| `GET /xlive/web-room/v1/giftPanel/tabRoomGiftList?tab_id=<页号>&room_id=…&ruid=…` | 面板某一页的礼物（网页切换分页时用）。内容和下面的 `tab_list` 一样，项目里不用 |
+
+`roomGiftList` 的 `data` 里（2026-09-27，本直播间，匿名访问）：
+
+| 字段 | 内容 |
+|---|---|
+| `gift_config.base_config.list` | 本直播间可送的礼物（96 个），带图 |
+| `gift_config.room_config` | 本直播间特有的礼物（6 个：发红包、舰长一号、提督一号、总督一号、人气票等），带图，和上面有重复 |
+| `gift_data.room_gift_list.gold_list` | 面板「礼物」页**实际显示的礼物和顺序**（61 个，只有 `gift_id`）。和网页上面板的顺序一致 |
+| `gift_data.tab_list` | 其余几页：`tab_id`、`tab_name`、`position`、`list`（只有 `gift_id`）。实测「粉丝团」（tab_id 9，11 个）、「航海」（tab_id 2，9 个） |
+
+两份 `config` 按 ID 合并去重后 101 个：面板三页一共 81 个，另外 20 个不在面板上显示（包裹、活动、特效版本等）。三页里的礼物在 `config` 里都能找到图。「包裹」「权益中心」两页是个人的，要登录，项目里不用。
 
 字段：`id`、`name`、`price`（金瓜子）、`coin_type`（gold / silver）、`img_basic`、`gif`、`webp` 等。
 
@@ -180,6 +192,29 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 - **月数**：`num`，`unit` 为"月"；为"年"时按 12 个月计算。
 - **去重**：两条 toast 按 `payflow_id` 去重；`GUARD_BUY` 先等 3 秒，同一人同等级的 toast 到了就丢弃（见 `packages/core/src/combo.ts`）。
 - 样本已脱敏为 `fixtures/bili/user_toast_msg_v2.cap-open.json` 等。
+
+### 5.6.2 大航海图标（船锚）✅
+
+B 站的大航海图标是一个船锚，蓝色舰长、紫色提督、红金色总督。版权归哔哩哔哩所有：只在运行时引用 B 站的地址，不放进项目。
+
+| 等级 | 60 × 60（消息里的 `medal.guard_icon`） | 30 × 30（直播间网页脚本里的 `guardResource`） |
+|---|---|---|
+| 总督 `guard_1` | ⏳ 还没收到过样本 | `https://i0.hdslb.com/bfs/live/0d2b29717af2e7b1bbdc21a4fba8619636f82517.png` |
+| 提督 `guard_2` | `https://i0.hdslb.com/bfs/live/62ac06fd72b05fe22be26426b9e1a8e1fc2c6b89.png` | `https://i0.hdslb.com/bfs/live/405bffdfd78bb562e0394dd828f8bf69ea01f400.png` |
+| 舰长 `guard_3` | `https://i0.hdslb.com/bfs/live/48360c8f3b7de8031e86ff1ef4a2dfc0ec2a61c2.png` | `https://i0.hdslb.com/bfs/live/00749d246e2b49b2328cb981de02142fb6aeceba.png` |
+
+**200 × 200 官方高清版（三个等级都有，后台界面在用）**：直播间「大航海」页的静态资源。文件名里带构建哈希，B 站改版后可能换地址，用的地方要准备加载失败时的替代图标。
+
+| 等级 | 200 × 200 |
+|---|---|
+| 总督 | `https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/governor-DpDXKEdA.png` |
+| 提督 | `https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/supervisor-u43ElIjU.png` |
+| 舰长 | `https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/captain-Bjw5Byb5.png`（200 × 203） |
+
+- 60 × 60 的来源：弹幕 `DANMU_MSG` 的 `info[0][15].user.medal.guard_icon`、进场 `ENTRY_EFFECT` 的 `data.uinfo.medal.guard_icon`，和同一对象里的 `guard_level` 对应（2026-09-26 统计：舰长 417 次、提督 250 次，没有总督）。
+- 30 × 30 的来源：直播间网页脚本 `bilibili.*.js` 里 `guardResource`：`{ guard_1, guard_2, guard_3 }`。
+- 60 × 60 的总督版本仍没收到过样本（总督很少；两次共听 8 个热门直播间约 5 分钟没遇到）。有了上面的 200 × 200 版就不再需要。
+- 不登录时「最近弹幕」接口（`dM/gethistory`）已经返回空列表，不能用。
 
 ### 5.7 开播 / 下播
 

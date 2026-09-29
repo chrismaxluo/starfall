@@ -129,6 +129,7 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
         count: gift.num ?? 1,
         paid: gift.coinType === 'gold',
         ...(gift.batchComboId ? { comboKey: gift.batchComboId } : {}),
+        ...(gift.img?.basic ? { icon: gift.img.basic } : {}),
       };
     }
 

@@ -1,8 +1,8 @@
 // 数据库表结构（方案设计第 6 节）。时间一律存毫秒时间戳；金额存金瓜子（整数）。
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { EffectTexts, Position, Tier } from '@starfall/shared';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import type { EffectTexts, FeatherMode, Position, Tier } from '@starfall/shared';
 
 const now = sql`(unixepoch() * 1000)`;
 const bool = (name: string) => integer(name, { mode: 'boolean' });
@@ -64,6 +64,21 @@ export const effects = sqliteTable('effects', {
   volume: integer('volume').notNull().default(70),
   position: text('position').$type<Position>().notNull().default('center'),
   durationMs: integer('duration_ms').notNull().default(5000),
+  /** 有时长的素材手动设置时长（关着时跟随素材） */
+  durationCustom: bool('duration_custom').notNull().default(false),
+  /** 上传的素材开头淡入、结尾淡出（升级前的素材保持开启，新上传的默认关闭） */
+  fadeIn: bool('fade_in').notNull().default(true),
+  fadeOut: bool('fade_out').notNull().default(true),
+  fadeInMs: integer('fade_in_ms').notNull().default(500),
+  fadeOutMs: integer('fade_out_ms').notNull().default(500),
+  /** 在位置的基础上挪动：画面宽、高的百分比 */
+  offsetX: real('offset_x').notNull().default(0),
+  offsetY: real('offset_y').notNull().default(0),
+  /** 大小：程序自动算出的大小的百分比 */
+  sizePct: integer('size_pct').notNull().default(100),
+  /** 上下羽化：跟随全局 / 自己设置 / 不羽化 */
+  feather: text('feather').$type<FeatherMode>().notNull().default('global'),
+  featherPct: integer('feather_pct').notNull().default(10),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

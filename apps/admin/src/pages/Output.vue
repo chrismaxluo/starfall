@@ -135,7 +135,7 @@ const stageStyle = computed(() => {
 });
 function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
   if (!env) return [];
-  return [['透明视频', Boolean(env.webmVp9)], ['毛玻璃', Boolean(env.blur)], ['动态描边', Boolean(env.dynamicBorder)], ['声音', Boolean(env.audio)]];
+  return [['透明视频', Boolean(env.webmVp9)], ['毛玻璃', Boolean(env.blur)], ['玻璃描边', Boolean(env.dynamicBorder)], ['声音', Boolean(env.audio)]];
 }
 </script>
 

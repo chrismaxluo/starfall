@@ -20,6 +20,7 @@ import { h } from './dom.ts';
 import { detect } from './env.ts';
 import { Player } from './player.ts';
 import { DEFAULT_CONFIG, applyConfig, fit, metrics, setViewInset, showSafeAreas } from './stage.ts';
+import { autoUpdate, pageBuild } from './update.ts';
 import { VIEW_BAR, startView } from './view.ts';
 import { warmUp } from './warm.ts';
 
@@ -56,6 +57,9 @@ addEventListener('resize', () => fit(stage, config));
 if (showSafe) showSafeAreas(stage);
 
 let conn: Conn | null = null;
+/** 这个页面的版本；服务端的版本不一样时，空闲时自动刷新 */
+const build = pageBuild();
+const onBuild = autoUpdate(build, () => player.playing !== null);
 const player = new Player(stage, () => metrics(config), (m) => {
   conn?.send(m);
   view?.onPlayer(m);
@@ -95,11 +99,12 @@ function preload(urls: string[]): Promise<void> {
 function onMessage(m: ServerToOverlay): void {
   switch (m.type) {
     case 'hello':
+      onBuild(m.build);
       config = m.config;
       apply();
       stage.querySelector('.notice')?.remove();
       view?.setConfig(config);
-      conn?.send({ type: 'report', env: { ...detect(), lite: lite(), canvas: `${config.width}×${config.height}`, ...(view ? { view: true } : {}) } });
+      conn?.send({ type: 'report', env: { ...detect(), lite: lite(), canvas: `${config.width}×${config.height}`, build, ...(view ? { view: true } : {}) } });
       void preload(m.preload);
       warmUp(stage, () => metrics(config), () => player.playing !== null);
       break;
@@ -119,13 +124,24 @@ function onMessage(m: ServerToOverlay): void {
     case 'stop':
       player.stop();
       break;
+    case 'version':
+      onBuild(m.build);
+      break;
   }
 }
 
+/** 只有预览模式用的消息 */
+type PreviewOnly = { type: 'nudge'; x: number; y: number; size: number } | { type: 'hold' } | { type: 'feather'; pct: number };
+
 // 预览模式（管理后台里的 iframe）：只接收同源页面发来的消息，只在本地播放，不连服务端
 if (preview) {
-  addEventListener('message', (e: MessageEvent<ServerToOverlay | { type: 'config'; config: OverlayConfig }>) => {
+  addEventListener('message', (e: MessageEvent<ServerToOverlay | { type: 'config'; config: OverlayConfig } | PreviewOnly>) => {
     if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
+    const d = e.data as PreviewOnly;
+    // 后台拖动素材、调位置滑块：直接挪正在播放的素材
+    if (d.type === 'nudge') return void player.nudge(Number(d.x) || 0, Number(d.y) || 0, Number(d.size) || 100);
+    if (d.type === 'hold') return player.hold();
+    if (d.type === 'feather') return player.feather(Number(d.pct) || 0);
     onMessage(e.data as ServerToOverlay);
   });
   parent.postMessage({ type: 'starfall-preview-ready' }, location.origin);

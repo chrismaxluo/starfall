@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
+import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getAllGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
 import { WbiSigner } from './wbi.ts';
 import { BiliApiError, BiliHttp } from './http.ts';
 
@@ -82,15 +82,39 @@ describe('接口字段转换', () => {
     expect(await getAnchorInfo(new BiliHttp(), 20000)).toEqual({ uid: 20000, name: '主播', face: 'f.jpg', followers: 123 });
   });
 
-  it('礼物面板：金瓜子单价、付费 / 免费', async () => {
-    mockFetch([{ body: { code: 0, data: { gift_config: { base_config: { list: [
-      { id: 31164, name: '粉丝团灯牌', price: 1000, coin_type: 'gold', img_basic: 'i1', gif: 'g1' },
-      { id: 1, name: '辣条', price: 100, coin_type: 'silver', img_basic: 'i2' },
-    ] } } } } }]);
+  it('礼物面板：金瓜子单价、付费 / 免费；合并本直播间特有的礼物，记下在面板哪一页、第几个', async () => {
+    mockFetch([{ body: { code: 0, data: {
+      gift_config: {
+        base_config: { list: [
+          { id: 31164, name: '粉丝团灯牌', price: 1000, coin_type: 'gold', img_basic: 'i1', gif: 'g1' },
+          { id: 1, name: '辣条', price: 100, coin_type: 'silver', img_basic: 'i2' },
+        ] },
+        room_config: [
+          { id: 13000, name: '发红包', price: 0, coin_type: 'gold', img_basic: 'i3' },
+          { id: 31164, name: '粉丝团灯牌', price: 1000, coin_type: 'gold', img_basic: 'dup' },
+          { id: 34637, name: '舰长一号', price: 198000, coin_type: 'gold', img_basic: 'i5' },
+        ],
+      },
+      gift_data: {
+        room_gift_list: { gold_list: [{ gift_id: 13000 }, { gift_id: 99999 }, { gift_id: 31164 }] },
+        tab_list: [
+          { tab_name: '航海', position: 5, list: [{ gift_id: 34637 }] },
+          { tab_name: '粉丝团', position: 4, list: [{ gift_id: 1 }, { gift_id: 31164 }, { gift_id: 34637 }] },
+        ],
+      },
+    } } }]);
     expect(await getRoomGifts(new BiliHttp(), 30000)).toEqual([
-      { id: 31164, name: '粉丝团灯牌', price: 1000, paid: true, icon: 'i1', gif: 'g1' },
-      { id: 1, name: '辣条', price: 100, paid: false, icon: 'i2' },
+      { id: 31164, name: '粉丝团灯牌', price: 1000, paid: true, icon: 'i1', gif: 'g1', tab: '礼物', panel: 3 },
+      { id: 1, name: '辣条', price: 100, paid: false, icon: 'i2', tab: '粉丝团', panel: 1 },
+      { id: 13000, name: '发红包', price: 0, paid: true, icon: 'i3', tab: '礼物', panel: 1 },
+      { id: 34637, name: '舰长一号', price: 198000, paid: true, icon: 'i5', tab: '粉丝团', panel: 3 },
     ]);
+  });
+
+  it('全站礼物列表', async () => {
+    const calls = mockFetch([{ body: { code: 0, data: { list: [{ id: 33647, name: '奇迹城堡', price: 1314000, coin_type: 'gold', img_basic: 'i4' }] } } }]);
+    expect(await getAllGifts(new BiliHttp())).toEqual([{ id: 33647, name: '奇迹城堡', price: 1314000, paid: true, icon: 'i4' }]);
+    expect(calls[0]).toContain('/giftPanel/giftConfig?platform=pc');
   });
 
   it('用户信息', async () => {

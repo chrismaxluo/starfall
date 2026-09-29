@@ -853,6 +853,9 @@ img.ev.gimg { object-fit: contain; border-radius: 0; background: none; transform
 .fc-set { display: flex; flex-direction: column; gap: 10px; }
 .fc-set .hint { font-size: 12px; color: var(--t3); line-height: 1.6; }
 [data-orient="portrait"] .fc .pstage { height: auto; width: 100%; }
+.fc-idle { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 0; background: transparent; color: rgba(255,255,255,.7); font: inherit; font-size: 12px; cursor: pointer; }
+.fc-idle svg { width: 26px; height: 26px; color: #fff; }
+.fc-idle span { font-size: 11px; color: rgba(255,255,255,.45); }
 .fc-empty { font-size: 12.5px; color: var(--t3); padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--r-md); text-align: center; }
 .set-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .acct { display: flex; align-items: center; gap: 12px; }

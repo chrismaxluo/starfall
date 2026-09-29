@@ -2,7 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { EffectTexts, Position, Tier } from '@starfall/shared';
+import type { EffectTexts, FeatherMode, Position, Tier } from '@starfall/shared';
 
 const now = sql`(unixepoch() * 1000)`;
 const bool = (name: string) => integer(name, { mode: 'boolean' });
@@ -76,6 +76,9 @@ export const effects = sqliteTable('effects', {
   offsetY: real('offset_y').notNull().default(0),
   /** 大小：程序自动算出的大小的百分比 */
   sizePct: integer('size_pct').notNull().default(100),
+  /** 上下羽化：跟随全局 / 自己设置 / 不羽化 */
+  feather: text('feather').$type<FeatherMode>().notNull().default('global'),
+  featherPct: integer('feather_pct').notNull().default(10),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

@@ -1,4 +1,5 @@
 // 素材与规则的数据格式。用 Zod 定义，既做接口校验，也生成 TypeScript 类型，前后端共用。
+import { FEATHER_MAX } from './overlay.ts';
 import { z } from 'zod';
 
 export * from './labels.ts';
@@ -26,6 +27,10 @@ export const OFFSET_MAX = 100;
 /** 上传的素材显示大小：程序自动算出的大小的百分比 */
 export const SIZE_MIN = 20;
 export const SIZE_MAX = 200;
+/** 上下羽化：跟随全局设置 / 这个素材自己设置 / 不羽化；宽度是素材高度的百分比 */
+export const FEATHER_MODES = ['global', 'custom', 'off'] as const;
+export type FeatherMode = (typeof FEATHER_MODES)[number];
+export const FEATHER_DEFAULT = 10;
 
 export const EffectSchema = z.object({
   id: z.number().int().positive(),
@@ -55,6 +60,10 @@ export const EffectSchema = z.object({
   offsetY: z.number().min(-OFFSET_MAX).max(OFFSET_MAX),
   /** 上传的素材：大小（自动大小的百分比，100 = 不变） */
   sizePct: z.number().int().min(SIZE_MIN).max(SIZE_MAX),
+  /** 上传的素材：上下边缘羽化（跟随全局时只对没有透明通道的素材生效） */
+  feather: z.enum(FEATHER_MODES),
+  /** 自己设置时的羽化宽度（素材高度的百分比） */
+  featherPct: z.number().int().min(0).max(FEATHER_MAX),
 });
 export type Effect = z.infer<typeof EffectSchema>;
 

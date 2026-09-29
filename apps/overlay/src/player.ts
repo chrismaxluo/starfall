@@ -1,4 +1,5 @@
 // 播放一个特效。播放节奏由服务端控制：新的 play 到来时，上一个一定已经结束（stop 时立即清掉）。
+import { FEATHER_MAX } from '@starfall/shared/overlay';
 import type { OverlayToServer, PlayItem } from '@starfall/shared';
 import { buildBuiltin, isFullStage } from './builtin.ts';
 import { h } from './dom.ts';
@@ -69,6 +70,7 @@ export class Player {
       wrap.dataset.w = String(size.w);
       wrap.dataset.h = String(size.h);
       resize(wrap, e.sizePct);
+      feather(wrap, e.featherPct);
       // 渐入渐出最多各占一半时长
       if (e.fadeIn) wrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: Math.min(e.fadeInMs, e.durationMs / 2), easing: 'ease-out', fill: 'backwards' });
       const fx = h('div', { class: 'fx fx-asset' }, wrap);
@@ -132,6 +134,12 @@ export class Player {
     return true;
   }
 
+  /** 预览里调羽化时：直接改正在播放的素材 */
+  feather(pct: number): void {
+    const wrap = this.current?.asset ? this.current.slot.querySelector<HTMLElement>('.media') : null;
+    if (wrap) feather(wrap, pct);
+  }
+
   /** 预览里拖动时：素材一直显示（视频循环、取消渐出），松手后由后台重新播放 */
   hold(): void {
     const c = this.current;
@@ -170,4 +178,14 @@ function resize(wrap: HTMLElement, sizePct: number): void {
   wrap.dataset.k = String(k);
   wrap.style.width = `${Math.round(Number(wrap.dataset.w) * k)}px`;
   wrap.style.height = `${Math.round(Number(wrap.dataset.h) * k)}px`;
+}
+
+/** 上传的素材：上下边缘羽化（素材高度的百分比），按平滑曲线从透明过渡到不透明 */
+function feather(wrap: HTMLElement, pct: number): void {
+  const p = Math.max(0, Math.min(FEATHER_MAX, pct || 0));
+  const ramp = (from: number, dir: 1 | -1) =>
+    [0, 0.16, 0.5, 0.84, 1].map((a, i) => `rgba(0,0,0,${a}) ${from + dir * (p * i) / 4}%`);
+  const m = p ? `linear-gradient(to bottom, ${[...ramp(0, 1), ...ramp(100, -1).reverse()].join(', ')})` : '';
+  wrap.style.setProperty('-webkit-mask-image', m);
+  wrap.style.setProperty('mask-image', m);
 }

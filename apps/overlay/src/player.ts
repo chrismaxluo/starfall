@@ -17,6 +17,10 @@ const VIDEO_GRACE_MS = 3000;
 interface Current {
   id: string;
   slot: HTMLElement;
+  /** 上传的素材（可以挪位置） */
+  asset: boolean;
+  /** 预览里正在拖动：先不结束 */
+  held?: boolean;
   media: Media | null;
   audio: HTMLAudioElement | null;
   timer?: ReturnType<typeof setTimeout>;
@@ -54,6 +58,7 @@ export class Player {
       slot.append(full ? fx : h('div', { class: 'z' }, fx));
     } else {
       slot.classList.add(`pos-${e.position}`);
+      place(slot, e.offsetX, e.offsetY, m);
       const center = e.position === 'center';
       // 居中：铺满画面（全屏动画本来就按整屏设计）；角落：不超过画面宽度、高度的 45%
       const box = center ? { w: m.width, h: m.height } : { w: m.width - 2 * m.marginX - 48, h: m.height * 0.45 };
@@ -79,7 +84,7 @@ export class Player {
     media?.start().catch((err: Error) => this.current?.id === item.id && err.name !== 'AbortError' && this.send({ type: 'error', id: item.id, message: `素材播放失败：${err.message}` }));
 
     const finish = () => {
-      if (this.current?.id !== item.id) return;
+      if (this.current?.id !== item.id || this.current.held) return;
       this.stop();
       this.send({ type: 'ended', id: item.id });
     };
@@ -98,7 +103,7 @@ export class Player {
       c.timer = setTimeout(finish, ms + grace);
       if (w) c.fadeTimer = setTimeout(() => w.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(fadeOutMs, ms), easing: 'ease-in', fill: 'forwards' }), Math.max(0, ms - fadeOutMs));
     };
-    this.current = { id: item.id, slot, media, audio };
+    this.current = { id: item.id, slot, media, audio, asset: e.visual.type === 'asset' };
     schedule(e.durationMs, vid ? VIDEO_GRACE_MS : 0);
     vid?.addEventListener(
       'playing',
@@ -111,6 +116,25 @@ export class Player {
       { once: true },
     );
     this.send({ type: 'started', id: item.id });
+  }
+
+  /** 预览里拖动、调滑块时：把正在播放的素材挪到新位置（不重新播放） */
+  nudge(x: number, y: number): boolean {
+    const c = this.current;
+    if (!c?.asset) return false;
+    place(c.slot, x, y, this.metrics());
+    return true;
+  }
+
+  /** 预览里拖动时：素材一直显示（视频循环、取消渐出），松手后由后台重新播放 */
+  hold(): void {
+    const c = this.current;
+    if (!c?.asset) return;
+    c.held = true;
+    clearTimeout(c.fadeTimer);
+    const media = c.slot.querySelector<HTMLElement>('.media');
+    media?.getAnimations().forEach((a) => a.cancel());
+    if (c.media?.el instanceof HTMLVideoElement) c.media.el.loop = true;
   }
 
   stop(): void {
@@ -127,4 +151,9 @@ export class Player {
     }
     c.slot.remove();
   }
+}
+
+/** 上传的素材：在位置的基础上挪动（画面宽、高的百分比，正数往右、往下） */
+function place(slot: HTMLElement, x: number, y: number, m: StageMetrics): void {
+  slot.style.translate = x || y ? `${(m.width * x) / 100}px ${(m.height * y) / 100}px` : '';
 }

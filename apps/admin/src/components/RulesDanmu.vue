@@ -1,26 +1,26 @@
 <script setup lang="ts">
 // 弹幕规则（F-DM-01 ~ 04）：关键词、匹配方式、发送人条件、素材、全局 / 每人冷却；从上到下匹配，可调整顺序
 import { computed, nextTick, ref } from 'vue';
-import { DANMU_WHO_NAMES } from '@starfall/shared/labels';
+import { DANMU_WHO_ALL } from '@starfall/shared';
 import { del, post, put } from '../lib/api.ts';
-import { SAMPLES } from '../lib/identity.ts';
+import { sampleFor } from '../lib/danmu-who.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
 import { effectById, refreshEffects, refreshRules, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
-import type { DanmuRule, DanmuWho } from '../lib/types.ts';
+import type { DanmuRule, DanmuRuleDto, DanmuWho } from '../lib/types.ts';
 import CdPick from './CdPick.vue';
 import ConfirmButton from './ConfirmButton.vue';
 import EffectPicker from './EffectPicker.vue';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
+import WhoPick from './WhoPick.vue';
 
 const emit = defineEmits<{ preview: [p: PreviewRequest] }>();
 const flash = ref<number | null>(null);
 const list = ref<HTMLElement | null>(null);
-const WHO = Object.entries(DANMU_WHO_NAMES) as Array<[DanmuWho, string]>;
 
-async function patch(r: DanmuRule, p: Partial<DanmuRule>, msg?: string): Promise<void> {
-  const res = await attempt(() => put<DanmuRule>(`/api/rules/danmu/${r.id}`, p), msg);
+async function patch(r: DanmuRuleDto, p: Partial<DanmuRule>, msg?: string): Promise<void> {
+  const res = await attempt(() => put<DanmuRuleDto>(`/api/rules/danmu/${r.id}`, p), msg);
   if (res) Object.assign(r, res);
   // 保存失败：开关、选择框已经在界面上改了，重新读回服务端的真实状态
   else void refreshRules().catch(() => undefined);
@@ -36,7 +36,7 @@ const TEMPLATES = [
 const unusedTemplates = computed(() => TEMPLATES.filter((t) => !state.danmu.some((r) => r.keywords.includes(t.keywords[0]!))));
 const defaultEffect = () => state.effects.find((e) => e.name === '晶语')?.id ?? state.effects[0]?.id ?? null;
 async function add(keywords: string[] = ['关键词']): Promise<void> {
-  const r = await attempt(() => post<DanmuRule>('/api/rules/danmu', { keywords, mode: 'contains', who: 'all', effectId: defaultEffect(), globalCdSec: 10, userCdMin: 10, enabled: true }));
+  const r = await attempt(() => post<DanmuRuleDto>('/api/rules/danmu', { keywords, mode: 'contains', who: DANMU_WHO_ALL, effectId: defaultEffect(), globalCdSec: 10, userCdMin: 10, enabled: true }));
   if (!r) return;
   state.danmu.push(r);
   flash.value = r.id;
@@ -47,7 +47,7 @@ async function add(keywords: string[] = ['关键词']): Promise<void> {
   const inputs = list.value?.querySelectorAll<HTMLInputElement>('.kwin');
   inputs?.[inputs.length - 1]?.focus();
 }
-async function remove(r: DanmuRule): Promise<void> {
+async function remove(r: DanmuRuleDto): Promise<void> {
   if (await attempt(() => del(`/api/rules/danmu/${r.id}`), '已删除弹幕规则')) {
     state.danmu = state.danmu.filter((x) => x.id !== r.id);
     void refreshEffects();
@@ -56,11 +56,11 @@ async function remove(r: DanmuRule): Promise<void> {
 async function move(i: number, d: -1 | 1): Promise<void> {
   const ids = state.danmu.map((r) => r.id);
   [ids[i], ids[i + d]] = [ids[i + d]!, ids[i]!];
-  const res = await attempt(() => put<{ rules: DanmuRule[] }>('/api/rules/danmu/order', { ids }));
+  const res = await attempt(() => put<{ rules: DanmuRuleDto[] }>('/api/rules/danmu/order', { ids }));
   if (res) state.danmu = res.rules;
 }
 /** 添加关键词；同一关键词在别的规则里也有时提示（F-DM-04） */
-async function addKeyword(r: DanmuRule, e: KeyboardEvent): Promise<void> {
+async function addKeyword(r: DanmuRuleDto, e: KeyboardEvent): Promise<void> {
   const el = e.target as HTMLInputElement;
   const v = el.value.trim();
   if (!v) return;
@@ -74,15 +74,18 @@ async function addKeyword(r: DanmuRule, e: KeyboardEvent): Promise<void> {
   await nextTick();
   (list.value?.querySelectorAll<HTMLInputElement>('.kwin')[state.danmu.indexOf(r)])?.focus();
 }
-function removeKeyword(r: DanmuRule, k: string): void {
+function removeKeyword(r: DanmuRuleDto, k: string): void {
   if (r.keywords.length === 1) return toast('至少保留一个关键词，不需要可以删除整条规则', 'info');
   void patch(r, { keywords: r.keywords.filter((x) => x !== k) });
 }
-function setCd(r: DanmuRule, key: 'globalCdSec' | 'userCdMin', v: number): void {
+function setCd(r: DanmuRuleDto, key: 'globalCdSec' | 'userCdMin', v: number): void {
   void patch(r, { [key]: v }, key === 'globalCdSec' ? (v ? `全场 ${v} 秒内不重复` : '全场不限次数') : v ? `同一个人 ${v} 分钟内不重复` : '同一个人不限次数');
 }
-function preview(r: DanmuRule): void {
-  emit('preview', { effectId: r.effectId, viewer: r.who === 'guard' ? SAMPLES.cap : r.who === 'mod' ? SAMPLES.mod : SAMPLES.fan, label: `弹幕「${r.keywords[0]}」`, kind: 'danmu', vars: { text: r.keywords[0] } });
+function preview(r: DanmuRuleDto): void {
+  emit('preview', { effectId: r.effectId, viewer: sampleFor(r.who), label: `弹幕「${r.keywords[0]}」`, kind: 'danmu', vars: { text: r.keywords[0] } });
+}
+function setWho(r: DanmuRuleDto, who: DanmuWho): void {
+  void patch(r, { who }, '已修改谁发的弹幕才算');
 }
 const clashes = computed(() => {
   const seen = new Map<string, number>();
@@ -117,9 +120,7 @@ const clashes = computed(() => {
           </span>
           时，播放 <EffectPicker v-model="r.effectId" @change="(id) => ((flash = r.id), patch(r, { effectId: id }, `改为播放「${effectById(id)?.name}」`))" />
           <span class="line2">
-            <select class="sel sm" :value="r.who" aria-label="谁发的弹幕才算" @change="(e) => patch(r, { who: (e.target as HTMLSelectElement).value as DanmuWho }, '已修改谁发的弹幕才算')">
-              <option v-for="[k, name] in WHO" :key="k" :value="k">{{ name }}</option>
-            </select>
+            <WhoPick :model-value="r.who" :people="r.people" :block-anchor="state.settings?.blockAnchor" @change="(w) => setWho(r, w)" />
             发的才算；全场 <CdPick :model-value="r.globalCdSec" unit="sec" hint="不管谁发，这段时间里只播一次" @change="(v) => setCd(r, 'globalCdSec', v)" /> 内、同一个人 <CdPick :model-value="r.userCdMin" hint="同一个人这段时间里再发，不重复播放" @change="(v) => setCd(r, 'userCdMin', v)" /> 内不重复
           </span>
           <span v-if="!r.enabled" class="offnote">已关闭：这条规则不起作用</span>

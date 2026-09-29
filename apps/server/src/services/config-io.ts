@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, TIERS } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -24,7 +24,8 @@ import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
 
 export const CONFIG_FORMAT = 'starfall-config';
-export const CONFIG_VERSION = 1;
+/** 2：弹幕规则的发送人条件改成多选（旧版本导入不了新文件，会提示先升级） */
+export const CONFIG_VERSION = 2;
 /** zip 里配置文件的名称；素材文件放在 files/ 下 */
 export const CONFIG_ENTRY = 'starfall-config.json';
 
@@ -120,7 +121,8 @@ const RulesPart = z.object({
       z.object({
         keywords: z.array(z.string().trim().min(1).max(30)).min(1).max(20),
         mode: z.enum(['contains', 'exact']),
-        who: z.enum(DANMU_WHO),
+        // 旧版本导出的是单选（字符串）
+        who: z.union([z.enum(DANMU_WHO_OLD).transform(danmuWhoFromOld), DanmuWhoSchema]),
         effect: effectRef,
         globalCdSec: z.number().int().min(0).max(3600),
         userCdMin: z.number().int().min(0).max(1440),

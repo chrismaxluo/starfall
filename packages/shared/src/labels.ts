@@ -24,8 +24,6 @@ export type PlayStatus = keyof typeof PLAY_STATUS;
 
 export const POSITION_NAMES = { bl: '左下', br: '右下', top: '顶部', center: '居中' } as const;
 
-export const DANMU_WHO_NAMES = { all: '所有人', fan: '戴本房间粉丝牌', fan10: '粉丝牌 ≥ 10 级', guard: '大航海', mod: '房管' } as const;
-
 /** 高价值插队的门槛：单次 ≥ 100 元（F-PL-03），单位：金瓜子 */
 export const JUMP_GOLD = 100_000;
 

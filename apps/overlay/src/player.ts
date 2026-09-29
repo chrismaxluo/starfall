@@ -9,8 +9,6 @@ import type { StageMetrics } from './stage.ts';
 
 /** 素材上的头像和欢迎语显示多久（素材更短时跟素材一起结束） */
 const CAPTION_MS = 4500;
-/** 素材开头淡入、结尾淡出的时长 */
-const FADE_MS = 300;
 /** 设置的时长和视频实际长度差这么多以内算播到结尾（素材时长是上传时测的，可能差一点） */
 const END_SLACK_MS = 250;
 /** 视频晚开始时最多多等这么久 */
@@ -62,7 +60,8 @@ export class Player {
       const size = fitSize(e.visual, box, center ? Infinity : m.fxz);
       media = buildMedia(e.visual, e.volume);
       wrap = h('div', { class: 'media', style: { width: `${size.w}px`, height: `${size.h}px` } }, media.el);
-      if (e.fadeIn) wrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_MS, easing: 'ease-out', fill: 'backwards' });
+      // 渐入渐出最多各占一半时长
+      if (e.fadeIn) wrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: Math.min(e.fadeInMs, e.durationMs / 2), easing: 'ease-out', fill: 'backwards' });
       const fx = h('div', { class: 'fx fx-asset' }, wrap);
       // 头像和欢迎语只显示几秒，不跟着素材一直挂着
       if (e.showText) fx.append(h('div', { class: 'card glass', style: { '--cd': `${Math.min(e.durationMs, CAPTION_MS)}ms` } }, avatar(item.viewer), textLine(item.text, item.viewer.name)));
@@ -89,14 +88,15 @@ export class Player {
     const vid = media?.el instanceof HTMLVideoElement ? media.el : null;
     vid?.addEventListener('ended', finish, { once: true });
     const w = e.fadeOut ? wrap : null;
-    /** 从现在起 ms 毫秒后结束（结尾渐出在最后 0.3 秒） */
+    const fadeOutMs = Math.min(e.fadeOutMs, e.durationMs / 2);
+    /** 从现在起 ms 毫秒后结束（结尾渐出在最后 fadeOutMs 毫秒） */
     const schedule = (ms: number, grace: number) => {
       const c = this.current;
       if (c?.id !== item.id) return;
       clearTimeout(c.timer);
       clearTimeout(c.fadeTimer);
       c.timer = setTimeout(finish, ms + grace);
-      if (w) c.fadeTimer = setTimeout(() => w.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: 'ease-in', fill: 'forwards' }), Math.max(0, ms - FADE_MS));
+      if (w) c.fadeTimer = setTimeout(() => w.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(fadeOutMs, ms), easing: 'ease-in', fill: 'forwards' }), Math.max(0, ms - fadeOutMs));
     };
     this.current = { id: item.id, slot, media, audio };
     schedule(e.durationMs, vid ? VIDEO_GRACE_MS : 0);

@@ -69,6 +69,8 @@ export const effects = sqliteTable('effects', {
   /** 上传的素材开头淡入、结尾淡出（升级前的素材保持开启，新上传的默认关闭） */
   fadeIn: bool('fade_in').notNull().default(true),
   fadeOut: bool('fade_out').notNull().default(true),
+  fadeInMs: integer('fade_in_ms').notNull().default(500),
+  fadeOutMs: integer('fade_out_ms').notNull().default(500),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

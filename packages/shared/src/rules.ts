@@ -17,6 +17,11 @@ export const EffectTextsSchema = z.object({
 });
 export type EffectTexts = z.infer<typeof EffectTextsSchema>;
 
+/** 渐入、渐出时长的范围和默认值（毫秒） */
+export const FADE_MIN_MS = 100;
+export const FADE_MAX_MS = 5000;
+export const FADE_DEFAULT_MS = 500;
+
 export const EffectSchema = z.object({
   id: z.number().int().positive(),
   name: z.string().min(1).max(40),
@@ -37,6 +42,9 @@ export const EffectSchema = z.object({
   /** 上传的素材：开头淡入 / 结尾淡出（内置样式有自己的动画，不用这两项） */
   fadeIn: z.boolean(),
   fadeOut: z.boolean(),
+  /** 渐入、渐出各用多久（毫秒） */
+  fadeInMs: z.number().int().min(FADE_MIN_MS).max(FADE_MAX_MS),
+  fadeOutMs: z.number().int().min(FADE_MIN_MS).max(FADE_MAX_MS),
 });
 export type Effect = z.infer<typeof EffectSchema>;
 

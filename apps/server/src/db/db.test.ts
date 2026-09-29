@@ -1,5 +1,11 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { openDb } from './index.ts';
 import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGuard, settings } from './schema.ts';
 import { BUILTIN_EFFECTS, RETIRED_EFFECTS, seed } from './seed.ts';
@@ -71,6 +77,30 @@ describe('数据库', () => {
     expect(byName('我的星冕')).toMatchObject({ builtin: false, style: 'glass-big', texts: { enter: ['我的'] } });
     // 替代素材都是现有的内置素材
     for (const r of RETIRED_EFFECTS) expect(BUILTIN_EFFECTS.some((e) => e.name === r.replacedBy)).toBe(true);
+  });
+
+  it('升级：已有素材的渐入渐出时长按以前的比例（总时长的 5% 和 8%）', () => {
+    // 先迁移到上一个版本，放两个旧素材，再用完整迁移打开
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sf-mig-'));
+    const src = path.resolve(import.meta.dirname, '../../drizzle');
+    fs.cpSync(src, path.join(dir, 'drizzle'), { recursive: true });
+    const journal = JSON.parse(fs.readFileSync(path.join(src, 'meta/_journal.json'), 'utf8'));
+    const last = journal.entries.pop();
+    fs.rmSync(path.join(dir, 'drizzle', `${last.tag}.sql`));
+    fs.writeFileSync(path.join(dir, 'drizzle/meta/_journal.json'), JSON.stringify(journal));
+    const file = path.join(dir, 'old.db');
+    const old = new Database(file);
+    migrate(drizzle(old), { migrationsFolder: path.join(dir, 'drizzle') });
+    old.exec(`insert into assets (id, sha256, kind, filename, ext, mime, size, duration_ms) values (1, 'a', 'video', 'v.mp4', 'mp4', 'video/mp4', 1, 30000), (2, 'b', 'image', 's.png', 'png', 'image/png', 1, null);
+      insert into effects (name, asset_id, texts, duration_ms) values ('视频', 1, '{"enter":["x"]}', 30000), ('图片', 2, '{"enter":["x"]}', 4000);`);
+    old.close();
+    const db = openDb(file);
+    const rows = db.select().from(effects).where(eq(effects.builtin, false)).all();
+    const by = (n: string) => rows.find((r) => r.name === n)!;
+    expect(by('视频')).toMatchObject({ fadeInMs: 1500, fadeOutMs: 2400 });
+    expect(by('图片')).toMatchObject({ fadeInMs: 200, fadeOutMs: 320 });
+    db.$client.close();
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it('被规则引用的素材不能删除（F-AS-14）', () => {

@@ -453,6 +453,10 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 .vars button:hover { border-color: var(--accent); color: var(--accent); }
 .toggle-line { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--t2); }
 .toggle-line .switch { margin-left: auto; }
+.toggle-line .ctl { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.toggle-line .ctl .switch { margin-left: 0; }
+.toggle-line .ctl .suffix { width: 96px; }
+.toggle-line .ctl .suffix span { top: 50%; transform: translateY(-50%); }
 .divider { height: 1px; background: var(--line); margin: 2px 0; }
 
 /* ============ 右键式菜单 ============ */

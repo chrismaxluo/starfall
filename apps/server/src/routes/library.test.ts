@@ -173,6 +173,12 @@ describe('修改素材', () => {
     const p = (await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { fadeOut: true } } })).json();
     expect(p.effect).toMatchObject({ fadeIn: true, fadeOut: true });
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeIn: 'yes' } })).statusCode).toBe(400);
+    // 渐入渐出的秒数：默认 0.5 秒，0.1 ~ 5 秒
+    expect(effect).toMatchObject({ fadeInMs: 500, fadeOutMs: 500 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeInMs: 1500, fadeOutMs: 2400 } })).json()).toMatchObject({ fadeInMs: 1500, fadeOutMs: 2400 });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { fadeOutMs: 800 } } })).json().effect).toMatchObject({ fadeInMs: 1500, fadeOutMs: 800 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeInMs: 50 } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeOutMs: 6000 } })).statusCode).toBe(400);
   });
 
   it('音效：上传、选用、被使用时不能删除', async () => {

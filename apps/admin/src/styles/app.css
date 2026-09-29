@@ -129,8 +129,10 @@ svg.i { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: n
 }
 .avatar {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
-  font-size: 12px; font-weight: 600; color: #fff;
+  font-size: 12px; font-weight: 600; color: #fff; position: relative;
 }
+/* 大航海头像框：头像的 1.4 倍，居中套在外面（GUARD_FRAME_SCALE） */
+.avatar .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; max-width: none; pointer-events: none; }
 .acct-meta { display: flex; flex-direction: column; min-width: 0; }
 .acct-meta b { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .acct-meta span { font-size: 11.5px; color: var(--t3); }

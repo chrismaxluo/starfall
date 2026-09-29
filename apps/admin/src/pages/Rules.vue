@@ -319,7 +319,7 @@ onMounted(() => void refreshRules());
           <div v-if="showRecent" class="picker">
             <label v-for="v in recentViewers" :key="v.uid" :style="state.exclusives.some((x) => x.uid === v.uid) ? 'opacity:.5' : ''">
               <input type="radio" name="expk" :disabled="state.exclusives.some((x) => x.uid === v.uid)" @change="((draft!.uid = String(v.uid)), (showRecent = false), lookup())" />
-              <Avatar :name="v.name" :face="v.face" />{{ v.name }}<IdTag :viewer="v" /><span class="uid num">{{ state.exclusives.some((x) => x.uid === v.uid) ? '已是专属' : v.uid }}</span>
+              <Avatar :name="v.name" :face="v.face" :guard="v.guard" />{{ v.name }}<IdTag :viewer="v" /><span class="uid num">{{ state.exclusives.some((x) => x.uid === v.uid) ? '已是专属' : v.uid }}</span>
             </label>
             <div v-if="!recentViewers.length" style="padding: 10px; color: var(--t3); font-size: 12.5px">还没有进场记录，开播后这里会列出最近进场的观众</div>
           </div>

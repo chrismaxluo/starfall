@@ -317,7 +317,7 @@ describe('播放队列', () => {
     t.live.emit(enter({ uid: 2, guard: 2 }));
     t.live.emit(gf({ unitPrice: 20_000, count: 2 }, { uid: 3 }));
     const snap = t.p.snapshot();
-    expect(snap.playing).toMatchObject({ viewerFace: 'https://i0.hdslb.com/a.jpg', detail: '舰长进场', durationMs: 4000 });
+    expect(snap.playing).toMatchObject({ viewerFace: 'https://i0.hdslb.com/a.jpg', viewerGuard: 3, detail: '舰长进场', durationMs: 4000 });
     expect(snap.items.map((i) => i.detail)).toEqual(['小花花 ×2', '提督进场']);
     expect(snap.items[1]).toMatchObject({ viewerFace: null, effectName: '亭阁', durationMs: 6000 });
     // 移出排队的：这次不播，事件记录为已清空

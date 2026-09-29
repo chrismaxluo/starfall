@@ -131,7 +131,7 @@ function setExclusive(e: EventDto): void {
             <td>{{ dateTime(e.ts) }}</td>
             <td>
               <span class="who" style="cursor: pointer" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
-                <Avatar :name="e.uname" :face="e.viewer.face" />
+                <Avatar :name="e.uname" :face="e.viewer.face" :guard="e.viewer.guard" />
                 <span><div>{{ e.uname }}<span v-if="isExcl(e.uid)" class="excl">专属</span></div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">{{ e.uid }}</div></span>
                 <IdTag :viewer="e.viewer" />
               </span>

@@ -1,5 +1,6 @@
 // 各个特效共用的部件：头像、粉丝牌、身份标签、欢迎语
 import type { PlayItem } from '@starfall/shared';
+import { GUARD_FRAMES } from '@starfall/shared/overlay';
 import { h } from './dom.ts';
 
 type PlayViewer = PlayItem['viewer'];
@@ -25,6 +26,18 @@ export function avatar(v: PlayViewer, size?: number): HTMLElement {
     img.src = thumb(v.face, size ?? 96);
   }
   return el;
+}
+
+/** 大航海观众的头像套上 B 站的头像框（框在头像外面一圈，加载失败就只显示头像） */
+export function withGuardFrame(av: HTMLElement, guard: number): HTMLElement {
+  const url = GUARD_FRAMES[guard as 1 | 2 | 3];
+  if (!url) return av;
+  const img = h('img', { class: 'av-frame' });
+  img.alt = '';
+  img.referrerPolicy = 'no-referrer';
+  img.onerror = () => img.remove();
+  img.src = url;
+  return h('span', { class: 'av-framed' }, av, img);
 }
 
 /** B 站头像用缩略图（原图可能有上千像素，下载和解码都浪费）；按 2 倍像素取，其他地址原样返回 */

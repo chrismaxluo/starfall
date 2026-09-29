@@ -2,6 +2,18 @@
 import type { GuardLevel, TriggerKind } from './events.ts';
 import type { Position } from './rules.ts';
 
+/**
+ * B 站的大航海头像框（200×200 透明 PNG，1 总督、2 提督、3 舰长）。版权归 B 站：只在运行时从 B 站加载，不打包；
+ * 地址来自醒目留言的 user_info.face_frame（B 站换设计后地址会变，加载失败时只显示头像）
+ */
+export const GUARD_FRAMES: Record<1 | 2 | 3, string> = {
+  1: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png',
+  2: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png',
+  3: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png',
+};
+/** 头像框画成头像的多少倍（框中间的圆洞直径约为图片的 72%） */
+export const GUARD_FRAME_SCALE = 1.4;
+
 /** 上下羽化宽度上限（素材高度的百分比）；特效页也要用，所以放在这里 */
 export const FEATHER_MAX = 40;
 
@@ -47,6 +59,8 @@ export interface PlayItem {
     sizePct: number;
     /** 上下羽化宽度（素材高度的百分比，0 为不羽化）：已经按全局设置算好 */
     featherPct: number;
+    /** 大航海观众的头像套上 B 站头像框 */
+    guardFrame: boolean;
     sound: { url: string } | null;
     volume: number;
   };

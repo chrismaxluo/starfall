@@ -55,7 +55,7 @@ async function block(): Promise<void> {
   <Teleport to="body">
     <div ref="el" class="menu" role="menu" :style="{ left: `${pos.left}px`, top: `${pos.top}px` }">
       <div class="mh">
-        <Avatar :name="viewer.name" :face="viewer.face" />
+        <Avatar :name="viewer.name" :face="viewer.face" :guard="viewer.guard" />
         <div><b>{{ viewer.name }}</b><span class="num">UID {{ viewer.uid }}</span></div>
         <span style="margin-left: auto"><IdTag :viewer="viewer" /></span>
       </div>

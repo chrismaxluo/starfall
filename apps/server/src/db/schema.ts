@@ -79,6 +79,8 @@ export const effects = sqliteTable('effects', {
   /** 上下羽化：跟随全局 / 自己设置 / 不羽化 */
   feather: text('feather').$type<FeatherMode>().notNull().default('global'),
   featherPct: integer('feather_pct').notNull().default(10),
+  /** 头像和欢迎语里，大航海观众的头像套上 B 站头像框 */
+  guardFrame: bool('guard_frame').notNull().default(false),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

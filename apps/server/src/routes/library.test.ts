@@ -179,6 +179,11 @@ describe('修改素材', () => {
     expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { fadeOutMs: 800 } } })).json().effect).toMatchObject({ fadeInMs: 1500, fadeOutMs: 800 });
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeInMs: 50 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { fadeOutMs: 6000 } })).statusCode).toBe(400);
+    // 位置微调：默认不挪，画面宽、高的 ±100%
+    expect(effect).toMatchObject({ offsetX: 0, offsetY: 0 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { offsetX: -12.5, offsetY: 30 } })).json()).toMatchObject({ offsetX: -12.5, offsetY: 30 });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { offsetY: -8 } } })).json().effect).toMatchObject({ offsetX: -12.5, offsetY: -8 });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { offsetX: 101 } })).statusCode).toBe(400);
   });
 
   it('音效：上传、选用、被使用时不能删除', async () => {

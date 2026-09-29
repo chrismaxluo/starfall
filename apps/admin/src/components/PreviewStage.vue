@@ -54,7 +54,41 @@ function stop(): void {
   send({ type: 'stop' });
 }
 
-defineExpose({ play, stop });
+/**
+ * 画面和正在播放的上传素材在页面上的位置（没在播放时 media 为 null）。
+ * base 是素材不挪动时的位置（去掉当前的挪动），用来比较挪动前后。
+ */
+function geom(): { stage: DOMRect; media: DOMRect | null; base: DOMRect | null } | null {
+  const f = frame.value;
+  const doc = f?.contentDocument;
+  const st = doc?.getElementById('stage');
+  if (!f || !doc || !st) return null;
+  const fr = f.getBoundingClientRect();
+  const k = f.clientWidth ? fr.width / f.clientWidth : 1;
+  const map = (r: DOMRect) => new DOMRect(fr.left + r.left * k, fr.top + r.top * k, r.width * k, r.height * k);
+  const stage = map(st.getBoundingClientRect());
+  const m = doc.querySelector<HTMLElement>('.slot:not(.warm) .fx-asset > .media');
+  if (!m) return { stage, media: null, base: null };
+  const media = map(m.getBoundingClientRect());
+  // 挪动写在 .slot 的 translate 上，单位是画布像素
+  const [tx = 0, ty = 0] = (m.closest<HTMLElement>('.slot')?.style.translate ?? '').split(' ').map((x) => parseFloat(x) || 0);
+  const s = st.offsetWidth ? stage.width / st.offsetWidth : 1;
+  return { stage, media, base: new DOMRect(media.x - tx * s, media.y - ty * s, media.width, media.height) };
+}
+
+/** 把正在播放的上传素材挪到新位置（不重新播放）；没在播放时返回 false */
+function nudge(x: number, y: number): boolean {
+  if (!ready || !geom()?.media) return false;
+  send({ type: 'nudge', x, y });
+  return true;
+}
+
+/** 拖动时让素材一直显示 */
+function hold(): void {
+  send({ type: 'hold' });
+}
+
+defineExpose({ play, stop, geom, nudge, hold });
 </script>
 
 <template>

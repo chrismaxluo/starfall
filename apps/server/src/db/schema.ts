@@ -1,7 +1,7 @@
 // 数据库表结构（方案设计第 6 节）。时间一律存毫秒时间戳；金额存金瓜子（整数）。
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { EffectTexts, Position, Tier } from '@starfall/shared';
 
 const now = sql`(unixepoch() * 1000)`;
@@ -71,6 +71,9 @@ export const effects = sqliteTable('effects', {
   fadeOut: bool('fade_out').notNull().default(true),
   fadeInMs: integer('fade_in_ms').notNull().default(500),
   fadeOutMs: integer('fade_out_ms').notNull().default(500),
+  /** 在位置的基础上挪动：画面宽、高的百分比 */
+  offsetX: real('offset_x').notNull().default(0),
+  offsetY: real('offset_y').notNull().default(0),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

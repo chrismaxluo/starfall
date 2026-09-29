@@ -2,7 +2,7 @@
 // 素材设置（F-AS-06 ~ 12）：左边预览，右边 ① 画面 ② 头像和欢迎语 ③ 音效 ④ 位置与时长
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
-import { FADE_MAX_MS, FADE_MIN_MS } from '@starfall/shared';
+import { FADE_MAX_MS, FADE_MIN_MS, OFFSET_MAX } from '@starfall/shared';
 import type { EffectTexts, Position } from '@starfall/shared';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
@@ -57,6 +57,8 @@ function snapshot(e: EffectDto) {
     fadeOut: e.fadeOut,
     fadeInS: e.fadeInMs / 1000,
     fadeOutS: e.fadeOutMs / 1000,
+    offsetX: e.offsetX,
+    offsetY: e.offsetY,
   };
 }
 const d = ref(eff.value ? snapshot(eff.value) : null);
@@ -72,12 +74,15 @@ function lines(s: string): string[] {
 }
 /** 渐入渐出秒数 → 毫秒（0.1 ~ 5 秒） */
 const fadeMs = (sec: number) => Math.round(Math.min(FADE_MAX_MS, Math.max(FADE_MIN_MS, (sec || 0) * 1000)));
+/** 位置微调：画面宽、高的百分比，保留一位小数 */
+const clampOff = (n: number) => Math.round(Math.min(OFFSET_MAX, Math.max(-OFFSET_MAX, n || 0)) * 10) / 10;
+const offText = (n: number, neg: string, pos: string) => (Math.abs(n) < 0.05 ? '不挪' : `${n < 0 ? neg : pos} ${Math.abs(n)}%`);
 /** 要提交给服务端的修改 */
 function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY) } : {}) };
   // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
   if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
   const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
@@ -93,7 +98,7 @@ const sample = computed(() => {
 const KIND_OF_TAB: Record<TextKey, 'enter' | 'gift' | 'guard' | 'danmu'> = { enter: 'enter', gift: 'gift', guard: 'guard', danmu: 'danmu' };
 function replay(): void {
   if (!eff.value || !d.value) return;
-  void stage.value?.play(eff.value.id, sample.value, patch(), KIND_OF_TAB[txTab.value]);
+  void stage.value?.play(eff.value.id, sample.value, patch(), KIND_OF_TAB[txTab.value]).then(() => setTimeout(checkSafe, 300));
 }
 let replayTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
@@ -108,6 +113,81 @@ watch(
   },
 );
 onMounted(() => setTimeout(replay, 300));
+
+// 位置微调：正在播放时直接挪过去，不重新播放；没在播放时重播一遍
+let offTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  () => d.value && [d.value.offsetX, d.value.offsetY],
+  () => {
+    if (!d.value) return;
+    checkSafe();
+    if (stage.value?.nudge(clampOff(d.value.offsetX), clampOff(d.value.offsetY)) || drag) return;
+    if (offTimer) clearTimeout(offTimer);
+    offTimer = setTimeout(replay, 600);
+  },
+);
+
+/** 挪动后素材进了哪些区域（顶部信息栏、底部弹幕区、画面外），没有时为空 */
+const intoSafe = ref('');
+function checkSafe(): void {
+  const g = stage.value?.geom();
+  const v = d.value;
+  const out = o.value;
+  if (!g?.base || !v || !out) return;
+  const S = g.stage;
+  const dx = (S.width * clampOff(v.offsetX)) / 100;
+  const dy = (S.height * clampOff(v.offsetY)) / 100;
+  const top = S.top + (S.height * out.safeTop) / 100;
+  const bot = S.bottom - (S.height * out.safeBottom) / 100;
+  const b = g.base;
+  // 和不挪的时候比：多进去 1 像素以上才提醒（居中的全屏素材本来就盖满画面）
+  const parts: string[] = [];
+  if (top - (b.top + dy) > Math.max(0, top - b.top) + 1) parts.push('顶部信息栏');
+  if (b.bottom + dy - bot > Math.max(0, b.bottom - bot) + 1) parts.push('底部弹幕区');
+  const visW = Math.min(S.right, b.right + dx) - Math.max(S.left, b.left + dx);
+  const visH = Math.min(S.bottom, b.bottom + dy) - Math.max(S.top, b.top + dy);
+  if (visW < b.width / 2 || visH < b.height / 2) parts.push('画面外');
+  intoSafe.value = parts.join('、');
+}
+
+// 在预览里按住素材拖动
+let drag: { x: number; y: number; ox: number; oy: number; w: number; h: number } | null = null;
+const dragging = ref(false);
+const overMedia = ref(false);
+function hit(e: PointerEvent): boolean {
+  const r = stage.value?.geom()?.media;
+  return Boolean(r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+}
+function onDown(e: PointerEvent): void {
+  const g = stage.value?.geom();
+  if (!d.value || !g || e.button !== 0) return;
+  // 素材已经播完：点一下先重播
+  if (!g.media) return replay();
+  if (!hit(e)) return;
+  e.preventDefault();
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  stage.value?.hold();
+  drag = { x: e.clientX, y: e.clientY, ox: d.value.offsetX, oy: d.value.offsetY, w: g.stage.width, h: g.stage.height };
+  dragging.value = true;
+}
+function onMove(e: PointerEvent): void {
+  if (!drag) return void (overMedia.value = hit(e));
+  if (!d.value) return;
+  d.value.offsetX = clampOff(drag.ox + ((e.clientX - drag.x) / drag.w) * 100);
+  d.value.offsetY = clampOff(drag.oy + ((e.clientY - drag.y) / drag.h) * 100);
+}
+function onUp(): void {
+  if (!drag) return;
+  drag = null;
+  dragging.value = false;
+  // 松手后在新位置从头播一遍
+  replay();
+}
+function resetOffset(): void {
+  if (!d.value) return;
+  d.value.offsetX = 0;
+  d.value.offsetY = 0;
+}
 
 function insertVar(v: string): void {
   const el = ta.value;
@@ -245,11 +325,14 @@ onBeforeUnmount(() => {
       </div>
       <div class="ed-b">
         <div class="ed-prev">
-          <PreviewStage ref="stage" :label="o ? `预览 · ${o.width}×${o.height}` : '预览'" />
+          <PreviewStage ref="stage" :label="o ? `预览 · ${o.width}×${o.height}` : '预览'">
+            <div v-if="a && !ro" class="drag-layer" :class="{ grab: overMedia, grabbing: dragging }" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp" @pointerleave="overMedia = false" />
+          </PreviewStage>
           <div class="tools">
             <button class="btn" @click="replay"><Icon name="i-replay" />重播（带声音）</button>
             <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :disabled="dirty" :title="dirty ? '先保存再发送到直播' : ''" @confirm="attempt(() => post('/api/playback/test', { effectId: eff!.id }), '已发送到直播画面')" />
           </div>
+          <span v-if="a && !ro" class="hint" style="font-size: 12px; color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>
           <span class="hint" style="font-size: 12px; color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
         </div>
         <div class="ed-set" :class="{ readonly: ro }">
@@ -311,6 +394,13 @@ onBeforeUnmount(() => {
               <div v-else class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div>
             </div>
             <template v-if="a">
+              <div class="slider-row off"><label for="edOffY">上下挪动</label><input id="edOffY" v-model.number="d.offsetY" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetY, '往上', '往下') }}</output></div>
+              <div class="slider-row off"><label for="edOffX">左右挪动</label><input id="edOffX" v-model.number="d.offsetX" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetX, '往左', '往右') }}</output></div>
+              <div class="toggle-line">
+                <span class="hint">在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算</span>
+                <button class="btn" type="button" style="margin-left: auto" :disabled="!d.offsetX && !d.offsetY" @click="resetOffset">回到原位</button>
+              </div>
+              <div v-if="intoSafe && (d.offsetX || d.offsetY)" class="warnbox">素材有一部分挪进了{{ intoSafe }}，直播时可能挡住 B 站的信息、弹幕，或者被挡住。</div>
               <div v-if="timed" class="toggle-line">手动设置时长 <span class="hint">{{ d.durationCustom ? `最长 ${maxSeconds} 秒，到时间就结束` : '关着时按素材完整播放' }}</span><Switch v-model="d.durationCustom" label="手动设置时长" /></div>
               <div class="toggle-line">
                 开头渐入 <span class="hint">{{ d.fadeIn ? '用多少秒慢慢出现' : '关掉后第一帧直接出现' }}</span>
@@ -321,7 +411,7 @@ onBeforeUnmount(() => {
                 <span class="ctl"><span v-if="d.fadeOut" class="suffix"><input v-model.number="d.fadeOutS" class="inp num" type="number" min="0.1" max="5" step="0.1" aria-label="渐出秒数" /><span>秒</span></span><Switch v-model="d.fadeOut" label="结尾渐出" /></span>
               </div>
             </template>
-            <span v-if="o?.orient === 'portrait'" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
+            <span v-if="o?.orient === 'portrait' && !(a && (d.offsetX || d.offsetY))" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>
         </div>
       </div>

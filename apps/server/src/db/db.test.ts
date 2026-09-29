@@ -80,13 +80,13 @@ describe('数据库', () => {
   });
 
   it('升级：已有素材的渐入渐出时长按以前的比例（总时长的 5% 和 8%）', () => {
-    // 先迁移到上一个版本，放两个旧素材，再用完整迁移打开
+    // 先迁移到加渐入渐出时长之前的版本，放两个旧素材，再用完整迁移打开
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sf-mig-'));
     const src = path.resolve(import.meta.dirname, '../../drizzle');
     fs.cpSync(src, path.join(dir, 'drizzle'), { recursive: true });
     const journal = JSON.parse(fs.readFileSync(path.join(src, 'meta/_journal.json'), 'utf8'));
-    const last = journal.entries.pop();
-    fs.rmSync(path.join(dir, 'drizzle', `${last.tag}.sql`));
+    const cut = journal.entries.findIndex((e: { tag: string }) => e.tag === '0005_fade_ms');
+    for (const e of journal.entries.splice(cut)) fs.rmSync(path.join(dir, 'drizzle', `${e.tag}.sql`));
     fs.writeFileSync(path.join(dir, 'drizzle/meta/_journal.json'), JSON.stringify(journal));
     const file = path.join(dir, 'old.db');
     const old = new Database(file);
@@ -99,6 +99,8 @@ describe('数据库', () => {
     const by = (n: string) => rows.find((r) => r.name === n)!;
     expect(by('视频')).toMatchObject({ fadeInMs: 1500, fadeOutMs: 2400 });
     expect(by('图片')).toMatchObject({ fadeInMs: 200, fadeOutMs: 320 });
+    // 以前的素材不挪位置
+    expect(by('视频')).toMatchObject({ offsetX: 0, offsetY: 0 });
     db.$client.close();
     fs.rmSync(dir, { recursive: true, force: true });
   });

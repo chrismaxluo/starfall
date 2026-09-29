@@ -37,6 +37,9 @@ export interface PlayItem {
     fadeOut: boolean;
     fadeInMs: number;
     fadeOutMs: number;
+    /** 在位置的基础上挪动（画面宽、高的百分比） */
+    offsetX: number;
+    offsetY: number;
     sound: { url: string } | null;
     volume: number;
   };

@@ -65,6 +65,8 @@ interface QueueBrief {
   effectName: string;
   viewerName: string;
   viewerFace: string | null;
+  /** 大航海等级（0 不是），后台给头像套头像框 */
+  viewerGuard: number;
   detail: string;
   /** 礼物图（礼物特效才有） */
   giftImg: string | null;
@@ -398,6 +400,7 @@ export class Pipeline {
         offsetY: effect.offsetY,
         sizePct: effect.sizePct,
         featherPct: this.featherOf(effect),
+        guardFrame: effect.guardFrame,
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },
@@ -521,7 +524,7 @@ export class Pipeline {
   snapshot(): QueueSnapshot {
     const brief = (q: QueueItem<Queued>): QueueBrief => {
       const it = q.payload.item;
-      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test) };
+      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, viewerGuard: it.viewer.guard, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test) };
     };
     const c = this.current;
     return {

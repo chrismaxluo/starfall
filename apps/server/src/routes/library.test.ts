@@ -190,6 +190,12 @@ describe('修改素材', () => {
     expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { sizePct: 60 } } })).json().effect).toMatchObject({ sizePct: 60 });
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 10 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 201 } })).statusCode).toBe(400);
+    // 大航海头像框：默认关闭
+    expect(effect).toMatchObject({ guardFrame: false });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { guardFrame: true } })).json()).toMatchObject({ guardFrame: true });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id } })).json().effect).toMatchObject({ guardFrame: true });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { guardFrame: false } } })).json().effect).toMatchObject({ guardFrame: false });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { guardFrame: 'yes' } })).statusCode).toBe(400);
   });
 
   it('上下羽化：跟随全局时只对没有透明通道的素材生效，可以单独设置或关闭', async () => {

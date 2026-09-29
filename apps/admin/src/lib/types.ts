@@ -160,6 +160,7 @@ export interface QueueBrief {
   effectName: string;
   viewerName: string;
   viewerFace: string | null;
+  viewerGuard?: number;
   giftImg?: string | null;
   /** 一句话说明，例如「舰长进场」「告白花束 ×1」 */
   detail: string;

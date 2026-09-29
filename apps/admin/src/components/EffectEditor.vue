@@ -63,6 +63,7 @@ function snapshot(e: EffectDto) {
     sizePct: e.sizePct,
     feather: e.feather,
     featherPct: e.featherPct,
+    guardFrame: e.guardFrame,
   };
 }
 const d = ref(eff.value ? snapshot(eff.value) : null);
@@ -87,7 +88,7 @@ function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct), feather: v.feather, featherPct: Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))) } : {}) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct), feather: v.feather, featherPct: Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))), guardFrame: v.guardFrame } : {}) };
   // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
   if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
   const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
@@ -107,7 +108,7 @@ function replay(): void {
 }
 let replayTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom],
+  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom, d.value.guardFrame],
   () => replay(),
 );
 watch(
@@ -393,6 +394,7 @@ onBeforeUnmount(() => {
           <div class="ed-sec">
             <h3><span class="n">2</span>头像和欢迎语</h3>
             <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">素材里已经画好文字的话可以关掉</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
+            <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B 站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
             <template v-if="!a || d.showText">
               <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />

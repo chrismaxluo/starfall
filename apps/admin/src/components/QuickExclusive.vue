@@ -40,7 +40,7 @@ async function remove(): Promise<void> {
     <div class="ed-scrim" @click="emit('close')" />
     <div class="qdialog" role="dialog" aria-label="设置专属素材">
       <div class="qh">
-        <Avatar :name="q.name" :face="q.face" />
+        <Avatar :name="q.name" :face="q.face" :guard="q.viewer?.guard" />
         <div><b>{{ existing ? '修改' : '为' }} {{ q.name }} {{ existing ? '的专属素材' : '设置专属素材' }}</b><span class="num">UID {{ q.uid }}</span></div>
         <span v-if="q.viewer" style="margin-left: auto"><IdTag :viewer="q.viewer" /></span>
       </div>

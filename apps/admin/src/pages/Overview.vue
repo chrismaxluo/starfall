@@ -216,7 +216,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
         <div class="card-h"><h2>实时动态</h2><span class="aside">点任意一行可设置专属特效<span v-if="s?.live.connection === 'connected'" class="live" style="height: 22px"><i />LIVE</span></span></div>
         <div class="feed">
           <div v-for="e in feed" :key="e.id" class="feed-row" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
-            <Avatar :name="e.uname" :face="e.viewer.face" />
+            <Avatar :name="e.uname" :face="e.viewer.face" :guard="e.viewer.guard" />
             <span class="who">
               <b>{{ e.uname }}</b>
               <span><EvIcon v-if="e.kind !== 'enter'" :kind="e.kind" :img="e.payload?.icon" />{{ rowText(e) }}</span>
@@ -237,7 +237,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
           <span class="aside">{{ playing ? `正在播 1 条 · 排队 ${state.queue.items.length} 条` : state.queue.items.length ? `排队 ${state.queue.items.length} 条` : '空闲' }}</span>
         </div>
         <div v-if="playing" class="ov-now">
-          <Avatar :name="playing.viewerName" :face="playing.viewerFace" />
+          <Avatar :name="playing.viewerName" :face="playing.viewerFace" :guard="playing.viewerGuard" />
           <div style="min-width: 0">
             <b>{{ playing.viewerName }}</b>
             <div class="what"><EvIcon v-if="playing.kind !== 'enter'" :kind="playing.kind" :img="playing.giftImg" />{{ playing.detail }} · 播放 <b>{{ playing.effectName }}</b></div>
@@ -248,7 +248,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
         <div v-if="upcoming.length" class="ov-q">
           <div v-for="(q, i) in upcoming.slice(0, Q_SHOW)" :key="q.id" class="qrow">
             <span class="n num">{{ i + 1 }}</span>
-            <Avatar :name="q.viewerName" :face="q.viewerFace" />
+            <Avatar :name="q.viewerName" :face="q.viewerFace" :guard="q.viewerGuard" />
             <span class="who"><b>{{ q.viewerName }}</b><span><EvIcon v-if="q.kind !== 'enter'" :kind="q.kind" :img="q.giftImg" />{{ q.detail }} · {{ q.effectName }}</span></span>
             <span class="eta num">{{ eta(q.eta) }}</span>
             <button class="x" :aria-label="`把 ${q.viewerName} 移出队列`" title="移出队列（这次不播）" @click="removeItem(q.id, q.viewerName)"><Icon name="i-x" /></button>

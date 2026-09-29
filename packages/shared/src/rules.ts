@@ -64,6 +64,8 @@ export const EffectSchema = z.object({
   feather: z.enum(FEATHER_MODES),
   /** 自己设置时的羽化宽度（素材高度的百分比） */
   featherPct: z.number().int().min(0).max(FEATHER_MAX),
+  /** 上传的素材：大航海观众的头像套上 B 站的头像框（头像和欢迎语里） */
+  guardFrame: z.boolean(),
 });
 export type Effect = z.infer<typeof EffectSchema>;
 

@@ -22,8 +22,12 @@ const followers = computed(() => state.effects.filter((e) => !e.builtin && e.ass
 /** 演示用的素材：优先用视频 */
 const sample = computed(() => followers.value.find((e) => e.asset?.kind === 'video') ?? followers.value[0] ?? null);
 
+/** 播一遍演示：静音（只看边缘效果），只在点按钮、改设置时播，打开设置页时不自动播 */
+const played = ref(false);
 function replay(): void {
-  if (sample.value) void stage.value?.play(sample.value.id);
+  if (!sample.value) return;
+  played.value = true;
+  void stage.value?.play(sample.value.id, undefined, { soundAssetId: null, volume: 0 });
 }
 async function save(patch: Partial<Settings>, msg: string): Promise<void> {
   await attempt(() => put('/api/settings', patch), msg);
@@ -42,12 +46,7 @@ async function onChange(): Promise<void> {
   await save({ featherPct: v }, `上下羽化宽度：${v}%`);
   if (!stage.value?.feather(v)) replay();
 }
-// 素材列表可能还没加载好：有了演示素材再播
-watch(
-  () => sample.value?.id,
-  (id) => id && setTimeout(replay, 300),
-  { immediate: true },
-);
+
 </script>
 
 <template>
@@ -59,9 +58,11 @@ watch(
         <div v-if="state.settings.featherOn" class="slider-row off"><label for="fcPct">羽化宽度</label><input id="fcPct" v-model.number="pct" type="range" min="0" :max="FEATHER_MAX" step="1" @input="onInput" @change="onChange" /><output>{{ pct }}%</output></div>
         <span class="hint">按素材高度算。只对没有透明通道的视频和图片生效（MP4、JPG 等）；透明 WebM 本身边缘就是透明的，不受影响。</span>
         <span class="hint">现在有 {{ followers.length }} 个素材跟随这里的设置。</span>
-        <button v-if="sample" class="btn" type="button" style="align-self: flex-start" @click="replay"><Icon name="i-replay" />重播演示</button>
+        <button v-if="sample" class="btn" type="button" style="align-self: flex-start" @click="replay"><Icon :name="played ? 'i-replay' : 'i-play'" />{{ played ? '重播演示' : '播放演示' }}</button>
       </div>
-      <PreviewStage v-if="sample" ref="stage" :label="`演示 · ${sample.name}`" :safe="false" />
+      <PreviewStage v-if="sample" ref="stage" :label="`演示 · ${sample.name}`" :safe="false">
+        <button v-if="!played" type="button" class="fc-idle" @click="replay"><Icon name="i-play" />点「播放演示」看效果<span>静音播放</span></button>
+      </PreviewStage>
       <div v-else class="fc-empty">上传一个 MP4 视频后，这里可以看到效果</div>
     </div>
   </div>

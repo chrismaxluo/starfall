@@ -230,10 +230,13 @@ export class Pipeline {
   }
 
   private remember(v: Viewer): void {
-    if (v.uid <= 0 || !v.name || v.mystery || this.remembered.get(v.uid) === v.name) return;
-    this.remembered.set(v.uid, v.name);
+    const roomId = this.d.room.get()?.roomId;
+    // 昵称、大航海等级都没变就不用再写
+    const key = `${v.name}|${v.guard}|${roomId}`;
+    if (v.uid <= 0 || !v.name || v.mystery || this.remembered.get(v.uid) === key) return;
+    this.remembered.set(v.uid, key);
     if (this.remembered.size > 50_000) this.remembered.clear();
-    this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '' });
+    this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '' }, roomId ? { level: v.guard, roomId } : undefined);
   }
 
   private record(ev: TriggerEvent, hit: Judgement['hit'], status: PlayStatus): number {

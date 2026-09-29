@@ -37,6 +37,8 @@ export const ExclusivePatchSchema = ExclusiveSchema.omit({ uid: true }).partial(
 export interface ExclusiveDto extends Exclusive {
   name: string | null;
   face: string | null;
+  /** 在当前直播间是大航海几级（0 不是或不知道） */
+  guard: number;
   createdAt: number;
 }
 
@@ -102,7 +104,7 @@ export class EnterRuleStore {
       .all()
       .map((r) => {
         const v = this.viewers.cached(r.uid);
-        return { ...toExclusive(r), name: v?.name ?? null, face: v?.face ?? null, createdAt: r.createdAt };
+        return { ...toExclusive(r), name: v?.name ?? null, face: v?.face ?? null, guard: this.viewers.guardIn(r.uid), createdAt: r.createdAt };
       });
   }
 

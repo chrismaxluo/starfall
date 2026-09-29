@@ -149,7 +149,7 @@ function removeBand(b: MedalBand, i: number): void {
 const exQ = ref('');
 const exList = computed(() => state.exclusives.filter((x) => !exQ.value || (x.name ?? '').includes(exQ.value) || String(x.uid).includes(exQ.value)));
 const flashUid = ref<number | null>(null);
-const draft = ref<null | { uid: string; busy: boolean; msg: string; ok: boolean; found: { uid: number; name: string; face: string } | null; effectId: number | null; cooldownMin: number }>(null);
+const draft = ref<null | { uid: string; busy: boolean; msg: string; ok: boolean; found: { uid: number; name: string; face: string; guard?: number } | null; effectId: number | null; cooldownMin: number }>(null);
 const showRecent = ref(false);
 const recentViewers = computed(() => {
   const seen = new Set<number>();
@@ -325,7 +325,7 @@ onMounted(() => void refreshRules());
           </div>
           <div v-if="draft.msg" class="lookup" :class="{ ok: draft.ok }">{{ draft.msg }}</div>
           <div v-if="draft.found" class="found">
-            <span class="who"><Avatar :name="draft.found.name" :face="draft.found.face" />{{ draft.found.name }}</span>
+            <span class="who"><Avatar :name="draft.found.name" :face="draft.found.face" :guard="draft.found.guard" />{{ draft.found.name }}</span>
             <span class="num" style="font-size: 12px; color: var(--t3)">UID {{ draft.found.uid }}</span>
             <EffectPicker v-model="draft.effectId" />
             <CdPick v-model="draft.cooldownMin" />
@@ -337,7 +337,7 @@ onMounted(() => void refreshRules());
             <thead><tr><th>观众</th><th>身份</th><th>专属特效</th><th>多久内不重复</th><th>有效期</th><th>开关</th><th /></tr></thead>
             <tbody>
               <tr v-for="x in exList" :key="x.uid" :style="flashUid === x.uid ? 'outline: 2px solid var(--accent-ring)' : ''">
-                <td><span class="who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" /><span><div>{{ x.name ?? '（昵称未知）' }}</div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">UID {{ x.uid }}</div></span></span></td>
+                <td><span class="who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" :guard="x.guard" /><span><div>{{ x.name ?? '（昵称未知）' }}</div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">UID {{ x.uid }}</div></span></span></td>
                 <td><IdTag v-if="viewerOf(x.uid)" :viewer="viewerOf(x.uid)!" /><span v-else style="color: var(--t3)">—</span></td>
                 <td><EffectPicker v-model="x.effectId" @change="(id) => updateEx(x, { effectId: id }, `${x.name ?? x.uid} 的专属素材改为「${effectById(id)?.name}」`)" /></td>
                 <td><CdPick v-if="!once" v-model="x.cooldownMin" @change="(v) => updateEx(x, { cooldownMin: v }, cdMsg(x.name ?? String(x.uid), v))" /><span v-else class="inline-hint">每场一次</span></td>

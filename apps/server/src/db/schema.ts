@@ -210,5 +210,8 @@ export const viewers = sqliteTable('viewers', {
   uid: integer('uid').primaryKey(),
   name: text('name').notNull(),
   face: text('face').notNull().default(''),
+  /** 最近一次在哪个直播间看到 TA 是大航海几级（0 不是）：只在同一个直播间里算数 */
+  guard: integer('guard').notNull().default(0),
+  guardRoom: integer('guard_room'),
   updatedAt: integer('updated_at').notNull().default(now),
 });

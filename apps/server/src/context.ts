@@ -76,7 +76,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const roomInfo = new RoomInfoService({ room, live, http: () => account.anon, authHttp: () => account.http() }, opts.roomInfoDeps);
   const assets = new AssetStore(db, p, opts.maxUpload);
   const effects = new EffectStore(db, assets);
-  const viewers = new ViewerStore(db, () => account.anon);
+  const viewers = new ViewerStore(db, () => account.anon, Date.now, () => room.get()?.roomId ?? null);
   const enterRules = new EnterRuleStore(db, settings, viewers);
   const outputs = new OutputStore(db);
   const danmuRules = new DanmuRuleStore(db);

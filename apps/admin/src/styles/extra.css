@@ -223,6 +223,22 @@
 .cdpop .opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .cdpop .opts button { height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; font-size: 12.5px; }
 .cdpop .opts button:hover { border-color: var(--line-strong); }
+/* 弹幕规则：谁发的才算 */
+.whopick { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.whopop { width: min(340px, calc(100vw - 16px)); }
+.whopop .fanrow button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.whopop .dim { opacity: .5; }
+.whopop .fanrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--t2); }
+.whopop .fanrow button { height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; font-size: 12.5px; }
+.whopop .fanrow .inp { width: 64px; height: 28px; padding: 0 8px; }
+.whopop .uidbox { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.whopop .uidin .inp { height: 30px; font-size: 12.5px; }
+.whopop .person { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 2px 3px 6px; }
+.whopop .person .pn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whopop .person .uid { color: var(--t3); font-size: 11.5px; margin-left: auto; }
+.whopop .person button { width: 22px; height: 22px; border: 0; background: transparent; color: var(--t3); display: grid; place-items: center; border-radius: 6px; flex: none; }
+.whopop .person button:hover { background: var(--l2); color: var(--t1); }
+.whopop .person button svg { width: 12px; height: 12px; }
 .cdpop .opts button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .cdpop .custom { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--t2); }
 .cdpop .custom input { width: 72px; height: 28px; }

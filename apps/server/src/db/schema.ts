@@ -2,7 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { EffectTexts, FeatherMode, Position, Tier } from '@starfall/shared';
+import type { DanmuWho, EffectTexts, FeatherMode, Position, Tier } from '@starfall/shared';
 
 const now = sql`(unixepoch() * 1000)`;
 const bool = (name: string) => integer(name, { mode: 'boolean' });
@@ -119,7 +119,8 @@ export const ruleDanmu = sqliteTable('rule_danmu', {
   sort: integer('sort').notNull(),
   keywords: text('keywords', { mode: 'json' }).$type<string[]>().notNull(),
   mode: text('mode', { enum: ['contains', 'exact'] }).notNull(),
-  who: text('who', { enum: ['all', 'fan', 'fan10', 'guard', 'mod'] }).notNull(),
+  /** 谁发的弹幕才算（多选，JSON）；以前是单选的字符串，升级时换成多选 */
+  who: text('who', { mode: 'json' }).$type<DanmuWho>().notNull(),
   effectId: integer('effect_id').references(() => effects.id, { onDelete: 'restrict' }),
   globalCdSec: integer('global_cd_sec').notNull(),
   userCdMin: integer('user_cd_min').notNull(),

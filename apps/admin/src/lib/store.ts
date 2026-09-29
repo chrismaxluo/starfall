@@ -3,7 +3,7 @@ import { reactive } from 'vue';
 import { get } from './api.ts';
 import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
-import type { DanmuRule, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
 export const state = reactive({
   /** null：还没检查 */
@@ -16,7 +16,7 @@ export const state = reactive({
   sounds: [] as SoundDto[],
   enter: null as EnterBase | null,
   exclusives: [] as ExclusiveDto[],
-  danmu: [] as DanmuRule[],
+  danmu: [] as DanmuRuleDto[],
   gift: null as GiftRules | null,
   guard: null as GuardRules | null,
   outputs: [] as OutputDto[],
@@ -49,7 +49,7 @@ export async function refreshRules(): Promise<void> {
   const [r, x, d, g, u] = await Promise.all([
     get<EnterBase>('/api/rules/enter'),
     get<{ exclusives: ExclusiveDto[] }>('/api/rules/exclusive'),
-    get<{ rules: DanmuRule[] }>('/api/rules/danmu'),
+    get<{ rules: DanmuRuleDto[] }>('/api/rules/danmu'),
     get<GiftRules>('/api/rules/gift'),
     get<GuardRules>('/api/rules/guard'),
   ]);

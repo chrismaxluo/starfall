@@ -32,6 +32,11 @@ export interface SoundDto extends AssetDto {
 
 export type EnterBase = Omit<EnterRules, 'exclusives'>;
 
+/** 弹幕规则：带上指定观众的昵称头像 */
+export interface DanmuRuleDto extends DanmuRule {
+  people: Array<{ uid: number; name: string | null; face: string | null; guard: number }>;
+}
+
 export interface ExclusiveDto extends Exclusive {
   name: string | null;
   face: string | null;

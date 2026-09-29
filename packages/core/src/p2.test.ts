@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { DanmuRule, GiftEvent, GiftRules, GuardEvent, GuardRules } from '@starfall/shared';
+import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, GiftEvent, GiftRules, GuardEvent, GuardRules } from '@starfall/shared';
 import { GiftComboMerger, GuardDeduper } from './combo.ts';
-import { keywordClashes, matchDanmu, whoOk } from './danmu.ts';
+import { keywordClashes, matchDanmu, whoNamed, whoOk } from './danmu.ts';
 import { giftBandLabel, matchGift, sortedGiftBands, yuanText } from './gift.ts';
 import { matchGuard } from './guard.ts';
 import { ANCHOR, medal, viewer } from './testing.ts';
 
-const rule = (p: Partial<DanmuRule> = {}): DanmuRule => ({ id: 1, keywords: ['生日快乐'], mode: 'contains', who: 'all', effectId: 7, globalCdSec: 30, userCdMin: 10, enabled: true, ...p });
+const rule = (p: Partial<DanmuRule> = {}): DanmuRule => ({ id: 1, keywords: ['生日快乐'], mode: 'contains', who: DANMU_WHO_ALL, effectId: 7, globalCdSec: 30, userCdMin: 10, enabled: true, ...p });
 
 describe('弹幕匹配', () => {
   it('包含 / 完全一致', () => {
@@ -22,18 +23,38 @@ describe('弹幕匹配', () => {
     expect(matchDanmu('随便说说', viewer(), rules, ANCHOR)).toBeNull();
   });
 
-  it('发送人条件', () => {
+  it('发送人条件：以前的单选换成多选后结果不变', () => {
     const plain = viewer();
     const fan = viewer({ medal: medal(5) });
     const fan12 = viewer({ medal: medal(12) });
     const other = viewer({ medal: medal(30, 999) });
     const cap = viewer({ guard: 3 });
     const mod = viewer({ isMod: true });
-    expect([plain, fan, other, cap, mod].map((v) => whoOk('fan', v, ANCHOR))).toEqual([false, true, false, true, true]);
-    expect([fan, fan12, other].map((v) => whoOk('fan10', v, ANCHOR))).toEqual([false, true, false]);
-    expect([plain, cap].map((v) => whoOk('guard', v, ANCHOR))).toEqual([false, true]);
-    expect([plain, mod].map((v) => whoOk('mod', v, ANCHOR))).toEqual([false, true]);
-    expect(matchDanmu('生日快乐', plain, [rule({ who: 'guard' })], ANCHOR)).toBeNull();
+    const old = (w: 'fan' | 'fan10' | 'guard' | 'mod') => danmuWhoFromOld(w);
+    expect([plain, fan, other, cap, mod].map((v) => whoOk(old('fan'), v, ANCHOR))).toEqual([false, true, false, true, true]);
+    expect([fan, fan12, other].map((v) => whoOk(old('fan10'), v, ANCHOR))).toEqual([false, true, false]);
+    expect([plain, cap].map((v) => whoOk(old('guard'), v, ANCHOR))).toEqual([false, true]);
+    expect([plain, mod].map((v) => whoOk(old('mod'), v, ANCHOR))).toEqual([false, true]);
+    expect(matchDanmu('生日快乐', plain, [rule({ who: old('guard') })], ANCHOR)).toBeNull();
+  });
+
+  it('发送人条件：多选、主播、只要总督、粉丝牌等级、指定观众', () => {
+    const none: DanmuWho = { ...DANMU_WHO_ALL, all: false };
+    const anchor = viewer({ uid: ANCHOR });
+    const gov = viewer({ uid: 2, guard: 1 });
+    const cap = viewer({ uid: 3, guard: 3 });
+    const mod = viewer({ uid: 4, isMod: true });
+    const fan20 = viewer({ uid: 5, medal: medal(20) });
+    const fan19 = viewer({ uid: 6, medal: medal(19) });
+    const friend = viewer({ uid: 777 });
+    const w: DanmuWho = { ...none, anchor: true, mod: true, guards: [1], fanMin: 20, uids: [777] };
+    expect([anchor, gov, cap, mod, fan20, fan19, friend, viewer()].map((v) => whoOk(w, v, ANCHOR))).toEqual([true, true, false, true, true, false, true, false]);
+    expect([anchor, mod, friend].map((v) => whoNamed(w, v, ANCHOR))).toEqual([true, false, true]);
+    // 发送人是主播本人或登录的账号（默认不触发）：只看点了 TA 名的规则；「所有人」不算点名
+    const rules = [rule({ id: 1 }), rule({ id: 2, who: { ...none, anchor: true } })];
+    expect(matchDanmu('生日快乐', anchor, rules, ANCHOR)?.ruleId).toBe(1);
+    expect(matchDanmu('生日快乐', anchor, rules, ANCHOR, true)?.ruleId).toBe(2);
+    expect(matchDanmu('生日快乐', anchor, [rule({ id: 1 })], ANCHOR, true)).toBeNull();
   });
 
   it('关键词重复提示；标签最多显示 3 个关键词', () => {

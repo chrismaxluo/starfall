@@ -254,6 +254,9 @@ export class Pipeline {
     const live = this.d.live.status();
     const anchorUid = this.d.room.get()?.anchorUid ?? 0;
     const uid = ev.viewer.uid;
+    const blockedBy = this.d.blacklist.reason(uid);
+    /** 弹幕规则点了 TA 的名：主播本人、登录的账号也照样触发（手动拉黑的不算） */
+    let named = false;
     let hit: Judgement['hit'] = null;
     let inCooldown = false;
     let playedThisLive = false;
@@ -278,8 +281,10 @@ export class Pipeline {
         break;
       }
       case 'danmu': {
-        const m = matchDanmu(ev.text, ev.viewer, this.d.danmuRules.list(), anchorUid);
+        const auto = blockedBy === 'anchor' || blockedBy === 'account';
+        const m = matchDanmu(ev.text, ev.viewer, this.d.danmuRules.list(), anchorUid, auto);
         vars = { text: ev.text };
+        named = auto && m !== null;
         if (m) {
           const g = `danmu:${m.ruleId}`;
           const u = `danmu:${m.ruleId}:${uid}`;
@@ -325,7 +330,7 @@ export class Pipeline {
       }
     }
     const result = decide({
-      blocked: this.d.blacklist.reason(uid) !== null,
+      blocked: blockedBy !== null && !named,
       matched: Boolean(hit && effect),
       paused: !whatIf && this.d.settings.get('paused'),
       live: whatIf || live.live,

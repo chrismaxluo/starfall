@@ -121,16 +121,57 @@ export type EnterRules = z.infer<typeof EnterRulesSchema>;
 
 // ---------- 弹幕规则（需求 F-DM-01 ~ 04） ----------
 
-/** 发送人条件 */
-export const DANMU_WHO = ['all', 'fan', 'fan10', 'guard', 'mod'] as const;
-export type DanmuWho = (typeof DANMU_WHO)[number];
+/** 以前的发送人条件（单选）：导入旧版本的配置文件、升级旧数据时换成下面的多选 */
+export const DANMU_WHO_OLD = ['all', 'fan', 'fan10', 'guard', 'mod'] as const;
+
+/** 粉丝牌等级上限 */
+export const MEDAL_LEVEL_MAX = 120;
+/** 一条规则最多指定多少位观众 */
+export const DANMU_UIDS_MAX = 100;
+
+/**
+ * 发送人条件（多选，满足任意一项就算）：所有人、主播、房管、总督 / 提督 / 舰长、戴本房间粉丝牌且不低于某级、指定观众。
+ * 点了名的（勾了主播、填了 UID）不受「主播本人不触发」「登录的账号不触发」限制；手动拉黑的照样不触发。
+ */
+export const DanmuWhoSchema = z
+  .object({
+    all: z.boolean(),
+    anchor: z.boolean(),
+    mod: z.boolean(),
+    guards: z.array(z.union([z.literal(1), z.literal(2), z.literal(3)])).max(3),
+    /** 戴本房间粉丝牌、不低于这个等级；null 为不按粉丝牌 */
+    fanMin: z.number().int().min(1).max(MEDAL_LEVEL_MAX).nullable(),
+    uids: z.array(z.number().int().positive()).max(DANMU_UIDS_MAX),
+  })
+  .strict()
+  .refine((w) => w.all || w.anchor || w.mod || w.guards.length > 0 || w.fanMin !== null || w.uids.length > 0, { message: '至少选一种人' });
+export type DanmuWho = z.infer<typeof DanmuWhoSchema>;
+
+export const DANMU_WHO_ALL: DanmuWho = { all: true, anchor: false, mod: false, guards: [], fanMin: null, uids: [] };
+
+/** 以前的单选换成多选（「戴本房间粉丝牌」以前也算上大航海和房管） */
+export function danmuWhoFromOld(w: (typeof DANMU_WHO_OLD)[number]): DanmuWho {
+  const none = { ...DANMU_WHO_ALL, all: false };
+  switch (w) {
+    case 'all':
+      return DANMU_WHO_ALL;
+    case 'fan':
+      return { ...none, mod: true, guards: [1, 2, 3], fanMin: 1 };
+    case 'fan10':
+      return { ...none, fanMin: 10 };
+    case 'guard':
+      return { ...none, guards: [1, 2, 3] };
+    case 'mod':
+      return { ...none, mod: true };
+  }
+}
 
 export const DanmuRuleSchema = z.object({
   id: z.number().int().positive(),
   keywords: z.array(z.string().trim().min(1).max(30)).min(1).max(20),
   /** 包含 / 完全一致 */
   mode: z.enum(['contains', 'exact']),
-  who: z.enum(DANMU_WHO),
+  who: DanmuWhoSchema,
   effectId: z.number().int().positive().nullable(),
   /** 全局冷却（秒）：这条规则播放后，任何人再触发都要等 */
   globalCdSec: z.number().int().min(0).max(3600),

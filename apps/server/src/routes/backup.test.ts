@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import { KEEP_BACKUPS, KEEP_MANUAL } from '../services/backup.ts';
 import { formFile, media, testApp } from '../testing.ts';
 
@@ -25,7 +26,7 @@ async function populate(t: T): Promise<void> {
   await t.req({ method: 'PUT', url: `/api/effects/${bday}`, payload: { showText: true, texts: { enter: ['{name} 生日快乐'] } } });
   const sound = (await t.req({ method: 'POST', url: '/api/sounds', ...formFile('叮.wav', media('beep.wav')) })).json().sound.id as number;
   await t.req({ method: 'PUT', url: `/api/effects/${bday}`, payload: { soundAssetId: sound } });
-  await t.req({ method: 'POST', url: '/api/rules/danmu', payload: { keywords: ['生日快乐', '生快'], mode: 'contains', who: 'all', effectId: bday, globalCdSec: 10, userCdMin: 5, enabled: true } });
+  await t.req({ method: 'POST', url: '/api/rules/danmu', payload: { keywords: ['生日快乐', '生快'], mode: 'contains', who: DANMU_WHO_ALL, effectId: bday, globalCdSec: 10, userCdMin: 5, enabled: true } });
   await t.req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10001, effectId: bday, cooldownMin: 0, until: '2026-12-31', enabled: true } });
   const gift = (await t.req({ method: 'GET', url: '/api/rules/gift' })).json();
   gift.specific = [{ giftId: 31036, giftName: '小花花', effectId: bday, enabled: true }];
@@ -45,8 +46,8 @@ describe('导出配置', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-disposition']).toMatch(/^attachment; filename="starfall-config-\d{8}-\d{4}\.json"$/);
     const f = res.json();
-    expect(f).toMatchObject({ format: 'starfall-config', version: 1 });
-    expect(f.rules.danmu).toEqual([{ keywords: ['生日快乐', '生快'], mode: 'contains', who: 'all', effect: '生日', globalCdSec: 10, userCdMin: 5, enabled: true }]);
+    expect(f).toMatchObject({ format: 'starfall-config', version: 2 });
+    expect(f.rules.danmu).toEqual([{ keywords: ['生日快乐', '生快'], mode: 'contains', who: DANMU_WHO_ALL, effect: '生日', globalCdSec: 10, userCdMin: 5, enabled: true }]);
     expect(f.rules.exclusives[0]).toMatchObject({ uid: 10001, effect: '生日', until: '2026-12-31' });
     expect(f.rules.enter.tiers.gov.effect).toBe('金銮');
     expect(f.settings).toMatchObject({ queueMax: 15, cooldownMode: 'oncePerLive' });
@@ -141,6 +142,18 @@ describe('导入配置', () => {
     expect(await dst.effectId('生日')).toBeDefined();
     expect((await dst.req({ method: 'GET', url: '/api/blacklist' })).json().blacklist).toHaveLength(1);
     expect(dst.ctx.outputs.list()).toHaveLength(2);
+  });
+
+  it('旧版本导出的文件：弹幕规则的发送人是单选，导入后换成多选', async () => {
+    const src = await setup();
+    await populate(src);
+    const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
+    f.version = 1;
+    f.rules.danmu[0].who = 'fan';
+    const dst = await setup();
+    const { token } = (await importFile(dst, 'old.json', JSON.stringify(f))).json();
+    await dst.req({ method: 'POST', url: `/api/backup/import/${token}` });
+    expect((await dst.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules[0].who).toEqual(danmuWhoFromOld('fan'));
   });
 
   it('取消导入；无效的文件给出能看懂的错误', async () => {

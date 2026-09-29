@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { openDb } from './index.ts';
-import { effects, outputs, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGuard, settings } from './schema.ts';
+import { effects, outputs, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGuard, settings } from './schema.ts';
 import { BUILTIN_EFFECTS, RETIRED_EFFECTS, seed } from './seed.ts';
 
 /** 只迁移到 before 这一步之前（模拟旧版本的数据库）：返回数据库文件和打开的旧库，用完整迁移再打开就是升级 */
@@ -117,7 +118,8 @@ describe('数据库', () => {
     old.exec(`insert into assets (id, sha256, kind, filename, ext, mime, size, duration_ms, width, height) values (1, 'a', 'video', 'v.mp4', 'mp4', 'video/mp4', 1, 20000, 1440, 1080);
       insert into effects (id, name, asset_id, texts, position, duration_ms) values (1, '胡迪', 1, '{"enter":["x"]}', 'bl', 20000);
       insert into effects (id, name, builtin, style, texts, duration_ms) values (2, '星冕', 1, 'star', '{"enter":["x"]}', 6000);
-      insert into rule_enter_tiers (tier, effect_id, cooldown_min, enabled) values ('cap', 2, 10, 1);`);
+      insert into rule_enter_tiers (tier, effect_id, cooldown_min, enabled) values ('cap', 2, 10, 1);
+      insert into rule_danmu (sort, keywords, mode, who, effect_id, global_cd_sec, user_cd_min, enabled) values (1, '["晚安"]', 'contains', 'fan', 1, 10, 10, 1), (2, '["上船"]', 'exact', 'all', 1, 0, 0, 1);`);
     old.close();
     const db = openDb(file);
     seed(db);
@@ -126,6 +128,8 @@ describe('数据库', () => {
     // 星冕下线：舰长进场换成晶耀
     const tier = db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'cap')).get()!;
     expect(db.select().from(effects).where(eq(effects.id, tier.effectId!)).get()?.name).toBe('晶耀');
+    // 弹幕规则的发送人：单选换成多选，以前的「戴本房间粉丝牌」也算上大航海和房管
+    expect(db.select().from(ruleDanmu).orderBy(ruleDanmu.sort).all().map((r) => r.who)).toEqual([danmuWhoFromOld('fan'), DANMU_WHO_ALL]);
     expect(db.select().from(effects).where(eq(effects.name, '星冕')).get()).toBeUndefined();
     db.$client.close();
     fs.rmSync(dir, { recursive: true, force: true });

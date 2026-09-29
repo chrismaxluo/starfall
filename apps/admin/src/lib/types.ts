@@ -98,6 +98,9 @@ export interface Settings {
   giftComboSec: number;
   autoBackup: boolean;
   onboarded: boolean;
+  /** 素材上下羽化（全局） */
+  featherOn: boolean;
+  featherPct: number;
 }
 
 /** 一份自动备份（数据库 + 配置） */

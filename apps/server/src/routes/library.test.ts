@@ -192,6 +192,27 @@ describe('修改素材', () => {
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 201 } })).statusCode).toBe(400);
   });
 
+  it('上下羽化：跟随全局时只对没有透明通道的素材生效，可以单独设置或关闭', async () => {
+    const { req, upload } = await setup();
+    const opaque = (await upload('/api/assets', 'o.mp4', media('opaque.mp4'))).json().effect;
+    const alpha = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json().effect;
+    expect(opaque).toMatchObject({ feather: 'global', featherPct: 10 });
+    const pct = async (id: number, draft?: object) => (await req({ method: 'POST', url: '/api/preview', payload: { effectId: id, ...(draft ? { draft } : {}) } })).json().effect.featherPct;
+    // 全局默认关闭
+    expect(await pct(opaque.id)).toBe(0);
+    expect((await req({ method: 'PUT', url: '/api/settings', payload: { featherOn: true, featherPct: 15 } })).json()).toMatchObject({ featherOn: true, featherPct: 15 });
+    expect(await pct(opaque.id)).toBe(15);
+    expect(await pct(alpha.id)).toBe(0);
+    // 单独设置：带透明通道的也生效；不羽化
+    expect(await pct(alpha.id, { feather: 'custom', featherPct: 20 })).toBe(20);
+    expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { feather: 'off' } })).json()).toMatchObject({ feather: 'off' });
+    expect(await pct(opaque.id)).toBe(0);
+    expect(await pct(opaque.id, { feather: 'global' })).toBe(15);
+    expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { feather: 'soft' } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { featherPct: 41 } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: '/api/settings', payload: { featherPct: 41 } })).statusCode).toBe(400);
+  });
+
   it('音效：上传、选用、被使用时不能删除', async () => {
     const { req, upload } = await setup();
     const { effect } = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json();

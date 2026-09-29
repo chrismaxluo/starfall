@@ -2,6 +2,9 @@
 import type { GuardLevel, TriggerKind } from './events.ts';
 import type { Position } from './rules.ts';
 
+/** 上下羽化宽度上限（素材高度的百分比）；特效页也要用，所以放在这里 */
+export const FEATHER_MAX = 40;
+
 export interface OverlayConfig {
   outputId: number;
   name: string;
@@ -42,6 +45,8 @@ export interface PlayItem {
     offsetY: number;
     /** 大小：自动大小的百分比 */
     sizePct: number;
+    /** 上下羽化宽度（素材高度的百分比，0 为不羽化）：已经按全局设置算好 */
+    featherPct: number;
     sound: { url: string } | null;
     volume: number;
   };

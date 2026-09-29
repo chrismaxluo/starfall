@@ -89,12 +89,19 @@ function nudge(x: number, y: number, size: number): boolean {
   return true;
 }
 
+/** 改正在播放的上传素材的上下羽化（不重新播放）；没在播放时返回 false */
+function feather(pct: number): boolean {
+  if (!ready || !geom()?.media) return false;
+  send({ type: 'feather', pct });
+  return true;
+}
+
 /** 拖动时让素材一直显示 */
 function hold(): void {
   send({ type: 'hold' });
 }
 
-defineExpose({ play, stop, geom, nudge, hold });
+defineExpose({ play, stop, geom, nudge, hold, feather });
 </script>
 
 <template>

@@ -2,8 +2,8 @@
 // 素材设置（F-AS-06 ~ 12）：左边预览，右边 ① 画面 ② 头像和欢迎语 ③ 音效 ④ 位置与时长
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
-import { FADE_MAX_MS, FADE_MIN_MS, OFFSET_MAX, SIZE_MAX, SIZE_MIN } from '@starfall/shared';
-import type { EffectTexts, Position } from '@starfall/shared';
+import { FADE_MAX_MS, FADE_MIN_MS, FEATHER_MAX, OFFSET_MAX, SIZE_MAX, SIZE_MIN } from '@starfall/shared';
+import type { EffectTexts, FeatherMode, Position } from '@starfall/shared';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { placeWarnings } from '../lib/place.ts';
@@ -61,6 +61,8 @@ function snapshot(e: EffectDto) {
     offsetX: e.offsetX,
     offsetY: e.offsetY,
     sizePct: e.sizePct,
+    feather: e.feather,
+    featherPct: e.featherPct,
   };
 }
 const d = ref(eff.value ? snapshot(eff.value) : null);
@@ -85,7 +87,7 @@ function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct) } : {}) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct), feather: v.feather, featherPct: Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))) } : {}) };
   // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
   if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
   const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
@@ -287,6 +289,32 @@ watch(
 );
 const meta = computed(() => (a.value ? `${a.value.ext.toUpperCase()}${a.value.width ? ` · ${a.value.width}×${a.value.height}` : ''} · ${seconds(a.value.durationMs)} · ${fileSize(a.value.size)}` : ''));
 const o = computed(() => output());
+
+// 上下羽化：跟随全局时只对没有透明通道的素材生效
+const globalFeather = computed(() => (a.value && !a.value.hasAlpha && state.settings?.featherOn ? state.settings.featherPct : 0));
+const featherOptions = computed<Array<{ value: FeatherMode; label: string }>>(() => [
+  { value: 'global', label: `跟随全局 · ${globalFeather.value ? `${globalFeather.value}%` : '不羽化'}` },
+  { value: 'custom', label: '自己设置' },
+  { value: 'off', label: '不羽化' },
+]);
+/** 现在实际用的羽化宽度 */
+const featherNow = computed(() => {
+  const v = d.value;
+  if (!v || !a.value || v.feather === 'off') return 0;
+  return v.feather === 'custom' ? Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))) : globalFeather.value;
+});
+const featherHint = computed(() => {
+  if (d.value?.feather === 'custom') return '按素材高度算，0% 就是不羽化';
+  if (d.value?.feather === 'off') return '这个素材的边缘不虚化';
+  if (a.value?.hasAlpha) return '这个素材有透明通道，跟随全局时不羽化；需要的话选「自己设置」';
+  return state.settings?.featherOn ? '全局设置在「设置 → 素材显示」里改' : '全局没有打开，可以在「设置 → 素材显示」里统一打开';
+});
+// 正在播放时直接改，不重新播放
+watch(featherNow, (p) => {
+  if (stage.value?.feather(p)) return;
+  if (offTimer) clearTimeout(offTimer);
+  offTimer = setTimeout(replay, 600);
+});
 function close(): void {
   audio?.pause();
   if (dirty.value && !confirmLeave.value) {
@@ -350,6 +378,9 @@ onBeforeUnmount(() => {
                 <button class="btn" :disabled="busy" @click="repIn?.click()"><Icon name="i-replay" />替换文件</button>
               </div>
               <input ref="repIn" type="file" hidden accept=".webm,.mp4,.svga,.json,.gif,.png,.apng,.webp,.jpg,.jpeg" @change="replaceFile" />
+              <div class="toggle-line fe-line">上下羽化 <Seg v-model="d.feather" label="上下羽化" :options="featherOptions" /></div>
+              <div v-if="d.feather === 'custom'" class="slider-row off"><label for="edFe">羽化宽度</label><input id="edFe" v-model.number="d.featherPct" type="range" min="0" :max="FEATHER_MAX" step="1" /><output>{{ d.featherPct }}%</output></div>
+              <span class="hint" style="font-size: 12px; color: var(--t3)">{{ featherHint }}</span>
               <div v-if="a.warnings.includes('no_alpha')" class="warnbox">这个文件没有透明通道，在直播软件里会带背景色，挡住直播画面。建议导出成带透明通道的 WebM（VP9）。</div>
               <div v-if="a.warnings.includes('large')" class="warnbox">文件超过 10 MB，首次加载可能会慢一点，建议压缩。</div>
             </template>

@@ -368,6 +368,13 @@ export class Pipeline {
 
   // ---------- 播放 ----------
 
+  /** 上下羽化宽度：跟随全局时只对没有透明通道的素材生效 */
+  private featherOf(e: EffectDto): number {
+    if (e.visual.type !== 'asset' || !e.asset || e.feather === 'off') return 0;
+    if (e.feather === 'custom') return e.featherPct;
+    return !e.asset.hasAlpha && this.d.settings.get('featherOn') ? this.d.settings.get('featherPct') : 0;
+  }
+
   private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {
     const a = effect.asset;
     return {
@@ -390,6 +397,7 @@ export class Pipeline {
         offsetX: effect.offsetX,
         offsetY: effect.offsetY,
         sizePct: effect.sizePct,
+        featherPct: this.featherOf(effect),
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },

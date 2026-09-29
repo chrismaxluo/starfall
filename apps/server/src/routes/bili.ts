@@ -1,6 +1,7 @@
 // B 站账号、直播间、连接状态（需求 F-BL-01 ~ 03、F-BL-10）
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { FEATHER_MAX } from '@starfall/shared';
 import { BiliApiError } from '@starfall/bili';
 import type { AppContext } from '../context.ts';
 import { HttpError, parseBody } from '../http.ts';
@@ -78,6 +79,8 @@ export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
         giftComboEnabled: z.boolean().optional(),
         giftComboSec: z.number().int().min(1).max(15).optional(),
         autoBackup: z.boolean().optional(),
+        featherOn: z.boolean().optional(),
+        featherPct: z.number().int().min(0).max(FEATHER_MAX).optional(),
         onboarded: z.boolean().optional(),
       }).strict(),
       req.body,

@@ -57,6 +57,13 @@
       "when": 1790693949521,
       "tag": "0007_asset_size",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790696494474,
+      "tag": "0008_feather",
+      "breakpoints": true
     }
   ]
 }

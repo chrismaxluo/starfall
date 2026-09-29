@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 抽卡出金</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+:root { --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  --bg: #0B0B10; --panel: #121218; --line: rgba(255,255,255,.08); --text: #EDEDF1; --mute: #A6A8B4; --dim: #80838F; --acc: #8D8BFF; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.app { height: 100%; display: grid; grid-template-columns: 320px 1fr; }
+.side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 22px 18px 40px; }
+.side h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.side h1 img { width: 22px; height: 22px; }
+.side .sub { color: var(--dim); font-size: 12.5px; line-height: 1.6; }
+.grp { margin-top: 18px; }
+.grp > b { display: block; font-size: 11.5px; letter-spacing: .12em; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: #0D0D12; padding: 3px; border-radius: 9px; border: 1px solid var(--line); }
+.seg button { flex: 1 1 30%; border: 0; background: transparent; padding: 7px 8px; border-radius: 7px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.seg button.on { background: #26262F; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.seg.big button { padding: 10px 8px; font-size: 13.5px; }
+.row { display: flex; gap: 8px; margin-top: 18px; }
+.btn { flex: 1; height: 38px; border-radius: 9px; border: 0; background: var(--acc); color: #0B0B12; font-weight: 600; font-size: 13.5px; }
+.btn.sec { background: #22222B; color: var(--text); }
+.btn.sec.on { background: rgba(61,214,140,.16); color: #3DD68C; }
+.note { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: #0D0D12; border: 1px solid var(--line); font-size: 12.5px; line-height: 1.75; color: var(--mute); }
+.note b { color: var(--text); font-weight: 600; }
+.view { position: relative; overflow: hidden; display: grid; place-items: center; }
+.frame { position: relative; flex: none; }
+.frame > .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cap-line { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-size: 12px; color: var(--dim); font-family: var(--font-mono); }
+@media (max-width: 820px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100%; } .side { border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; } .view { height: 78vh; } }
+
+/* ================= 画布（1080×1920 竖屏） ================= */
+.stage { width: 1080px; height: 1920px; overflow: hidden; --st: 12%; --sb: 40%;
+  background-color: #15151C; background-image: linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%), linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%);
+  background-size: 64px 64px; background-position: 0 0, 32px 32px; box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+.stage.sc-room { background:
+  radial-gradient(260px 260px at 18% 62%, rgba(255,170,90,.85), transparent 70%),
+  radial-gradient(340px 300px at 86% 70%, rgba(90,160,255,.75), transparent 70%),
+  radial-gradient(500px 420px at 60% 18%, rgba(210,120,255,.45), transparent 70%),
+  linear-gradient(175deg, #2A2436, #151823 60%, #0E1017); }
+.stage.sc-dark { background: radial-gradient(700px 500px at 70% 20%, rgba(88,120,190,.45), transparent 70%), radial-gradient(600px 500px at 20% 90%, rgba(40,90,80,.45), transparent 70%), linear-gradient(170deg, #1B2233, #0C0F16); }
+.person { position: absolute; left: 50%; top: 520px; width: 0; height: 0; display: none; }
+.stage.sc-dark .person, .stage.sc-room .person { display: block; }
+.person::before { content: ""; position: absolute; left: -165px; top: 0; width: 330px; height: 380px; border-radius: 50% 50% 46% 46%; background: #6E5A50; }
+.person::after { content: ""; position: absolute; left: -380px; top: 420px; width: 760px; height: 900px; border-radius: 380px 380px 0 0; background: linear-gradient(90deg, #3A4A78, #7A4A8A); }
+.safe { position: absolute; left: 0; right: 0; z-index: 50; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 22px; letter-spacing: .1em; color: rgba(255,255,255,.5); background: repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 14px, transparent 14px 28px); }
+.safe.top { top: 0; height: var(--st); border-bottom: 2px dashed rgba(255,255,255,.25); }
+.safe.bot { bottom: 0; height: var(--sb); border-top: 2px dashed rgba(255,255,255,.25); }
+.stage:not(.show-safe) .safe { display: none; }
+
+/* ================= 抽卡出金 =================
+   --p：召唤光的颜色（抽卡悬念：先蓝，提督变紫，总督再变金）；--g / --c1 / --c2 / --c3：这位观众身份的颜色 */
+.gc { position: absolute; inset: 0; z-index: 10; pointer-events: none; --cy: 790px; --p: 79, 160, 255; }
+.gc.lv-cap { --g: 72, 150, 255; --c1: #4896FF; --c2: #BFE0FF; --c3: #0B2352; }
+.gc.lv-adm { --g: 170, 112, 255; --c1: #A970FF; --c2: #E8D6FF; --c3: #25104E; }
+.gc.lv-gov { --g: 255, 184, 64; --c1: #FFB840; --c2: #FFEDB8; --c3: #4B1C06; }
+.gc.p-purple { --p: 176, 120, 255; }
+.gc.p-gold { --p: 255, 196, 80; }
+
+.gc-dim { position: absolute; inset: 0; opacity: 0; background: radial-gradient(1100px 1300px at 50% 41%, rgba(12, 14, 32, .52), rgba(3, 4, 10, .93) 72%); }
+.gc-tint { position: absolute; inset: 0; opacity: 0; background: radial-gradient(900px 1100px at 50% 41%, rgba(var(--p), .22), transparent 70%); }
+/* 粒子是柔和的光点：用一半的分辨率画，再放大（省 3/4 的计算） */
+.gc canvas { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+.gc-pillar { position: absolute; left: 50%; top: 0; width: 300px; height: 100%; margin-left: -150px; transform: scaleX(0); opacity: 0; will-change: transform, opacity;
+  background: linear-gradient(90deg, transparent, rgba(var(--p), .06) 20%, rgba(var(--p), .32) 40%, rgba(255, 255, 255, .8) 50%, rgba(var(--p), .32) 60%, rgba(var(--p), .06) 80%, transparent); }
+.gc-portal { position: absolute; left: 50%; top: var(--cy); width: 900px; height: 900px; margin: -450px 0 0 -450px; opacity: 0; transform: scale(.4); }
+.gc-portal .ly { position: absolute; inset: 0; will-change: transform; }
+.gc-portal .ly.a { animation: gcSpin 26s linear infinite; }
+.gc-portal .ly.b { animation: gcSpin 18s linear infinite reverse; }
+.gc-portal .ly.c { animation: gcSpin 12s linear infinite; }
+.gc-portal .ly.d { animation: gcSpin 40s linear infinite reverse; }
+.gc-portal svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.gc-portal .r { fill: none; stroke: rgba(var(--p), .75); }
+.gc-portal .r1 { stroke-width: 2; stroke-dasharray: 2 16; }
+.gc-portal .r2 { stroke-width: 10; stroke-dasharray: 1 9; opacity: .55; }
+.gc-portal .r3 { stroke-width: 2.5; }
+.gc-portal .r3g { stroke-width: 16; opacity: .22; }
+.gc-portal .r4 { stroke-width: 1.2; stroke-dasharray: 60 18 6 18; opacity: .7; }
+.gc-portal .glyphs path { fill: rgba(var(--p), .9); }
+.gc-core { position: absolute; left: 50%; top: var(--cy); width: 640px; height: 640px; margin: -320px 0 0 -320px; border-radius: 50%; opacity: 0; will-change: transform, opacity;
+  background: radial-gradient(circle, rgba(255, 255, 255, .95) 0, rgba(var(--p), .75) 16%, rgba(var(--p), .18) 42%, transparent 66%); }
+@keyframes gcSpin { to { transform: rotate(360deg); } }
+
+.gc-rays { position: absolute; left: 50%; top: var(--cy); width: 1800px; height: 1800px; margin: -900px 0 0 -900px; opacity: 0; will-change: transform, opacity;
+  background: repeating-conic-gradient(from 0deg, rgba(var(--g), 0) 0deg 7deg, rgba(var(--g), .30) 9deg, rgba(var(--g), 0) 11deg 15deg);
+  -webkit-mask: radial-gradient(circle, #000 0, rgba(0,0,0,.6) 22%, transparent 48%); mask: radial-gradient(circle, #000 0, rgba(0,0,0,.6) 22%, transparent 48%); }
+.gc-rays.spin { animation: gcSpin 60s linear infinite; }
+.gc-wave { position: absolute; left: 50%; top: var(--cy); width: 600px; height: 600px; margin: -300px 0 0 -300px; border-radius: 50%; opacity: 0;
+  box-shadow: 0 0 0 6px rgba(var(--g), .9), 0 0 60px 10px rgba(var(--g), .6), inset 0 0 60px rgba(var(--g), .5); }
+.gc-flash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(900px 1100px at 50% 41%, #fff, rgba(255, 255, 255, .6) 45%, rgba(255, 255, 255, .15)); }
+.gc-gold { position: absolute; inset: 0; opacity: 0; will-change: opacity; background: radial-gradient(1000px 1300px at 50% 41%, rgba(255, 214, 120, .95), rgba(255, 150, 40, .55) 45%, rgba(255, 110, 20, .15) 80%); }
+
+/* 卡牌 */
+.gc-card3d { position: absolute; left: 50%; top: var(--cy); width: 560px; height: 820px; margin: -410px 0 0 -280px; perspective: 2000px; opacity: 0; }
+.gc-float { width: 100%; height: 100%; will-change: transform; transform-style: preserve-3d; }
+.gc-card { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; will-change: transform; }
+.gc-face { position: absolute; inset: 0; border-radius: 32px; overflow: hidden; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.gc-face::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 5px; z-index: 5;
+  background: linear-gradient(145deg, var(--edge2), var(--edge1) 28%, #fff 48%, var(--edge1) 64%, var(--edge2));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.gc-face::after { content: ""; position: absolute; inset: 18px; border-radius: 20px; z-index: 5; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .16); }
+.gc-back { --edge1: rgb(var(--p)); --edge2: rgba(var(--p), .5); background:
+  radial-gradient(360px 360px at 50% 50%, rgba(var(--p), .55), transparent 70%),
+  repeating-conic-gradient(from 45deg, rgba(255, 255, 255, .055) 0 25%, transparent 0 50%) 0 0 / 44px 44px,
+  linear-gradient(160deg, #10152C, #05060C); box-shadow: 0 0 90px rgba(var(--p), .55); }
+.gc-back svg { position: absolute; left: 50%; top: 50%; width: 330px; height: 330px; margin: -165px 0 0 -165px; }
+.gc-back .em { fill: none; stroke: rgba(var(--p), 1); stroke-width: 3; filter: drop-shadow(0 0 14px rgba(var(--p), .9)); }
+.gc-back .em2 { fill: rgba(var(--p), .22); stroke: rgba(255, 255, 255, .8); stroke-width: 2; }
+/* 旋转时不露正面（抽卡的悬念）：正面藏起来，背面转到后面也看得见；最后一次翻面前才恢复 */
+.gc-card.spinning .gc-front { visibility: hidden; }
+.gc-card.spinning .gc-back { -webkit-backface-visibility: visible; backface-visibility: visible; }
+.gc-card.spinning .gc-back .brand { visibility: hidden; }
+.gc-back .brand { position: absolute; left: 0; right: 0; bottom: 60px; text-align: center; font-family: "Geist", sans-serif; font-weight: 600; font-size: 22px; letter-spacing: .6em; color: rgba(255, 255, 255, .45); }
+.gc-front { --edge1: var(--c1); --edge2: var(--c2); transform: rotateY(180deg); background:
+  linear-gradient(180deg, rgba(var(--g), .30), transparent 38%),
+  radial-gradient(460px 400px at 50% 38%, rgba(var(--g), .55), transparent 72%),
+  linear-gradient(165deg, var(--c3), #06070F 78%); box-shadow: 0 0 110px rgba(var(--g), .6), 0 30px 80px rgba(0, 0, 0, .6); }
+.gc-holo { position: absolute; left: 0; top: 0; width: 220%; height: 220%; z-index: 1; opacity: .5; will-change: transform;
+  background: repeating-linear-gradient(115deg, transparent 0, rgba(255, 110, 200, .12) 5%, rgba(110, 200, 255, .12) 10%, rgba(255, 250, 150, .1) 15%, transparent 20%); }
+.gc-sheen { position: absolute; top: -20%; bottom: -20%; left: 0; width: 40%; z-index: 4; transform: translateX(-150%) skewX(-18deg); opacity: 0; will-change: transform;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent); }
+.gc-rar { position: absolute; left: 40px; top: 30px; z-index: 3; font-family: "Geist", sans-serif; font-weight: 700; font-style: italic; font-size: 108px; line-height: 1; letter-spacing: -4px;
+  background: linear-gradient(180deg, #fff 20%, var(--c2) 55%, var(--c1)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 18px rgba(var(--g), .9)) drop-shadow(0 4px 0 rgba(0, 0, 0, .35)); }
+.gc-tag { position: absolute; right: 38px; top: 44px; z-index: 3; display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 18px 0 8px; border-radius: 25px;
+  background: rgba(0, 0, 0, .35); box-shadow: inset 0 0 0 1.5px rgba(var(--g), .8); font-size: 26px; font-weight: 700; color: var(--c2); letter-spacing: .1em; }
+.gc-tag img { width: 40px; height: 40px; }
+.gc-avw { position: absolute; left: 50%; top: 330px; width: 0; height: 0; z-index: 3; }
+.gc-avw .glow { position: absolute; left: -210px; top: -210px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(var(--g), .7), transparent 68%); }
+.gc-avw .ring { position: absolute; left: -150px; top: -150px; width: 300px; height: 300px; border-radius: 50%; border: 2px dashed rgba(var(--g), .55); animation: gcSpin 20s linear infinite; will-change: transform; }
+.gc-avw .av { position: absolute; left: -98px; top: -98px; width: 196px; height: 196px; border-radius: 50%; overflow: hidden; background: #333; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+.gc-avw .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gc-avw .fr { position: absolute; left: -137px; top: -137px; width: 274px; height: 274px; }
+.gc-stars { position: absolute; left: 0; right: 0; top: 520px; z-index: 3; display: flex; justify-content: center; gap: 12px; }
+.gc-stars svg { width: 50px; height: 50px; overflow: visible; }
+.gc-stars .s0 { fill: rgba(255, 255, 255, .12); stroke: rgba(255, 255, 255, .22); stroke-width: 1.5; }
+.gc-stars .s1 { fill: url(#gcStarFill); stroke: #fff; stroke-width: 1.5; opacity: 0; transform-origin: 25px 25px; filter: drop-shadow(0 0 8px rgba(var(--g), 1)); }
+.gc-name { position: absolute; left: 36px; right: 36px; top: 596px; z-index: 3; text-align: center; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 0 22px rgba(var(--g), .9), 0 3px 0 rgba(0, 0, 0, .35); }
+.gc-say { position: absolute; left: 36px; right: 36px; top: 682px; z-index: 3; text-align: center; font-size: 28px; letter-spacing: .12em; color: var(--c2); opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-foot { position: absolute; left: 0; right: 0; bottom: 42px; z-index: 3; display: flex; justify-content: center; align-items: center; gap: 12px; font-size: 21px; color: rgba(255, 255, 255, .6); letter-spacing: .06em; }
+.gc-medal { display: inline-flex; height: 32px; border-radius: 6px; overflow: hidden; font-size: 19px; font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--mb); }
+.gc-medal span { display: grid; place-items: center; padding: 0 9px; }
+.gc-medal .n { background: var(--mc); color: #fff; }
+.gc-medal .l { background: #fff; color: var(--mc2); min-width: 34px; font-family: "Geist", sans-serif; }
+@keyframes gcShake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-14px, 8px); } 30% { transform: translate(12px, -10px); } 45% { transform: translate(-9px, -6px); } 60% { transform: translate(8px, 9px); } 75% { transform: translate(-5px, 4px); } }
+.gc.shake { animation: gcShake .5s ease-out; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1><img src="assets/logo.svg" alt="">抽卡出金</h1>
+    <div class="sub">全屏入场特效 · 舰长、提督、总督通用，按身份自动换头像框、颜色、稀有度和时长。头像框从 B 站加载。</div>
+    <div class="grp"><b>身份</b><div class="seg big" id="lv"></div></div>
+    <div class="grp"><b>昵称</b><div class="seg" id="nm"></div></div>
+    <div class="grp"><b>粉丝牌</b><div class="seg" id="md"></div></div>
+    <div class="grp"><b>背景</b><div class="seg" id="bg"></div></div>
+    <div class="row"><button class="btn" id="play">▶ 播放</button></div>
+    <div class="row"><button class="btn sec" id="loop">自动循环</button><button class="btn sec on" id="snd">声音</button><button class="btn sec" id="safe">安全区</button></div>
+    <div class="note" id="info"></div>
+    <div class="note"><b>过程</b><br>① 画面压暗，中间亮起召唤光门<br>② 卡牌从光门升起、越转越快；<b>提督</b>光从蓝变紫，<b>总督</b>再变金（出金！）<br>③ 翻面：闪光、冲击波、光芒，总督还有全屏金光和震动<br>④ 卡面：头像框、稀有度、星星一颗颗点亮、昵称和欢迎语<br>⑤ 停留一会儿后收光退场</div>
+  </aside>
+  <main class="view" id="view">
+    <div class="frame" id="frame">
+      <div class="stage sc-room" id="stage">
+        <div class="person"></div>
+        <div class="safe top">顶部信息栏</div><div class="safe bot">底部弹幕区</div>
+      </div>
+    </div>
+    <div class="cap-line" id="cap"></div>
+  </main>
+</div>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <linearGradient id="gcStarFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".45" stop-color="#FFE8A6"/><stop offset="1" stop-color="#FFB23C"/></linearGradient>
+</defs></svg>
+<script>
+const $ = (s) => document.querySelector(s);
+const FACE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB3C8"/><stop offset="1" stop-color="#7A5CFF"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="40" r="18" fill="#fff" opacity=".9"/><path d="M18 92c4-20 18-30 32-30s28 10 32 30z" fill="#fff" opacity=".9"/></svg>');
+// B 站的大航海头像框、船锚图标（版权归 B 站，只在运行时加载）
+const FRAMES = { gov: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', adm: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', cap: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const BADGES = { gov: `${BADGE}governor-DpDXKEdA.png`, adm: `${BADGE}supervisor-u43ElIjU.png`, cap: `${BADGE}captain-Bjw5Byb5.png` };
+const LEVELS = {
+  cap: { name: '舰长', rar: 'SR', stars: 3, dur: 5000 },
+  adm: { name: '提督', rar: 'SSR', stars: 4, dur: 6000 },
+  gov: { name: '总督', rar: 'UR', stars: 5, dur: 7000 },
+};
+const NAMES = { short: '道具堡', mid: '晚风与星河漫步', long: '今天也要早点睡觉的超长昵称啊' };
+const MEDALS = { 8: 8, 24: 24, 41: 41 };
+const RGB = { blue: [79, 160, 255], purple: [176, 120, 255], gold: [255, 196, 80] };
+const LV_RGB = { cap: [72, 150, 255], adm: [170, 112, 255], gov: [255, 184, 64] };
+const st = { lv: 'cap', nm: 'short', md: 24, bg: 'room', loop: false, snd: true, safe: false };
+
+function medalColors(level) {
+  const t = level <= 10 ? '#5762A7' : level <= 20 ? '#C770A4' : level <= 30 ? '#3FB4F6' : level <= 40 ? '#4C7DFF' : level <= 50 ? '#A773F1' : '#EC4F6E';
+  return { mc: t, mb: `${t}99` };
+}
+
+/* ---------- 时间线（毫秒）：身份越高，悬念越长 ---------- */
+function plan(lv) {
+  const base = { dim: 0, pillar: 220, portal: 380, cardIn: 950, esc: [], exit: LEVELS[lv].dur - 650 };
+  if (lv === 'cap') return { ...base, spinEnd: 2250, reveal: 2380, stars: 2800, step: 170 };
+  if (lv === 'adm') return { ...base, esc: [[2150, 'purple']], spinEnd: 2900, reveal: 3030, stars: 3450, step: 160 };
+  return { ...base, esc: [[2100, 'purple'], [2850, 'gold']], spinEnd: 3500, reveal: 3640, stars: 4080, step: 150 };
+}
+
+/* ---------- 声音：全部现场合成，不用外部音频 ---------- */
+let ac = null;
+function audio() {
+  if (!st.snd) return null;
+  ac ??= new (window.AudioContext || window.webkitAudioContext)();
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function noiseBuf(a, sec) {
+  const b = a.createBuffer(1, a.sampleRate * sec, a.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return b;
+}
+function env(a, g, t, peak, att, dec) {
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + att);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + att + dec);
+}
+function tone(freq, when, dur, peak = 0.12, type = 'sine', slideTo) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + when / 1000;
+  const o = a.createOscillator(); const g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  env(a, g, t, peak, 0.01, dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+function noise(when, dur, peak, type, f0, f1, q = 1) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + when / 1000;
+  const s = a.createBufferSource(); s.buffer = noiseBuf(a, dur + 0.1);
+  const f = a.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  const g = a.createGain(); env(a, g, t, peak, dur * 0.6, dur * 0.4);
+  s.connect(f).connect(g).connect(a.destination); s.start(t); s.stop(t + dur + 0.1);
+}
+const sfx = {
+  charge: (ms) => { tone(110, 0, ms / 1000, 0.05, 'sine', 330); noise(0, ms / 1000, 0.06, 'bandpass', 300, 1800, 2); },
+  whoosh: (at) => noise(at, 0.5, 0.08, 'bandpass', 500, 2400, 1.5),
+  escalate: (at, up) => { tone(up ? 1175 : 880, at, 0.9, 0.09, 'triangle'); tone(up ? 1760 : 1320, at + 30, 0.9, 0.05, 'sine'); noise(at, 0.35, 0.05, 'highpass', 3000, 8000); },
+  reveal: (at, big) => { tone(big ? 70 : 90, at, 0.9, big ? 0.35 : 0.25, 'sine', 32); noise(at, 0.5, big ? 0.22 : 0.14, 'lowpass', 2400, 200); tone(2093, at + 60, 1.4, 0.05, 'triangle'); tone(2637, at + 120, 1.4, 0.035, 'triangle'); },
+  star: (at, i) => { tone(1046 * Math.pow(1.122, i), at, 0.35, 0.07, 'sine'); tone(2093 * Math.pow(1.122, i), at, 0.2, 0.025, 'triangle'); },
+  chord: (at, lv) => { const r = lv === 'gov' ? [523, 659, 784, 1046] : lv === 'adm' ? [466, 587, 698, 932] : [440, 554, 659]; r.forEach((f, i) => tone(f, at + i * 40, 1.6, 0.035, 'triangle')); },
+};
+
+/* ---------- 粒子：召唤时往中间聚、翻面时炸开、停留时往上飘 ---------- */
+function particles(canvas) {
+  const c = canvas.getContext('2d');
+  c.scale(0.5, 0.5);
+  const ps = [];
+  const sprite = {};
+  function spr(rgb) {
+    const k = rgb.join(',');
+    if (sprite[k]) return sprite[k];
+    const s = document.createElement('canvas'); s.width = s.height = 64;
+    const x = s.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.22, `rgba(${k},0.95)`); g.addColorStop(1, `rgba(${k},0)`);
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return (sprite[k] = s);
+  }
+  let cx = 540, cy = 790, raf = 0, alive = true;
+  const api = {
+    converge(n, rgb) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, r = 380 + Math.random() * 280;
+        ps.push({ kind: 'in', x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r * 1.2, a, r, spin: 0.018 + Math.random() * 0.02, sp: 4 + Math.random() * 5, s: 6 + Math.random() * 11, rgb, life: 1 });
+      }
+    },
+    burst(n, rgb, power = 1) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, v = (6 + Math.random() * 20) * power;
+        ps.push({ kind: 'out', x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, s: 6 + Math.random() * (Math.random() < 0.15 ? 40 : 16), rgb, life: 1, dec: 0.008 + Math.random() * 0.014, star: Math.random() < 0.25 });
+      }
+    },
+    drift(n, rgb) {
+      for (let i = 0; i < n; i++) ps.push({ kind: 'up', x: cx + (Math.random() - 0.5) * 760, y: cy + 200 + Math.random() * 400, vy: -(0.8 + Math.random() * 1.8), vx: (Math.random() - 0.5) * 0.4, s: 5 + Math.random() * 12, rgb, life: 1, dec: 0.004 + Math.random() * 0.006, tw: Math.random() * 6 });
+    },
+    stop() { alive = false; cancelAnimationFrame(raf); c.clearRect(0, 0, 1080, 1920); },
+  };
+  // 没有粒子时不画（加了新粒子再开始）
+  let idle = false;
+  const wake = () => { if (idle && alive) { idle = false; raf = requestAnimationFrame(frame); } };
+  for (const k of ['converge', 'burst', 'drift']) { const f = api[k]; api[k] = (...a) => { f(...a); wake(); }; }
+  function frame() {
+    if (!alive) return;
+    c.clearRect(0, 0, 1080, 1920);
+    c.globalCompositeOperation = 'lighter';
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i];
+      if (p.kind === 'in') { p.r -= p.sp; p.a += p.spin; p.x = cx + Math.cos(p.a) * p.r; p.y = cy + Math.sin(p.a) * p.r * 1.2; if (p.r < 30) p.life = 0; p.al = Math.min(1, p.r / 200); }
+      else if (p.kind === 'out') { p.x += p.vx; p.y += p.vy; p.vx *= 0.955; p.vy *= 0.955; p.vy += 0.05; p.life -= p.dec; p.al = p.life; }
+      else { p.x += p.vx; p.y += p.vy; p.life -= p.dec; p.tw += 0.12; p.al = p.life * (0.55 + 0.45 * Math.sin(p.tw)); }
+      if (p.life <= 0) { ps.splice(i, 1); continue; }
+      c.globalAlpha = Math.max(0, Math.min(1, p.al));
+      const s = p.s; c.drawImage(spr(p.rgb), p.x - s, p.y - s, s * 2, s * 2);
+      if (p.star) { c.fillStyle = 'rgba(255,255,255,0.9)'; c.fillRect(p.x - s * 1.4, p.y - 1.2, s * 2.8, 2.4); c.fillRect(p.x - 1.2, p.y - s * 1.4, 2.4, s * 2.8); }
+    }
+    if (!ps.length) { idle = true; return; }
+    raf = requestAnimationFrame(frame);
+  }
+  raf = requestAnimationFrame(frame);
+  return api;
+}
+
+/* ---------- 搭画面 ---------- */
+const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const STAR = '<path d="M25 2l6.6 14.2 15.4 1.8-11.4 10.5 3 15.3L25 36.2 11.4 43.8l3-15.3L3 18l15.4-1.8z"/>';
+function portalSvg() {
+  const glyphs = Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2, x = 450 + Math.cos(a) * 395, y = 450 + Math.sin(a) * 395; return `<path transform="translate(${x} ${y}) rotate(${(a * 180) / Math.PI + 45})" d="M0 -9L4 0L0 9L-4 0z"/>`; }).join('');
+  const ly = (cls, body) => `<div class="ly ${cls}"><svg viewBox="0 0 900 900">${body}</svg></div>`;
+  return ly('a', '<circle class="r r1" cx="450" cy="450" r="430"/>') + ly('b', '<circle class="r r2" cx="450" cy="450" r="360"/>') + ly('c', '<circle class="r r4" cx="450" cy="450" r="315"/>')
+    + `<svg viewBox="0 0 900 900"><circle class="r r3g" cx="450" cy="450" r="285"/><circle class="r r3" cx="450" cy="450" r="285"/></svg>` + ly('d', `<g class="glyphs">${glyphs}</g>`);
+}
+function backSvg() {
+  const pts = (r1, r2, n) => Array.from({ length: n * 2 }, (_, i) => { const r = i % 2 ? r2 : r1, a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2; return `${165 + Math.cos(a) * r},${165 + Math.sin(a) * r}`; }).join(' ');
+  return `<svg viewBox="0 0 330 330"><circle class="em" cx="165" cy="165" r="150" stroke-dasharray="4 10"/><circle class="em" cx="165" cy="165" r="128"/><polygon class="em2" points="${pts(118, 46, 8)}"/><polygon class="em2" points="${pts(62, 26, 4)}" style="fill:rgba(255,255,255,.25)"/></svg>`;
+}
+function build(lv, name, medalLv) {
+  const L = LEVELS[lv];
+  const root = h('div', `gc lv-${lv}`);
+  const canvas = h('canvas'); canvas.width = 540; canvas.height = 960;
+  const card3d = h('div', 'gc-card3d');
+  const flt = h('div', 'gc-float');
+  const card = h('div', 'gc-card');
+  const back = h('div', 'gc-face gc-back', backSvg() + '<div class="brand">STARFALL</div>');
+  const front = h('div', 'gc-face gc-front');
+  const mc = medalColors(medalLv);
+  const size = Math.round(Math.max(34, Math.min(62, 470 / [...name].length)));
+  front.innerHTML = `
+    <div class="gc-holo"></div><div class="gc-sheen"></div>
+    <div class="gc-rar">${L.rar}</div>
+    <div class="gc-tag"><img src="${BADGES[lv]}" alt="" referrerpolicy="no-referrer">${L.name}</div>
+    <div class="gc-avw"><div class="glow"></div><div class="ring"></div><div class="av"><img src="${FACE}" alt=""></div><img class="fr" src="${FRAMES[lv]}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"></div>
+    <div class="gc-stars">${Array.from({ length: L.stars }, () => `<svg viewBox="0 0 50 50"><g class="s0">${STAR}</g><g class="s1">${STAR}</g></svg>`).join('')}</div>
+    <div class="gc-name" style="font-size:${size}px">${name}</div>
+    <div class="gc-say">欢迎${L.name} 驾临直播间</div>
+    <div class="gc-foot"><span class="gc-medal" style="--mc:${mc.mc};--mc2:${mc.mc};--mb:${mc.mb}"><span class="n">星临</span><span class="l">${medalLv}</span></span><span>本场第 3 位大航海</span></div>`;
+  card.append(back, front); flt.append(card); card3d.append(flt);
+  root.append(h('div', 'gc-dim'), h('div', 'gc-tint'), h('div', 'gc-rays'), h('div', 'gc-pillar'), h('div', 'gc-portal', portalSvg()), h('div', 'gc-core'), canvas, h('div', 'gc-wave'), card3d, h('div', 'gc-gold'), h('div', 'gc-flash'));
+  return { root, canvas, card3d, flt, card, front };
+}
+
+/* ---------- 播放 ---------- */
+let cur = null;
+function stop() {
+  if (!cur) return;
+  cur.timers.forEach(clearTimeout); cur.parts.stop(); cur.root.remove(); cur = null;
+}
+function play() {
+  stop();
+  const lv = st.lv, P = plan(lv), L = LEVELS[lv];
+  const b = build(lv, NAMES[st.nm], st.md);
+  $('#stage').append(b.root);
+  const parts = particles(b.canvas);
+  const timers = [];
+  cur = { root: b.root, parts, timers };
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+  const q = (sel) => b.root.querySelector(sel);
+  // 有延迟的动画在等待期间也保持起始状态（否则名字、星星会先露出来）
+  const anim = (el, kf, o) => el.animate(kf, { fill: 'both', ...o });
+  const ease = 'cubic-bezier(.2,.8,.2,1)';
+  const lvRgb = LV_RGB[lv];
+
+  // ① 压暗、光柱、光门
+  anim(q('.gc-dim'), [{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
+  anim(q('.gc-tint'), [{ opacity: 0 }, { opacity: 1 }], { duration: 800, delay: 300 });
+  // 光柱：亮起、卡牌升起时收掉（不要一直竖在卡牌中间）
+  anim(q('.gc-pillar'), [{ transform: 'scaleX(0)', opacity: 0 }, { transform: 'scaleX(1)', opacity: 1, offset: 0.35 }, { transform: 'scaleX(.5)', opacity: .8, offset: 0.7 }, { transform: 'scaleX(0)', opacity: 0 }], { duration: P.cardIn + 500 - P.pillar, delay: P.pillar, easing: ease });
+  anim(q('.gc-portal'), [{ opacity: 0, transform: 'scale(.4) rotate(-40deg)' }, { opacity: 1, transform: 'scale(1) rotate(0deg)' }], { duration: 900, delay: P.portal, easing: 'cubic-bezier(.16,1.2,.3,1)' });
+  anim(q('.gc-core'), [{ opacity: 0, transform: 'scale(.3)' }, { opacity: .9, transform: 'scale(1)' }], { duration: 700, delay: P.portal + 150, easing: ease });
+  at(P.portal, () => { parts.converge(lv === 'gov' ? 50 : 36, RGB.blue); sfx.charge(P.reveal - P.portal); });
+  at(P.portal + 500, () => parts.converge(lv === 'gov' ? 36 : 26, RGB.blue));
+
+  // ② 卡牌升起、越转越快
+  anim(b.card3d, [{ opacity: 0, transform: 'translateY(300px) scale(.3)' }, { opacity: 1, transform: 'translateY(0) scale(.82)' }], { duration: 750, delay: P.cardIn, easing: 'cubic-bezier(.2,1.25,.35,1)' });
+  const turns = lv === 'cap' ? 3 : lv === 'adm' ? 4 : 5;
+  b.card.classList.add('spinning');
+  // 转完最后一圈（正好背面朝前）才恢复正面，接下来那半圈就是翻面
+  at(P.spinEnd, () => b.card.classList.remove('spinning'));
+  const spinDur = P.reveal + 520 - P.cardIn;
+  const spinOff = (P.spinEnd - P.cardIn) / spinDur;
+  anim(b.card, [
+    { transform: 'rotateY(0deg) rotateX(6deg)', easing: 'cubic-bezier(.55,0,.95,.55)' },
+    { transform: `rotateY(${turns * 360}deg) rotateX(0deg)`, offset: spinOff, easing: 'cubic-bezier(.15,1.35,.35,1)' },
+    { transform: `rotateY(${turns * 360 + 180}deg) rotateX(0deg)` },
+  ], { duration: spinDur, delay: P.cardIn });
+  sfx.whoosh(P.cardIn + 200); sfx.whoosh(P.spinEnd - 500);
+
+  // 抽卡悬念：光换颜色
+  P.esc.forEach(([t, color], i) => at(t, () => {
+    b.root.classList.remove('p-purple', 'p-gold'); b.root.classList.add(`p-${color}`);
+    anim(q('.gc-flash'), [{ opacity: 0 }, { opacity: color === 'gold' ? .55 : .35 }, { opacity: 0 }], { duration: 320 });
+    anim(q('.gc-core'), [{ transform: 'scale(1)' }, { transform: 'scale(1.35)' }, { transform: 'scale(1)' }], { duration: 420 });
+    parts.burst(color === 'gold' ? 50 : 30, RGB[color], 0.7);
+    parts.converge(30, RGB[color]);
+    sfx.escalate(0, i > 0);
+    if (color === 'gold') { b.root.classList.remove('shake'); void b.root.offsetWidth; b.root.classList.add('shake'); }
+  }));
+
+  // ③ 翻面：闪光、冲击波、光芒、（总督）全屏金光
+  at(P.reveal, () => {
+    const big = lv === 'gov';
+    anim(q('.gc-flash'), [{ opacity: 0 }, { opacity: big ? .95 : .8, offset: .18 }, { opacity: 0 }], { duration: big ? 520 : 380 });
+    anim(q('.gc-wave'), [{ opacity: 1, transform: 'scale(.2)' }, { opacity: 0, transform: `scale(${big ? 4.4 : 3.2})` }], { duration: 900, easing: 'cubic-bezier(.1,.7,.3,1)' });
+    q('.gc-rays').classList.add('spin');
+    anim(q('.gc-rays'), [{ opacity: 0, transform: 'scale(.4)' }, { opacity: big ? 1 : .75, transform: 'scale(1)' }], { duration: 700, easing: ease });
+    anim(q('.gc-portal'), [{ opacity: 1, transform: 'scale(1)' }, { opacity: .35, transform: 'scale(1.25)' }], { duration: 900, easing: ease });
+    anim(q('.gc-core'), [{ opacity: .9 }, { opacity: .25 }], { duration: 900 });
+    anim(b.card3d, [{ transform: 'scale(.82)' }, { transform: 'scale(1.06)', offset: .35 }, { transform: 'scale(1)' }], { duration: 700, easing: ease });
+    parts.burst(big ? 220 : lv === 'adm' ? 150 : 110, lvRgb, big ? 1.35 : 1);
+    if (big) {
+      anim(q('.gc-gold'), [{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: 0 }], { duration: 1500 });
+      b.root.classList.remove('shake'); void b.root.offsetWidth; b.root.classList.add('shake');
+      parts.burst(120, RGB.gold, 1.8);
+    }
+    sfx.reveal(0, big); sfx.chord(120, lv);
+    // 卡面：高光扫过一次，全息光慢慢流动
+    anim(q('.gc-sheen'), [{ opacity: 1, transform: 'translateX(-150%) skewX(-18deg)' }, { opacity: 1, transform: 'translateX(330%) skewX(-18deg)' }], { duration: 1100, delay: 350, easing: 'cubic-bezier(.4,0,.2,1)' });
+    q('.gc-holo').animate([{ transform: 'translate(0, 0)' }, { transform: 'translate(-45%, -45%)' }], { duration: 4000, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+    // 头像和名字依次出现
+    anim(q('.gc-avw'), [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 600, delay: 150, easing: 'cubic-bezier(.2,1.4,.4,1)' });
+    anim(q('.gc-rar'), [{ opacity: 0, transform: 'translateX(-30px) scale(1.3)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 250, easing: ease });
+    anim(q('.gc-tag'), [{ opacity: 0, transform: 'translateX(30px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 300, easing: ease });
+    anim(q('.gc-name'), [{ opacity: 0, transform: 'translateY(20px)', letterSpacing: '.3em' }, { opacity: 1, transform: 'none', letterSpacing: '.02em' }], { duration: 650, delay: 420 + L.stars * P.step, easing: ease });
+    anim(q('.gc-say'), [{ opacity: 0 }, { opacity: .85 }], { duration: 500, delay: 650 + L.stars * P.step });
+    anim(q('.gc-foot'), [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 800 + L.stars * P.step });
+  });
+  // ④ 星星一颗颗点亮
+  b.root.querySelectorAll('.gc-stars .s1').forEach((s, i) => at(P.stars + i * P.step, () => {
+    anim(s, [{ opacity: 0, transform: 'scale(2.2) rotate(-40deg)' }, { opacity: 1, transform: 'scale(1) rotate(0)' }], { duration: 380, easing: 'cubic-bezier(.2,1.5,.4,1)' });
+    sfx.star(0, i);
+  }));
+  // 停留：轻轻浮动、光点往上飘
+  at(P.reveal + 700, () => {
+    b.flt.animate([{ transform: 'translateY(0) rotateZ(0)' }, { transform: 'translateY(-14px) rotateZ(.6deg)' }, { transform: 'translateY(0) rotateZ(0)' }], { duration: 2600, iterations: Infinity, easing: 'ease-in-out' });
+    const n = lv === 'gov' ? 6 : 3;
+    const drip = () => { if (!cur || cur.root !== b.root) return; parts.drift(n, lvRgb); if (Date.now() < end) timers.push(setTimeout(drip, 90)); };
+    const end = Date.now() + (P.exit - P.reveal - 700);
+    drip();
+  });
+  // ⑤ 收光退场
+  at(P.exit, () => {
+    anim(b.card3d, [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(.9) translateY(-30px)' }], { duration: 600, easing: 'cubic-bezier(.4,0,1,1)' });
+    ['.gc-rays', '.gc-portal', '.gc-core', '.gc-tint'].forEach((s) => anim(q(s), [{}, { opacity: 0 }], { duration: 550 }));
+    anim(q('.gc-dim'), [{ opacity: 1 }, { opacity: 0 }], { duration: 650 });
+  });
+  at(L.dur, () => { stop(); if (st.loop) setTimeout(play, 700); });
+  $('#cap').textContent = `${L.name} · ${L.rar} · ${L.stars} 星 · ${(L.dur / 1000).toFixed(0)} 秒`;
+}
+
+/* ---------- 控件 ---------- */
+function segs() {
+  const mk = (id, items, key) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const bt = h('button', st[key] == v ? 'on' : '', label); bt.onclick = () => { st[key] = typeof st[key] === 'number' ? Number(v) : v; sync(); if (key !== 'bg') play(); }; el.append(bt); } };
+  mk('#lv', [['cap', '舰长'], ['adm', '提督'], ['gov', '总督']], 'lv');
+  mk('#nm', [['short', '短昵称'], ['mid', '中等'], ['long', '很长']], 'nm');
+  mk('#md', Object.keys(MEDALS).map((k) => [k, `${k} 级`]), 'md');
+  mk('#bg', [['room', '直播间'], ['dark', '深色'], ['clear', '透明格']], 'bg');
+}
+function sync() {
+  segs();
+  const s = $('#stage'); s.className = `stage sc-${st.bg}${st.safe ? ' show-safe' : ''}`;
+  $('#loop').classList.toggle('on', st.loop); $('#snd').classList.toggle('on', st.snd); $('#safe').classList.toggle('on', st.safe);
+  const L = LEVELS[st.lv];
+  $('#info').innerHTML = `<b>${L.name}</b>：稀有度 ${L.rar}，${L.stars} 颗星，${L.dur / 1000} 秒。${st.lv === 'cap' ? '召唤光保持蓝色。' : st.lv === 'adm' ? '召唤光由蓝变紫，悬念更长一点。' : '召唤光由蓝变紫再变金，翻面时全屏金光加震动。'}`;
+}
+function fit() {
+  const v = $('#view'), f = $('#frame'), s = $('#stage');
+  const k = Math.min((v.clientWidth - 40) / 1080, (v.clientHeight - 50) / 1920);
+  f.style.width = `${1080 * k}px`; f.style.height = `${1920 * k}px`; s.style.transform = `scale(${k})`;
+}
+$('#play').onclick = play;
+$('#loop').onclick = () => { st.loop = !st.loop; sync(); if (st.loop && !cur) play(); };
+$('#snd').onclick = () => { st.snd = !st.snd; sync(); };
+$('#safe').onclick = () => { st.safe = !st.safe; sync(); };
+addEventListener('resize', fit);
+sync(); fit();
+setTimeout(play, 400);
+</script>
+</body>
+</html>

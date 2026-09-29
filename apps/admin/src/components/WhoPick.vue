@@ -18,6 +18,9 @@ const open = ref(false);
 const pos = ref({ left: 0, top: 0 });
 const uidIn = ref('');
 const busy = ref(false);
+/** 勾了「指定观众」但还没加人：先显示输入框 */
+const wantUids = ref(false);
+const uidsOn = computed(() => !w.value.all && (w.value.uids.length > 0 || wantUids.value));
 /** 刚加的观众：服务端返回之前先显示 */
 const added = ref<DanmuPerson[]>([]);
 const w = computed(() => props.modelValue);
@@ -34,27 +37,36 @@ const GUARDS = [
   { level: 3, name: '舰长' },
 ] as const;
 
-function set(next: DanmuWho): void {
-  if (!(next.all || next.anchor || next.mod || next.guards.length || next.fanMin !== null || next.uids.length)) return toast('至少选一种人；不限的话选「所有人」', 'info');
+/** 保存；一种人都没选时不保存，返回 false */
+function set(next: DanmuWho): boolean {
+  if (!(next.all || next.anchor || next.mod || next.guards.length || next.fanMin !== null || next.uids.length)) {
+    toast('至少选一种人；不限的话选「所有人」', 'info');
+    return false;
+  }
   emit('change', next);
+  return true;
+}
+/** 没保存成功：勾选框改回去 */
+function keep(e: Event, ok: boolean): void {
+  if (!ok) (e.target as HTMLInputElement).checked = !(e.target as HTMLInputElement).checked;
 }
 /** 勾了别的就不再是「所有人」 */
 const base = () => ({ ...w.value, all: false });
-function toggleAll(): void {
-  set({ ...w.value, all: !w.value.all });
+function toggleAll(): boolean {
+  return set({ ...w.value, all: !w.value.all });
 }
-function toggleRole(key: 'anchor' | 'mod'): void {
+function toggleRole(key: 'anchor' | 'mod'): boolean {
   const b = base();
-  set({ ...b, [key]: w.value.all ? true : !w.value[key] });
+  return set({ ...b, [key]: w.value.all ? true : !w.value[key] });
 }
-function toggleGuard(level: 1 | 2 | 3): void {
+function toggleGuard(level: 1 | 2 | 3): boolean {
   const b = base();
   const on = !w.value.all && w.value.guards.includes(level);
-  set({ ...b, guards: on ? b.guards.filter((g) => g !== level) : [...b.guards.filter((g) => g !== level), level].sort() });
+  return set({ ...b, guards: on ? b.guards.filter((g) => g !== level) : [...b.guards.filter((g) => g !== level), level].sort() });
 }
-function toggleFan(): void {
+function toggleFan(): boolean {
   const b = base();
-  set({ ...b, fanMin: !w.value.all && w.value.fanMin !== null ? null : (w.value.fanMin ?? 1) });
+  return set({ ...b, fanMin: !w.value.all && w.value.fanMin !== null ? null : (w.value.fanMin ?? 1) });
 }
 function setFanMin(e: Event): void {
   const n = Math.round(Number((e.target as HTMLInputElement).value));
@@ -79,6 +91,16 @@ async function addUid(): Promise<void> {
 }
 function removeUid(uid: number): void {
   set({ ...w.value, uids: w.value.uids.filter((x) => x !== uid) });
+}
+/** 取消勾选「指定观众」：名单清空 */
+function toggleUids(): boolean {
+  if (!uidsOn.value) {
+    wantUids.value = true;
+    return true;
+  }
+  if (w.value.uids.length && !set({ ...w.value, uids: [] })) return false;
+  wantUids.value = false;
+  return true;
 }
 
 function close(): void {
@@ -114,24 +136,27 @@ onBeforeUnmount(close);
   <Teleport to="body">
     <div v-if="open" ref="pop" class="cdpop whopop" :style="{ left: `${pos.left}px`, top: `${pos.top}px` }">
       <div class="lbl">谁发的弹幕才算：满足任意一项就算，改了立即保存</div>
-      <div class="opts">
-        <button type="button" :aria-pressed="w.all" @click="toggleAll">所有人</button>
+      <label class="ck"><input type="checkbox" :checked="w.all" @change="(e) => keep(e, toggleAll())" />所有人</label>
+      <div class="ckrow" :class="{ dim: w.all }">
+        <label v-for="r in ROLES" :key="r.key" class="ck"><input type="checkbox" :checked="!w.all && w[r.key]" @change="(e) => keep(e, toggleRole(r.key))" />{{ r.name }}</label>
       </div>
-      <div class="opts" :class="{ dim: w.all }">
-        <button v-for="r in ROLES" :key="r.key" type="button" :aria-pressed="!w.all && w[r.key]" @click="toggleRole(r.key)">{{ r.name }}</button>
-        <button v-for="g in GUARDS" :key="g.level" type="button" :aria-pressed="!w.all && w.guards.includes(g.level)" @click="toggleGuard(g.level)">{{ g.name }}</button>
+      <div class="ckrow" :class="{ dim: w.all }">
+        <label v-for="g in GUARDS" :key="g.level" class="ck"><input type="checkbox" :checked="!w.all && w.guards.includes(g.level)" @change="(e) => keep(e, toggleGuard(g.level))" />{{ g.name }}</label>
       </div>
-      <div class="fanrow" :class="{ dim: w.all }">
-        <button type="button" :aria-pressed="!w.all && w.fanMin !== null" @click="toggleFan">戴本房间粉丝牌</button>
-        <label v-if="!w.all && w.fanMin !== null">至少 <input class="inp num" type="number" min="1" :max="MEDAL_LEVEL_MAX" :value="w.fanMin" aria-label="粉丝牌最低等级" @change="setFanMin" @keydown.enter="setFanMin" /> 级</label>
+      <div class="ckrow" :class="{ dim: w.all }">
+        <label class="ck"><input type="checkbox" :checked="!w.all && w.fanMin !== null" @change="(e) => keep(e, toggleFan())" />戴本房间粉丝牌</label>
+        <label v-if="!w.all && w.fanMin !== null" class="lv">至少 <input class="inp num" type="number" min="1" :max="MEDAL_LEVEL_MAX" :value="w.fanMin" aria-label="粉丝牌最低等级" @change="setFanMin" @keydown.enter="setFanMin" /> 级</label>
       </div>
       <div class="uidbox" :class="{ dim: w.all }">
-        <div class="uidin"><input v-model="uidIn" class="inp num" placeholder="指定观众：输入 UID，回车添加" inputmode="numeric" aria-label="指定观众的 UID" :disabled="busy" @keydown.enter.prevent="addUid" /></div>
-        <div v-for="p in people" :key="p.uid" class="person">
-          <Avatar :name="p.name || String(p.uid)" :face="p.face" :guard="p.guard" :size="24" />
-          <span class="pn">{{ p.name || '（昵称未知）' }}</span><span class="uid num">{{ p.uid }}</span>
-          <button type="button" :aria-label="`移出 ${p.name || p.uid}`" @click="removeUid(p.uid)"><Icon name="i-x" /></button>
-        </div>
+        <label class="ck"><input type="checkbox" :checked="uidsOn" @change="(e) => keep(e, toggleUids())" />指定观众</label>
+        <template v-if="uidsOn">
+          <div class="uidin"><input v-model="uidIn" class="inp num" placeholder="输入 UID，回车添加" inputmode="numeric" aria-label="指定观众的 UID" :disabled="busy" @keydown.enter.prevent="addUid" /></div>
+          <div v-for="p in people" :key="p.uid" class="person">
+            <Avatar :name="p.name || String(p.uid)" :face="p.face" :guard="p.guard" :size="24" />
+            <span class="pn">{{ p.name || '（昵称未知）' }}</span><span class="uid num">{{ p.uid }}</span>
+            <button type="button" :aria-label="`移出 ${p.name || p.uid}`" @click="removeUid(p.uid)"><Icon name="i-x" /></button>
+          </div>
+        </template>
       </div>
       <div v-if="blockAnchor && !w.all && w.anchor" class="lbl">设置里「主播本人不触发」是开着的，这里点了主播的名，主播发的照样算。</div>
     </div>

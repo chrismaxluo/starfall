@@ -226,12 +226,13 @@
 /* 弹幕规则：谁发的才算 */
 .whopick { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .whopop { width: min(340px, calc(100vw - 16px)); }
-.whopop .fanrow button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .whopop .dim { opacity: .5; }
-.whopop .fanrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--t2); }
-.whopop .fanrow button { height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; font-size: 12.5px; }
-.whopop .fanrow .inp { width: 64px; height: 28px; padding: 0 8px; }
-.whopop .uidbox { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.whopop .ck { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--t1); cursor: pointer; min-height: 26px; }
+.whopop .ck input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.whopop .ckrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; }
+.whopop .lv { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--t2); }
+.whopop .lv .inp { width: 64px; height: 28px; padding: 0 8px; }
+.whopop .uidbox { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
 .whopop .uidin .inp { height: 30px; font-size: 12.5px; }
 .whopop .person { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 2px 3px 6px; }
 .whopop .person .pn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

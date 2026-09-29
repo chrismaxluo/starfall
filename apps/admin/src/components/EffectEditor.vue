@@ -2,10 +2,11 @@
 // 素材设置（F-AS-06 ~ 12）：左边预览，右边 ① 画面 ② 头像和欢迎语 ③ 音效 ④ 位置与时长
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
-import { FADE_MAX_MS, FADE_MIN_MS, OFFSET_MAX } from '@starfall/shared';
+import { FADE_MAX_MS, FADE_MIN_MS, OFFSET_MAX, SIZE_MAX, SIZE_MIN } from '@starfall/shared';
 import type { EffectTexts, Position } from '@starfall/shared';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
+import { placeWarnings } from '../lib/place.ts';
 import { SAMPLES, STYLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
@@ -59,6 +60,7 @@ function snapshot(e: EffectDto) {
     fadeOutS: e.fadeOutMs / 1000,
     offsetX: e.offsetX,
     offsetY: e.offsetY,
+    sizePct: e.sizePct,
   };
 }
 const d = ref(eff.value ? snapshot(eff.value) : null);
@@ -76,13 +78,14 @@ function lines(s: string): string[] {
 const fadeMs = (sec: number) => Math.round(Math.min(FADE_MAX_MS, Math.max(FADE_MIN_MS, (sec || 0) * 1000)));
 /** 位置微调：画面宽、高的百分比，保留一位小数 */
 const clampOff = (n: number) => Math.round(Math.min(OFFSET_MAX, Math.max(-OFFSET_MAX, n || 0)) * 10) / 10;
+const clampSize = (n: number) => Math.round(Math.min(SIZE_MAX, Math.max(SIZE_MIN, n || 100)));
 const offText = (n: number, neg: string, pos: string) => (Math.abs(n) < 0.05 ? '不挪' : `${n < 0 ? neg : pos} ${Math.abs(n)}%`);
 /** 要提交给服务端的修改 */
 function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY) } : {}) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct) } : {}) };
   // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
   if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
   const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
@@ -114,40 +117,32 @@ watch(
 );
 onMounted(() => setTimeout(replay, 300));
 
-// 位置微调：正在播放时直接挪过去，不重新播放；没在播放时重播一遍
+// 位置微调、大小：正在播放时直接改过去，不重新播放；没在播放时重播一遍
 let offTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => d.value && [d.value.offsetX, d.value.offsetY],
+  () => d.value && [d.value.offsetX, d.value.offsetY, d.value.sizePct],
   () => {
     if (!d.value) return;
     checkSafe();
-    if (stage.value?.nudge(clampOff(d.value.offsetX), clampOff(d.value.offsetY)) || drag) return;
+    if (stage.value?.nudge(clampOff(d.value.offsetX), clampOff(d.value.offsetY), clampSize(d.value.sizePct)) || drag) return;
     if (offTimer) clearTimeout(offTimer);
     offTimer = setTimeout(replay, 600);
   },
 );
 
-/** 挪动后素材进了哪些区域（顶部信息栏、底部弹幕区、画面外），没有时为空 */
+/** 调整后比原来多盖住的区域（顶部信息栏、底部弹幕区），以及有没有超出画面 */
 const intoSafe = ref('');
+const outOfStage = ref(false);
+/** 挪过位置或改过大小 */
+const adjusted = computed(() => Boolean(d.value && (d.value.offsetX || d.value.offsetY || clampSize(d.value.sizePct) !== 100)));
 function checkSafe(): void {
   const g = stage.value?.geom();
   const v = d.value;
   const out = o.value;
   if (!g?.base || !v || !out) return;
-  const S = g.stage;
-  const dx = (S.width * clampOff(v.offsetX)) / 100;
-  const dy = (S.height * clampOff(v.offsetY)) / 100;
-  const top = S.top + (S.height * out.safeTop) / 100;
-  const bot = S.bottom - (S.height * out.safeBottom) / 100;
-  const b = g.base;
-  // 和不挪的时候比：多进去 1 像素以上才提醒（居中的全屏素材本来就盖满画面）
-  const parts: string[] = [];
-  if (top - (b.top + dy) > Math.max(0, top - b.top) + 1) parts.push('顶部信息栏');
-  if (b.bottom + dy - bot > Math.max(0, b.bottom - bot) + 1) parts.push('底部弹幕区');
-  const visW = Math.min(S.right, b.right + dx) - Math.max(S.left, b.left + dx);
-  const visH = Math.min(S.bottom, b.bottom + dy) - Math.max(S.top, b.top + dy);
-  if (visW < b.width / 2 || visH < b.height / 2) parts.push('画面外');
-  intoSafe.value = parts.join('、');
+  const w = placeWarnings(g.base, g.stage, out, g.pos, clampOff(v.offsetX), clampOff(v.offsetY), clampSize(v.sizePct));
+  intoSafe.value = w.into.join('、');
+  outOfStage.value = w.out;
 }
 
 // 在预览里按住素材拖动
@@ -156,7 +151,7 @@ const dragging = ref(false);
 const overMedia = ref(false);
 function hit(e: PointerEvent): boolean {
   const r = stage.value?.geom()?.media;
-  return Boolean(r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom);
+  return Boolean(r && e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h);
 }
 function onDown(e: PointerEvent): void {
   const g = stage.value?.geom();
@@ -167,7 +162,7 @@ function onDown(e: PointerEvent): void {
   e.preventDefault();
   (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   stage.value?.hold();
-  drag = { x: e.clientX, y: e.clientY, ox: d.value.offsetX, oy: d.value.offsetY, w: g.stage.width, h: g.stage.height };
+  drag = { x: e.clientX, y: e.clientY, ox: d.value.offsetX, oy: d.value.offsetY, w: g.stage.w, h: g.stage.h };
   dragging.value = true;
 }
 function onMove(e: PointerEvent): void {
@@ -187,6 +182,7 @@ function resetOffset(): void {
   if (!d.value) return;
   d.value.offsetX = 0;
   d.value.offsetY = 0;
+  d.value.sizePct = 100;
 }
 
 function insertVar(v: string): void {
@@ -319,7 +315,10 @@ onBeforeUnmount(() => {
     <div class="ed-scrim" @click="close" />
     <div v-if="eff && d" class="editor" role="dialog" aria-label="素材设置">
       <div class="ed-h">
-        <input v-model="d.name" aria-label="素材名称" :disabled="ro" maxlength="40" />
+        <label class="ed-name" :title="ro ? '' : '点击改名，保存后生效'">
+          <input v-model="d.name" aria-label="素材名称" :disabled="ro" maxlength="40" />
+          <Icon v-if="!ro" name="i-pen" />
+        </label>
         <span v-if="ro" class="badge">内置</span>
         <button class="icon-btn" aria-label="关闭" @click="close"><Icon name="i-x" /></button>
       </div>
@@ -396,11 +395,13 @@ onBeforeUnmount(() => {
             <template v-if="a">
               <div class="slider-row off"><label for="edOffY">上下挪动</label><input id="edOffY" v-model.number="d.offsetY" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetY, '往上', '往下') }}</output></div>
               <div class="slider-row off"><label for="edOffX">左右挪动</label><input id="edOffX" v-model.number="d.offsetX" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetX, '往左', '往右') }}</output></div>
+              <div class="slider-row off"><label for="edSize">大小</label><input id="edSize" v-model.number="d.sizePct" type="range" :min="SIZE_MIN" :max="SIZE_MAX" step="1" /><output>{{ clampSize(d.sizePct) }}%</output></div>
               <div class="toggle-line">
-                <span class="hint">在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算</span>
-                <button class="btn" type="button" style="margin-left: auto" :disabled="!d.offsetX && !d.offsetY" @click="resetOffset">回到原位</button>
+                <span class="hint">在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算；大小 100% 是自动算出的大小</span>
+                <button class="btn" type="button" style="margin-left: auto; flex: none" :disabled="!adjusted" @click="resetOffset">回到原位</button>
               </div>
-              <div v-if="intoSafe && (d.offsetX || d.offsetY)" class="warnbox">素材有一部分挪进了{{ intoSafe }}，直播时可能挡住 B 站的信息、弹幕，或者被挡住。</div>
+              <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B 站的信息、弹幕，或者被挡住。</div>
+              <div v-if="adjusted && outOfStage" class="warnbox">素材有一部分超出了画面，超出的部分直播时看不到。</div>
               <div v-if="timed" class="toggle-line">手动设置时长 <span class="hint">{{ d.durationCustom ? `最长 ${maxSeconds} 秒，到时间就结束` : '关着时按素材完整播放' }}</span><Switch v-model="d.durationCustom" label="手动设置时长" /></div>
               <div class="toggle-line">
                 开头渐入 <span class="hint">{{ d.fadeIn ? '用多少秒慢慢出现' : '关掉后第一帧直接出现' }}</span>
@@ -411,7 +412,7 @@ onBeforeUnmount(() => {
                 <span class="ctl"><span v-if="d.fadeOut" class="suffix"><input v-model.number="d.fadeOutS" class="inp num" type="number" min="0.1" max="5" step="0.1" aria-label="渐出秒数" /><span>秒</span></span><Switch v-model="d.fadeOut" label="结尾渐出" /></span>
               </div>
             </template>
-            <span v-if="o?.orient === 'portrait' && !(a && (d.offsetX || d.offsetY))" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
+            <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>
         </div>
       </div>

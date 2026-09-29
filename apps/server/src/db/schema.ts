@@ -74,6 +74,8 @@ export const effects = sqliteTable('effects', {
   /** 在位置的基础上挪动：画面宽、高的百分比 */
   offsetX: real('offset_x').notNull().default(0),
   offsetY: real('offset_y').notNull().default(0),
+  /** 大小：程序自动算出的大小的百分比 */
+  sizePct: integer('size_pct').notNull().default(100),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

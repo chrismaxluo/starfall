@@ -78,4 +78,7 @@ export const ui = reactive({
   /** 预览小窗：点规则的 ▶、命令面板里的「预览某身份进场特效」 */
   preview: null as PreviewRequest | null,
   quick: null as { uid: number; name: string; face?: string | undefined; viewer?: Viewer } | null,
+  /** 服务端有新版本的后台（和这个页面不一样），顶部提示刷新；dismissed：点了「稍后」的那个版本 */
+  newVersion: null as string | null,
+  dismissedVersion: null as string | null,
 });

@@ -125,7 +125,10 @@ describe('管理后台 WebSocket', () => {
   it('连上后收到当前状态，之后实时收到事件、队列、特效页上下线', async () => {
     const t = await setup();
     const a = await t.connect('/ws/admin', { cookie: `sf_session=${t.session}` });
-    expect(await a.waitFor('hello')).toMatchObject({ status: { paused: false, overlays: 0, room: { roomId: 30000 } }, queue: { playing: null, items: [] } });
+    const aHello = await a.waitFor('hello');
+    expect(aHello).toMatchObject({ status: { paused: false, overlays: 0, room: { roomId: 30000 } }, queue: { playing: null, items: [] } });
+    // 后台的版本（没构建时为 null）：旧页面据此提示刷新
+    expect(aHello).toHaveProperty('build');
     const o = await t.overlay();
     await o.waitFor('hello');
     await a.waitFor('overlays');

@@ -827,6 +827,10 @@ td .excl { font-size: 11px; color: var(--accent); background: var(--accent-soft)
 .pausebtn:hover { color: var(--t1); border-color: var(--line-strong); }
 .pausebtn[aria-pressed="true"] { background: #D64545; border-color: transparent; color: #fff; }
 .pausebtn[aria-pressed="true"] svg use { }
+.verbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 24px; background: var(--accent-soft); border-bottom: 1px solid var(--line); color: var(--accent); font-size: 13px; }
+.verbar svg { width: 15px; height: 15px; }
+.verbar span { color: var(--t2); }
+.verbar .btn:first-of-type { margin-left: auto; }
 .pausebar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 24px; background: rgba(214, 69, 69, .1); border-bottom: 1px solid rgba(214, 69, 69, .3); color: #C03A3A; font-size: 13px; }
 [data-theme="dark"] .pausebar { color: #FF8A8A; }
 .pausebar span { color: var(--t2); }

@@ -1,10 +1,10 @@
-// 特效页的版本：从构建好的入口页里读出入口脚本名（带哈希）。
-// 重新构建特效页后版本变化，在线的旧页面收到后会在空闲时自动刷新，直播软件里不用手动刷新浏览器源。
+// 特效页、管理后台的版本：从构建好的入口页里读出入口脚本名（带哈希）。
+// 重新构建后版本变化：在线的旧特效页会在空闲时自动刷新（直播软件里不用手动刷新浏览器源），旧后台页面顶部提示刷新。
 import fs from 'node:fs';
 import path from 'node:path';
 import { OVERLAY_BUILD_RE } from '@starfall/shared';
 
-export class OverlayBuild {
+export class BuildVersion {
   private readonly file: string;
   private cached: { mtimeMs: number; build: string | null } | null = null;
 

@@ -35,6 +35,8 @@ export type EnterBase = Omit<EnterRules, 'exclusives'>;
 export interface ExclusiveDto extends Exclusive {
   name: string | null;
   face: string | null;
+  /** 在当前直播间是大航海几级（0 不是或不知道） */
+  guard?: number;
   createdAt: number;
 }
 

@@ -20,6 +20,7 @@ import { h } from './dom.ts';
 import { detect } from './env.ts';
 import { Player } from './player.ts';
 import { DEFAULT_CONFIG, applyConfig, fit, metrics, setViewInset, showSafeAreas } from './stage.ts';
+import { autoUpdate, pageBuild } from './update.ts';
 import { VIEW_BAR, startView } from './view.ts';
 import { warmUp } from './warm.ts';
 
@@ -56,6 +57,9 @@ addEventListener('resize', () => fit(stage, config));
 if (showSafe) showSafeAreas(stage);
 
 let conn: Conn | null = null;
+/** 这个页面的版本；服务端的版本不一样时，空闲时自动刷新 */
+const build = pageBuild();
+const onBuild = autoUpdate(build, () => player.playing !== null);
 const player = new Player(stage, () => metrics(config), (m) => {
   conn?.send(m);
   view?.onPlayer(m);
@@ -95,11 +99,12 @@ function preload(urls: string[]): Promise<void> {
 function onMessage(m: ServerToOverlay): void {
   switch (m.type) {
     case 'hello':
+      onBuild(m.build);
       config = m.config;
       apply();
       stage.querySelector('.notice')?.remove();
       view?.setConfig(config);
-      conn?.send({ type: 'report', env: { ...detect(), lite: lite(), canvas: `${config.width}×${config.height}`, ...(view ? { view: true } : {}) } });
+      conn?.send({ type: 'report', env: { ...detect(), lite: lite(), canvas: `${config.width}×${config.height}`, build, ...(view ? { view: true } : {}) } });
       void preload(m.preload);
       warmUp(stage, () => metrics(config), () => player.playing !== null);
       break;
@@ -118,6 +123,9 @@ function onMessage(m: ServerToOverlay): void {
       break;
     case 'stop':
       player.stop();
+      break;
+    case 'version':
+      onBuild(m.build);
       break;
   }
 }

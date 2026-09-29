@@ -88,6 +88,7 @@ journalctl -u starfall --since "1 hour ago"
 | `STARFALL_HOST` | `0.0.0.0` | 监听地址。放在反向代理后面时可以改为 `127.0.0.1` |
 | `STARFALL_DATA` | `<安装目录>/data` | 数据目录 |
 | `STARFALL_TZ` | `Asia/Shanghai` | 主播所在时区，用于「今天」的统计与专属用户有效期 |
+| `STARFALL_ADMIN_DIST` / `STARFALL_OVERLAY_DIST` | `<安装目录>/apps/admin/dist`、`<安装目录>/apps/overlay/dist` | 构建好的管理后台、特效页所在目录（一般不用改） |
 | `STARFALL_TRUST_PROXY` | 不设置 | 放在 HTTPS 反向代理后面时填代理的地址（同一台机器上填 `127.0.0.1`），用于识别访问者的真实地址（登录限流按人计算）和 HTTPS（Cookie 加上 secure） |
 
 ## 6. 配置 HTTPS（可选）

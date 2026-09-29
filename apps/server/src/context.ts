@@ -23,6 +23,7 @@ import type { LiveDeps } from './services/live.ts';
 import { RoomInfoService } from './services/room-info.ts';
 import type { RoomInfoDeps } from './services/room-info.ts';
 import { OutputStore } from './services/outputs.ts';
+import { OverlayBuild } from './services/overlay-build.ts';
 import { Pipeline } from './services/pipeline.ts';
 import { RoomStore } from './services/room.ts';
 import { EnterRuleStore } from './services/rules.ts';
@@ -52,6 +53,7 @@ export interface AppContext {
   blacklist: BlacklistStore;
   log: EventLog;
   hub: Hub;
+  overlayBuild: OverlayBuild;
   pipeline: Pipeline;
   io: ConfigIO;
   backups: BackupService;
@@ -82,7 +84,8 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
-  const hub = new Hub();
+  const overlayBuild = new OverlayBuild(config.overlayDist);
+  const hub = new Hub({ build: () => overlayBuild.current() });
   const pipeline = new Pipeline({ live, gifts, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
   const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
@@ -96,7 +99,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, overlayBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -121,10 +124,13 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   ctx.gifts.start();
   ctx.pipeline.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));
+  // 重新构建了特效页：告诉在线的页面，旧页面会在空闲时自动刷新
+  const stopBuild = ctx.overlayBuild.watch((build) => ctx.hub.toOverlays({ type: 'version', build }));
   await ctx.live.start();
   void ctx.roomInfo.start().catch((e: Error) => console.error('查询直播间信息失败', e.message));
   return () => {
     clearInterval(timer);
+    stopBuild();
     ctx.roomInfo.stop();
     ctx.backups.stop();
     ctx.pipeline.stop();

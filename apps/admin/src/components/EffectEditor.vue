@@ -2,6 +2,7 @@
 // 素材设置（F-AS-06 ~ 12）：左边预览，右边 ① 画面 ② 头像和欢迎语 ③ 音效 ④ 位置与时长
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
+import { FADE_MAX_MS, FADE_MIN_MS } from '@starfall/shared';
 import type { EffectTexts, Position } from '@starfall/shared';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
@@ -54,6 +55,8 @@ function snapshot(e: EffectDto) {
     durationCustom: e.durationCustom,
     fadeIn: e.fadeIn,
     fadeOut: e.fadeOut,
+    fadeInS: e.fadeInMs / 1000,
+    fadeOutS: e.fadeOutMs / 1000,
   };
 }
 const d = ref(eff.value ? snapshot(eff.value) : null);
@@ -67,12 +70,14 @@ const replaceRefs = ref(true);
 function lines(s: string): string[] {
   return s.split('\n').map((x) => x.trim()).filter(Boolean);
 }
+/** 渐入渐出秒数 → 毫秒（0.1 ~ 5 秒） */
+const fadeMs = (sec: number) => Math.round(Math.min(FADE_MAX_MS, Math.max(FADE_MIN_MS, (sec || 0) * 1000)));
 /** 要提交给服务端的修改 */
 function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS) };
   // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
   if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
   const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
@@ -96,7 +101,7 @@ watch(
   () => replay(),
 );
 watch(
-  () => d.value && [d.value.texts[txTab.value], d.value.seconds],
+  () => d.value && [d.value.texts[txTab.value], d.value.seconds, d.value.fadeInS, d.value.fadeOutS],
   () => {
     if (replayTimer) clearTimeout(replayTimer);
     replayTimer = setTimeout(replay, 600);
@@ -307,8 +312,14 @@ onBeforeUnmount(() => {
             </div>
             <template v-if="a">
               <div v-if="timed" class="toggle-line">手动设置时长 <span class="hint">{{ d.durationCustom ? `最长 ${maxSeconds} 秒，到时间就结束` : '关着时按素材完整播放' }}</span><Switch v-model="d.durationCustom" label="手动设置时长" /></div>
-              <div class="toggle-line">开头渐入 <span class="hint">关掉后第一帧直接出现</span><Switch v-model="d.fadeIn" label="开头渐入" /></div>
-              <div class="toggle-line">结尾渐出 <span class="hint">关掉后播完直接消失</span><Switch v-model="d.fadeOut" label="结尾渐出" /></div>
+              <div class="toggle-line">
+                开头渐入 <span class="hint">{{ d.fadeIn ? '用多少秒慢慢出现' : '关掉后第一帧直接出现' }}</span>
+                <span class="ctl"><span v-if="d.fadeIn" class="suffix"><input v-model.number="d.fadeInS" class="inp num" type="number" min="0.1" max="5" step="0.1" aria-label="渐入秒数" /><span>秒</span></span><Switch v-model="d.fadeIn" label="开头渐入" /></span>
+              </div>
+              <div class="toggle-line">
+                结尾渐出 <span class="hint">{{ d.fadeOut ? '用多少秒慢慢消失' : '关掉后播完直接消失' }}</span>
+                <span class="ctl"><span v-if="d.fadeOut" class="suffix"><input v-model.number="d.fadeOutS" class="inp num" type="number" min="0.1" max="5" step="0.1" aria-label="渐出秒数" /><span>秒</span></span><Switch v-model="d.fadeOut" label="结尾渐出" /></span>
+              </div>
             </template>
             <span v-if="o?.orient === 'portrait'" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>

@@ -28,7 +28,7 @@ export interface EffectDto extends Effect {
   updatedAt: number;
 }
 
-export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true, durationCustom: true, fadeIn: true, fadeOut: true })
+export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true, durationCustom: true, fadeIn: true, fadeOut: true, fadeInMs: true, fadeOutMs: true })
   .partial()
   .strict();
 export type EffectPatch = z.infer<typeof EffectPatchSchema>;
@@ -113,6 +113,8 @@ export class EffectStore {
       durationCustom: r.durationCustom,
       fadeIn: r.fadeIn,
       fadeOut: r.fadeOut,
+      fadeInMs: r.fadeInMs,
+      fadeOutMs: r.fadeOutMs,
       asset: asset ? assetDto(asset) : null,
       sound: sound ? assetDto(sound) : null,
       usedBy,

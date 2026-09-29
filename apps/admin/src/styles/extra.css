@@ -44,7 +44,7 @@
 .tag.excl { color: var(--accent); background: var(--accent-soft); }
 /* 数字输入框不显示上下箭头（会盖住右侧的单位） */
 .inp[type="number"] { -moz-appearance: textfield; appearance: textfield; }
-.inp[type="number"]::-webkit-inner-spin-button, .inp[type="number"]::-webkit-outer-spin-button,
+.inp[type="number"]::-webkit-inner-spin-button, .inp[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .suffix .inp { padding-right: 40px; }
 
 /* 设置 → 数据：备份列表、导出导入 */

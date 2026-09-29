@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 通灵登场</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<!-- 卷轴毛笔字：马善政毛笔楷书（SIL OFL 1.1，可免费商用），由 design/tools/fetch_fonts.py 下载到本地 -->
+<style>
+:root { --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  --bg: #0B0B10; --panel: #121218; --line: rgba(255,255,255,.08); --text: #EDEDF1; --mute: #A6A8B4; --dim: #80838F; --acc: #8D8BFF; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.app { height: 100%; display: grid; grid-template-columns: 320px 1fr; }
+.side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 22px 18px 40px; }
+.side h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.side h1 img { width: 22px; height: 22px; }
+.side .sub { color: var(--dim); font-size: 12.5px; line-height: 1.6; }
+.grp { margin-top: 18px; }
+.grp > b { display: block; font-size: 11.5px; letter-spacing: .12em; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: #0D0D12; padding: 3px; border-radius: 9px; border: 1px solid var(--line); }
+.seg button { flex: 1 1 30%; border: 0; background: transparent; padding: 7px 8px; border-radius: 7px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.seg button.on { background: #26262F; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.seg.big button { padding: 10px 8px; font-size: 13.5px; }
+.row { display: flex; gap: 8px; margin-top: 18px; }
+.btn { flex: 1; height: 38px; border-radius: 9px; border: 0; background: var(--acc); color: #0B0B12; font-weight: 600; font-size: 13.5px; }
+.btn.sec { background: #22222B; color: var(--text); }
+.btn.sec.on { background: rgba(61,214,140,.16); color: #3DD68C; }
+.note { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: #0D0D12; border: 1px solid var(--line); font-size: 12.5px; line-height: 1.75; color: var(--mute); }
+.note b { color: var(--text); font-weight: 600; }
+.view { position: relative; overflow: hidden; display: grid; place-items: center; }
+.frame { position: relative; flex: none; }
+.frame > .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+@media (max-width: 820px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100%; } .side { border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; } .view { height: 78vh; } }
+
+/* ================= 画布（1080×1920 竖屏） ================= */
+.stage { width: 1080px; height: 1920px; overflow: hidden; --st: 12%; --sb: 40%;
+  background-color: #15151C; background-image: linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%), linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%);
+  background-size: 64px 64px; background-position: 0 0, 32px 32px; box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+.stage.sc-room { background: radial-gradient(260px 260px at 18% 62%, rgba(255,170,90,.85), transparent 70%), radial-gradient(340px 300px at 86% 70%, rgba(90,160,255,.75), transparent 70%), radial-gradient(500px 420px at 60% 18%, rgba(210,120,255,.45), transparent 70%), linear-gradient(175deg, #2A2436, #151823 60%, #0E1017); }
+.stage.sc-light { background: radial-gradient(700px 600px at 30% 20%, #FFE9D6, transparent 70%), radial-gradient(700px 600px at 80% 70%, #D9ECFF, transparent 70%), linear-gradient(170deg, #F6F1EA, #E6EEF6); }
+.person { position: absolute; left: 50%; top: 520px; width: 0; height: 0; }
+.stage.sc-clear .person { display: none; }
+.person::before { content: ""; position: absolute; left: -165px; top: 0; width: 330px; height: 380px; border-radius: 50% 50% 46% 46%; background: #6E5A50; }
+.person::after { content: ""; position: absolute; left: -380px; top: 420px; width: 760px; height: 900px; border-radius: 380px 380px 0 0; background: linear-gradient(90deg, #3A4A78, #7A4A8A); }
+.stage.sc-light .person::before { background: #C9A690; }
+.stage.sc-light .person::after { background: #4A5670; }
+.safe { position: absolute; left: 0; right: 0; z-index: 50; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 22px; letter-spacing: .1em; color: rgba(255,255,255,.5); background: repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 14px, transparent 14px 28px); }
+.safe.top { top: 0; height: var(--st); border-bottom: 2px dashed rgba(255,255,255,.25); }
+.safe.bot { bottom: 0; height: var(--sb); border-top: 2px dashed rgba(255,255,255,.25); }
+.stage:not(.show-safe) .safe { display: none; }
+.band-guide { position: absolute; left: 0; right: 0; height: 720px; z-index: 49; pointer-events: none; outline: 2px dashed rgba(255,210,120,.5); outline-offset: -2px; display: none; }
+.stage.show-safe .band-guide { display: block; }
+
+/* ================= 通灵登场：横条 1080×720 =================
+   --a：身份色（查克拉光、术式阵、卷轴绫边），--a2：亮一点的身份色 */
+.nj { position: absolute; left: 0; width: 1080px; height: 720px; z-index: 10; pointer-events: none; --ink: #16161A; --paper: #EFE3C7; }
+.nj.lv-cap { --a: 70, 150, 255; --a2: 170, 215, 255; --ac: #3C84F0; }
+.nj.lv-adm { --a: 160, 105, 255; --a2: 220, 195, 255; --ac: #8A55E8; }
+.nj.lv-gov { --a: 255, 110, 50; --a2: 255, 205, 120; --ac: #E0521F; }
+.nj-in { position: absolute; inset: 0; will-change: transform, opacity; }
+/* 墨色底：只在横条里，往上下两边淡掉 */
+.nj-bg { position: absolute; inset: 0; opacity: 0;
+  background: linear-gradient(180deg, transparent, rgba(14, 14, 18, .72) 18%, rgba(14, 14, 18, .78) 50%, rgba(14, 14, 18, .72) 82%, transparent),
+    radial-gradient(420px 260px at 300px 470px, rgba(var(--a), .22), transparent 70%); }
+.nj-bg::after { content: ""; position: absolute; inset: 0; opacity: .5;
+  background: repeating-linear-gradient(-4deg, transparent 0 11px, rgba(255, 255, 255, .025) 11px 13px, transparent 13px 31px);
+  -webkit-mask: linear-gradient(180deg, transparent, #000 20%, #000 80%, transparent); mask: linear-gradient(180deg, transparent, #000 20%, #000 80%, transparent); }
+/* 术式阵：画成圆，再压扁成地面上的样子 */
+.nj-seal { position: absolute; left: 300px; top: 560px; width: 560px; height: 560px; margin: -280px 0 0 -280px; transform: scaleY(.34); }
+.nj-seal svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; will-change: transform; }
+.nj-seal .ln { fill: none; stroke: rgb(var(--a2)); stroke-linecap: round; stroke-linejoin: round; }
+.nj-seal .gl { fill: none; stroke: rgba(var(--a), .35); stroke-linecap: round; }
+.nj-rays { position: absolute; inset: 0; }
+.nj-rays i { position: absolute; bottom: 150px; width: 6px; height: 260px; border-radius: 3px; opacity: 0; background: linear-gradient(0deg, rgba(var(--a2), 0), rgba(var(--a2), .9) 40%, rgba(255, 255, 255, .95) 70%, rgba(var(--a2), 0)); }
+.nj-flash { position: absolute; left: 300px; top: 520px; width: 900px; height: 600px; margin: -300px 0 0 -450px; border-radius: 50%; opacity: 0; background: radial-gradient(closest-side, rgba(255, 255, 255, .95), rgba(var(--a2), .6) 35%, rgba(var(--a), 0)); }
+/* 查克拉光（现身后，头像身后跳动） */
+.nj-aura { position: absolute; left: 300px; top: 350px; width: 0; height: 0; opacity: 0; }
+.nj-aura .halo { position: absolute; left: -230px; top: -230px; width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(closest-side, rgba(var(--a), .55), rgba(var(--a), .18) 55%, transparent); }
+.nj-aura .fl { position: absolute; bottom: -120px; width: 150px; height: 360px; margin-left: -75px; border-radius: 50% 50% 46% 46% / 64% 64% 36% 36%; transform-origin: 50% 100%;
+  background: radial-gradient(60% 55% at 50% 72%, rgba(255, 255, 255, .7), rgba(var(--a2), .6) 30%, rgba(var(--a), .35) 60%, transparent 76%); will-change: transform; }
+.nj-av { position: absolute; left: 300px; top: 350px; width: 0; height: 0; opacity: 0; }
+.nj-av .av { position: absolute; left: -100px; top: -100px; width: 200px; height: 200px; border-radius: 50%; overflow: hidden; background: #333; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+.nj-av .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nj-av .fr { position: absolute; left: -140px; top: -140px; width: 280px; height: 280px; }
+.nj canvas { position: absolute; left: 0; top: 0; width: 1080px; height: 720px;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent); }
+.nj-glow { position: absolute; left: 300px; top: 470px; width: 700px; height: 520px; margin: -260px 0 0 -350px; border-radius: 50%; opacity: 0; background: radial-gradient(closest-side, rgba(var(--a2), .55), rgba(var(--a), .25) 45%, transparent); }
+/* 苦无 */
+.nj-kunai { position: absolute; left: 0; top: 0; width: 170px; height: 44px; margin: -22px 0 0 -85px; opacity: 0; }
+.nj-kunai svg { width: 100%; height: 100%; overflow: visible; }
+.nj-trail { position: absolute; right: 150px; top: 18px; width: 260px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55)); }
+/* 卷轴：上下是身份色的绫边，两头是木轴 */
+.nj-scroll { position: absolute; left: 780px; top: 350px; width: 0; height: 0; opacity: 0; }
+.nj-paper { position: absolute; left: -255px; top: -118px; width: 510px; height: 236px; clip-path: inset(0 50% 0 50%);
+  background: linear-gradient(180deg, var(--ac) 0 16px, #D9B45A 16px 19px, transparent 19px calc(100% - 19px), #D9B45A calc(100% - 19px) calc(100% - 16px), var(--ac) calc(100% - 16px)),
+    repeating-linear-gradient(94deg, transparent 0 7px, rgba(120, 90, 40, .05) 7px 8px, transparent 8px 19px), var(--paper);
+  box-shadow: inset 0 0 40px rgba(120, 80, 30, .28), 0 12px 30px rgba(0, 0, 0, .45); }
+.nj-roll { position: absolute; top: -136px; width: 30px; height: 272px; margin-left: -15px; border-radius: 8px;
+  background: linear-gradient(90deg, #3A2112, #8A5A34 35%, #B07A48 50%, #6B4122 70%, #2E190C); box-shadow: 0 8px 18px rgba(0, 0, 0, .5); }
+.nj-roll::before, .nj-roll::after { content: ""; position: absolute; left: -5px; width: 40px; height: 16px; border-radius: 6px; background: linear-gradient(90deg, #6B5A2A, #E8CF7A 50%, #6B5A2A); }
+.nj-roll::before { top: -8px; } .nj-roll::after { bottom: -8px; }
+.nj-tx { position: absolute; left: -225px; top: -92px; width: 440px; height: 184px; font-family: "Ma Shan Zheng", "STKaiti", "KaiTi", serif; color: var(--ink); }
+.nj-tx .l1 { position: absolute; left: 0; top: 10px; white-space: nowrap; line-height: 1; clip-path: inset(0 100% 0 0); }
+.nj-tx .l1 b { font-weight: 400; color: var(--ac); margin-right: .3em; }
+.nj-tx .l2 { position: absolute; right: 40px; bottom: 6px; font-size: 104px; line-height: 1; white-space: nowrap; clip-path: inset(0 100% 0 0); }
+.nj-stamp { position: absolute; left: 4px; bottom: 2px; width: 86px; height: 86px; border-radius: 10px; opacity: 0; background: #C3342C; color: #FFF3E6;
+  display: grid; place-items: center; font-family: "Ma Shan Zheng", serif; font-size: 36px; line-height: .95; text-align: center; box-shadow: inset 0 0 0 4px #C3342C, inset 0 0 0 6px rgba(255, 243, 230, .8); transform: rotate(-7deg); }
+.nj-pin { position: absolute; width: 150px; height: 40px; margin: -20px 0 0 -75px; opacity: 0; }
+.nj-pin svg { width: 100%; height: 100%; overflow: visible; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1><img src="assets/logo.svg" alt="">通灵登场</h1>
+    <div class="sub">横条入场特效 1080×720 · 舰长、提督、总督用同一套动画，只换身份色和头像框，6 秒。先放进场动画，最后才出现头像和名字。头像框从 B 站加载。</div>
+    <div class="grp"><b>身份</b><div class="seg big" id="lv"></div></div>
+    <div class="grp"><b>昵称</b><div class="seg" id="nm"></div></div>
+    <div class="grp"><b>位置</b><div class="seg" id="pos"></div></div>
+    <div class="grp"><b>背景</b><div class="seg" id="bg"></div></div>
+    <div class="row"><button class="btn" id="play">▶ 播放</button></div>
+    <div class="row"><button class="btn sec" id="loop">自动循环</button><button class="btn sec on" id="snd">声音</button><button class="btn sec" id="safe">安全区</button></div>
+    <div class="row"><button class="btn sec" id="slow">慢放（¼ 速度，看细节）</button></div>
+    <div class="note"><b>过程</b><br>① 起阵：地面上一笔一笔画出术式阵<br>② 蓄力：身份色的光丝往上升<br>③「嘭」！白烟炸开铺满横条<br>④ 烟中翻涌：查克拉光透出来，苦无穿烟飞过<br>⑤ 烟分开，头像现身，身后查克拉光<br>⑥ 卷轴展开「舰长 XXX 参上！」，苦无钉住、盖印<br>⑦ 停留后整条淡出</div>
+  </aside>
+  <main class="view" id="view">
+    <div class="frame" id="frame">
+      <div class="stage sc-room" id="stage">
+        <div class="person"></div>
+        <div class="safe top">顶部信息栏</div><div class="safe bot">底部弹幕区</div>
+        <div class="band-guide" id="guide"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const FACE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC9A8"/><stop offset="1" stop-color="#E0769A"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="40" r="18" fill="#fff" opacity=".92"/><circle cx="43" cy="38" r="2.6" fill="#333"/><circle cx="57" cy="38" r="2.6" fill="#333"/><path d="M18 92c4-20 18-30 32-30s28 10 32 30z" fill="#fff" opacity=".92"/></svg>');
+const FRAMES = { gov: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', adm: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', cap: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
+const LEVELS = { cap: '舰长', adm: '提督', gov: '总督' };
+const LV_RGB = { cap: [70, 150, 255], adm: [160, 105, 255], gov: [255, 110, 50] };
+const LV_RGB2 = { cap: [170, 215, 255], adm: [220, 195, 255], gov: [255, 205, 120] };
+const NAMES = { short: '道具堡', mid: '晚风与星河漫步', long: '今天也要早点睡觉的超长昵称啊' };
+const POS = { up: 300, mid: 600, down: 900 };
+const DUR = 6000;
+const st = { lv: 'cap', nm: 'short', pos: 'mid', bg: 'room', loop: false, snd: true, safe: false, slow: false };
+const SLOW = () => (st.slow ? 4 : 1);
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+/* ---------- 声音：现场合成 ---------- */
+let ac = null;
+function audio() { if (!st.snd) return null; ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; }
+function env(g, t, peak, att, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + att + dec); }
+function tone(f0, f1, dur, peak, type = 'sine', att = 0.005) { const a = audio(); if (!a) return; const t = a.currentTime; const o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur); env(g, t, peak, att, dur); o.connect(g).connect(a.destination); o.start(t); o.stop(t + att + dur + 0.05); }
+function noise(dur, peak, type, f0, f1, q = 1, att = 0.01) { const a = audio(); if (!a) return; const t = a.currentTime; const b = a.createBuffer(1, a.sampleRate * (dur + 0.2), a.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = a.createBufferSource(); s.buffer = b; const f = a.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur); const g = a.createGain(); env(g, t, peak, att, dur); s.connect(f).connect(g).connect(a.destination); s.start(t); s.stop(t + dur + 0.2); }
+const sfx = {
+  brush: () => noise(0.5, 0.05, 'bandpass', 1800, 900, 1.5, 0.08),
+  charge: () => { tone(90, 260, 0.6, 0.06, 'sawtooth', 0.3); noise(0.6, 0.05, 'bandpass', 400, 1600, 2, 0.3); },
+  poof: (big = true) => { tone(big ? 70 : 110, 35, big ? 0.9 : 0.5, big ? 0.4 : 0.22); noise(big ? 1.1 : 0.6, big ? 0.3 : 0.18, 'lowpass', 1400, 150, 0.8); },
+  whiz: () => noise(0.22, 0.12, 'bandpass', 1200, 5000, 4),
+  clink: () => { tone(2600, 2400, 0.35, 0.08, 'triangle'); tone(3900, 3700, 0.25, 0.04, 'sine'); noise(0.05, 0.1, 'highpass', 4000, 8000); },
+  unroll: () => noise(0.4, 0.08, 'bandpass', 700, 2600, 1.2, 0.05),
+  stamp: () => { tone(140, 60, 0.18, 0.2); noise(0.08, 0.1, 'lowpass', 1200, 300); },
+};
+
+/* ---------- 烟雾：代码生成几种烟团纹理，几十团一起膨胀、翻滚、变淡；按真实时间计算 ---------- */
+function puffSprites() {
+  const out = [];
+  for (let v = 0; v < 4; v++) {
+    const r = rng(101 + v * 17);
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    for (let i = 0; i < 46; i++) {
+      const a = r() * Math.PI * 2, d = Math.pow(r(), 0.7) * 40, cx = 64 + Math.cos(a) * d, cy = 64 + Math.sin(a) * d * 0.85, rad = 12 + r() * 22;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      const al = 0.08 + r() * 0.12;
+      g.addColorStop(0, `rgba(255,255,255,${al})`); g.addColorStop(0.6, `rgba(255,255,255,${al * 0.5})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+    }
+    // 底部稍暗：烟团有明暗，才有体积感
+    x.globalCompositeOperation = 'source-atop';
+    const sh = x.createLinearGradient(0, 30, 0, 110); sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(1, 'rgba(150,150,165,0.55)');
+    x.fillStyle = sh; x.fillRect(0, 0, 128, 128);
+    out.push(c);
+  }
+  return out;
+}
+function glowSprite(rgb) {
+  const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d');
+  const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.3, `rgba(${rgb},0.9)`); g.addColorStop(1, `rgba(${rgb},0)`);
+  x.fillStyle = g; x.fillRect(0, 0, 32, 32); return c;
+}
+function smoke(canvas, lvRgb) {
+  const c = canvas.getContext('2d'); c.scale(0.5, 0.5);
+  const puffs = puffSprites(), ember = glowSprite(lvRgb.join(','));
+  const ps = []; let raf = 0, alive = true, last = performance.now(), idle = false;
+  const R = rng(7);
+  const api = {
+    // 从 (x, y) 往四周炸开（横向为主：烟被压在横条里）
+    burst(x, y, n, power = 1) {
+      for (let i = 0; i < n; i++) {
+        const a = R() * Math.PI * 2, v = (360 + R() * 1250) * power;
+        ps.push({ k: 'puff', x: x + (R() - 0.5) * 80, y: y + (R() - 0.5) * 40, vx: Math.cos(a) * v * 1.35, vy: Math.sin(a) * v * 0.32 - 70, r: 80 + R() * 80, grow: 1.1 + R() * 1.2, rot: R() * 6.28, vr: (R() - 0.5) * 0.9, a0: 0.6 + R() * 0.3, age: 0, life: 2.2 + R() * 1.2, sp: (R() * 4) | 0, drag: 1.7 + R() * 0.9 });
+      }
+      wake();
+    },
+    billow(x, y, n, spread = 120) { for (let i = 0; i < n; i++) { const a = R() * Math.PI * 2, v = 60 + R() * 200; ps.push({ k: 'puff', x: x + (R() - 0.5) * spread, y: y + (R() - 0.5) * 120, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.4 - 50, r: 70 + R() * 70, grow: 0.9 + R() * 0.9, rot: R() * 6.28, vr: (R() - 0.5) * 0.8, a0: 0.4 + R() * 0.3, age: 0, life: 1.4 + R() * 1.2, sp: (R() * 4) | 0, drag: 1.6 }); } wake(); },
+    wisp(n) { for (let i = 0; i < n; i++) { const left = R() < 0.5; ps.push({ k: 'puff', x: left ? R() * 160 : 920 + R() * 160, y: 180 + R() * 420, vx: (left ? 1 : -1) * (10 + R() * 30), vy: -12 - R() * 20, r: 50 + R() * 60, grow: 0.5, rot: R() * 6.28, vr: (R() - 0.5) * 0.3, a0: 0.12 + R() * 0.14, age: 0, life: 2 + R() * 1.5, sp: (R() * 4) | 0, drag: 0.4 }); } wake(); },
+    // 烟从中间分开：离 (x, y) 越近推得越远、散得越快
+    part(x, y) { for (const p of ps) { const dx = p.x - x, dy = p.y - y, d = Math.hypot(dx, dy) || 1; const f = Math.max(0, 1 - d / 520); p.vx += (dx / d) * 900 * f; p.vy += (dy / d) * 260 * f; p.life = Math.min(p.life, p.age + 0.5 + (1 - f) * 0.9); } },
+    embers(x, y, n) { for (let i = 0; i < n; i++) ps.push({ k: 'ember', x: x + (R() - 0.5) * 240, y: y + R() * 80, vx: (R() - 0.5) * 30, vy: -(60 + R() * 110), s: 3 + R() * 6, age: 0, life: 1 + R() * 1.2, ph: R() * 6 }); wake(); },
+    stop() { alive = false; cancelAnimationFrame(raf); },
+  };
+  function wake() { if (idle && alive) { idle = false; last = performance.now(); raf = requestAnimationFrame(frame); } }
+  function frame(now) {
+    if (!alive) return;
+    const dt = Math.min(0.05, (now - last) / 1000 / SLOW()); last = now;
+    c.clearRect(0, 0, 1080, 720);
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i]; p.age += dt;
+      if (p.age >= p.life) { ps.splice(i, 1); continue; }
+      const t = p.age / p.life;
+      if (p.k === 'puff') {
+        const k = Math.exp(-p.drag * dt); p.vx *= k; p.vy = p.vy * k - 8 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+        const r = p.r * (1 + p.grow * (1 - Math.pow(1 - t, 2)));
+        c.globalCompositeOperation = 'source-over';
+        c.globalAlpha = p.a0 * Math.min(1, t * 10) * Math.pow(1 - t, 1.4);
+        c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.drawImage(puffs[p.sp], -r, -r, r * 2, r * 2); c.restore();
+      } else {
+        p.x += (p.vx + Math.sin(p.age * 6 + p.ph) * 20) * dt; p.y += p.vy * dt;
+        c.globalCompositeOperation = 'lighter'; c.globalAlpha = Math.min(1, t * 6) * (1 - t);
+        c.drawImage(ember, p.x - p.s * 2, p.y - p.s * 2, p.s * 4, p.s * 4);
+      }
+    }
+    if (!ps.length) { idle = true; c.clearRect(0, 0, 1080, 720); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  idle = true;
+  return api;
+}
+
+/* ---------- 形状 ---------- */
+function sealSvg() {
+  const P = (d, w, cls = 'ln') => `<path class="${cls}" pathLength="1" stroke-width="${w}" d="${d}"/>`;
+  const circ = (r) => `M${280 - r},280a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0`;
+  const tri = (r, rot) => { const pts = [0, 1, 2].map((i) => { const a = rot + (i / 3) * Math.PI * 2; return `${280 + Math.cos(a) * r},${280 + Math.sin(a) * r}`; }); return `M${pts[0]}L${pts[1]}L${pts[2]}Z`; };
+  // 八个方位的"卦"：三条短横（有断开的），是忍者题材的通用纹样
+  const r = rng(3); let marks = '';
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2; let bars = '';
+    for (let k = 0; k < 3; k++) { const y = -12 + k * 12; bars += r() < 0.45 ? `M-18,${y}L-4,${y}M4,${y}L18,${y}` : `M-18,${y}L18,${y}`; }
+    marks += `<path class="ln" pathLength="1" stroke-width="5" transform="translate(${280 + Math.cos(a) * 186},${280 + Math.sin(a) * 186}) rotate(${(a * 180) / Math.PI + 90})" d="${bars}"/>`;
+  }
+  let ticks = '';
+  for (let i = 0; i < 48; i++) { const a = (i / 48) * Math.PI * 2, r1 = 222, r2 = i % 4 ? 232 : 246; ticks += `M${280 + Math.cos(a) * r1},${280 + Math.sin(a) * r1}L${280 + Math.cos(a) * r2},${280 + Math.sin(a) * r2}`; }
+  return `<svg viewBox="0 0 560 560">
+    ${P(circ(262), 16, 'gl')}${P(circ(150), 14, 'gl')}
+    ${P(circ(262), 7)}${P(circ(214), 2.5)}${P(ticks, 3)}${P(circ(150), 5)}${P(tri(142, -Math.PI / 2), 3)}${P(tri(142, Math.PI / 2), 3)}${P(circ(58), 4)}${marks}</svg>`;
+}
+const KUNAI = (id) => `<svg viewBox="-85 -22 170 44"><defs><linearGradient id="kb${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F4F6FA"/><stop offset=".5" stop-color="#9CA3B0"/><stop offset="1" stop-color="#4B5160"/></linearGradient></defs>
+  <path d="M84,0 L22,-15 L10,0 L22,15 Z" fill="url(#kb${id})" stroke="#2A2D35" stroke-width="2"/><path d="M84,0 L22,-15 L16,0 Z" fill="rgba(255,255,255,.35)"/>
+  <rect x="-44" y="-6" width="56" height="12" rx="3" fill="#2A2320"/>${[-38, -26, -14, -2].map((x) => `<path d="M${x},-6l8,12" stroke="#7A6048" stroke-width="3"/>`).join('')}
+  <circle cx="-58" cy="0" r="12" fill="none" stroke="#8C93A0" stroke-width="5"/></svg>`;
+
+const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+function build(lv, name) {
+  const L = LEVELS[lv];
+  const root = h('div', `nj lv-${lv}`);
+  root.style.top = `${POS[st.pos]}px`;
+  const inn = h('div', 'nj-in');
+  const rays = h('div', 'nj-rays', Array.from({ length: 12 }, (_, i) => `<i style="left:${300 + (i - 5.5) * 36 + ((i * 37) % 13)}px"></i>`).join(''));
+  const aura = h('div', 'nj-aura', '<div class="halo"></div>' + [[-70, 0.8, -8], [70, 0.85, 8], [0, 1.1, 0]].map(([x, s, r]) => `<div class="fl" style="left:${x}px;transform:scale(${s}) rotate(${r}deg)"></div>`).join(''));
+  const av = h('div', 'nj-av', `<div class="av"><img src="${FACE}" alt=""></div><img class="fr" src="${FRAMES[lv]}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`);
+  const canvas = h('canvas'); canvas.width = 540; canvas.height = 360;
+  const kunai = [0, 1].map((i) => h('div', 'nj-kunai', `<div class="nj-trail"></div>${KUNAI(`f${i}`)}`));
+  // 卷轴文字：长昵称缩小字号，太长时截断
+  const n = [...name].length;
+  const shown = n > 10 ? [...name].slice(0, 10).join('') + '…' : name;
+  const fs = Math.round(Math.max(38, Math.min(68, 410 / ([...shown].length + 2.4))));
+  const scroll = h('div', 'nj-scroll', `<div class="nj-paper"></div><div class="nj-roll r0"></div><div class="nj-roll r1"></div>
+    <div class="nj-tx"><div class="l1" style="font-size:${fs}px"><b>${L}</b>${shown}</div><div class="l2">参上！</div><div class="nj-stamp">${[...L].join('<br>')}</div></div>
+    <div class="nj-pin p0">${KUNAI('p0')}</div><div class="nj-pin p1">${KUNAI('p1')}</div>`);
+  inn.append(h('div', 'nj-bg'), h('div', 'nj-seal', sealSvg()), rays, aura, av, canvas, h('div', 'nj-glow'), h('div', 'nj-flash'), ...kunai, scroll);
+  root.append(inn);
+  return { root, inn, canvas, kunai, scroll };
+}
+
+/* ---------- 播放 ---------- */
+let cur = null;
+function stop() { if (!cur) return; cur.timers.forEach(clearTimeout); cur.fx.stop(); cancelAnimationFrame(cur.rate); cur.root.remove(); cur = null; }
+function play() {
+  stop();
+  const lv = st.lv;
+  const b = build(lv, NAMES[st.nm]);
+  $('#stage').append(b.root);
+  const fx = smoke(b.canvas, LV_RGB2[lv]);
+  const timers = [];
+  cur = { root: b.root, timers, fx, rate: 0 };
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms * SLOW()));
+  const rate = 1 / SLOW();
+  const keepRate = () => { if (!cur) return; for (const a of document.getAnimations()) if (a.playbackRate !== rate) a.playbackRate = rate; cur.rate = requestAnimationFrame(keepRate); };
+  if (rate !== 1) keepRate();
+  const q = (s) => b.root.querySelector(s);
+  const qa = (s) => b.root.querySelectorAll(s);
+  const anim = (el, kf, o) => el.animate(kf, { fill: 'both', ...o });
+  const out = 'cubic-bezier(.2,.8,.2,1)';
+  const shake = (px, ms) => b.inn.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${-px}px,${px * 0.5}px)` }, { transform: `translate(${px * 0.8}px,${-px * 0.6}px)` }, { transform: `translate(${-px * 0.4}px,${-px * 0.3}px)` }, { transform: 'translate(0,0)' }], { duration: ms, composite: 'add' });
+
+  // ① 起阵：墨色底淡入，术式阵一笔一笔画出来
+  anim(q('.nj-bg'), [{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
+  qa('.nj-seal [pathLength]').forEach((p, i) => {
+    p.style.strokeDasharray = '1'; p.style.strokeDashoffset = '1';
+    anim(p, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 380, delay: 100 + (i < 9 ? i * 60 : 560 + (i - 9) * 22), easing: 'cubic-bezier(.4,0,.2,1)' });
+  });
+  at(100, sfx.brush);
+  // 画完后慢慢转
+  at(850, () => q('.nj-seal svg').animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], { duration: 14000, iterations: Infinity }));
+  anim(q('.nj-seal'), [{ filter: 'brightness(1)' }, { filter: 'brightness(1.8)' }, { filter: 'brightness(1.2)' }], { duration: 500, delay: 800 });
+
+  // ② 蓄力：光丝往上升，横条轻轻颤
+  qa('.nj-rays i').forEach((el, i) => anim(el, [{ opacity: 0, transform: 'translateY(60px) scaleY(.3)' }, { opacity: 1, transform: 'translateY(-60px) scaleY(1)', offset: 0.5 }, { opacity: 0, transform: 'translateY(-220px) scaleY(1.2)' }], { duration: 520, delay: 700 + ((i * 7) % 12) * 45, easing: 'ease-out' }));
+  at(700, sfx.charge);
+  at(950, () => shake(4, 350));
+
+  // ③「嘭」！白烟炸开
+  at(1300, () => {
+    fx.burst(300, 500, 95, 1);
+    anim(q('.nj-flash'), [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1)', offset: 0.25 }, { opacity: 0, transform: 'scale(1.3)' }], { duration: 600, easing: out });
+    shake(14, 420); sfx.poof(true);
+  });
+  // ④ 烟中翻涌：还在往外冒，查克拉光一阵阵透出来，苦无穿烟飞过
+  // 烟还在翻涌：横条里到处冒
+  [1450, 1650, 1900, 2150, 2400].forEach((t, i) => at(t, () => fx.billow(i % 2 ? 640 : 380, 380, 12, 700)));
+  anim(q('.nj-glow'), [{ opacity: 0 }, { opacity: .9 }, { opacity: .35 }, { opacity: .8 }, { opacity: .3 }, { opacity: .7 }, { opacity: 0 }], { duration: 1500, delay: 1350 });
+  b.kunai.forEach((k, i) => {
+    const y = i ? 250 : 430, t = 1900 + i * 140;
+    anim(k, [{ opacity: 1, transform: `translate(-200px,${y + 30}px) rotate(-4deg)` }, { opacity: 1, transform: `translate(1300px,${y - 20}px) rotate(-4deg)` }], { duration: 300, delay: t, easing: 'linear' });
+    at(t + 300, () => (k.style.visibility = 'hidden'));
+    at(t, sfx.whiz);
+  });
+
+  // ⑤ 烟分开，现身
+  at(2750, () => fx.part(300, 360));
+  anim(q('.nj-aura'), [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 500, delay: 2780, easing: out });
+  qa('.nj-aura .fl').forEach((f, i) => at(2780, () => f.animate([{ transform: f.style.transform + ' scaleY(1)' }, { transform: f.style.transform + ` scaleY(${1.12 + i * 0.04}) skewX(${i % 2 ? 4 : -4}deg)` }, { transform: f.style.transform + ' scaleY(.94)' }], { duration: 380 + i * 90, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' })));
+  anim(q('.nj-av'), [{ opacity: 0, transform: 'scale(.72)' }, { opacity: 1, transform: 'scale(1.05)', offset: 0.7 }, { opacity: 1, transform: 'scale(1)' }], { duration: 480, delay: 2820, easing: out });
+  at(2900, () => { const drip = () => { if (!cur || cur.fx !== fx) return; fx.embers(300, 420, 3); if (++nE < 34) timers.push(setTimeout(drip, 90 * SLOW())); }; let nE = 0; drip(); });
+  [3000, 3900, 4800].forEach((t) => at(t, () => fx.wisp(3)));
+
+  // ⑥ 卷轴展开、写字、苦无钉住、盖印
+  anim(b.scroll, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, delay: 3000 });
+  anim(q('.nj-paper'), [{ clipPath: 'inset(0 50% 0 50%)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 420, delay: 3050, easing: 'cubic-bezier(.3,.8,.2,1)' });
+  anim(q('.nj-roll.r0'), [{ transform: 'translateX(0)' }, { transform: 'translateX(-255px)' }], { duration: 420, delay: 3050, easing: 'cubic-bezier(.3,.8,.2,1)' });
+  anim(q('.nj-roll.r1'), [{ transform: 'translateX(0)' }, { transform: 'translateX(255px)' }], { duration: 420, delay: 3050, easing: 'cubic-bezier(.3,.8,.2,1)' });
+  at(3050, sfx.unroll);
+  anim(q('.nj-tx .l1'), [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 520, delay: 3420, easing: 'linear' });
+  anim(q('.nj-tx .l2'), [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 380, delay: 3860, easing: 'linear' });
+  // 苦无回头钉住卷轴两端
+  // 苦无尖朝着飞行方向，扎进木轴顶端
+  [[q('.nj-pin.p0'), -255, -60, -520], [q('.nj-pin.p1'), 255, 60, -520]].forEach(([el, x, fromX, fromY], i) => {
+    const t = 3480 + i * 110, ex = x + (i ? 34 : -34), ey = -120;
+    const ang = (Math.atan2(ey - fromY, ex - fromX) * 180) / Math.PI;
+    anim(el, [{ opacity: 1, transform: `translate(${fromX}px,${fromY}px) rotate(${ang}deg)` }, { opacity: 1, transform: `translate(${ex}px,${ey}px) rotate(${ang}deg)` }], { duration: 160, delay: t, easing: 'cubic-bezier(.5,0,1,.6)' });
+    at(t + 160, () => { sfx.clink(); b.scroll.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(5px)' }, { transform: 'translateY(0)' }], { duration: 160, composite: 'add' }); });
+  });
+  anim(q('.nj-stamp'), [{ opacity: 0, transform: 'rotate(-7deg) scale(1.8)' }, { opacity: 1, transform: 'rotate(-7deg) scale(.94)', offset: 0.7 }, { opacity: 1, transform: 'rotate(-7deg) scale(1)' }], { duration: 260, delay: 4250, easing: 'ease-in' });
+  at(4430, sfx.stamp);
+
+  // ⑦ 停留后整条淡出
+  anim(b.inn, [{ opacity: 1 }, { opacity: 0 }], { duration: 420, delay: DUR - 440, easing: 'ease-in' });
+  at(DUR, () => { stop(); if (st.loop) setTimeout(play, 700); });
+}
+
+/* ---------- 控件 ---------- */
+function segs() {
+  const mk = (id, items, key) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const bt = h('button', st[key] == v ? 'on' : '', label); bt.onclick = () => { st[key] = v; sync(); if (key !== 'bg') play(); }; el.append(bt); } };
+  mk('#lv', [['cap', '舰长'], ['adm', '提督'], ['gov', '总督']], 'lv');
+  mk('#nm', [['short', '短昵称'], ['mid', '中等'], ['long', '很长']], 'nm');
+  mk('#pos', [['up', '偏上'], ['mid', '居中'], ['down', '偏下']], 'pos');
+  mk('#bg', [['room', '直播间'], ['light', '浅色'], ['clear', '透明格']], 'bg');
+}
+function sync() {
+  segs();
+  $('#stage').className = `stage sc-${st.bg}${st.safe ? ' show-safe' : ''}`;
+  $('#guide').style.top = `${POS[st.pos]}px`;
+  $('#slow').classList.toggle('on', st.slow); $('#loop').classList.toggle('on', st.loop); $('#snd').classList.toggle('on', st.snd); $('#safe').classList.toggle('on', st.safe);
+}
+function fit() {
+  const v = $('#view'), f = $('#frame'), s = $('#stage');
+  const k = Math.min((v.clientWidth - 40) / 1080, (v.clientHeight - 40) / 1920);
+  f.style.width = `${1080 * k}px`; f.style.height = `${1920 * k}px`; s.style.transform = `scale(${k})`;
+}
+$('#play').onclick = play;
+$('#loop').onclick = () => { st.loop = !st.loop; sync(); if (st.loop && !cur) play(); };
+$('#snd').onclick = () => { st.snd = !st.snd; sync(); };
+$('#safe').onclick = () => { st.safe = !st.safe; sync(); };
+$('#slow').onclick = () => { st.slow = !st.slow; sync(); play(); };
+addEventListener('resize', fit);
+sync(); fit();
+document.fonts.load('70px "Ma Shan Zheng"', '参上舰长提督总督').finally(() => setTimeout(play, 300));
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@
 
 识别每一位进场的观众，在弹幕、礼物、上舰的时刻，于直播画面上播放专属的动画、欢迎语与音效。
 
-[![Version](https://img.shields.io/badge/version-1.0.1-5451D6?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-5451D6?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-2F6FEB?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24-3C873A?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -31,8 +31,8 @@
     <td width="33%" valign="top"><b>统一调度</b><br><sub>按优先级排队播放，高价值事件插队，冷却、合并、去重，一键紧急暂停</sub></td>
   </tr>
   <tr>
-    <td width="33%" valign="top"><b>特效素材</b><br><sub>内置大航海东方宫廷特效和玻璃质感特效，支持上传透明 WebM、MP4、图片、SVGA、Lottie，可搭配音效</sub></td>
-    <td width="33%" valign="top"><b>直播软件</b><br><sub>兼容 B 站直播姬与 OBS，竖屏优先并自动避开安全区，支持多路输出</sub></td>
+    <td width="33%" valign="top"><b>特效素材</b><br><sub>内置大航海东方宫廷特效和玻璃质感特效，支持上传透明 WebM、MP4、图片、SVGA、Lottie，可搭配音效；位置、大小、边缘羽化随意调</sub></td>
+    <td width="33%" valign="top"><b>直播软件</b><br><sub>兼容 B 站直播姬与 OBS，竖屏优先并自动避开安全区，支持多路输出，升级后特效页自动更新</sub></td>
     <td width="33%" valign="top"><b>管理后台</b><br><sub>实时动态、播放队列、直播数据、事件记录、模拟验证、备份与导入导出</sub></td>
   </tr>
 </table>
@@ -224,6 +224,7 @@ pnpm --filter @starfall/server start
 
 - [x] **v1.0.0**：进场、弹幕、礼物、上舰特效，完整的管理后台，服务器部署
 - [x] 特效升级：大航海用东方宫廷风格（门楼 / 亭阁 / 金銮）；礼物、房管、弹幕回应用玻璃质感（晶礼 / 晶耀 / 晶巡 / 晶语）
+- [x] **v1.1.0**：素材位置、大小、上下羽化、渐入渐出可调；素材库卡片操作；特效页自动更新、后台新版本提示
 - [ ] Windows 客户端：在主播电脑上直接运行，界面与服务器版一致
 - [ ] 第二期：醒目留言、关注、点赞触发；礼物与直播数据统计；观众档案
 

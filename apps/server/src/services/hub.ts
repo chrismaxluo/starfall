@@ -44,9 +44,15 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
 });
 
 export class Hub {
+  /** 现在的特效页版本（连接时告诉特效页，旧页面会自动刷新） */
+  private readonly build: () => string | null;
   private readonly overlays = new Set<OverlayClient>();
   private readonly admins = new Set<Sock>();
   private readonly overlayListeners = new Set<() => void>();
+
+  constructor(opts: { build?: () => string | null } = {}) {
+    this.build = opts.build ?? (() => null);
+  }
 
   /** 特效页上下线、上报环境时通知（管理后台显示在线状态） */
   onOverlaysChange(fn: () => void): () => void {
@@ -61,7 +67,7 @@ export class Hub {
   addOverlay(sock: Sock, output: OutputRow, preload: string[], now = Date.now()): OverlayClient {
     const c: OverlayClient = { sock, outputId: output.id, since: now, env: null, lastError: null, pending: new Map() };
     this.overlays.add(c);
-    send(sock, { type: 'hello', config: overlayConfig(output), preload });
+    send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
     this.overlaysChanged();
     return c;
   }

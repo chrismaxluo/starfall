@@ -67,8 +67,14 @@ export interface PlayItem {
   test?: boolean;
 }
 
+/** 特效页的版本：构建出的入口脚本名（带哈希），重新构建后会变 */
+export const OVERLAY_BUILD_RE = /index-[\w-]+\.js/;
+
 export type ServerToOverlay =
-  | { type: 'hello'; config: OverlayConfig; preload: string[] }
+  /** build：服务端现在的特效页版本；和页面自己的不一样时，页面会在空闲时自动刷新 */
+  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null }
+  /** 特效页重新构建了（不用重启服务） */
+  | { type: 'version'; build: string }
   | { type: 'config'; config: OverlayConfig }
   | { type: 'preload'; preload: string[] }
   | { type: 'play'; item: PlayItem }

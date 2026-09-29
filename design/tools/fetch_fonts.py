@@ -10,7 +10,9 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "design" / "preview" / "assets"
 URL = ("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700"
-       "&family=Geist+Mono:wght@500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap")
+       "&family=Geist+Mono:wght@500;600&family=Noto+Sans+SC:wght@400;500;600;700"
+       # 漫画登场的拟声字、台词（站酷庆科黄油体，SIL OFL 1.1）
+       "&family=ZCOOL+QingKe+HuangYou&display=swap")
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
 
 

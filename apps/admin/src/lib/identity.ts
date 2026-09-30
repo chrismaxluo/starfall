@@ -26,6 +26,11 @@ export function identityOf(v: Viewer, anchorUid: number | undefined): Identity {
   return 'nor';
 }
 
+/** 主播本人（显示「主播」标签，不算普通观众） */
+export function isAnchor(v: Viewer, anchorUid: number | undefined): boolean {
+  return anchorUid !== undefined && anchorUid > 0 && v.uid === anchorUid;
+}
+
 /** 预览用的示例观众 */
 export interface SampleViewer {
   name: string;

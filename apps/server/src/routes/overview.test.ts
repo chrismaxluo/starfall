@@ -9,8 +9,8 @@ afterEach(async () => { for (const c of close) await c(); close = []; vi.restore
 
 const lv = (uid: number, p: Partial<ListViewer> = {}): ListViewer => ({ uid, name: `观众${uid}`, face: '', guard: 0, honor: 0, mystery: false, ...p });
 
-async function setup(fakes: { online?: (page: number) => OnlineRank; guards?: (page: number) => GuardPage } = {}) {
-  const fetchOnline = vi.fn(async (_h: unknown, _r: number, _a: number, page = 1) => fakes.online?.(page) ?? { count: 0, items: [] });
+async function setup(fakes: { online?: () => OnlineRank; guards?: (page: number) => GuardPage } = {}) {
+  const fetchOnline = vi.fn(async () => fakes.online?.() ?? { count: 0, items: [] });
   const fetchGuards = vi.fn(async (_h: unknown, _r: number, _a: number, page: number) => fakes.guards?.(page) ?? { total: 0, pages: 1, items: [] });
   const t = await testApp({ audience: { fetchOnline, fetchGuards, sleep: async () => undefined } });
   close.push(() => t.app.close());
@@ -103,19 +103,23 @@ describe('总览右侧面板', () => {
     expect(r.fleetError).toContain('连不上');
   });
 
-  it('在线观众：没开播时是空的；开播后读两页（每页 50），20 秒内不重复读', async () => {
-    const page = (p: number): OnlineRank => ({ count: 70, items: Array.from({ length: p === 1 ? 50 : 20 }, (_, i) => ({ ...lv((p - 1) * 50 + i + 1, { honor: 10 }), rank: (p - 1) * 50 + i + 1, score: 100 - i })) });
+  it('在线观众：没开播时是空的；开播后读一次（B 站只给前 100 位，没贡献的也在），20 秒内不重复读', async () => {
+    const page = (): OnlineRank => ({ count: 130, items: Array.from({ length: 100 }, (_, i) => ({ ...lv(i + 1, { honor: 10 }), rank: i + 1, score: Math.max(0, 70 - i) })) });
     const t = await setup({ online: page });
     expect((await t.req({ method: 'GET', url: '/api/online' })).json()).toEqual({ live: false, count: 0, items: [], updatedAt: null });
     expect(t.fetchOnline).not.toHaveBeenCalled();
     t.goLive();
+    // B 站的名单里没有房管，按本直播间的房管名单补上
+    vi.spyOn(t.ctx.live, 'isMod').mockImplementation((uid) => uid === 2);
     const r = (await t.req({ method: 'GET', url: '/api/online' })).json();
-    expect(r).toMatchObject({ live: true, count: 70 });
-    expect(r.items).toHaveLength(70);
-    expect(r.items[0]).toMatchObject({ uid: 1, rank: 1, score: 100, honor: 10 });
-    expect(t.fetchOnline).toHaveBeenCalledTimes(2);
+    expect(r).toMatchObject({ live: true, count: 130 });
+    expect(r.items).toHaveLength(100);
+    expect(r.items[0]).toMatchObject({ uid: 1, rank: 1, score: 70, honor: 10, isMod: false });
+    expect(r.items[1]).toMatchObject({ uid: 2, isMod: true });
+    expect(r.items[99]).toMatchObject({ score: 0 });
+    expect(t.fetchOnline).toHaveBeenCalledTimes(1);
     await t.req({ method: 'GET', url: '/api/online' });
-    expect(t.fetchOnline).toHaveBeenCalledTimes(2);
+    expect(t.fetchOnline).toHaveBeenCalledTimes(1);
   });
 
   it('在线观众读失败：以前读到过就用以前的，从来没读到过返回 502', async () => {

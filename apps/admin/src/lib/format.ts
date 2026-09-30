@@ -60,15 +60,13 @@ export function bigNum(n: number | null | undefined): string {
   return `${w >= 1000 ? Math.round(w) : Math.round(w * 10) / 10}万`;
 }
 
-/** 某个时刻：今天 19:02、昨天 19:02、9月25日 19:02 */
+/** 某个时刻：今天 19:02、昨天 19:02、9月25日 19:02（和别处一样按主播所在时区） */
 export function when(ts: number, now = Date.now()): string {
-  const d = new Date(ts);
-  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  const day = (t: number) => Math.floor((t - new Date(t).getTimezoneOffset() * 60_000) / 86_400_000);
-  const diff = day(now) - day(ts);
-  if (diff === 0) return `今天 ${hm}`;
-  if (diff === 1) return `昨天 ${hm}`;
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${hm}`;
+  const p = parts(ts);
+  const hm = p.slice(11, 16);
+  if (p.slice(0, 10) === parts(now).slice(0, 10)) return `今天 ${hm}`;
+  if (p.slice(0, 10) === parts(now - 86_400_000).slice(0, 10)) return `昨天 ${hm}`;
+  return `${Number(p.slice(5, 7))}月${Number(p.slice(8, 10))}日 ${hm}`;
 }
 
 /** 直播时长：2:14:37 */

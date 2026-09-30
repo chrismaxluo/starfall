@@ -1,4 +1,4 @@
-// 总览右侧面板的 B 站名单：在线观众（高能榜：只列出这场投喂、点赞、发过弹幕的观众）、舰队（大航海榜）。只在后台打开这一页时按需读取，带缓存。
+// 总览右侧面板的 B 站名单：在线观众（前 100 位，按贡献排，没贡献的也在）、舰队（大航海榜）。只在后台打开这一页时按需读取，带缓存。
 // 头像、头像框等图片只记地址，后台运行时从 B 站加载。
 import { getGuardPage, getOnlineRank } from '@starfall/bili';
 import type { BiliHttp, ListViewer, OnlineRank } from '@starfall/bili';
@@ -8,8 +8,6 @@ import type { RoomStore } from './room.ts';
 
 /** 在线名单缓存多久（后台 30 秒刷新一次，几个页面同时打开也只读一次） */
 const ONLINE_TTL_MS = 20_000;
-/** 在线名单最多读几页（每页 50 人） */
-const ONLINE_PAGES = 2;
 /** 舰队名单变化慢，15 分钟读一次 */
 const FLEET_TTL_MS = 15 * 60_000;
 /** 舰队名单最多读几页（每页 30 人）：人特别多的直播间只读前 1200 人 */
@@ -20,20 +18,21 @@ const PAGE_GAP_MS = 150;
 export interface OnlineList {
   live: boolean;
   count: number;
-  items: OnlineRank['items'];
+  /** isMod：本直播间房管（B 站的名单里没有，按房管名单补上） */
+  items: Array<OnlineRank['items'][number] & { isMod: boolean }>;
   updatedAt: number | null;
 }
 
 export interface FleetList {
   total: number;
   /** 读到的名单（人特别多时只有前面一部分） */
-  members: ListViewer[];
+  members: Array<ListViewer & { isMod: boolean }>;
   updatedAt: number;
 }
 
 export interface AudienceDeps {
   room: RoomStore;
-  live: Pick<LiveService, 'status'>;
+  live: Pick<LiveService, 'status' | 'isMod'>;
   anon: () => BiliHttp;
   fetchOnline?: typeof getOnlineRank;
   fetchGuards?: typeof getGuardPage;
@@ -67,16 +66,11 @@ export class AudienceService {
     this.onlineLoading ??= (async () => {
       // 高能榜是公开的，不用登录（登录了拿到的也一样）
       const http = this.d.anon();
+      // B 站只给前 100 位，一次读完
+      const p = await this.d.fetchOnline(http, r.roomId, r.anchorUid);
       const items: OnlineList['items'] = [];
-      let count = 0;
-      for (let page = 1; page <= ONLINE_PAGES; page++) {
-        const p = await this.d.fetchOnline(http, r.roomId, r.anchorUid, page, 50);
-        count = p.count;
-        items.push(...p.items.filter((x) => !items.some((y) => y.uid === x.uid)));
-        if (p.items.length < 50 || items.length >= count) break;
-        await this.d.sleep(PAGE_GAP_MS);
-      }
-      const value: OnlineList = { live: true, count, items, updatedAt: this.d.now() };
+      for (const x of p.items) if (!items.some((y) => y.uid === x.uid)) items.push({ ...x, isMod: this.d.live.isMod(x.uid) });
+      const value: OnlineList = { live: true, count: p.count, items, updatedAt: this.d.now() };
       this.onlineCache = { roomId: r.roomId, at: this.d.now(), value };
       return value;
     })()
@@ -95,12 +89,12 @@ export class AudienceService {
     if (c && c.roomId === r.roomId && this.d.now() - c.value.updatedAt < FLEET_TTL_MS) return c.value;
     this.fleetLoading ??= (async () => {
       const http = this.d.anon();
-      const members: ListViewer[] = [];
+      const members: FleetList['members'] = [];
       let total = 0;
       for (let page = 1; page <= FLEET_PAGES; page++) {
         const p = await this.d.fetchGuards(http, r.roomId, r.anchorUid, page);
         total = p.total;
-        for (const m of p.items) if (!members.some((x) => x.uid === m.uid)) members.push(m);
+        for (const m of p.items) if (!members.some((x) => x.uid === m.uid)) members.push({ ...m, isMod: this.d.live.isMod(m.uid) });
         if (page >= p.pages || !p.items.length) break;
         await this.d.sleep(PAGE_GAP_MS);
       }

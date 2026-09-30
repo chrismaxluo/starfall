@@ -247,6 +247,13 @@ svg.i { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: n
 .tag.cap { color: var(--cap); background: var(--cap-soft); }
 .tag.mod { color: var(--mod); background: var(--mod-soft); }
 .tag.nor { color: var(--nor); background: var(--nor-soft); }
+/* 主播本人：B 站粉色 */
+.tag.anchor { color: #FF6699; background: rgba(255, 102, 153, 0.12); }
+/* 一个人的几个身份标签排在一起（大航海 + 房 + 粉丝牌） */
+.idtags { display: inline-flex; align-items: center; gap: 5px; flex: none; }
+/* 房管：橙色圆圈里一个「房」字（和 B 站弹幕里的一样，自己画的） */
+.fang { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; border: 1.3px solid #F39A3D; color: #F39A3D; font-size: 9px; font-style: normal; font-weight: 600; line-height: 1; flex: none; box-sizing: border-box; }
+.fang.solo { width: 18px; height: 18px; font-size: 11px; border-width: 1.5px; }
 
 /* B站粉丝牌（真实配色） */
 .medal {

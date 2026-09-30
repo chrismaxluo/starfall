@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describe as describeEvent, statusCls } from './events.ts';
 import { bigNum, clock, dateTime, fileSize, gcd, hms, seconds, setTimeZone, today, when } from './format.ts';
-import { identityOf, medalColors } from './identity.ts';
+import { identityOf, isAnchor, medalColors } from './identity.ts';
 import { placeWarnings, scaleRect } from './place.ts';
 import { sampleFor, whoText } from './danmu-who.ts';
 import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
@@ -16,6 +16,11 @@ describe('观众身份', () => {
     expect(identityOf(v({ medal: { name: '牌', level: 30, anchorUid: 20000 } }), 20000)).toBe('fan');
     expect(identityOf(v({ medal: { name: '牌', level: 30, anchorUid: 999 } }), 20000)).toBe('nor');
     expect(identityOf(v(), 20000)).toBe('nor');
+  });
+  it('认出主播本人', () => {
+    expect(isAnchor(v({ uid: 20000 }), 20000)).toBe(true);
+    expect(isAnchor(v({ uid: 20001 }), 20000)).toBe(false);
+    expect(isAnchor(v({ uid: 20000 }), undefined)).toBe(false);
   });
   it('粉丝牌颜色按等级；大航海有亮边', () => {
     expect(medalColors(5).bg).toBe('#5762A799');
@@ -72,6 +77,10 @@ describe('时间按主播所在时区显示', () => {
     expect(dateTime(ts)).toBe('09-27 04:00:00');
     expect(clock(ts)).toBe('04:00:00');
     expect(today()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // 开播时间这类「今天 / 昨天」也按这个时区，不按浏览器的
+    expect(when(ts, Date.UTC(2026, 8, 27, 1, 0))).toBe('今天 04:00');
+    expect(when(ts, Date.UTC(2026, 8, 27, 17, 0))).toBe('昨天 04:00');
+    expect(when(ts, Date.UTC(2026, 8, 29, 1, 0))).toBe('9月27日 04:00');
     setTimeZone('America/New_York');
     expect(dateTime(ts)).toBe('09-26 16:00:00');
     setTimeZone('Not/AZone');

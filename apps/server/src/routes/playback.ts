@@ -131,12 +131,12 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/stats/fleet', async (req) => {
     const { scope, room, from, to } = range(req.query);
     const came = room && from !== null ? ctx.log.guardVisits(room.roomId, from, to) : [];
-    let fleet: { total: number; members: Array<{ uid: number; name: string; face: string; guard: number }>; updatedAt: number } | null = null;
+    let fleet: { total: number; members: Array<{ uid: number; name: string; face: string; guard: number; isMod: boolean }>; updatedAt: number } | null = null;
     let fleetError: string | null = null;
     if (room) {
       try {
         const f = await ctx.audience.fleet();
-        fleet = { total: f.total, members: f.members.map((m) => ({ uid: m.uid, name: m.name, face: m.face, guard: m.guard })), updatedAt: f.updatedAt };
+        fleet = { total: f.total, members: f.members.map((m) => ({ uid: m.uid, name: m.name, face: m.face, guard: m.guard, isMod: m.isMod })), updatedAt: f.updatedAt };
       } catch (e) {
         fleetError = (e as Error).message;
       }

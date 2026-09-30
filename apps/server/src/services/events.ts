@@ -132,13 +132,14 @@ export class EventLog {
     return { events: page, nextCursor: rows.length > limit ? page[page.length - 1]!.id : null };
   }
 
-  /** 一段时间里某个直播间的统计（总览）：进场人数（去重）、播放次数、身份构成。to 为 null 表示到现在 */
+  /** 一段时间里某个直播间的统计（总览）：进场人数（去重）、播放次数、身份构成（都不算主播本人）。to 为 null 表示到现在 */
   stats(roomId: number, from: number, to: number | null, anchorUid: number): EventStats {
     const db = this.db.$client;
     const end = to ?? Number.MAX_SAFE_INTEGER;
     const where = 'room_id = ? and ts >= ? and ts < ?';
     const args = [roomId, from, end];
-    const enterUnique = (db.prepare(`select count(distinct uid) n from events where ${where} and kind = 'enter'`).get(...args) as { n: number }).n;
+    // 主播本人不算观众：进场人数、身份构成都不算主播
+    const enterUnique = (db.prepare(`select count(distinct uid) n from events where ${where} and kind = 'enter' and uid != ?`).get(...args, anchorUid) as { n: number }).n;
     const played = (db.prepare(`select count(*) n from events where ${where} and status = 'played'`).get(...args) as { n: number }).n;
     const guardPlayed = (db.prepare(`select count(*) n from events where ${where} and status = 'played' and cast(json_extract(viewer, '$.guard') as integer) > 0`).get(...args) as { n: number }).n;
     // 每个人取这段时间里最后一次进场时的身份
@@ -146,9 +147,9 @@ export class EventLog {
       .prepare(
         `select json_extract(viewer, '$.guard') g, json_extract(viewer, '$.isMod') m, json_extract(viewer, '$.medal.anchorUid') a, json_extract(viewer, '$.medal.level') l
          , json_extract(viewer, '$.honor') h
-         from events where id in (select max(id) from events where ${where} and kind = 'enter' group by uid)`,
+         from events where id in (select max(id) from events where ${where} and kind = 'enter' and uid != ? group by uid)`,
       )
-      .all(...args) as Array<{ g: number | null; m: number | null; a: number | null; l: number | null; h: number | null }>;
+      .all(...args, anchorUid) as Array<{ g: number | null; m: number | null; a: number | null; l: number | null; h: number | null }>;
     const composition = { gov: 0, adm: 0, cap: 0, mod: 0, fan: 0, nor: 0 };
     const honor = { l1: 0, l21: 0, l41: 0, l61: 0, none: 0 };
     for (const r of rows) {

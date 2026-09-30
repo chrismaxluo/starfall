@@ -48,7 +48,7 @@ const fleetMembers: ListViewer[] = [...P.filter((p) => p.guard), ...MISSING.map(
 const ctx = createContext(config, {
   fetchGifts: async () => [],
   audience: {
-    fetchOnline: async (_h, _r, _a, page = 1) => (page === 1 ? online : { count: online.count, items: [] }),
+    fetchOnline: async () => online,
     fetchGuards: async (_h, _r, _a, page): Promise<GuardPage> => ({ total: fleetMembers.length, pages: 1, items: page === 1 ? fleetMembers : [] }),
   },
   liveDeps: {

@@ -244,17 +244,20 @@ export interface OnlineRank {
   items: Array<ListViewer & { rank: number; score: number }>;
 }
 
-/** 高能榜：count 是在线人数（登录了 B 站的观众）；名单只列出这场投喂、点赞、发过弹幕的人（贡献值大于 0），按贡献排序。公开接口 */
-export async function getOnlineRank(http: BiliHttp, roomId: number, anchorUid: number, page = 1, pageSize = 50): Promise<OnlineRank> {
-  const d = await http.getData<{ onlineNum?: number; OnlineRankItem?: Array<{ userRank?: number; uid?: number; name?: string; face?: string; score?: number; guard_level?: number; wealth_level?: number; is_mystery?: boolean; uinfo?: RawUinfo }> | null }>(
-    `${LIVE}/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=${anchorUid}&roomId=${roomId}&page=${page}&pageSize=${pageSize}`,
+/**
+ * 在线观众（直播间里「在线观众」那个名单）：count 是在线人数；名单按贡献排，没贡献的也在（贡献值 0）。
+ * B 站只给前 100 位，翻页没用（每一页都是前 100）；登录不登录一样，所以不用登录。隐身之类的少数观众不在名单里
+ */
+export async function getOnlineRank(http: BiliHttp, roomId: number, anchorUid: number): Promise<OnlineRank> {
+  const d = await http.getData<{ count?: number; item?: Array<{ rank?: number; uid?: number; name?: string; face?: string; score?: number; guard_level?: number; wealth_level?: number; is_mystery?: boolean; uinfo?: RawUinfo }> | null }>(
+    `${LIVE}/xlive/general-interface/v1/rank/queryContributionRank?ruid=${anchorUid}&room_id=${roomId}&page=1&page_size=100&type=online_rank&switch=contribution_rank`,
     { auth: false, referer: `https://live.bilibili.com/${roomId}` },
   );
   return {
-    count: Number(d.onlineNum) || 0,
-    items: (d.OnlineRankItem ?? []).map((x) => ({
+    count: Number(d.count) || 0,
+    items: (d.item ?? []).map((x) => ({
       ...listViewer(x.uinfo, { uid: x.uid, name: x.name, face: x.face, guard: x.guard_level, honor: x.wealth_level, mystery: x.is_mystery }),
-      rank: Number(x.userRank) || 0,
+      rank: Number(x.rank) || 0,
       score: Number(x.score) || 0,
     })).filter((x) => x.uid > 0),
   };

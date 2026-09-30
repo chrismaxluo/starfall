@@ -61,7 +61,7 @@ button { cursor: pointer; }
 /* ================= 弹幕列表 =================
    新的从下面进来，旧的往上顶，最多 8 条。
    玻璃做法和晶礼、晶巡一样。注意：毛玻璃在带透明度动画的父元素里会失效，所以透明度只加在气泡、头像本身，外层只做位移 */
-.chat { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; --k: 1; }
+.chat { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; --k: 1; }
 .chat.big { --k: 1.2; }
 .msg { position: relative; display: flex; align-items: flex-start; gap: calc(14px * var(--k)); --acc: rgba(255,255,255,.55); --acc2: #fff; }
 .at-r .msg { flex-direction: row-reverse; }

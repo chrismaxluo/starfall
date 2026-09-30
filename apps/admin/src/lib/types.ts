@@ -65,6 +65,7 @@ export interface OutputDto {
   chatSide: 'left' | 'right';
   chatSize: 'normal' | 'large';
   chatMedal: 'own' | 'all';
+  chatMax: number;
   key: string;
   path: string;
   /** 弹幕列表地址 */

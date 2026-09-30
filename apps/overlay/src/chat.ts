@@ -1,8 +1,8 @@
-// 弹幕列表：直播间里所有人的弹幕排成一列，新的从下面进来，旧的往上顶，最多 CHAT_MAX 条（放不下时少显示几条）。
+// 弹幕列表：直播间里所有人的弹幕排成一列，新的从下面进来，旧的往上顶，最多显示设置的条数（放不下时少显示几条）。
 // 地址形如 /overlay/?output=1&key=...&chat=1，在直播软件里单独加一个浏览器源（建议 600×900），拖到画面左边或右边。
 // 设计见 design/preview/chat-list.html。毛玻璃在带透明度动画的父元素里会失效：透明度只加在气泡、头像本身，外层只做位移
 import './chat.css';
-import { CHAT_MAX, GUARD_BADGES } from '@starfall/shared/overlay';
+import { CHAT_MAX_LIMIT, GUARD_BADGES } from '@starfall/shared/overlay';
 import type { ChatItem, OverlayConfig, ServerToOverlay } from '@starfall/shared/overlay';
 import { connect } from './conn.ts';
 import type { Conn } from './conn.ts';
@@ -18,7 +18,7 @@ const preview = q.get('preview') === '1';
 const env = detect();
 
 let config: OverlayConfig = { ...DEFAULT_CONFIG };
-/** 收到的弹幕（最多 CHAT_MAX 条）：改设置（例如粉丝牌显示范围）时按它重新画 */
+/** 最近收到的弹幕（最多 CHAT_MAX_LIMIT 条）：改设置（例如粉丝牌显示范围、条数调大）时按它重新画 */
 let items: ChatItem[] = [];
 
 document.getElementById('stage')?.remove();
@@ -76,12 +76,13 @@ function build(item: ChatItem): HTMLElement {
 const anim = (el: Element, kf: Keyframe[], o: KeyframeAnimationOptions) => el.animate(kf, { fill: 'both', ...o });
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** 越旧越淡一点（透明度加在气泡和头像本身） */
+/** 列表满了时，最上面两条淡一点（快要离开了）；透明度加在气泡和头像本身 */
 function fadeAged(): void {
   const rows = [...list.children].filter((r) => !(r as HTMLElement).dataset.out) as HTMLElement[];
+  const max = config.chatMax;
   rows.forEach((r, i) => {
     const age = rows.length - 1 - i;
-    const o = age >= 7 ? '0.55' : age >= 6 ? '0.78' : '';
+    const o = max < 4 ? '' : age >= max - 1 ? '0.55' : age >= max - 2 ? '0.78' : '';
     for (const e of r.querySelectorAll<HTMLElement>(':scope > .g, :scope > .avw')) e.style.opacity = o;
   });
 }
@@ -109,14 +110,14 @@ function enter(el: HTMLElement, item: ChatItem): void {
 }
 
 /** 加一条：旧的往上挪（FLIP：先记下位置，插入后从旧位置滑过去）；超过条数或放不下时，最上面的淡出 */
-function add(item: ChatItem, quiet = false): void {
-  items = [...items, item].slice(-CHAT_MAX);
+function add(item: ChatItem, quiet = false, remember = true): void {
+  if (remember) items = [...items, item].slice(-CHAT_MAX_LIMIT);
   const before = new Map([...list.children].map((r) => [r, r.getBoundingClientRect().top]));
   const el = build(item);
   list.append(el);
   const leaving: HTMLElement[] = [];
   const live = [...list.children].filter((r) => !(r as HTMLElement).dataset.out) as HTMLElement[];
-  while (live.length > 1 && (live.length > CHAT_MAX || list.offsetHeight > root.clientHeight)) {
+  while (live.length > 1 && (live.length > config.chatMax || list.offsetHeight > root.clientHeight)) {
     const old = live.shift()!;
     old.dataset.out = '1';
     if (quiet || reduced()) {
@@ -152,14 +153,12 @@ function add(item: ChatItem, quiet = false): void {
 
 /** 按现在的设置重新画一遍（不要动画） */
 function redraw(): void {
-  const keep = items;
-  items = [];
   list.replaceChildren();
-  for (const it of keep) add(it, true);
+  for (const it of items.slice(-config.chatMax)) add(it, true, false);
 }
 
 function applyConfig(next: OverlayConfig): void {
-  const redrawNeeded = next.chatMedal !== config.chatMedal || next.chatSize !== config.chatSize;
+  const redrawNeeded = next.chatMedal !== config.chatMedal || next.chatSize !== config.chatSize || next.chatMax !== config.chatMax;
   config = next;
   const lite = q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
   root.className = `chat-root side-${config.chatSide}${config.chatSize === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${config.chatEnabled ? '' : ' off'}`;
@@ -180,9 +179,8 @@ function onMessage(m: ServerToOverlay): void {
     case 'hello':
       onBuild(m.build);
       applyConfig(m.config);
-      items = [];
-      list.replaceChildren();
-      for (const it of m.chat ?? []) add(it, true);
+      items = (m.chat ?? []).slice(-CHAT_MAX_LIMIT);
+      redraw();
       conn?.send({ type: 'report', env: { ...detect(), lite: root.classList.contains('lite'), chat: true, build: build0, ...(q.get('view') === '1' ? { view: true } : {}) } });
       break;
     case 'config':

@@ -5,7 +5,7 @@ import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_SIZE } from '@starfall/shared/overlay';
+import { CHAT_MAX_LIMIT, CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
@@ -128,10 +128,19 @@ const chatUrl = computed(() => (o.value ? `${location.origin}${o.value.chatPath}
 const mask = (u: string, show: boolean) => (show || !o.value ? u : u.replace(o.value.key, '••••••••••'));
 const shownUrl = computed(() => mask(url.value, showKey.value));
 const shownChatUrl = computed(() => mask(chatUrl.value, showChatKey.value));
+/** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
+const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
+function setChatMax(v: number): void {
+  if (!o.value) return;
+  const n = Math.round(v);
+  if (!(n >= 1 && n <= CHAT_MAX_LIMIT)) return toast(`条数要在 1 – ${CHAT_MAX_LIMIT} 之间`, 'err');
+  if (n === o.value.chatMax) return;
+  void save({ chatMax: n }, `最多显示 ${n} 条；浏览器源的高度建议改成 ${chatHeight(n, o.value.chatSize)}`);
+}
 async function copy(which: 'fx' | 'chat'): Promise<void> {
   try {
     await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : url.value);
-    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${CHAT_SIZE.width} × ${CHAT_SIZE.height}` : '已复制特效页地址');
+    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : '已复制特效页地址');
   } catch {
     if (which === 'chat') showChatKey.value = true;
     else showKey.value = true;
@@ -240,7 +249,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           <div class="srcbox" :class="{ off: !o.chatEnabled }">
             <div class="src-h">
               <span class="src-ic dm"><Icon name="i-chat" /></span>
-              <span class="src-t"><b>弹幕列表</b><span>所有人的弹幕排成一列，最多 8 条 · 拖到画面左边或右边</span></span>
+              <span class="src-t"><b>弹幕列表</b><span>所有人的弹幕排成一列，最多 {{ o.chatMax }} 条 · 拖到画面左边或右边</span></span>
               <span class="right">
                 <span class="live" :class="o.chatEnabled && chats.length ? '' : 'off'"><i />{{ o.chatEnabled ? liveText(chats) : '已关闭' }}</span>
                 <button class="switch" role="switch" type="button" :aria-checked="o.chatEnabled" aria-label="启用弹幕列表" @click="save({ chatEnabled: !o.chatEnabled }, o.chatEnabled ? '已关闭弹幕列表：直播画面上不再显示' : '已打开弹幕列表')" />
@@ -252,8 +261,8 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <button class="btn ic" :title="showChatKey ? '隐藏密钥' : '显示密钥'" :aria-label="showChatKey ? '隐藏密钥' : '显示密钥'" @click="showChatKey = !showChatKey"><Icon :name="showChatKey ? 'i-eye-off' : 'i-eye'" /></button>
             </div>
             <div class="src-f">
-              <span class="wh2">宽高填 <code>{{ CHAT_SIZE.width }} × {{ CHAT_SIZE.height }}</code></span>
-              <span>高一点能放满 8 条，矮了就少显示几条</span>
+              <span class="wh2">宽高填 <code>{{ chatWh.w }} × {{ chatWh.h }}</code></span>
+              <span>高度按 {{ o.chatMax }} 条算好了，矮了就少显示几条</span>
               <span class="links"><a class="linkish" :href="`${o.chatPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
             </div>
           </div>
@@ -264,13 +273,13 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <li v-if="o.orient === 'portrait'"><span>竖屏推流时，OBS 的 <b>设置 → 视频 → 基础分辨率</b> 也要设成 <code>{{ o.width }}x{{ o.height }}</code>。</span></li>
               <li><span><em class="tagsrc fx">特效页</em>在 <b>来源</b> 里点 <b>+</b> → <b>浏览器</b>，命名为「星临特效」，URL 粘贴特效页地址，宽 <code>{{ o.width }}</code> 高 <code>{{ o.height }}</code>，勾选 <b>通过 OBS 控制音频</b>（特效的音效才会进入直播）。</span></li>
               <li><span><em class="tagsrc fx">特效页</em>取消勾选 <b>不可见时关闭源</b> 和 <b>场景变为活动状态时刷新浏览器</b>，避免切场景时漏播；把它拖到来源列表 <b>最上方</b>。</span></li>
-              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再加一个 <b>浏览器</b> 来源，命名为「星临弹幕」，URL 粘贴弹幕列表地址，宽 <code>{{ CHAT_SIZE.width }}</code> 高 <code>{{ CHAT_SIZE.height }}</code>，拖到画面左边或右边。</span></li>
+              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再加一个 <b>浏览器</b> 来源，命名为「星临弹幕」，URL 粘贴弹幕列表地址，宽 <code>{{ chatWh.w }}</code> 高 <code>{{ chatWh.h }}</code>，拖到画面左边或右边。</span></li>
               <li><span>第一次用可以先打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
             </ol>
             <ol v-else class="steps">
               <li v-if="o.orient === 'portrait'"><span>在直播姬里切换到 <b>竖屏直播</b> 模式。</span></li>
               <li><span><em class="tagsrc fx">特效页</em>点 <b>添加素材 → 浏览器</b>，粘贴特效页地址，宽高填 <code>{{ o.width }}</code> × <code>{{ o.height }}</code>，拖动 <b>铺满画面</b>，放到 <b>图层最上方</b>。</span></li>
-              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再添加一个 <b>浏览器</b> 素材，粘贴弹幕列表地址，宽高填 <code>{{ CHAT_SIZE.width }}</code> × <code>{{ CHAT_SIZE.height }}</code>，拖到画面左边或右边。想改大小就改宽高数字或下面的「字号」，不要拉伸变形。</span></li>
+              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再添加一个 <b>浏览器</b> 素材，粘贴弹幕列表地址，宽高填 <code>{{ chatWh.w }}</code> × <code>{{ chatWh.h }}</code>，拖到画面左边或右边。想改大小就改宽高数字或下面的「字号」，不要拉伸变形。</span></li>
               <li><span>第一次用可以先用浏览器素材打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
             </ol>
           </details>
@@ -353,7 +362,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                   <button :aria-pressed="o.chatSize === 'normal'" @click="save({ chatSize: 'normal' })">标准</button>
                   <button :aria-pressed="o.chatSize === 'large'" @click="save({ chatSize: 'large' })">大</button>
                 </span>
-                <span class="hint">字号大时同样的高度放的条数少一些</span>
+                <span class="hint">字号改了，浏览器源的高度也跟着变（上面「宽高填」已经算好）</span>
               </div></div>
             </div>
             <div class="srow">
@@ -370,7 +379,17 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
             <div class="srow">
               <span class="lb">条数</span>
-              <div class="ctl"><span class="hint strong">最多 8 条。放不下时从最上面开始少显示几条。</span></div>
+              <div class="ctl">
+                <div class="line">
+                  <span class="stepper">
+                    <button type="button" aria-label="少一条" :disabled="o.chatMax <= 1" @click="setChatMax(o.chatMax - 1)">−</button>
+                    <input :key="`${o.id}-${o.chatMax}`" class="inp num" type="number" min="1" :max="CHAT_MAX_LIMIT" :value="o.chatMax" aria-label="最多显示几条" @change="(e) => setChatMax(Number((e.target as HTMLInputElement).value))" />
+                    <button type="button" aria-label="多一条" :disabled="o.chatMax >= CHAT_MAX_LIMIT" @click="setChatMax(o.chatMax + 1)">+</button>
+                  </span>
+                  <span class="hint">最多显示几条（1 – {{ CHAT_MAX_LIMIT }}）</span>
+                </div>
+                <span class="hint">条数改了，浏览器源的高度也要跟着改（上面「宽高填」已经算好）。放不下时从最上面开始少显示几条。</span>
+              </div>
             </div>
           </div>
         </div>
@@ -382,7 +401,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           <div class="ptabs" role="tablist" aria-label="预览">
             <button role="tab" :aria-selected="ptab === 'fx'" @click="ptab = 'fx'">特效页</button>
             <button role="tab" :aria-selected="ptab === 'chat'" @click="ptab = 'chat'">弹幕列表</button>
-            <span class="aside">{{ ptab === 'fx' ? `${o.width} × ${o.height} · 只在这里播放` : o.chatEnabled ? `${CHAT_SIZE.width} × ${CHAT_SIZE.height} · 实时弹幕` : '弹幕列表已关闭' }}</span>
+            <span class="aside">{{ ptab === 'fx' ? `${o.width} × ${o.height} · 只在这里播放` : o.chatEnabled ? `${chatWh.w} × ${chatWh.h} · 实时弹幕` : '弹幕列表已关闭' }}</span>
           </div>
           <div class="ostage-wrap">
             <PreviewStage v-if="ptab === 'fx'" ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && o.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />

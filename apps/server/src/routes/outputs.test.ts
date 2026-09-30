@@ -17,15 +17,16 @@ describe('直播软件输出', () => {
     expect(o.key).toMatch(/^[\w-]{22}$/);
     expect(o.path).toBe(`/overlay/?output=${o.id}&key=${o.key}`);
     // 弹幕列表：默认打开、靠左、标准字号、只显示本直播间的粉丝牌
-    expect(o).toMatchObject({ chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatPath: `/overlay/?output=${o.id}&key=${o.key}&chat=1` });
+    expect(o).toMatchObject({ chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: 8, chatPath: `/overlay/?output=${o.id}&key=${o.key}&chat=1` });
   });
 
   it('弹幕列表的设置可以改，取值要合法', async () => {
     const { req } = await setup();
     const [o] = (await req({ method: 'GET', url: '/api/outputs' })).json().outputs;
-    const u = (await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatEnabled: false, chatSide: 'right', chatSize: 'large', chatMedal: 'all' } })).json();
-    expect(u).toMatchObject({ chatEnabled: false, chatSide: 'right', chatSize: 'large', chatMedal: 'all' });
+    const u = (await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatEnabled: false, chatSide: 'right', chatSize: 'large', chatMedal: 'all', chatMax: 15 } })).json();
+    expect(u).toMatchObject({ chatEnabled: false, chatSide: 'right', chatSize: 'large', chatMedal: 'all', chatMax: 15 });
     expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatSide: 'middle' } })).statusCode).toBe(400);
+    for (const chatMax of [0, 21, 2.5]) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatMax } })).statusCode).toBe(400);
   });
 
   it('新建（未填的用默认值）、修改、参数校验', async () => {

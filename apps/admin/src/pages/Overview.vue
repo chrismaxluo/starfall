@@ -97,10 +97,12 @@ const honorTotal = computed(() => Object.values(stats.value?.honor ?? {}).reduce
 // ---------- 实时动态 ----------
 const FEED_SHOW = 12;
 const kind = ref<'all' | TriggerKind>('all');
+/** 筛「礼物」时醒目留言也算（都是花钱的） */
+const kindHit = (e: EventDto) => kind.value === 'all' || e.kind === kind.value || (kind.value === 'gift' && e.kind === 'sc');
 const onlyGuard = ref(false);
 /** 鼠标停在列表上时先不滚动（方便点人），移开后再显示新的 */
 const frozen = ref<EventDto[] | null>(null);
-const filtered = computed(() => state.feed.filter((e) => (kind.value === 'all' || e.kind === kind.value) && (!onlyGuard.value || Number((e.viewer as Viewer).guard) > 0)));
+const filtered = computed(() =>  state.feed.filter((e) => kindHit(e) && (!onlyGuard.value || Number((e.viewer as Viewer).guard) > 0)));
 const feed = computed(() => frozen.value ?? filtered.value.slice(0, FEED_SHOW));
 const newWhileFrozen = computed(() => {
   const f = frozen.value;
@@ -110,6 +112,8 @@ const newWhileFrozen = computed(() => {
 });
 watch([kind, onlyGuard], () => frozen.value && (frozen.value = filtered.value.slice(0, FEED_SHOW)));
 function rowText(e: EventDto): string {
+  // 醒目留言只记录，不触发特效
+  if (e.kind === 'sc') return describe(e);
   const parts = e.kind === 'enter' ? [] : [describe(e)];
   if (e.status === 'played' || e.status === 'queued') parts.push(`${e.status === 'played' ? '已播放' : '排队中'} ${effectById(e.effectId)?.name ?? ''}`);
   else if (e.rule) parts.push(`${statusText(e.status)}，未播放`);
@@ -181,7 +185,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
       <div class="card span7" style="grid-row: span 2">
         <div class="card-h"><h2>实时动态</h2><span class="aside"><span v-if="frozen" class="hold"><i />暂停滚动{{ newWhileFrozen ? ` · 新来 ${newWhileFrozen} 条` : '' }}</span><template v-else>点任意一行可设置专属特效</template><span v-if="s?.live.connection === 'connected'" class="live" style="height: 22px"><i />LIVE</span></span></div>
         <div class="fbar">
-          <Seg v-model="kind" label="实时动态筛选" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物' }, { value: 'guard', label: '上舰' }]" />
+          <Seg v-model="kind" label="实时动态筛选" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物 / SC' }, { value: 'guard', label: '上舰' }]" />
           <label>只看大航海<Switch v-model="onlyGuard" label="只看大航海" /></label>
         </div>
         <div class="feed" @mouseenter="frozen = feed.slice()" @mouseleave="frozen = null">

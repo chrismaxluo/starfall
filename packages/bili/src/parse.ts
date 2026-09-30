@@ -15,6 +15,7 @@ export interface ParseContext {
 }
 
 type Raw = { cmd?: string; data?: unknown; info?: unknown };
+type PbLikeMedal = { name?: string; level?: number; ruid?: number; v2_medal_color_start?: string; v2_medal_color_border?: string; v2_medal_color_text?: string; v2_medal_color_level?: string };
 
 const toGuard = (n: unknown): GuardLevel => (n === 1 || n === 2 || n === 3 ? n : 0);
 
@@ -146,26 +147,63 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
     // ---- 上舰：一次购买会同时推送下面三条，由调用方去重（见 core 的 GuardDeduper） ----
     case 'USER_TOAST_MSG_V2': {
       const d = raw.data as
-        | { sender_uinfo?: { uid?: number; base?: { name?: string; face?: string } }; guard_info?: { guard_level?: number }; pay_info?: { payflow_id?: string; num?: number; unit?: string }; toast_msg?: string }
+        | { sender_uinfo?: { uid?: number; base?: { name?: string; face?: string } }; guard_info?: { guard_level?: number }; pay_info?: { payflow_id?: string; num?: number; unit?: string; price?: number }; toast_msg?: string }
         | undefined;
       const uid = Number(d?.sender_uinfo?.uid) || 0;
       const level = toGuard(d?.guard_info?.guard_level);
       if (!uid || !level) return null;
-      return guardEvent(ctx, { uid, name: d?.sender_uinfo?.base?.name ?? '', face: d?.sender_uinfo?.base?.face, level, num: d?.pay_info?.num, unit: d?.pay_info?.unit, toast: d?.toast_msg, key: d?.pay_info?.payflow_id, source: 'toast' });
+      return guardEvent(ctx, { uid, name: d?.sender_uinfo?.base?.name ?? '', face: d?.sender_uinfo?.base?.face, level, num: d?.pay_info?.num, unit: d?.pay_info?.unit, price: d?.pay_info?.price, toast: d?.toast_msg, key: d?.pay_info?.payflow_id, source: 'toast' });
     }
     case 'USER_TOAST_MSG': {
-      const d = raw.data as { uid?: number; username?: string; guard_level?: number; num?: number; unit?: string; payflow_id?: string; toast_msg?: string } | undefined;
+      const d = raw.data as { uid?: number; username?: string; guard_level?: number; num?: number; unit?: string; price?: number; payflow_id?: string; toast_msg?: string } | undefined;
       const uid = Number(d?.uid) || 0;
       const level = toGuard(d?.guard_level);
       if (!uid || !level) return null;
-      return guardEvent(ctx, { uid, name: d?.username ?? '', level, num: d?.num, unit: d?.unit, toast: d?.toast_msg, key: d?.payflow_id, source: 'toast' });
+      return guardEvent(ctx, { uid, name: d?.username ?? '', level, num: d?.num, unit: d?.unit, price: d?.price, toast: d?.toast_msg, key: d?.payflow_id, source: 'toast' });
     }
     case 'GUARD_BUY': {
-      const d = raw.data as { uid?: number; username?: string; guard_level?: number; num?: number } | undefined;
+      const d = raw.data as { uid?: number; username?: string; guard_level?: number; num?: number; price?: number } | undefined;
       const uid = Number(d?.uid) || 0;
       const level = toGuard(d?.guard_level);
       if (!uid || !level) return null;
-      return guardEvent(ctx, { uid, name: d?.username ?? '', level, num: d?.num, unit: '月', source: 'guard_buy' });
+      return guardEvent(ctx, { uid, name: d?.username ?? '', level, num: d?.num, unit: '月', price: d?.price, source: 'guard_buy' });
+    }
+
+    // 醒目留言（_JPN 是带日文翻译的同一条，不要）
+    case 'SUPER_CHAT_MESSAGE': {
+      const d = raw.data as
+        | {
+            id?: number | string; uid?: number | string; price?: number; message?: string; start_time?: number;
+            user_info?: { uname?: string; face?: string; guard_level?: number; manager?: number };
+            medal_info?: { medal_name?: string; medal_level?: number; target_id?: number } | null;
+            uinfo?: { uid?: number; base?: { name?: string; face?: string; is_mystery?: boolean }; medal?: PbLikeMedal | null; wealth?: { level?: number } | null; guard?: { level?: number } | null };
+          }
+        | undefined;
+      const uid = Number(d?.uid ?? d?.uinfo?.uid) || 0;
+      const price = Number(d?.price) || 0;
+      if (!uid || price <= 0 || d?.id === undefined) return null;
+      const u = d.uinfo;
+      const m = u?.medal;
+      const mi = d.medal_info;
+      const colors = m?.v2_medal_color_start && m.v2_medal_color_border && m.v2_medal_color_text && m.v2_medal_color_level
+        ? { bg: m.v2_medal_color_start, level: m.v2_medal_color_level, border: m.v2_medal_color_border, text: m.v2_medal_color_text }
+        : undefined;
+      const medal: Medal | undefined = m?.name && m.level
+        ? { name: m.name, level: m.level, anchorUid: Number(m.ruid) || 0, ...(colors ? { colors } : {}) }
+        : mi?.medal_name && mi.medal_level ? { name: mi.medal_name, level: mi.medal_level, anchorUid: Number(mi.target_id) || 0 } : undefined;
+      const face = u?.base?.face || d.user_info?.face;
+      const viewer: Viewer = {
+        uid,
+        name: u?.base?.name || d.user_info?.uname || '',
+        ...(face ? { face } : {}),
+        // 醒目留言是在本直播间发的，身上的大航海就是本直播间的
+        guard: toGuard(u?.guard?.level ?? d.user_info?.guard_level),
+        isMod: d.user_info?.manager === 1 || (ctx.isMod?.(uid) ?? false),
+        ...(medal ? { medal } : {}),
+        ...honorOf(u?.wealth?.level),
+        mystery: Boolean(u?.base?.is_mystery),
+      };
+      return { kind: 'sc', id: ctx.newId(), ts: d.start_time ? d.start_time * 1000 : ctx.now(), viewer, text: String(d.message ?? ''), priceYuan: price, scId: String(d.id) };
     }
 
     case 'LIVE':
@@ -182,10 +220,11 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
  *  P0 抓到的样本里 op_type=2 对应的文案是"开通"，和网上常见的说法（2 = 续费）不一致，所以不依赖 op_type。 */
 function guardEvent(
   ctx: ParseContext,
-  p: { uid: number; name: string; face?: string | undefined; level: 1 | 2 | 3; num?: number | undefined; unit?: string | undefined; toast?: string | undefined; key?: string | undefined; source: 'toast' | 'guard_buy' },
+  p: { uid: number; name: string; face?: string | undefined; level: 1 | 2 | 3; num?: number | undefined; unit?: string | undefined; price?: number | undefined; toast?: string | undefined; key?: string | undefined; source: 'toast' | 'guard_buy' },
 ): StdEvent {
   const num = Math.max(1, Number(p.num) || 1);
   const months = p.unit === '年' ? num * 12 : num;
+  const priceGold = guardTotal(p.level, Number(p.price) || 0, months);
   const viewer: Viewer = { uid: p.uid, name: p.name, ...(p.face ? { face: p.face } : {}), guard: p.level, isMod: ctx.isMod?.(p.uid) ?? false, mystery: false };
   return {
     kind: 'guard',
@@ -197,6 +236,20 @@ function guardEvent(
     op: p.toast && /续费/.test(p.toast) ? 'renew' : 'open',
     source: p.source,
     ...(p.key ? { dedupeKey: String(p.key) } : {}),
+    ...(priceGold > 0 ? { priceGold } : {}),
   };
+}
+
+/** 各等级一个月最贵多少（金瓜子，B 站 App 里的原价） */
+const MONTH_MAX: Record<1 | 2 | 3, number> = { 1: 19_998_000, 2: 1_998_000, 3: 198_000 };
+
+/**
+ * 这次上舰一共花了多少。样本里都是 1 个月，price 就是这一个月的价格；
+ * 买多个月时 price 是总价还是单价没有样本（⏳），按大小判断：超过一个月的最高价就当总价，否则当单价乘月数
+ */
+export function guardTotal(level: 1 | 2 | 3, price: number, months: number): number {
+  if (price <= 0) return 0;
+  if (months <= 1 || price > MONTH_MAX[level] * 1.05) return price;
+  return price * months;
 }
 

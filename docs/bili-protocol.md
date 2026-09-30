@@ -233,6 +233,16 @@ B 站给舰长、提督、总督的头像套一圈头像框（和船锚图标是
 - 网上旧资料里有更早的舰长框（`78e8a800…`）、提督框（`9b3cfee1…`），说明 B 站换过设计：用的地方要准备加载失败时只显示头像。
 - B 站图片支持 `@120w_120h.webp` 这样的后缀取缩略图（后台用）。
 
+### 5.6.1.1 上舰的价格 ✅
+
+- `USER_TOAST_MSG_V2.pay_info.price`、`USER_TOAST_MSG.price`：**实际支付**的价格（金瓜子），有折扣时是折扣价。2026-09-30 同一场里舰长有 138000、168000、198000 三种。
+- `GUARD_BUY.price`：原价（同一次购买，toast 是 168000，GUARD_BUY 是 198000）。只有 GUARD_BUY 到了时才用它。
+- 样本都是买 1 个月；买多个月时 price 是总价还是单价还没有样本（⏳），暂时按大小判断：超过这个等级一个月的最高价就当总价，否则乘月数。
+
+### 5.6.1.2 醒目留言 SUPER_CHAT_MESSAGE ✅（结构）
+
+和 `av/v1/SuperChat/getMessageList` 接口里的一条一样：`id`（编号，同一条可能推两次）、`uid`、`price`（**元**）、`message`、`start_time`（秒）、`time`（显示多少秒）、`user_info`（uname、face、guard_level、manager、face_frame）、`medal_info`、`uinfo`（新结构，带 wealth）。`SUPER_CHAT_MESSAGE_JPN` 是带日文翻译的同一条，不用。
+
 ### 5.6.4 荣耀等级勋章 ✅
 
 荣耀等级（B 站字段名 wealth）在进场（`INTERACT_WORD_V2` 的 22.4.1）、高级进场（`ENTRY_EFFECT.wealthy_info.level`）、弹幕（`info[16][0]`）里都有；2026-09-30 抓到的 5 条送礼消息里没有。
@@ -257,6 +267,7 @@ GET https://api.live.bilibili.com/xlive/general-interface/v1/content/get?key=wea
 ```
 高能榜（在线观众）：GET https://api.live.bilibili.com/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=主播UID&roomId=房间号&page=1&pageSize=50
 → data.onlineNum（在线人数，和 ONLINE_RANK_COUNT 一样）、data.OnlineRankItem[]：userRank、uid、name、face、score（贡献值）、guard_level、wealth_level（荣耀等级）、is_mystery、medalInfo、uinfo（和进场消息的新结构一样）
+   score 的单位是电池（实测一位观众：我们按礼物算 2850 电池，B 站 2860；他这场发了 225 条弹幕。盲盒按开出的礼物算，不按盲盒原价）。
    名单只有这场贡献值大于 0 的人（接口自己的说明：「投喂、点赞、发弹幕均可上榜」）：实测 398 人在线时 31 人上榜，12 人在线时 4 人上榜；登录不登录拿到的一样，所以不用登录读。
 
 大航海榜（舰队名单）：GET https://api.live.bilibili.com/xlive/app-room/v2/guardTab/topListNew?roomid=房间号&page=1&ruid=主播UID&page_size=30&typ=5

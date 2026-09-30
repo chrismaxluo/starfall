@@ -199,7 +199,7 @@ export const events = sqliteTable(
     /** 哪个直播间的事件（换直播间后数据分开算） */
     roomId: integer('room_id'),
     sessionId: integer('session_id'),
-    kind: text('kind', { enum: ['enter', 'danmu', 'gift', 'guard'] }).notNull(),
+    kind: text('kind', { enum: ['enter', 'danmu', 'gift', 'guard', 'sc'] }).notNull(),
     uid: integer('uid').notNull(),
     uname: text('uname').notNull(),
     viewer: text('viewer', { mode: 'json' }).notNull(),

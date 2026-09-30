@@ -1,11 +1,12 @@
 // 事件记录（需求 F-DA-01 ~ 02、F-UI-04）：每个事件一行，带命中规则和播放状态。
 import { and, desc, eq, inArray, isNotNull, like, lt, or } from 'drizzle-orm';
-import type { PlayStatus, StdEvent, TriggerKind } from '@starfall/shared';
+import type { EventKind, PlayStatus, StdEvent } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
 import { events } from '../db/schema.ts';
 
 export type EventRow = typeof events.$inferSelect;
-type TriggerEvent = Exclude<StdEvent, { kind: 'live' }>;
+/** 写进事件记录的事件（触发特效的四种 + 醒目留言） */
+export type LoggedEvent = Exclude<StdEvent, { kind: 'live' }>;
 
 /** 原始消息只保留 7 天（用于排查协议问题） */
 const RAW_KEEP_MS = 7 * 24 * 3600_000;
@@ -14,7 +15,7 @@ const DAY_MS = 24 * 3600_000;
 export interface EventDto {
   id: number;
   ts: number;
-  kind: TriggerKind;
+  kind: EventKind;
   uid: number;
   uname: string;
   viewer: unknown;
@@ -26,7 +27,7 @@ export interface EventDto {
 
 const dto = (r: EventRow): EventDto => ({ id: r.id, ts: r.ts, kind: r.kind, uid: r.uid, uname: r.uname, viewer: r.viewer, payload: r.payload, rule: r.rule, effectId: r.effectId, status: r.status as PlayStatus });
 
-function payloadOf(ev: TriggerEvent): unknown {
+function payloadOf(ev: LoggedEvent): unknown {
   switch (ev.kind) {
     case 'enter':
       return { source: ev.source };
@@ -35,7 +36,9 @@ function payloadOf(ev: TriggerEvent): unknown {
     case 'gift':
       return { giftId: ev.giftId, giftName: ev.giftName, unitPrice: ev.unitPrice, count: ev.count, paid: ev.paid, ...(ev.icon ? { icon: ev.icon } : {}) };
     case 'guard':
-      return { level: ev.level, months: ev.months, op: ev.op };
+      return { level: ev.level, months: ev.months, op: ev.op, ...(ev.priceGold ? { price: ev.priceGold } : {}) };
+    case 'sc':
+      return { text: ev.text, price: ev.priceYuan, scId: ev.scId };
   }
 }
 
@@ -54,12 +57,18 @@ export interface EventStats {
 export interface GiftRankRow {
   uid: number;
   viewer: unknown;
-  /** 付费礼物总价值（金瓜子） */
+  /** 总价值（金瓜子）：付费礼物 + 上舰 + 醒目留言 */
   gold: number;
-  /** 送了几次（连击合并后） */
+  /** 送了几次付费礼物（连击合并后） */
   times: number;
   /** 单价最高的一件礼物 */
   topGift: string;
+  /** 上舰几次、花了多少（金瓜子） */
+  guards: number;
+  guardGold: number;
+  /** 醒目留言几条、花了多少（金瓜子） */
+  scs: number;
+  scGold: number;
 }
 
 /** 这段时间进场过的大航海 */
@@ -83,7 +92,7 @@ export class EventLog {
     return () => this.listeners.delete(fn);
   }
 
-  record(ev: TriggerEvent, r: { roomId: number | null; sessionId: number | null; rule: string | null; effectId: number | null; status: PlayStatus; raw?: unknown }): EventDto {
+  record(ev: LoggedEvent, r: { roomId: number | null; sessionId: number | null; rule: string | null; effectId: number | null; status: PlayStatus; raw?: unknown }): EventDto {
     const row = this.db
       .insert(events)
       .values({ ts: ev.ts, roomId: r.roomId, sessionId: r.sessionId, kind: ev.kind, uid: ev.viewer.uid, uname: ev.viewer.name, viewer: ev.viewer, payload: payloadOf(ev), rule: r.rule, effectId: r.effectId, status: r.status, raw: r.raw ?? null })
@@ -100,7 +109,7 @@ export class EventLog {
   }
 
   /** 按时间倒序分页查询；cursor 是上一页最后一条的 id；roomId 只看这个直播间的 */
-  query(f: { roomId?: number; kind?: TriggerKind; status?: PlayStatus[]; q?: string; cursor?: number; limit?: number }): { events: EventDto[]; nextCursor: number | null } {
+  query(f: { roomId?: number; kind?: EventKind; status?: PlayStatus[]; q?: string; cursor?: number; limit?: number }): { events: EventDto[]; nextCursor: number | null } {
     const limit = Math.min(200, Math.max(1, f.limit ?? 50));
     const conds = [];
     if (f.roomId !== undefined) conds.push(eq(events.roomId, f.roomId));
@@ -155,23 +164,50 @@ export class EventLog {
     return { enterUnique, guardUnique: composition.gov + composition.adm + composition.cap, played, guardPlayed, composition, honor };
   }
 
-  /** 礼物榜：这段时间里每人送的付费礼物总价值，从高到低 */
+  /** 礼物榜：这段时间里每人花的钱（付费礼物 + 上舰 + 醒目留言），从高到低。盲盒按开出来的礼物算（和 B 站高能榜一样） */
   giftRank(roomId: number, from: number, to: number | null, limit = 50): { people: number; gold: number; rows: GiftRankRow[] } {
     const db = this.db.$client;
     const args = [roomId, from, to ?? Number.MAX_SAFE_INTEGER];
-    const paid = `room_id = ? and ts >= ? and ts < ? and kind = 'gift' and json_extract(payload, '$.paid') = 1`;
-    const value = `json_extract(payload, '$.unitPrice') * json_extract(payload, '$.count')`;
-    const sum = db.prepare(`select count(distinct uid) people, coalesce(sum(${value}), 0) gold from events where ${paid}`).get(...args) as { people: number; gold: number };
+    const value = `case kind
+        when 'gift' then case when json_extract(payload, '$.paid') = 1 then json_extract(payload, '$.unitPrice') * json_extract(payload, '$.count') else 0 end
+        when 'guard' then coalesce(json_extract(payload, '$.price'), 0)
+        when 'sc' then json_extract(payload, '$.price') * 1000
+      end`;
+    const base = `select id, uid, kind, viewer, (${value}) v, json_extract(payload, '$.unitPrice') p, json_extract(payload, '$.giftName') name
+      from events where room_id = ? and ts >= ? and ts < ? and kind in ('gift', 'guard', 'sc')`;
+    const sum = db.prepare(`with g as (${base}) select count(distinct uid) people, coalesce(sum(v), 0) gold from g where v > 0`).get(...args) as { people: number; gold: number };
     const rows = db
       .prepare(
-        `with g as (select id, uid, viewer, ${value} v, json_extract(payload, '$.unitPrice') p, json_extract(payload, '$.giftName') name from events where ${paid}),
-              top as (select uid, sum(v) gold, count(*) times, max(id) last from g group by uid order by gold desc, last desc limit ?)
-         select top.uid, top.gold, top.times, (select viewer from g where g.id = top.last) viewer,
-                (select name from g where g.uid = top.uid order by p desc, id desc limit 1) topGift
+        `with g as (${base}),
+              top as (select uid, sum(v) gold, sum(kind = 'gift') times, sum(kind = 'guard') guards, sum(case when kind = 'guard' then v else 0 end) guardGold,
+                        sum(kind = 'sc') scs, sum(case when kind = 'sc' then v else 0 end) scGold, max(id) last
+                      from g where v > 0 group by uid order by gold desc, last desc limit ?)
+         select top.*, (select viewer from events where id = top.last) viewer,
+                (select name from g where g.uid = top.uid and g.kind = 'gift' and g.v > 0 order by p desc, id desc limit 1) topGift
          from top order by top.gold desc, top.last desc`,
       )
-      .all(...args, limit) as Array<{ uid: number; gold: number; times: number; viewer: string; topGift: string | null }>;
-    return { people: sum.people, gold: sum.gold, rows: rows.map((r) => ({ uid: r.uid, viewer: JSON.parse(r.viewer), gold: r.gold, times: r.times, topGift: r.topGift ?? '' })) };
+      .all(...args, limit) as Array<{ uid: number; gold: number; times: number; guards: number; guardGold: number; scs: number; scGold: number; viewer: string; topGift: string | null }>;
+    return {
+      people: sum.people,
+      gold: sum.gold,
+      rows: rows.map((r) => ({ uid: r.uid, viewer: JSON.parse(r.viewer), gold: r.gold, times: r.times, topGift: r.topGift ?? '', guards: r.guards, guardGold: r.guardGold, scs: r.scs, scGold: r.scGold })),
+    };
+  }
+
+  /** 以前记录的上舰没有存价格：从留着的原始消息里补上（原始消息只留 7 天）。返回补了几条 */
+  backfillGuardPrices(priceOf: (raw: unknown) => number | undefined): number {
+    const rows = this.db.$client
+      .prepare(`select id, payload, raw from events where kind = 'guard' and raw is not null and json_extract(payload, '$.price') is null`)
+      .all() as Array<{ id: number; payload: string; raw: string }>;
+    const upd = this.db.$client.prepare(`update events set payload = ? where id = ?`);
+    let n = 0;
+    for (const r of rows) {
+      const price = priceOf(JSON.parse(r.raw));
+      if (!price) continue;
+      upd.run(JSON.stringify({ ...JSON.parse(r.payload), price }), r.id);
+      n++;
+    }
+    return n;
   }
 
   /** 这段时间进场过的大航海：进场几次、最后一次什么时候（按最后一次进场时的身份算） */

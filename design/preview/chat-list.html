@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 弹幕列表</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+:root { --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --bg: #0B0B10; --panel: #121218; --line: rgba(255,255,255,.08); --text: #EDEDF1; --mute: #A6A8B4; --dim: #80838F; --acc: #8D8BFF; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.app { height: 100%; display: grid; grid-template-columns: 320px 1fr; }
+.side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 22px 18px 40px; }
+.side h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.side h1 img { width: 22px; height: 22px; }
+.side .sub { color: var(--dim); font-size: 12.5px; line-height: 1.6; }
+.grp { margin-top: 18px; }
+.grp > b { display: block; font-size: 11.5px; letter-spacing: .12em; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: #0D0D12; padding: 3px; border-radius: 9px; border: 1px solid var(--line); }
+.seg button { flex: 1 1 22%; border: 0; background: transparent; padding: 7px 8px; border-radius: 7px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.seg button.on { background: #26262F; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.row { display: flex; gap: 8px; margin-top: 10px; }
+.btn { flex: 1; height: 36px; border-radius: 9px; border: 0; background: #22222B; color: var(--text); font-size: 13px; white-space: nowrap; padding: 0 8px; }
+.btn.pri { background: var(--acc); color: #0B0B12; font-weight: 600; }
+.btn.on { background: rgba(61,214,140,.16); color: #3DD68C; }
+.say-in { flex: 1; min-width: 0; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: #0D0D12; padding: 0 10px; font-size: 13px; outline: none; }
+.say-in:focus { border-color: var(--acc); }
+.note { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: #0D0D12; border: 1px solid var(--line); font-size: 12.5px; line-height: 1.75; color: var(--mute); }
+.note b { color: var(--text); font-weight: 600; }
+.view { position: relative; overflow: hidden; display: grid; place-items: center; }
+.frame { position: relative; flex: none; }
+.frame > .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+@media (max-width: 820px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100%; } .side { border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; } .view { height: 80vh; } }
+
+/* ================= 画布（1080×1920 竖屏），背景只是为了看效果，实际页面是透明的 ================= */
+.stage { width: 1080px; height: 1920px; overflow: hidden; --st: 12%; --sb: 40%; --mx: 9%;
+  background-color: #15151C; background-image: linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%), linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%);
+  background-size: 64px 64px; background-position: 0 0, 32px 32px; box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+.stage.sc-room { background: radial-gradient(260px 260px at 18% 62%, rgba(255,170,90,.85), transparent 70%), radial-gradient(340px 300px at 86% 70%, rgba(90,160,255,.75), transparent 70%), radial-gradient(500px 420px at 60% 18%, rgba(210,120,255,.45), transparent 70%), linear-gradient(175deg, #2A2436, #151823 60%, #0E1017); }
+.stage.sc-light { background: radial-gradient(700px 600px at 30% 20%, #FFE9D6, transparent 70%), radial-gradient(700px 600px at 80% 70%, #D9ECFF, transparent 70%), linear-gradient(170deg, #F6F1EA, #E6EEF6); }
+.person { position: absolute; left: 50%; top: 520px; width: 0; height: 0; }
+.stage.sc-clear .person { display: none; }
+.person::before { content: ""; position: absolute; left: -165px; top: 0; width: 330px; height: 380px; border-radius: 50% 50% 46% 46%; background: #6E5A50; }
+.person::after { content: ""; position: absolute; left: -380px; top: 420px; width: 760px; height: 900px; border-radius: 380px 380px 0 0; background: linear-gradient(90deg, #3A4A78, #7A4A8A); }
+.stage.sc-light .person::before { background: #C9A690; }
+.stage.sc-light .person::after { background: #4A5670; }
+.safe { position: absolute; left: 0; right: 0; z-index: 50; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 22px; letter-spacing: .1em; color: rgba(255,255,255,.5); background: repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 14px, transparent 14px 28px); }
+.safe.top { top: 0; height: var(--st); border-bottom: 2px dashed rgba(255,255,255,.25); }
+.safe.bot { bottom: 0; height: var(--sb); border-top: 2px dashed rgba(255,255,255,.25); }
+.stage:not(.show-safe) .safe { display: none; }
+/* 浏览器源的范围（实际使用时在直播软件里拖动、拉伸这个框） */
+.src { position: absolute; top: calc(var(--st) + 20px); bottom: calc(var(--sb) + 20px); width: 600px; z-index: 10; }
+.src.at-l { left: 28px; }
+.src.at-r { right: 28px; }
+.stage.show-src .src { outline: 3px dashed rgba(141,139,255,.7); outline-offset: 6px; }
+.stage.show-src .src::after { content: "浏览器源（在直播软件里拖动、拉伸）"; position: absolute; bottom: -48px; left: 0; font-size: 22px; color: rgba(190,188,255,.9); letter-spacing: .08em; }
+
+/* ================= 弹幕列表 =================
+   新的从下面进来，旧的往上顶，最多 8 条。
+   玻璃做法和晶礼、晶巡一样。注意：毛玻璃在带透明度动画的父元素里会失效，所以透明度只加在气泡、头像本身，外层只做位移 */
+.chat { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; --k: 1; }
+.chat.big { --k: 1.2; }
+.msg { position: relative; display: flex; align-items: flex-start; gap: calc(14px * var(--k)); --acc: rgba(255,255,255,.55); --acc2: #fff; }
+.at-r .msg { flex-direction: row-reverse; }
+.msg.lv-cap { --acc: #4A9BFF; --acc2: #A9D2FF; }
+.msg.lv-adm { --acc: #A774FF; --acc2: #DCC6FF; }
+.msg.lv-gov { --acc: #FF6A3D; --acc2: #FFD27A; }
+.msg.anchor { --acc: #FF6699; --acc2: #FFC2D6; }
+
+/* 头像（大航海套 B 站头像框） */
+.msg .avw { position: relative; flex: none; width: calc(64px * var(--k)); height: calc(64px * var(--k)); margin-top: calc(4px * var(--k)); }
+.msg .av { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: #333; box-shadow: 0 4px 14px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.55); }
+.msg.guard .av, .msg.anchor .av { box-shadow: 0 4px 14px rgba(0,0,0,.4), 0 0 0 2.5px var(--acc); }
+.msg.framed .av { box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.msg .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.msg .fr { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
+
+/* 气泡 */
+.msg .g { position: relative; min-width: 0; max-width: calc(100% - 64px * var(--k) - 14px * var(--k)); padding: calc(10px * var(--k)) calc(20px * var(--k)) calc(12px * var(--k)); color: #fff;
+  border-radius: calc(8px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k));
+  background: linear-gradient(135deg, rgba(255,255,255,.15), rgba(255,255,255,.05) 45%, rgba(255,255,255,.02)), rgba(16,18,30,.5);
+  -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.16), 0 16px 36px -16px rgba(0,0,0,.55); }
+.at-r .msg .g { border-radius: calc(26px * var(--k)) calc(8px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k)); }
+.msg .g::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px; pointer-events: none;
+  background: linear-gradient(140deg, rgba(255,255,255,.7), rgba(255,255,255,.12) 30%, rgba(255,255,255,.04) 60%, color-mix(in srgb, var(--acc) 55%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+/* 大航海、主播：描边和左上角柔光换成身份色 */
+.msg.guard .g::before, .msg.anchor .g::before { padding: 2px; background: linear-gradient(140deg, color-mix(in srgb, var(--acc2) 90%, transparent), color-mix(in srgb, var(--acc) 40%, transparent) 35%, rgba(255,255,255,.06) 65%, color-mix(in srgb, var(--acc) 85%, transparent)); }
+.msg .gl { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.msg.guard .gl::before, .msg.anchor .gl::before { content: ""; position: absolute; left: -20%; top: -120%; width: 70%; height: 260%; background: radial-gradient(closest-side, color-mix(in srgb, var(--acc) 60%, transparent), transparent); opacity: .45; }
+.at-r .msg .gl::before { left: auto; right: -20%; }
+.msg .sheen { position: absolute; top: -30%; bottom: -30%; left: 0; width: 30%; opacity: 0; transform: translateX(-120%) skewX(-18deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent); }
+
+/* 第一行：身份 + 昵称 */
+.msg .who { position: relative; display: flex; align-items: center; gap: calc(7px * var(--k)); min-width: 0; height: calc(30px * var(--k)); }
+.at-r .msg .who { flex-direction: row-reverse; }
+.msg .nm { min-width: 0; font-size: calc(22px * var(--k)); font-weight: 600; color: rgba(255,255,255,.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg.guard .nm, .msg.anchor .nm { color: var(--acc2); font-weight: 700; }
+.msg .badge { flex: none; width: calc(30px * var(--k)); height: calc(30px * var(--k)); object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+.msg .fang { flex: none; display: inline-grid; place-items: center; width: calc(24px * var(--k)); height: calc(24px * var(--k)); border-radius: 50%; border: calc(2px * var(--k)) solid #F39A3D; color: #F39A3D; font-size: calc(14px * var(--k)); font-weight: 700; line-height: 1; background: rgba(0,0,0,.25); }
+.msg .zb { flex: none; height: calc(26px * var(--k)); padding: 0 calc(10px * var(--k)); border-radius: calc(13px * var(--k)); display: inline-flex; align-items: center; background: #FF6699; color: #fff; font-size: calc(16px * var(--k)); font-weight: 700; letter-spacing: .06em; }
+.msg .honor { flex: none; height: calc(22px * var(--k)); width: auto; }
+/* B 站粉丝牌：名字 | 等级 */
+.msg .medal { flex: none; display: inline-flex; align-items: stretch; height: calc(26px * var(--k)); border-radius: calc(6px * var(--k)); overflow: hidden; font-size: calc(15px * var(--k)); font-weight: 600; line-height: 1; box-shadow: inset 0 0 0 1.5px var(--mb); }
+.msg .medal .mn { display: inline-flex; align-items: center; padding: 0 calc(7px * var(--k)); background: var(--mbg); color: #fff; }
+.msg .medal .ml { display: inline-flex; align-items: center; justify-content: center; min-width: calc(26px * var(--k)); padding: 0 calc(5px * var(--k)); background: rgba(255,255,255,.92); color: var(--mlv); font-family: "Geist", sans-serif; font-weight: 700; }
+
+/* 第二行：弹幕内容（小表情显示成图，表情包单独一张大图） */
+.msg .tx { position: relative; margin-top: calc(4px * var(--k)); font-size: calc(29px * var(--k)); line-height: 1.38; font-weight: 500; word-break: break-word; text-shadow: 0 1px 6px rgba(0,0,0,.3);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.msg .tx .em { height: 1.3em; width: auto; vertical-align: -0.3em; margin: 0 .04em; }
+.msg .sticker { display: block; margin-top: calc(6px * var(--k)); height: calc(120px * var(--k)); width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
+.at-r .msg .sticker { margin-left: auto; }
+
+.lite .msg .g { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,.04) 45%), rgba(16,18,28,.84); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1><img src="assets/logo.svg" alt="">弹幕列表</h1>
+    <div class="sub">直播间里所有人的弹幕排成一列，最多 8 条：新的从下面进来，旧的往上顶，最上面那条淡出。单独一个网址，在直播软件里加一个浏览器源，拖到左边或右边。头像框、船锚、表情、荣耀勋章从 B 站加载。</div>
+    <div class="grp"><b>放在哪边（对齐）</b><div class="seg" id="side"></div></div>
+    <div class="grp"><b>弹幕速度</b><div class="seg" id="speed"></div></div>
+    <div class="grp"><b>字号</b><div class="seg" id="size"></div></div>
+    <div class="grp"><b>背景</b><div class="seg" id="bg"></div></div>
+    <div class="grp"><b>手动发一条</b>
+      <div class="row" style="margin-top:0"><input class="say-in" id="say" placeholder="打字试试，[dog] [比心] 会变成表情" maxlength="60"><button class="btn pri" id="send" style="flex:none;width:64px">发送</button></div>
+      <div class="row"><button class="btn" data-k="cap">舰长发言</button><button class="btn" data-k="adm">提督发言</button><button class="btn" data-k="gov">总督发言</button></div>
+      <div class="row"><button class="btn" data-k="anchor">主播发言</button><button class="btn" data-k="sticker">表情包</button><button class="btn" data-k="long">长弹幕</button></div>
+    </div>
+    <div class="row" style="margin-top:18px"><button class="btn" id="pause">暂停</button><button class="btn" id="clear">清空</button><button class="btn" id="safe">安全区</button><button class="btn" id="srcb">源范围</button></div>
+    <div class="note"><b>每一条</b><br>头像（大航海套头像框）· 身份（船锚、「房」、主播、粉丝牌、荣耀勋章）· 昵称 · 弹幕内容<br><b>大航海和主播</b>：昵称和气泡描边换成身份色，进来时一道高光扫过<br><b>动画</b>：头像先弹出来，气泡从头像那边展开，上面的往上挪；第 9 条进来时最上面那条往上淡出</div>
+  </aside>
+  <main class="view" id="view">
+    <div class="frame" id="frame">
+      <div class="stage sc-room" id="stage">
+        <div class="person"></div>
+        <div class="safe top">顶部信息栏</div><div class="safe bot">底部弹幕区</div>
+        <div class="src at-l" id="src"><div class="chat" id="chat"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const MAX = 8;
+// ---------- B 站资源（版权归 B 站，只在运行时加载） ----------
+const FRAMES = { gov: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', adm: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', cap: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const BADGES = { gov: `${BADGE}governor-DpDXKEdA.png`, adm: `${BADGE}supervisor-u43ElIjU.png`, cap: `${BADGE}captain-Bjw5Byb5.png` };
+const HONOR = { 3: '5d5e873b7b0d1894c56c4843bfba4617ff22e490', 12: 'f5f0cb238bfa8a4481fc67ee7e99c32e3b62ce83', 18: '256d22fcb8375155a29b01709960bfa74124ae1b', 25: '7e3c647c9b6abea76703f43fe89f0dd729a63954', 33: '8d0656d3a7a74480b2faf6c9488794e54d0da026', 41: '2a956d7d87a2fa0af0c0874e9cb80202b4159516', 52: 'd89b1dbed63531c43b6b5ef903be3ddb6bee0b23', 68: 'ce6a2ca64b8cd945d14b49807124b7a8a4ea946d' };
+const EMOTS = { '[dog]': '4428c84e694fbf4e0ef6c06e958d9352c3582740', '[比心]': '4e029593562283f00d39b99e0557878c4199c71d', '[吃瓜]': 'ffb53c252b085d042173379ac724694ce3196194', '[笑哭]': 'c5436c6806c32b28d471bb23d42f0f8f164a187a', '[鼓掌]': 'd581d0bc30c8f9712b46ec02303579840c72c42d', '[妙]': '08f735d950a0fba267dda140673c9ab2edf6410d', '[花]': '7dd2ef03e13998575e4d8a803c6e12909f94e72b', '[大笑]': 'e2589d086df0db8a7b5ca2b1273c02d31d4433d4', '[偷笑]': 'e2ba16f947a23179cdc00420b71cc1d627d8ae25', '[赞]': '2dd666d3651bafe8683acf770b7f4163a5f49809', '[喝彩]': 'b51824125d09923a4ca064f0c0b49fc97d3fab79', '[抱抱]': 'abddb0b621b389fc8c2322b1cfcf122d8936ba91', '[滑稽]': '8624fd172037573c8600b2597e3731ef0e5ea983', '[捂脸]': 'e6073c6849f735ae6cb7af3a20ff7dcec962b4c5' };
+const STICKERS = ['https://i0.hdslb.com/bfs/emote/777c32b3d36d88d7cc68408db9f3945c6e210ca4.png', 'http://i0.hdslb.com/bfs/emote/6781fd903f532c0ce8b48ad57e9e34f8dbdb79ad.png', 'http://i0.hdslb.com/bfs/emote/ea893aa25355de95ab4f03c2dad3f0c58d0c159e.png'];
+
+// ---------- 示例观众（编的，头像是画的） ----------
+function face(seed) {
+  const hues = [[18, 340], [200, 250], [150, 190], [35, 12], [270, 310], [90, 140], [320, 20], [220, 180]];
+  const [a, b] = hues[seed % hues.length];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${a} 85% 78%)"/><stop offset="1" stop-color="hsl(${b} 65% 55%)"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="41" r="18" fill="#fff" opacity=".92"/><circle cx="43" cy="39" r="2.6" fill="#333"/><circle cx="57" cy="39" r="2.6" fill="#333"/><path d="M18 94c4-20 18-30 32-30s28 10 32 30z" fill="#fff" opacity=".92"/></svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+const PEOPLE = [
+  { name: '路过的猫', honor: 3 },
+  { name: '晚风与你', medal: 8, honor: 12 },
+  { name: '青柠汽水', mod: true, medal: 17, honor: 25 },
+  { name: '今天也要早睡', medal: 23, honor: 18 },
+  { name: '一只小土豆' },
+  { name: '星河漫步', guard: 'cap', medal: 27, honor: 33 },
+  { name: '月下独酌', guard: 'adm', medal: 38, honor: 41 },
+  { name: '长夜未央', guard: 'gov', medal: 44, honor: 68, mod: true },
+  { name: '奶茶要三分糖', medal: 12 },
+  { name: 'momo酱', honor: 12 },
+  { name: '不吃香菜的人', medal: 31, honor: 25 },
+  { name: '柚子味的风', guard: 'cap', medal: 22, honor: 25 },
+];
+PEOPLE.forEach((p, i) => (p.face = face(i)));
+const ANCHOR = { name: '喵酱', anchor: true, face: face(6), honor: 52 };
+const LINES = ['晚上好呀', '来了来了[dog]', '主播今天好好看[比心]', '这首歌好听！', '哈哈哈哈哈哈[笑哭]', '打卡[花]', '前排[吃瓜]', '刚下班，赶上了', '妙啊[妙]', '主播唱一首晴天吧', '666', '[鼓掌][鼓掌][鼓掌]', '好耶', '今天播到几点呀', '这个操作可以[赞]', '笑死我了[大笑]', '第一次来，关注了', '晚安晚安', '冲冲冲', '牛哇牛哇[喝彩]'];
+const LONG = '主播我跟你说，今天路上看到一只超级可爱的橘猫，一直跟着我走了两条街，最后被我带回家了[偷笑]，晚上还要给它洗澡';
+
+// ---------- B 站粉丝牌配色（和后台一样） ----------
+function medalColors(level, guard) {
+  const t = level <= 10 ? ['#5762A7', null] : level <= 20 ? ['#C770A4', null] : level <= 30 ? ['#3FB4F6', '#5FC7F4'] : level <= 40 ? ['#4C7DFF', '#58A1F8'] : level <= 50 ? ['#A773F1', '#D47AFF'] : ['#EC4F6E', '#F18087'];
+  return { bg: t[0], border: guard && t[1] ? t[1] : `${t[0]}`, lv: t[0] };
+}
+
+const st = { side: 'l', speed: 'mid', size: 'std', bg: 'room', paused: false, safe: false, src: true };
+const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const NR = 'referrerpolicy="no-referrer" onerror="this.remove()"';
+function richText(s) {
+  return esc(s).replace(/\[[^\]]{1,12}\]/g, (m) => (EMOTS[m] ? `<img class="em" src="https://i0.hdslb.com/bfs/live/${EMOTS[m]}.png" alt="${m}" ${NR}>` : m));
+}
+
+function build(p, text, sticker) {
+  const cls = ['msg'];
+  if (p.guard) cls.push('guard', `lv-${p.guard}`, 'framed');
+  if (p.anchor) cls.push('anchor');
+  const el = h('div', cls.join(' '));
+  let who = '';
+  if (p.anchor) who += '<span class="zb">主播</span>';
+  if (p.guard) who += `<img class="badge" src="${BADGES[p.guard]}" alt="" ${NR}>`;
+  if (p.mod) who += '<i class="fang">房</i>';
+  if (p.medal) { const c = medalColors(p.medal, Boolean(p.guard)); who += `<span class="medal" style="--mbg:${c.bg};--mb:${c.border};--mlv:${c.lv}"><span class="mn">喵喵</span><span class="ml">${p.medal}</span></span>`; }
+  if (p.honor && HONOR[p.honor]) who += `<img class="honor" src="https://i0.hdslb.com/bfs/live/${HONOR[p.honor]}.png" alt="" ${NR}>`;
+  who += `<span class="nm">${esc(p.name)}</span>`;
+  const body = sticker ? `<img class="sticker" src="${sticker}" alt="" ${NR}>` : `<div class="tx">${richText(text)}</div>`;
+  el.innerHTML = `<div class="avw"><div class="av"><img src="${p.face}" alt=""></div>${p.guard ? `<img class="fr" src="${FRAMES[p.guard]}" alt="" ${NR}>` : ''}</div>
+    <div class="g"><div class="gl"><div class="sheen"></div></div><div class="who">${who}</div>${body}</div>`;
+  return el;
+}
+
+// ---------- 加一条：FLIP（先记下旧位置，插入后从旧位置滑到新位置） ----------
+const chat = $('#chat');
+const anim = (el, kf, o) => el.animate(kf, { fill: 'both', ...o });
+function fadeAged() {
+  // 越旧越淡一点（透明度加在气泡和头像本身，不加在外层，免得毛玻璃失效）
+  const rows = [...chat.children].filter((r) => !r.dataset.out);
+  rows.forEach((r, i) => {
+    const age = rows.length - 1 - i;
+    const o = age >= 7 ? 0.55 : age >= 6 ? 0.78 : 1;
+    for (const e of r.querySelectorAll(':scope > .g, :scope > .avw')) e.style.opacity = o;
+  });
+}
+function add(p, text, sticker) {
+  const before = new Map([...chat.children].map((r) => [r, r.getBoundingClientRect().top]));
+  const el = build(p, text, sticker);
+  chat.append(el);
+  // 超过 8 条、或者源的高度放不下：最上面的离开（先从布局里拿掉，放在原位淡出）
+  const k = $('#stage').getBoundingClientRect().height / 1920;
+  const avail = $('#src').clientHeight;
+  const leaving = [];
+  let live = [...chat.children].filter((r) => !r.dataset.out);
+  while (live.length > 1 && (live.length > MAX || chat.offsetHeight > avail)) {
+    const old = live.shift();
+    old.dataset.out = '1';
+    old.style.cssText = 'position:absolute;left:0;right:0;top:0';
+    leaving.push(old);
+  }
+  const top0 = chat.getBoundingClientRect().top;
+  for (const old of leaving) {
+    old.style.top = `${(before.get(old) - top0) / k}px`;
+    const g = old.querySelector('.g'), av = old.querySelector('.avw');
+    const out = [{ opacity: g.style.opacity || 1, transform: 'translateY(0) scale(1)' }, { opacity: 0, transform: 'translateY(-40px) scale(.94)' }];
+    anim(g, out, { duration: 420, easing: 'cubic-bezier(.4,0,.2,1)' });
+    anim(av, out, { duration: 420, easing: 'cubic-bezier(.4,0,.2,1)' }).finished.then(() => old.remove());
+  }
+  // 上面的往上挪
+  for (const [r, y0] of before) {
+    if (r.dataset.out) continue;
+    const dy = (y0 - r.getBoundingClientRect().top) / k;
+    if (Math.abs(dy) > 0.5) r.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }], { duration: 460, easing: 'cubic-bezier(.22,1,.36,1)' });
+  }
+  fadeAged();
+  enter(el, p);
+}
+function enter(el, p) {
+  const right = st.side === 'r';
+  const q = (s) => el.querySelector(s);
+  const g = q('.g'), av = q('.avw');
+  const o = getComputedStyle(g).opacity;
+  // 头像先弹出来
+  anim(av, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1.12)', offset: 0.6 }, { opacity: o, transform: 'scale(1)' }], { duration: 380, easing: 'ease-out' });
+  // 气泡从头像那边展开
+  g.style.transformOrigin = right ? '100% 0' : '0 0';
+  anim(g, [{ opacity: 0, transform: `translateX(${right ? 18 : -18}px) scale(.7)` }, { opacity: 1, transform: 'translateX(0) scale(1.02)', offset: 0.65 }, { opacity: o, transform: 'none' }], { duration: 420, delay: 70, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  anim(q('.who'), [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 200, easing: 'ease-out' });
+  const body = q('.tx') || q('.sticker');
+  anim(body, [{ opacity: 0, transform: body.classList.contains('sticker') ? 'scale(.5) rotate(-8deg)' : 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: body.classList.contains('sticker') ? 480 : 320, delay: 260, easing: body.classList.contains('sticker') ? 'cubic-bezier(.3,1.6,.5,1)' : 'ease-out' });
+  // 大航海、主播：一道高光扫过
+  if (p.guard || p.anchor) {
+    const sweep = right ? ['translateX(420%) skewX(-18deg)', 'translateX(-120%) skewX(-18deg)'] : ['translateX(-120%) skewX(-18deg)', 'translateX(420%) skewX(-18deg)'];
+    anim(q('.sheen'), [{ opacity: 0, transform: sweep[0] }, { opacity: 1, offset: 0.25 }, { opacity: 0, transform: sweep[1] }], { duration: 900, delay: 360, easing: 'cubic-bezier(.45,0,.3,1)' });
+  }
+}
+
+// ---------- 自动来弹幕 ----------
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+let timer = 0;
+const GAP = { slow: [2200, 3600], mid: [900, 1800], fast: [260, 650] };
+function randomOne() {
+  const r = Math.random();
+  if (r < 0.04) return add(ANCHOR, pick(['谢谢大家~', '欢迎新来的朋友[比心]', '下一首唱什么呀']));
+  const p = pick(PEOPLE);
+  if (r < 0.1) return add(p, '', pick(STICKERS));
+  add(p, pick(LINES));
+}
+function loop() {
+  clearTimeout(timer);
+  if (st.paused) return;
+  const [a, b] = GAP[st.speed];
+  timer = setTimeout(() => { randomOne(); loop(); }, a + Math.random() * (b - a));
+}
+
+// ---------- 控制面板 ----------
+function segs() {
+  const mk = (id, items, key) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const bt = h('button', st[key] === v ? 'on' : '', label); bt.onclick = () => { st[key] = v; sync(); if (key === 'speed') loop(); }; el.append(bt); } };
+  mk('#side', [['l', '左边'], ['r', '右边']], 'side');
+  mk('#speed', [['slow', '慢'], ['mid', '正常'], ['fast', '刷屏']], 'speed');
+  mk('#size', [['std', '标准'], ['big', '大']], 'size');
+  mk('#bg', [['room', '直播间'], ['light', '浅色'], ['clear', '透明格']], 'bg');
+}
+function sync() {
+  segs();
+  $('#stage').className = `stage sc-${st.bg}${st.safe ? ' show-safe' : ''}${st.src ? ' show-src' : ''}`;
+  $('#src').className = `src at-${st.side}`;
+  chat.classList.toggle('big', st.size === 'big');
+  $('#pause').textContent = st.paused ? '继续' : '暂停';
+  $('#pause').classList.toggle('on', st.paused); $('#safe').classList.toggle('on', st.safe); $('#srcb').classList.toggle('on', st.src);
+}
+function fit() {
+  const v = $('#view'), f = $('#frame'), s = $('#stage');
+  const k = Math.min((v.clientWidth - 40) / 1080, (v.clientHeight - 40) / 1920);
+  f.style.width = `${1080 * k}px`; f.style.height = `${1920 * k}px`; s.style.transform = `scale(${k})`;
+}
+const send = () => { const t = $('#say').value.trim(); if (!t) return; add(PEOPLE[1], t); $('#say').value = ''; };
+$('#send').onclick = send;
+$('#say').onkeydown = (e) => { if (e.key === 'Enter') send(); };
+for (const b of document.querySelectorAll('[data-k]')) b.onclick = () => {
+  const k = b.dataset.k;
+  if (k === 'anchor') add(ANCHOR, '谢谢大家的礼物[比心]');
+  else if (k === 'sticker') add(pick(PEOPLE), '', pick(STICKERS));
+  else if (k === 'long') add(PEOPLE[3], LONG);
+  else add(PEOPLE.find((p) => p.guard === k), pick(['晚上好，来陪主播了', '今天的歌单好棒[鼓掌]', '冲！[喝彩]']));
+};
+$('#pause').onclick = () => { st.paused = !st.paused; sync(); loop(); };
+$('#clear').onclick = () => { chat.innerHTML = ''; };
+$('#safe').onclick = () => { st.safe = !st.safe; sync(); };
+$('#srcb').onclick = () => { st.src = !st.src; sync(); };
+addEventListener('resize', fit);
+sync(); fit();
+// 先放几条，看起来像正在直播
+[[0, '晚上好呀'], [2, '打卡[花]'], [5, '来了来了[dog]'], [3, '主播今天好好看[比心]'], [7, '今天的歌单好棒[鼓掌]']].forEach(([i, t], n) => setTimeout(() => add(PEOPLE[i], t), 300 + n * 260));
+setTimeout(loop, 2000);
+</script>
+</body>
+</html>

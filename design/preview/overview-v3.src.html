@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>星临 · 总览改版预览</title>
+<!-- 用的是后台真实的样式表（从 apps/admin/src/styles 复制到 assets/admin/，不进仓库）：
+  mkdir -p design/preview/assets/admin && cp apps/admin/src/styles/app.css apps/admin/src/styles/extra.css design/preview/assets/admin/
+  这个页面由 overview-v3.src.html 生成（把后台的图标表放进来）：python3 design/tools/build_overview_preview.py -->
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/admin/app.css">
+<link rel="stylesheet" href="assets/admin/extra.css">
+<style>
+:root { --font-sans: "Geist Sans", "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace; }
+body { margin: 0; }
+.honor { flex: none; height: 18px; width: auto; vertical-align: middle; }
+.ids { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.new { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; color: #fff; background: linear-gradient(90deg, #6E6BF2, #E0689B); }
+
+/* ---- 一排数字 ---- */
+.kstrip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 0; margin-bottom: 16px; }
+.kstrip > div { padding: 16px 18px; min-width: 0; }
+.kstrip > div + div { border-left: 1px solid var(--line); }
+.kstrip small { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t3); white-space: nowrap; }
+.kstrip .src { font-size: 10px; letter-spacing: .06em; padding: 0 5px; border-radius: 4px; color: #FB7299; background: rgba(251, 114, 153, .12); font-weight: 600; }
+.kstrip .v { display: block; font-size: 26px; font-weight: 600; letter-spacing: -.03em; line-height: 1.25; margin-top: 4px; }
+.kstrip .d { font-size: 11.5px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kstrip .d b { color: var(--t1); font-weight: 500; }
+
+/* ---- 实时动态筛选 ---- */
+.fbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 10px; }
+.fbar .seg button { height: 24px; padding: 0 10px; font-size: 12px; }
+.fbar label { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--t2); margin-left: auto; }
+.fbar .switch { transform: scale(.85); }
+.hold { font-size: 11.5px; color: var(--t3); display: inline-flex; align-items: center; gap: 5px; }
+.hold i { width: 6px; height: 6px; border-radius: 2px; background: var(--gov); }
+
+/* ---- 右侧切换面板 ---- */
+.ptabs { display: flex; gap: 2px; margin: -6px -8px 12px; padding: 0 0 0; border-bottom: 1px solid var(--line); }
+.ptabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; background: none; color: var(--t3); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.ptabs button svg.i { width: 15px; height: 15px; }
+.ptabs button[aria-selected="true"] { color: var(--t1); }
+.ptabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.ptabs .cnt { font-family: var(--font-mono); font-size: 11px; color: var(--t3); font-weight: 500; }
+.ptabs .dot { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px; background: #E0485A; color: #fff; font-size: 10.5px; font-weight: 600; display: inline-grid; place-items: center; font-family: var(--font-mono); }
+.ptabs .dot.play { background: var(--ok); }
+.pbody { min-height: 330px; }
+.phead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 12.5px; color: var(--t3); flex-wrap: wrap; }
+.phead b { color: var(--t1); font-weight: 600; }
+.phead .seg { margin-left: auto; }
+.phead .seg button { height: 24px; padding: 0 9px; font-size: 12px; }
+.plist { display: flex; flex-direction: column; max-height: 318px; overflow: auto; margin: 0 -8px; }
+.prow { display: grid; grid-template-columns: 22px 30px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 7px 8px; border-radius: var(--r-sm); cursor: pointer; }
+.prow:hover { background: var(--hover); }
+.prow + .prow { border-top: 1px solid var(--line); }
+.prow .n { width: 22px; min-width: 0; padding: 0; margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--t3); text-align: center; }
+.prow .n.rk { color: #fff; border-radius: 6px; height: 20px; display: grid; place-items: center; font-weight: 600; }
+.prow .n.r1 { background: linear-gradient(135deg, #F7C75B, #D98A1C); } .prow .n.r2 { background: linear-gradient(135deg, #C9D2DE, #8994A6); } .prow .n.r3 { background: linear-gradient(135deg, #E8A77A, #B0673A); }
+.prow .avatar { width: 30px; height: 30px; font-size: 13px; }
+.prow .who { min-width: 0; display: flex; flex-direction: column; }
+.prow .who b { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .who span { font-size: 11.5px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .sc { font-family: var(--font-mono); font-size: 12.5px; color: var(--t1); text-align: right; min-width: 44px; }
+.prow .sc small { display: block; font-size: 10.5px; color: var(--t3); font-family: var(--font-sans); }
+.pfoot { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--t3); }
+.pfoot .sp { flex: 1; }
+.fleet { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; padding: 12px 14px; border-radius: var(--r-md); background: var(--hover); }
+.fleet .ring { width: 46px; height: 46px; border-radius: 50%; background: conic-gradient(var(--cap) calc(var(--p) * 1%), var(--line-strong) 0); display: grid; place-items: center; flex: none; }
+.fleet .ring span { width: 36px; height: 36px; border-radius: 50%; background: var(--l3); display: grid; place-items: center; font-size: 11px; font-weight: 600; font-family: var(--font-mono); }
+.fleet b { font-size: 15px; } .fleet small { display: block; font-size: 12px; color: var(--t3); margin-top: 2px; }
+.missing { margin-top: 10px; font-size: 12px; color: var(--t3); }
+.missing summary { cursor: pointer; }
+.missing .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.missing .chips span { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 4px; border-radius: 99px; background: var(--hover); border: 1px solid var(--line); color: var(--t2); }
+.missing .chips .avatar { width: 20px; height: 20px; font-size: 10px; }
+
+/* ---- 荣耀等级分布 ---- */
+.sub-h { font-size: 12.5px; color: var(--t2); font-weight: 500; margin: 18px 0 2px; display: flex; align-items: center; gap: 8px; }
+
+/* ---- 预览控制（只在这个预览页里有） ---- */
+.pv { position: fixed; left: 12px; bottom: 12px; width: 224px; z-index: 50; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--l4); backdrop-filter: blur(16px); box-shadow: var(--shadow-pop); border: 1px solid var(--line-strong); font-size: 12px; color: var(--t2); }
+.pv .seg { flex-wrap: wrap; }
+.pv b { font-size: 12.5px; color: var(--t1); }
+.pv .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pv .row > span { width: 34px; color: var(--t3); }
+.pv .seg button { height: 24px; padding: 0 9px; font-size: 12px; }
+
+/* ---- 图标对比 ---- */
+.icmp { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.icmp .card { display: flex; flex-direction: column; gap: 12px; }
+.icmp .pair2 { display: flex; align-items: center; gap: 14px; }
+.icmp .ic { width: 64px; height: 64px; border-radius: 14px; display: grid; place-items: center; background: var(--hover); border: 1px solid var(--line); position: relative; }
+.icmp .ic svg.i { width: 30px; height: 30px; }
+.icmp .ic.after { background: var(--accent-soft); border-color: var(--accent-ring); color: var(--accent); }
+.icmp .ic em { position: absolute; bottom: -18px; left: 0; right: 0; text-align: center; font-style: normal; font-size: 11px; color: var(--t3); }
+.icmp .arrow { color: var(--t3); }
+.icmp h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.icmp p { margin: 0; font-size: 12.5px; color: var(--t2); line-height: 1.7; }
+.icmp .where { font-size: 12px; color: var(--t3); }
+.icmp .alsoold { display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--t3); }
+.icmp .alsoold svg.i { width: 18px; height: 18px; }
+.inline-demo { display: flex; flex-wrap: wrap; gap: 8px; }
+.inline-demo .btn svg.i { width: 15px; height: 15px; }
+@media (max-width: 1280px) { .kstrip { grid-template-columns: repeat(3, minmax(0, 1fr)); } .kstrip > div:nth-child(4) { border-left: 0; } .kstrip > div:nth-child(n+4) { border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+%%SPRITE%%
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- 新图标 -->
+  <symbol id="n-gear" viewBox="0 0 24 24"><path d="%%GEAR%%"/><circle cx="12" cy="12" r="3.2"/></symbol>
+  <symbol id="n-dup" viewBox="0 0 24 24"><path d="M8 8V5.5A1.5 1.5 0 019.5 4h9A1.5 1.5 0 0120 5.5v9a1.5 1.5 0 01-1.5 1.5H16"/><rect x="4" y="8" width="12" height="12" rx="1.5"/><path d="M10 11.5v5M7.5 14h5"/></symbol>
+  <symbol id="n-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M12 16.5V20M8 20h8"/></symbol>
+  <symbol id="n-anchor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M12 7v13M8.5 10.5h7M4.5 13.5a7.5 7.5 0 0015 0M4.5 13.5l-1.3 1.6M4.5 13.5l1.8.9M19.5 13.5l1.3 1.6M19.5 13.5l-1.8.9"/></symbol>
+  <symbol id="n-medal" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2.5"/><path d="M15 7v10M5.8 12h5.8"/><path d="M17.3 10.6l.9-.6v4"/></symbol>
+  <symbol id="n-demo" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8.5h18"/><path d="M10.5 11.6v5.3l4.4-2.65z"/></symbol>
+  <symbol id="n-update" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16.5v-9M8.3 11.2L12 7.5l3.7 3.7"/></symbol>
+  <symbol id="n-todo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/></symbol>
+  <symbol id="n-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".4" fill="currentColor"/></symbol>
+  <symbol id="n-queue" viewBox="0 0 24 24"><path d="M4 6.5h10M4 12h10M4 17.5h6"/><path d="M16.5 14.5v6l4.5-3z"/></symbol>
+  <symbol id="n-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 5.5H4.5a3 3 0 003.6 4.2M16 5.5h3.5a3 3 0 01-3.6 4.2M12 13v3.5M8.5 20h7M9.5 20l.8-3.5h3.4l.8 3.5"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img src="assets/logo.svg" width="32" height="32" alt=""><span><div class="brand-name">星临</div><div class="brand-sub">STARFALL</div></span></div>
+    <div>
+      <div class="nav-label">工作台</div>
+      <nav class="nav" aria-label="主导航">
+        <a href="#" aria-current="page" data-view="ov"><svg class="i"><use href="#i-grid"/></svg>总览</a>
+        <a href="#"><svg class="i"><use href="#i-wand"/></svg>触发规则</a>
+        <a href="#"><svg class="i"><use href="#i-image"/></svg>素材库</a>
+        <a href="#"><svg class="i"><use href="#i-list"/></svg>事件记录</a>
+        <a href="#"><svg class="i"><use href="#n-monitor"/></svg>直播软件输出</a>
+      </nav>
+    </div>
+    <div>
+      <div class="nav-label">即将推出</div>
+      <nav class="nav"><a class="disabled" href="#"><svg class="i"><use href="#i-chart"/></svg>数据统计<span class="soon">第二期</span></a></nav>
+    </div>
+    <div>
+      <div class="nav-label">其他</div>
+      <nav class="nav">
+        <a href="#"><svg class="i"><use href="#n-demo"/></svg>特效页演示<svg class="i"><use href="#i-ext"/></svg></a>
+        <a href="#" data-view="ic"><svg class="i"><use href="#n-gear"/></svg>设置</a>
+      </nav>
+    </div>
+    <div class="side-foot"><a class="acct" href="#"><span class="avatar" style="background:#6E6BF2">吃</span><span class="acct-meta"><b>吃喵放花椒的喵酱</b><span>登录还剩 172 天</span></span></a></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb">直播间 <b class="num">21752762</b></div>
+      <span class="live ok"><i></i>已连接</span>
+      <span class="livestate on" id="livestate"><i></i>直播中</span>
+      <button class="search"><svg class="i"><use href="#i-search"/></svg>搜索或执行命令<span class="kbd">Ctrl K</span></button>
+      <button class="pausebtn"><svg class="i"><use href="#i-pause"/></svg><span>暂停所有特效</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="切换亮色 / 暗色"><svg class="i theme-light-only"><use href="#i-moon"/></svg><svg class="i theme-dark-only"><use href="#i-sun"/></svg></button>
+      <button class="icon-btn"><svg class="i"><use href="#i-logout"/></svg></button>
+    </header>
+
+    <!-- ================= 总览 ================= -->
+    <section class="page" id="view-ov">
+      <div class="page-head"><div><h1>总览</h1><p>正在监控的直播间和实时动态</p></div></div>
+
+      <div class="card ov-room">
+        <div class="ov-cover" id="cover">
+          <div class="ph"><span class="avatar" style="background:#E0689B">桥</span></div>
+          <span class="badge" id="coverBadge"><i></i>直播中</span>
+          <span class="dur num" id="dur">02:14:37</span>
+        </div>
+        <div class="ov-meta">
+          <div class="ov-anchor"><span class="avatar" style="background:#E0689B">桥</span><span><b>桥耳朵</b><span class="sub">UID 33623955 · 粉丝 12.8万</span></span></div>
+          <div class="ov-title">周三夜聊｜今天也来听歌吧</div>
+          <div class="ov-tags"><span class="pill">虚拟主播 · 虚拟日常</span><a class="pill" href="#">房间号 <b class="num">21752762</b><svg class="i"><use href="#i-ext"/></svg></a><span class="pill">19:30 开播</span></div>
+        </div>
+        <div class="ov-side">
+          <div class="row"><span>弹幕服务器</span><span class="ok">已连接</span></div>
+          <div class="row"><span>特效页</span><span class="ok">1 个在线</span></div>
+          <div class="row"><span>房管总数</span><span class="num">130 人</span></div>
+          <div class="row"><span>换直播间</span><a class="linkish" href="#">去设置 →</a></div>
+        </div>
+      </div>
+
+      <div class="ov-scope"><span>下面的数据：<b id="scopeText">本场（19:30 开播至今）</b> · 只算直播间 21752762</span>
+        <div class="seg"><button aria-pressed="true">本场</button><button aria-pressed="false">今天</button></div>
+      </div>
+
+      <!-- 一排数字：以前是 4 张大卡片，粉丝和直播间卡片里的重复了 -->
+      <div class="card kstrip" id="kstrip"></div>
+
+      <div class="bento">
+        <div class="card span7" style="grid-row: span 2">
+          <div class="card-h"><h2>实时动态</h2><span class="aside"><span class="hold" id="hold" hidden><i></i>鼠标在列表上，暂停滚动</span>点任意一行可设置专属特效<span class="live ok" style="height:22px"><i></i>LIVE</span></span></div>
+          <div class="fbar">
+            <div class="seg" id="feedKind"></div>
+            <label>只看大航海<button class="switch" role="switch" aria-checked="false" id="onlyGuard"></button></label>
+          </div>
+          <div class="feed" id="feed"></div>
+        </div>
+
+        <div class="card span5">
+          <div class="ptabs" role="tablist" id="ptabs"></div>
+          <div class="pbody" id="pbody"></div>
+        </div>
+
+        <div class="card span5">
+          <div class="card-h"><h2>身份构成</h2><span class="aside">本场进场</span></div>
+          <div class="stack" id="compStack"></div>
+          <div class="legend" id="compLegend"></div>
+          <div class="sub-h">荣耀等级分布 <span class="new">新</span></div>
+          <div class="stack" id="honorStack"></div>
+          <div class="legend" id="honorLegend"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 图标对比 ================= -->
+    <section class="page" id="view-ic" hidden>
+      <div class="page-head"><div><h1>图标对比</h1><p>左边是现在的图标，右边是改后的；下面写了用在哪里</p></div></div>
+      <div class="icmp" id="icmp"></div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-h"><h2>放在按钮里的样子（改后）</h2></div>
+        <div class="inline-demo">
+          <button class="btn"><svg class="i"><use href="#n-dup"/></svg>复制一份来改</button>
+          <button class="btn"><svg class="i"><use href="#i-copy"/></svg>复制 UID</button>
+          <button class="btn"><svg class="i"><use href="#i-spark"/></svg>为 TA 设置专属特效</button>
+          <button class="btn"><svg class="i"><use href="#n-gear"/></svg>设置</button>
+          <button class="btn"><svg class="i"><use href="#n-demo"/></svg>特效页演示</button>
+          <button class="btn"><svg class="i"><use href="#n-anchor"/></svg>上舰规则</button>
+          <button class="btn"><svg class="i"><use href="#n-monitor"/></svg>直播软件输出</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="pv" id="pv">
+  <b>预览控制（只在预览页里有）</b>
+  <div class="row"><span>页面</span><div class="seg" id="pvView"></div></div>
+  <div class="row"><span>直播</span><div class="seg" id="pvLive"></div></div>
+  <div class="row"><span>队列</span><div class="seg" id="pvQueue"></div></div>
+  <div style="color:var(--t3);line-height:1.6">数据都是假的；头像框、荣耀勋章是 B 站的图（只引用地址）。</div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const FRAMES = { 1: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', 2: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', 3: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const BADGES = { 1: `${BADGE}governor-DpDXKEdA.png`, 2: `${BADGE}supervisor-u43ElIjU.png`, 3: `${BADGE}captain-Bjw5Byb5.png` };
+const HONOR = %%HONOR%%;
+const GNAME = { 1: '总督', 2: '提督', 3: '舰长' };
+const GRADS = ['#6E6BF2', '#E0689B', '#2FA6A0', '#E58B3A', '#5B8DEF', '#9A6BE0'];
+
+function avatar(name, guard) {
+  const bg = GRADS[[...name].reduce((s, c) => s + c.charCodeAt(0), 0) % GRADS.length];
+  const fr = guard ? `<img class="av-frame" src="${FRAMES[guard]}@120w_120h.webp" alt="">` : '';
+  return `<span class="avatar${guard ? ' framed' : ''}" style="background:${bg}">${esc([...name][0])}${fr}</span>`;
+}
+function honor(lv) {
+  if (!lv) return '';
+  return HONOR[lv] ? `<img class="honor" src="${HONOR[lv]}" alt="" title="荣耀等级 ${lv}">` : `<i class="honor" style="font-style:normal;font-size:11px">荣耀 ${lv}</i>`;
+}
+function idtag(v) {
+  if (v.guard) return `<span class="tag ${['', 'gov', 'adm', 'cap'][v.guard]}"><img class="badge" src="${BADGES[v.guard]}" alt="">${GNAME[v.guard]}</span>`;
+  if (v.mod) return `<span class="tag mod"><svg class="i"><use href="#g-mod"/></svg>房管</span>`;
+  if (v.medal) {
+    const t = v.medal <= 10 ? '#5762A7' : v.medal <= 20 ? '#C770A4' : v.medal <= 30 ? '#3FB4F6' : v.medal <= 40 ? '#4C7DFF' : '#A773F1';
+    return `<span class="medal" style="--mc:${t}99;--ml:${t}E6;--mb:${t}99;color:#fff"><span>桥耳朵</span><b>${v.medal}</b></span>`;
+  }
+  return `<span class="tag nor">普通</span>`;
+}
+const ids = (v) => `<span class="ids">${honor(v.honor)}${idtag(v)}</span>`;
+
+// 观众
+const P = [
+  { name: '抱着自己の弦瑟', guard: 3, honor: 28, medal: 35, score: 6400 },
+  { name: '长夜未央', guard: 1, honor: 68, medal: 44, score: 52000 },
+  { name: '月下独酌', guard: 2, honor: 53, medal: 38, score: 21000 },
+  { name: '晚风与你', guard: 0, honor: 28, medal: 21, score: 120 },
+  { name: '青柠汽水', guard: 0, mod: true, honor: 12, medal: 15, score: 30 },
+  { name: '半糖主义', guard: 3, honor: 37, medal: 27, score: 3300 },
+  { name: '星河漫步', guard: 3, honor: 21, medal: 26, score: 900 },
+  { name: '路过的猫', guard: 0, honor: 5, score: 0 },
+  { name: '今天也要早睡', guard: 0, honor: 17, medal: 9, score: 12 },
+  { name: 'H3_W', guard: 0, honor: 0, score: 0 },
+  { name: '听雨的鲸', guard: 3, honor: 44, medal: 31, score: 1800 },
+  { name: '南山有鹿', guard: 0, honor: 33, medal: 18, score: 60 },
+  { name: '白开水不加糖', guard: 0, honor: 61, score: 8800 },
+];
+const by = (n) => P.find((p) => p.name === n);
+
+const FEED = [
+  ['enter', '长夜未央', '进场 · 播放 金銮', '21:36:12'], ['danmu', '晚风与你', '「主播晚上好！」', '21:36:08'], ['gift', '白开水不加糖', '送出 告白花束 ×1 · 220 元', '21:35:51'],
+  ['enter', '路过的猫', '进场', '21:35:40'], ['guard', '听雨的鲸', '续费 舰长 · 1 个月', '21:35:22'], ['danmu', '青柠汽水', '「晚上好」', '21:35:02'],
+  ['enter', '月下独酌', '进场 · 播放 亭阁', '21:34:47'], ['gift', '半糖主义', '送出 小花花 ×20 · 2 元', '21:34:30'], ['enter', 'H3_W', '进场', '21:34:12'],
+  ['danmu', '今天也要早睡', '「打卡」', '21:33:58'], ['enter', '星河漫步', '进场 · 播放 门楼', '21:33:40'], ['enter', '南山有鹿', '进场 · 播放 霜玻', '21:33:21'],
+];
+const EV = { enter: ['进', 'var(--accent)'], danmu: ['弹', '#4C6FE0'], gift: ['礼', 'linear-gradient(135deg,#FFB38A,#E0568F)'], guard: ['舰', 'var(--cap)'] };
+
+const st = { view: 'ov', live: true, queue: true, tab: 'queue', feedKind: 'all', onlyGuard: false, onlineF: 'all' };
+
+function seg(el, items, key, after) {
+  el.innerHTML = items.map(([v, l]) => `<button aria-pressed="${st[key] === v}" data-v="${v}">${l}</button>`).join('');
+  el.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st[key] = typeof st[key] === 'boolean' ? b.dataset.v === 'true' : b.dataset.v; render(); after?.(); };
+}
+
+function kstrip() {
+  const L = st.live;
+  const cell = (label, v, d, src) => `<div><small>${label}${src ? '<span class="src">B站</span>' : ''}</small><span class="v num">${v}</span><div class="d">${d}</div></div>`;
+  $('#kstrip').innerHTML = [
+    cell('进场人数 · 去重', '1,284', '其中大航海 <b>18</b> 人'),
+    cell('触发特效', '342', '其中大航海 <b>25</b> 次'),
+    cell('看过', L ? '3.2万' : '—', L ? '本场累计' : '开播后显示', 1),
+    cell('高能榜', L ? '70' : '—', L ? '现在在线、登录了的观众' : '开播后显示', 1),
+    cell('点赞', L ? '1.5万' : '—', L ? '本场累计' : '开播后显示', 1),
+    cell('粉丝', '12.8万', '粉丝团 <b>2,140</b> 人', 1),
+  ].join('');
+}
+
+function feed() {
+  seg($('#feedKind'), [['all', '全部'], ['enter', '进场'], ['danmu', '弹幕'], ['gift', '礼物'], ['guard', '上舰']], 'feedKind');
+  $('#onlyGuard').setAttribute('aria-checked', st.onlyGuard);
+  const rows = FEED.filter(([k, n]) => (st.feedKind === 'all' || k === st.feedKind) && (!st.onlyGuard || by(n).guard));
+  $('#feed').innerHTML = rows.map(([k, n, t, time]) => { const v = by(n); return `<div class="feed-row">${avatar(n, v.guard)}<span class="who"><b>${esc(n)}</b><span>${k !== 'enter' ? `<span class="ev" style="background:${EV[k][1]};display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;font-size:10px;margin-right:4px;vertical-align:-2px;color:#fff">${EV[k][0]}</span>` : ''}${esc(t)}</span></span>${ids(v)}<time class="num">${time}</time><span class="rowact"><svg class="i"><use href="#i-more"/></svg></span></div>`; }).join('')
+    || `<div class="soon-box" style="border:0;background:none"><b>没有符合的动态</b>换个筛选试试</div>`;
+}
+
+const QUEUE = [['长夜未央', '总督进场', '金銮', '马上'], ['白开水不加糖', '告白花束 ×1', '晶耀', '约 8 秒后'], ['月下独酌', '提督进场', '亭阁', '约 14 秒后']];
+const ONLINE = [...P].sort((a, b) => b.score - a.score);
+const GIFTS = [['长夜未央', 1314, 3, '天空之翼'], ['白开水不加糖', 520, 2, '告白花束'], ['月下独酌', 198, 1, '舰长一号'], ['听雨的鲸', 138, 1, '续费舰长'], ['半糖主义', 12.4, 7, '小花花'], ['星河漫步', 5.2, 3, '粉丝团灯牌'], ['晚风与你', 1, 1, '辣条']];
+const FLEET_CAME = [['长夜未央', 3, '21:36'], ['月下独酌', 2, '21:34'], ['听雨的鲸', 1, '21:35'], ['半糖主义', 4, '21:30'], ['星河漫步', 1, '21:33'], ['抱着自己の弦瑟', 2, '20:58']];
+const FLEET_MISS = ['雾里看花', '一只小企鹅', '栗子不甜', '夏至未至', '深海的鱼', '阿白', '橘子汽水', '晴天娃娃'];
+
+function panel() {
+  const q = st.queue;
+  const tabs = [
+    ['queue', 'n-queue', '播放队列', q ? '<span class="dot play">3</span>' : '<span class="cnt">空闲</span>'],
+    ['online', 'i-users', '在线观众', `<span class="cnt">${st.live ? 70 : '—'}</span>`],
+    ['gift', 'n-trophy', '礼物榜', ''],
+    ['fleet', 'n-anchor', '大航海', '<span class="cnt">6/32</span>'],
+  ];
+  $('#ptabs').innerHTML = tabs.map(([k, ic, l, x]) => `<button role="tab" aria-selected="${st.tab === k}" data-k="${k}"><svg class="i"><use href="#${ic}"/></svg>${l}${x}</button>`).join('');
+  $('#ptabs').onclick = (e) => { const b = e.target.closest('button'); if (b) { st.tab = b.dataset.k; render(); } };
+  const B = $('#pbody');
+  if (st.tab === 'queue') {
+    B.innerHTML = q ? `
+      <div class="ov-now">${avatar('抱着自己の弦瑟', 3)}<div style="min-width:0"><b>抱着自己の弦瑟</b><div class="what">舰长进场 · 播放 <b>门楼</b></div></div><span class="left num">还剩 2.4 秒</span><div class="bar"><i style="width:62%"></i></div></div>
+      <div class="ov-q">${QUEUE.map(([n, d, e, eta], i) => `<div class="qrow"><span class="n num">${i + 1}</span>${avatar(n, by(n).guard)}<span class="who"><b>${esc(n)}</b><span>${d} · ${e}</span></span><span class="eta num">${eta}</span><button class="x"><svg class="i"><use href="#i-x"/></svg></button></div>`).join('')}</div>
+      <div class="ov-qfoot"><button class="linkish">排队设置</button><span class="sp"></span><button class="btn">跳过当前</button><button class="btn">清空排队</button></div>`
+      : `<div class="ov-qempty"><b>现在没有排队</b>观众进场、送礼时会出现在这里，按顺序一个一个播放</div><div class="ov-qfoot"><button class="linkish">排队设置</button></div>
+         <div class="missing" style="margin-top:14px">队列空闲时标签上显示「空闲」；有特效在播时显示绿色的条数，不会自动切换页面。</div>`;
+  } else if (st.tab === 'online') {
+    if (!st.live) { B.innerHTML = `<div class="ov-qempty"><b>开播后显示</b>在线观众来自 B 站的高能榜：在直播间里、登录了 B 站的观众，按贡献排序</div>`; return; }
+    const list = ONLINE.filter((v) => st.onlineF === 'all' || (st.onlineF === 'guard' ? v.guard : v.medal));
+    B.innerHTML = `<div class="phead"><span>在线 <b class="num">70</b> 人 · 每 30 秒刷新</span><div class="seg" id="onlineF"></div></div>
+      <div class="plist">${list.map((v, i) => `<div class="prow"><span class="n${i < 3 ? ` rk r${i + 1}` : ''}">${i + 1}</span>${avatar(v.name, v.guard)}<span class="who"><b>${esc(v.name)}</b><span>${v.guard ? GNAME[v.guard] : v.mod ? '房管' : v.medal ? `粉丝牌 ${v.medal} 级` : '普通观众'}</span></span>${ids(v)}<span class="sc">${v.score.toLocaleString('zh-CN')}<small>贡献值</small></span></div>`).join('')}</div>
+      <div class="pfoot">只列出登录了 B 站的观众（B 站不提供完整在线名单）<span class="sp"></span>点一行可设置专属特效</div>`;
+    seg($('#onlineF'), [['all', '全部'], ['guard', '大航海'], ['fan', '粉丝牌']], 'onlineF');
+  } else if (st.tab === 'gift') {
+    B.innerHTML = `<div class="phead"><span>本场送礼 <b class="num">23</b> 人 · 合计 <b class="num">2,188</b> 元</span></div>
+      <div class="plist">${GIFTS.map(([n, y, c, g], i) => `<div class="prow"><span class="n${i < 3 ? ` rk r${i + 1}` : ''}">${i + 1}</span>${avatar(n, by(n).guard)}<span class="who"><b>${esc(n)}</b><span>送了 ${c} 次 · 最贵：${g}</span></span>${ids(by(n))}<span class="sc">${y.toLocaleString('zh-CN')}<small>元</small></span></div>`).join('')}</div>
+      <div class="pfoot">按礼物价值算（付费礼物，1 元 = 10 电池）<span class="sp"></span>本场 / 今天跟着上面的数据范围</div>`;
+  } else {
+    B.innerHTML = `<div class="fleet"><span class="ring" style="--p:${(6 / 32) * 100}"><span>19%</span></span><div><b>舰队 32 人，本场来了 6 人</b><small>总督 1 · 提督 1 · 舰长 30（来自 B 站的大航海名单）</small></div></div>
+      <div class="plist" style="max-height:220px">${FLEET_CAME.map(([n, c, t]) => `<div class="prow" style="grid-template-columns:30px minmax(0,1fr) auto auto">${avatar(n, by(n).guard)}<span class="who"><b>${esc(n)}</b><span>${GNAME[by(n).guard]} · 最后一次 ${t}</span></span>${ids(by(n))}<span class="sc">${c}<small>次进场</small></span></div>`).join('')}</div>
+      <details class="missing"><summary>还没来的 26 人（点开看）</summary><div class="chips">${FLEET_MISS.map((n) => `<span>${avatar(n, 3)}${esc(n)}</span>`).join('')}<span>… 还有 18 人</span></div></details>`;
+  }
+}
+
+function comp() {
+  const C = [['gov', '总督', 'var(--gov)', 1], ['adm', '提督', 'var(--adm)', 2], ['cap', '舰长', 'var(--cap)', 15], ['mod', '房管', 'var(--mod)', 9], ['fan', '粉丝牌', '#C770A4', 312], ['nor', '普通观众', 'var(--nor)', 945]];
+  const tot = C.reduce((s, c) => s + c[3], 0);
+  $('#compStack').innerHTML = C.map((c) => `<i style="width:${Math.max((c[3] / tot) * 100, 1.2)}%;background:${c[2]}"></i>`).join('');
+  $('#compLegend').innerHTML = C.map((c) => `<div><i style="background:${c[2]}"></i>${c[1]}<b class="num">${c[3]}</b></div>`).join('');
+  const H = [['1 – 20 级', '#8FA3C8', 702], ['21 – 40 级', '#6D8BE8', 331], ['41 – 60 级', '#9A7BE8', 96], ['61 级以上', '#E0A43C', 14], ['没有 / 不知道', 'var(--line-strong)', 141]];
+  const ht = H.reduce((s, c) => s + c[2], 0);
+  $('#honorStack').innerHTML = H.map((c) => `<i style="width:${Math.max((c[2] / ht) * 100, 1.2)}%;background:${c[1]}"></i>`).join('');
+  $('#honorLegend').innerHTML = H.map((c) => `<div><i style="background:${c[1]}"></i>${c[0]}<b class="num">${c[2]}</b></div>`).join('');
+}
+
+const ICONS = [
+  ['i-gear', 'n-gear', '设置', '现在是一个圆加一圈短线，像太阳，和右上角「亮色模式」的太阳几乎一样。改成齿轮。', '侧栏「设置」、命令面板', 'i-sun'],
+  ['i-dup', 'n-dup', '复制一份来改', '和「复制 UID / 复制地址」是同一个图标。改成「叠起来的两张 + 加号」，意思是复制出一个新的。', '素材库「复制」「复制一份来改」、素材设置里的「复制」', 'i-copy'],
+  ['i-screen', 'n-monitor', '直播软件输出', '现在是竖着的手机，用 OBS 横屏的会觉得奇怪。改成显示器。', '侧栏、手机底部导航、命令面板、登录页'],
+  ['i-star', 'n-anchor', '上舰', '规则页用星星、命令面板用空心长方形，前后不一致。统一成船锚。', '触发规则「上舰」标签、命令面板「上舰规则」', 'i-medal'],
+  ['i-medal', 'n-medal', '粉丝牌', '现在只是一个圆角长方形，看不出是牌子。改成「牌子名 + 等级格」。', '以后粉丝牌相关的地方（命令面板里的上舰规则改用船锚后，粉丝牌用这个）'],
+  ['i-spark', 'n-demo', '特效页演示', '闪光图标同时用在 6 个意思不同的地方。特效页演示改成「窗口里一个播放键」。', '侧栏「特效页演示」、命令面板「打开特效页演示」'],
+  ['i-spark', 'n-update', '后台有新版本', '改成「圆圈里一个向上箭头」，意思是有新版本。', '顶部「后台有新版本」提示条'],
+  ['i-spark', 'n-todo', '新手步骤：还没完成', '没完成的步骤现在也用闪光，看起来像「完成了、很厉害」。改成空心圆，完成了是打勾。', '总览「开始使用」三个步骤'],
+  ['i-spark', 'n-info', '普通提示', '右下角弹出的普通提示（不是出错、不是成功）改成「i」。', '所有 info 类型的提示'],
+  ['i-spark', 'i-spark', '专属特效', '闪光只留给「专属特效」，意思更集中。', '观众菜单「为 TA 设置专属特效」、登录页、素材缩略图'],
+  ['i-chev', 'i-chev', '向下箭头（重复）', '「i-chev」和「i-down」一模一样，界面上看不出来，只是代码里合并成一个。', '下拉框、弹幕规则「下移」', 'i-down'],
+];
+function icons() {
+  $('#icmp').innerHTML = ICONS.map(([a, b, t, p, w, old2]) => `<div class="card"><div class="pair2"><span class="ic"><svg class="i"><use href="#${a}"/></svg><em>现在</em></span><svg class="i arrow"><use href="#i-arrow"/></svg><span class="ic after"><svg class="i"><use href="#${b}"/></svg><em>改后</em></span>${old2 ? `<span class="alsoold">跟它一样的：<svg class="i"><use href="#${old2}"/></svg></span>` : ''}</div><h3 style="margin-top:8px">${t}</h3><p>${p}</p><div class="where">用在：${w}</div></div>`).join('');
+}
+
+function render() {
+  $('#view-ov').hidden = st.view !== 'ov'; $('#view-ic').hidden = st.view !== 'ic';
+  document.querySelectorAll('.nav a[data-view]').forEach((a) => a.setAttribute('aria-current', a.dataset.view === st.view ? 'page' : 'false'));
+  seg($('#pvView'), [['ov', '总览改版'], ['ic', '图标对比']], 'view');
+  seg($('#pvLive'), [['true', '直播中'], ['false', '未开播']], 'live');
+  seg($('#pvQueue'), [['true', '有排队'], ['false', '空闲']], 'queue');
+  $('#livestate').classList.toggle('on', st.live); $('#livestate').lastChild.textContent = st.live ? '直播中' : '未开播';
+  $('#coverBadge').classList.toggle('off', !st.live); $('#coverBadge').innerHTML = st.live ? '<i></i>直播中' : '未开播'; $('#dur').hidden = !st.live; $('#cover').classList.toggle('off', !st.live);
+  $('#scopeText').textContent = st.live ? '本场（19:30 开播至今）' : '上一场（09-29 19:30 – 23:12）';
+  kstrip(); feed(); panel(); comp(); icons();
+}
+$('#onlyGuard').onclick = () => { st.onlyGuard = !st.onlyGuard; render(); };
+$('#feed').onmouseenter = () => ($('#hold').hidden = false);
+$('#feed').onmouseleave = () => ($('#hold').hidden = true);
+document.querySelectorAll('.nav a[data-view]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); st.view = a.dataset.view; render(); }));
+$('#themeBtn').onclick = () => (document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark';
+if (location.hash === '#icons') st.view = 'ic';
+render();
+</script>
+</body>
+</html>

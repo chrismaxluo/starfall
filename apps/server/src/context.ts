@@ -16,6 +16,7 @@ import { ConfigIO } from './services/config-io.ts';
 import { EffectStore } from './services/effects.ts';
 import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-rules.ts';
 import { EventLog } from './services/events.ts';
+import { parseMessage } from '@starfall/bili';
 import type { getHonorMedals, getRoomGifts } from '@starfall/bili';
 import { GiftCatalog } from './services/gifts.ts';
 import { HonorMedals } from './services/honor.ts';
@@ -128,6 +129,16 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   };
   ctx.assets.cleanTmp(0);
   void ctx.assets.backfillSlots().catch((e: Error) => console.error('读取 SVGA 图层失败', e.message));
+  try {
+    // 以前记录的上舰补上价格（礼物榜要算）
+    const n = ctx.log.backfillGuardPrices((raw) => {
+      const ev = parseMessage(raw as Parameters<typeof parseMessage>[0], { newId: () => 'backfill', now: Date.now });
+      return ev?.kind === 'guard' ? ev.priceGold : undefined;
+    });
+    if (n) console.log(`补上了 ${n} 条上舰记录的价格`);
+  } catch (e) {
+    console.error('补上舰价格失败', (e as Error).message);
+  }
   ctx.backups.cleanPartial();
   prune();
   const timer = setInterval(prune, PRUNE_MS);

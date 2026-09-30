@@ -20,7 +20,10 @@ import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
 import type { ViewerStore } from './viewers.ts';
 
-export type TriggerEvent = Exclude<StdEvent, { kind: 'live' }>;
+/** 会触发特效的事件（醒目留言现在只记录） */
+export type TriggerEvent = Exclude<StdEvent, { kind: 'live' | 'sc' }>;
+/** 醒目留言编号记多久（同一条可能推送两次） */
+const SC_DEDUPE_MS = 10 * 60_000;
 /** 欢迎语变量（除观众以外） */
 export type Vars = Omit<TextVars, 'viewer'> & {
   /** 礼物图（不进欢迎语，放进播放内容给礼物特效用） */
@@ -225,8 +228,20 @@ export class Pipeline {
       case 'danmu':
         this.process(ev);
         break;
+      case 'sc': {
+        // 只记录（算进礼物榜、显示在实时动态），不触发特效
+        for (const [id, at] of this.scSeen) if (now - at > SC_DEDUPE_MS) this.scSeen.delete(id);
+        if (this.scSeen.has(ev.scId)) {
+          this.raws.delete(ev.id);
+          break;
+        }
+        this.scSeen.set(ev.scId, now);
+        this.record(ev, null, 'no_rule');
+        break;
+      }
     }
   }
+  private readonly scSeen = new Map<string, number>();
 
   /** 取出等待超时的进场、连击结束的礼物、单独到达的 GUARD_BUY（定时调用） */
   flush(): void {
@@ -247,7 +262,7 @@ export class Pipeline {
     this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '', ...(v.honor ? { honor: v.honor } : {}) }, roomId ? { level: v.guard, roomId } : undefined);
   }
 
-  private record(ev: TriggerEvent, hit: Judgement['hit'], status: PlayStatus): number {
+  private record(ev: TriggerEvent | Extract<StdEvent, { kind: 'sc' }>, hit: Judgement['hit'], status: PlayStatus): number {
     const raw = this.raws.get(ev.id)?.raw;
     this.raws.delete(ev.id);
     return this.d.log.record(ev, { roomId: this.d.room.get()?.roomId ?? null, sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;

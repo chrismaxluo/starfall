@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 总览右侧面板「礼物榜」：这段时间（本场 / 今天，跟着总览的数据范围）每人送的付费礼物总价值
+// 总览右侧面板「礼物榜」：这段时间（本场 / 今天，跟着总览的数据范围）每人花的钱：付费礼物 + 上舰 + 醒目留言
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PersonRow from './PersonRow.vue';
 import { get } from '../lib/api.ts';
@@ -20,7 +20,7 @@ async function load(): Promise<void> {
 watch(() => [props.scope, state.status?.room?.roomId, state.status?.live.liveSince], () => void load());
 // 有人送礼时稍后刷新（连击合并完才记录，不用每条都请求）
 const off = onLiveEvent((e) => {
-  if (e.kind === 'gift' && !timer) timer = setTimeout(() => ((timer = null), void load()), 3000);
+  if ((e.kind === 'gift' || e.kind === 'guard' || e.kind === 'sc') && !timer) timer = setTimeout(() => ((timer = null), void load()), 3000);
 });
 onMounted(() => {
   void load();
@@ -37,6 +37,14 @@ const num = (n: number) => n.toLocaleString('zh-CN', { maximumFractionDigits: 1 
 const battery = (gold: number) => `${num(gold / 100)} 电池`;
 const yuan = (gold: number) => `${num(gold / 1000)} 元`;
 const rows = computed(() => data.value?.rows ?? []);
+/** 一行说明：送了几次、最贵的一件，含上舰、醒目留言 */
+function sub(r: GiftRankDto['rows'][number]): string {
+  const parts: string[] = [];
+  if (r.times) parts.push(`送了 ${r.times} 次${r.topGift ? ` · 最贵：${r.topGift}` : ''}`);
+  if (r.guards) parts.push(`含上舰 ×${r.guards}`);
+  if (r.scs) parts.push(`含醒目留言 ×${r.scs}`);
+  return parts.join(' · ');
+}
 </script>
 
 <template>
@@ -47,9 +55,9 @@ const rows = computed(() => data.value?.rows ?? []);
       <span v-else>正在读取……</span>
     </div>
     <div class="plist">
-      <PersonRow v-for="(r, i) in rows" :key="r.uid" :viewer="r.viewer" :rank="i + 1" :sub="`送了 ${r.times} 次${r.topGift ? ` · 最贵：${r.topGift}` : ''}`" :value="battery(r.gold)" :unit="yuan(r.gold)" @pick="(v, px, py) => emit('pick', v, px, py)" />
-      <div v-if="data && !rows.length" class="pempty">{{ scope === 'live' ? '这场' : '今天' }}还没有人送付费礼物</div>
+      <PersonRow v-for="(r, i) in rows" :key="r.uid" :viewer="r.viewer" :rank="i + 1" :sub="sub(r)" :value="battery(r.gold)" :unit="yuan(r.gold)" @pick="(v, px, py) => emit('pick', v, px, py)" />
+      <div v-if="data && !rows.length" class="pempty">{{ scope === 'live' ? '这场' : '今天' }}还没有人送付费礼物、上舰或发醒目留言</div>
     </div>
-    <div class="pfoot"><span>按付费礼物的价值算（10 电池 = 1 元）</span><span class="sp" /><span>本场 / 今天跟着上面的数据范围</span></div>
+    <div class="pfoot"><span>付费礼物（盲盒按开出的礼物算）+ 上舰（实付价格）+ 醒目留言，10 电池 = 1 元</span><span class="sp" /><span>本场 / 今天跟着上面的数据范围</span></div>
   </template>
 </template>

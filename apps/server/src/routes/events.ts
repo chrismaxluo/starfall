@@ -9,7 +9,7 @@ import { parseBody } from '../http.ts';
 const STATUSES = Object.keys(PLAY_STATUS) as [PlayStatus, ...PlayStatus[]];
 
 const EventQuery = z.object({
-  kind: z.enum(['enter', 'danmu', 'gift', 'guard']).optional(),
+  kind: z.enum(['enter', 'danmu', 'gift', 'guard', 'sc']).optional(),
   status: z
     .string()
     .optional()

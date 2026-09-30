@@ -58,7 +58,7 @@ const rows = computed(() =>
     </div>
     <div v-if="error" class="warnbox" style="margin-bottom: 10px">{{ error }}</div>
     <div class="plist">
-      <PersonRow v-for="x in rows" :key="x.uid" :viewer="x.viewer" :rank="x.rank" :sub="roleText(x.viewer, anchorUid)" :value="x.score.toLocaleString('zh-CN')" unit="贡献值" @pick="(v, px, py) => emit('pick', v, px, py)" />
+      <PersonRow v-for="x in rows" :key="x.uid" :viewer="x.viewer" :rank="x.rank" :sub="roleText(x.viewer, anchorUid)" :value="`${x.score.toLocaleString('zh-CN')} 电池`" unit="贡献" @pick="(v, px, py) => emit('pick', v, px, py)" />
       <div v-if="data && !rows.length" class="pempty">{{ filter === 'all' ? '还没有人上榜：投喂、点赞、发弹幕的观众会出现在这里' : '没有符合的观众' }}</div>
     </div>
     <div class="pfoot">

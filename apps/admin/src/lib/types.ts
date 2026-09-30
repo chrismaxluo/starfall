@@ -155,11 +155,13 @@ export interface GiftConfig {
 export interface EventDto {
   id: number;
   ts: number;
-  kind: TriggerKind;
+  /** sc：醒目留言（只记录，不触发特效） */
+  kind: TriggerKind | 'sc';
   uid: number;
   uname: string;
   viewer: Viewer;
-  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string } | null;
+  /** price：上舰是金瓜子，醒目留言是元 */
+  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string; price?: number } | null;
   rule: string | null;
   effectId: number | null;
   status: PlayStatus;
@@ -248,7 +250,8 @@ export interface GiftRankDto {
   people: number;
   /** 合计（金瓜子） */
   gold: number;
-  rows: Array<{ uid: number; viewer: Viewer; gold: number; times: number; topGift: string }>;
+  /** gold：付费礼物 + 上舰 + 醒目留言（金瓜子）；times：付费礼物几次 */
+  rows: Array<{ uid: number; viewer: Viewer; gold: number; times: number; topGift: string; guards: number; guardGold: number; scs: number; scGold: number }>;
 }
 
 export interface FleetDto {

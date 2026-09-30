@@ -23,7 +23,9 @@ async function setup(fakes: { online?: (page: number) => OnlineRank; guards?: (p
     record({ kind: 'gift', id: `g${Math.random()}`, ts: Date.now(), viewer: viewer(uid), giftId: 1, giftName: name, unitPrice, count, paid }, roomId);
   const enter = (uid: number, p: object = {}, ts = Date.now()) => record({ kind: 'enter', id: `e${Math.random()}`, ts, source: 'interact', viewer: viewer(uid, p) });
   const goLive = () => vi.spyOn(t.ctx.live, 'status').mockReturnValue({ ...t.ctx.live.status(), live: true, liveSince: Date.now() - 3600_000 });
-  return { ...t, req, fetchOnline, fetchGuards, gift, enter, goLive };
+  const guard = (uid: number, priceGold?: number, raw?: unknown) =>
+    t.ctx.log.record({ kind: 'guard', id: `u${Math.random()}`, ts: Date.now(), viewer: viewer(uid, { guard: 3 }), level: 3, months: 1, op: 'open', source: 'toast', ...(priceGold ? { priceGold } : {}) }, { roomId: 30000, sessionId: null, rule: null, effectId: null, status: 'no_rule', raw });
+  return { ...t, req, fetchOnline, fetchGuards, gift, enter, guard, goLive, viewer };
 }
 
 describe('总览右侧面板', () => {
@@ -40,6 +42,38 @@ describe('总览右侧面板', () => {
     expect(r.rows[0].viewer).toMatchObject({ uid: 2, name: '观众2' });
     // 本场：从来没开播过就没有
     expect((await t.req({ method: 'GET', url: '/api/stats/gifts?scope=live' })).json()).toMatchObject({ from: null, people: 0, rows: [] });
+  });
+
+  it('礼物榜算上上舰（实付价格）和醒目留言；醒目留言同一条推两次只记一次，不触发特效', async () => {
+    const t = await setup();
+    t.gift(1, '小花花', 100, 10);
+    t.guard(1, 168_000);
+    t.guard(2, 138_000);
+    t.guard(4);
+    const sc = { kind: 'sc' as const, id: 'sc1', ts: Date.now(), viewer: t.viewer(3), text: '晚上好', priceYuan: 30, scId: '777' };
+    t.ctx.pipeline.handle(sc);
+    t.ctx.pipeline.handle({ ...sc, id: 'sc2' });
+    const r = (await t.req({ method: 'GET', url: '/api/stats/gifts?scope=today' })).json();
+    expect(r).toMatchObject({ people: 3, gold: 1000 + 168_000 + 138_000 + 30_000 });
+    expect(r.rows.map((x: Record<string, unknown>) => [x.uid, x.gold, x.times, x.guards, x.scs])).toEqual([[1, 169_000, 1, 1, 0], [2, 138_000, 0, 1, 0], [3, 30_000, 0, 0, 1]]);
+    expect(r.rows[1].topGift).toBe('');
+    const scs = t.ctx.log.query({ kind: 'sc' }).events;
+    expect(scs).toHaveLength(1);
+    expect(scs[0]).toMatchObject({ status: 'no_rule', rule: null, payload: { text: '晚上好', price: 30, scId: '777' } });
+    expect(t.ctx.pipeline.snapshot().items).toHaveLength(0);
+    // 事件记录可以只看醒目留言
+    expect((await t.req({ method: 'GET', url: '/api/events?kind=sc' })).json().events).toHaveLength(1);
+  });
+
+  it('以前记录的上舰从原始消息里补上价格', async () => {
+    const t = await setup();
+    const raw = { cmd: 'USER_TOAST_MSG', data: { uid: 5, username: 'a', guard_level: 3, num: 1, unit: '月', price: 138_000, payflow_id: 'p', toast_msg: '<%a%> 开通了舰长' } };
+    t.guard(5, undefined, raw);
+    t.guard(6);
+    const { parseMessage } = await import('@starfall/bili');
+    const n = t.ctx.log.backfillGuardPrices((x) => { const ev = parseMessage(x as never, { newId: () => 'x', now: Date.now }); return ev?.kind === 'guard' ? ev.priceGold : undefined; });
+    expect(n).toBe(1);
+    expect(t.ctx.log.query({ kind: 'guard' }).events.map((e) => (e.payload as { price?: number }).price)).toEqual([undefined, 138_000]);
   });
 
   it('大航海：来了谁、几次、最后一次；舰队名单读全部页，缓存 15 分钟', async () => {

@@ -31,6 +31,8 @@ describe('事件说明', () => {
     expect(describeEvent(e({ kind: 'danmu', payload: { text: '晚上好' } }))).toBe('「晚上好」');
     expect(describeEvent(e({ kind: 'gift', payload: { giftName: '小花花', count: 10 } }))).toBe('送出 小花花 ×10');
     expect(describeEvent(e({ kind: 'guard', payload: { level: 3, months: 1, op: 'open' } }))).toBe('开通舰长 1 个月');
+    expect(describeEvent(e({ kind: 'guard', payload: { level: 3, months: 1, op: 'renew', price: 168_000 } }))).toBe('续费舰长 1 个月 · 168 元');
+    expect(describeEvent(e({ kind: 'sc', payload: { text: '晚上好', price: 30 } }))).toBe('醒目留言 30 元「晚上好」');
   });
   it('状态颜色', () => {
     expect(statusCls('played')).toBe('ok');

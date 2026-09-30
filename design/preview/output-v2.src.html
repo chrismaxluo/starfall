@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>星临 · 输出页改版预览</title>
+<!-- 用的是后台真实的样式表（从 apps/admin/src/styles 复制到 assets/admin/，不进仓库）：
+  mkdir -p design/preview/assets/admin && cp apps/admin/src/styles/app.css apps/admin/src/styles/extra.css design/preview/assets/admin/
+  这个页面由 output-v2.src.html 生成（把后台的图标表放进来）：python3 design/tools/build_output_preview.py -->
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/admin/app.css">
+<link rel="stylesheet" href="assets/admin/extra.css">
+<style>
+:root { --font-sans: "Geist Sans", "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace; }
+body { margin: 0; }
+.new { display: inline-flex; align-items: center; height: 17px; padding: 0 6px; border-radius: 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; color: #fff; background: linear-gradient(90deg, #6E6BF2, #E0689B); }
+
+/* ---- 输出切换（标题下面一排标签） ---- */
+.outbar { display: flex; align-items: center; gap: 4px; margin: -8px 0 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.outbar .otab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 0; background: none; color: var(--t3); font-size: 13.5px; font-weight: 500; white-space: nowrap; }
+.outbar .otab:hover { color: var(--t1); }
+.outbar .otab[aria-selected="true"] { color: var(--t1); }
+.outbar .otab[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.outbar .otab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.outbar .otab .dot.off { background: var(--line-strong); }
+.outbar .otab .res { font-family: var(--font-mono); font-size: 11.5px; color: var(--t3); font-weight: 400; }
+.outbar .otab.add { color: var(--t3); }
+.outbar .otab.add svg { width: 14px; height: 14px; }
+.outbar .omore { margin-left: auto; display: flex; gap: 14px; align-items: center; padding-bottom: 4px; }
+
+.o2 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(340px, 1fr); gap: 16px; align-items: start; }
+.o2-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.o2-prev { position: sticky; top: 0; }
+@media (max-width: 1100px) { .o2 { grid-template-columns: minmax(0, 1fr); } .o2-prev { position: static; } }
+@media (max-width: 640px) { .src-h { flex-wrap: wrap; } .src-t { flex: 1; } .src-h .right { margin-left: 50px; flex-basis: 100%; } .srow { grid-template-columns: 1fr; gap: 8px; } .src-f .links { margin-left: 0; } .howto summary .aside { display: none; } }
+
+/* ---- ① 加到直播软件：两个浏览器源 ---- */
+.card-h .seg button { height: 26px; padding: 0 10px; font-size: 12.5px; }
+.src { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--l2); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; transition: opacity .2s; }
+.src + .src { margin-top: 10px; }
+.src-h { display: flex; align-items: center; gap: 12px; }
+.src-ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; flex: none; color: #fff; }
+.src-ic svg { width: 19px; height: 19px; }
+.src-ic.fx { background: linear-gradient(135deg, #8D8BFF, #5451D6); }
+.src-ic.dm { background: linear-gradient(135deg, #3FB4F6, #2F6FEB); }
+.src-t { min-width: 0; }
+.src-t b { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: var(--t1); }
+.src-t > span { display: block; font-size: 12.5px; color: var(--t3); margin-top: 2px; }
+.src-h .right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex: none; }
+.src .live { height: 22px; padding: 0 9px; font-size: 12px; }
+.src-url { display: flex; gap: 6px; }
+.src-url .inp { flex: 1; min-width: 0; height: 34px; font-family: var(--font-mono); font-size: 12px; color: var(--t2); }
+.src-url .btn { height: 34px; }
+.src-url .btn.ic { width: 34px; padding: 0; justify-content: center; }
+.src-url .btn svg { width: 15px; height: 15px; }
+.src-f { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--t3); }
+.src-f .wh2 { display: inline-flex; align-items: center; gap: 6px; color: var(--t2); }
+.src-f .wh2 code { font-family: var(--font-mono); font-size: 12px; padding: 2px 7px; border-radius: 6px; background: var(--hover); color: var(--t1); }
+.src-f .caps { display: inline-flex; gap: 10px; }
+.src-f .caps .ok { color: var(--ok); }
+.src-f .caps .mid { color: var(--gov); }
+.src-f .links { margin-left: auto; display: inline-flex; gap: 14px; }
+.src.off .src-url, .src.off .src-f { opacity: .45; pointer-events: none; }
+.src .offhint { font-size: 12.5px; color: var(--t3); }
+
+/* 添加步骤（可以收起） */
+.howto { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.howto summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--t2); user-select: none; }
+.howto summary::-webkit-details-marker { display: none; }
+.howto summary svg { width: 14px; height: 14px; transition: transform .2s; color: var(--t3); transform: rotate(-90deg); }
+.howto[open] summary svg { transform: none; }
+.howto summary .aside { margin-left: auto; font-size: 12px; color: var(--t3); font-weight: 400; }
+.howto .steps { margin-top: 14px; }
+.steps .tagsrc { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 600; margin-right: 6px; vertical-align: 1px; }
+.steps .tagsrc.fx { color: #8D8BFF; background: rgba(141,139,255,.14); }
+.steps .tagsrc.dm { color: #3FB4F6; background: rgba(63,180,246,.14); }
+
+/* ---- 设置：左边名字、右边控件 ---- */
+.srows { display: flex; flex-direction: column; }
+.srow { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 16px; align-items: center; padding: 12px 0; }
+.srow + .srow { border-top: 1px solid var(--line); }
+.srow > .lb { font-size: 13px; color: var(--t2); font-weight: 500; align-self: start; padding-top: 6px; }
+.srow > .lb small { display: block; font-size: 11.5px; color: var(--t3); font-weight: 400; margin-top: 2px; line-height: 1.5; }
+.srow .ctl { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.srow .line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.srow .hint { font-size: 12px; color: var(--t3); line-height: 1.6; }
+.srow .seg button { display: inline-flex; align-items: center; gap: 7px; }
+.srow .seg .shp { border: 1.6px solid currentColor; border-radius: 3px; display: inline-block; }
+.srow .presets button { height: 30px; }
+.srow .wh3 { display: inline-flex; align-items: center; gap: 6px; }
+.srow .wh3 .inp { width: 86px; height: 30px; font-family: var(--font-mono); font-size: 12.5px; text-align: center; padding: 0 6px; }
+.srow .wh3 span { color: var(--t3); }
+.srow .slider-row { grid-template-columns: 72px minmax(0, 1fr) 48px; }
+.srow .sel { height: 32px; width: 140px; font-size: 13px; }
+.card-h .sw { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--t3); }
+
+/* ---- 右侧预览 ---- */
+.ptabs { display: flex; gap: 2px; margin: -6px -8px 14px; border-bottom: 1px solid var(--line); }
+.ptabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; background: none; color: var(--t3); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.ptabs button[aria-selected="true"] { color: var(--t1); }
+.ptabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.ptabs .aside { margin-left: auto; align-self: center; font-size: 12px; color: var(--t3); padding-right: 8px; }
+.pv { display: grid; place-items: center; padding: 16px; border-radius: var(--r-md); background: var(--l2); border: 1px solid var(--line); }
+.pstage { position: relative; overflow: hidden; border-radius: 12px; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 20px 50px -20px rgba(0,0,0,.6);
+  background: radial-gradient(60% 40% at 25% 60%, rgba(255,170,90,.55), transparent 70%), radial-gradient(60% 40% at 85% 70%, rgba(90,160,255,.5), transparent 70%), radial-gradient(70% 45% at 60% 18%, rgba(210,120,255,.35), transparent 70%), linear-gradient(175deg, #2A2436, #151823 60%, #0E1017); }
+.pstage.alpha { background: repeating-conic-gradient(#2A2A31 0% 25%, #1F1F25 0% 50%) 0 0 / 14px 14px; }
+.pstage .res { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 10.5px; font-family: var(--font-mono); color: rgba(255,255,255,.55); }
+.pstage .sb { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; letter-spacing: .1em; color: rgba(255,255,255,.45); background: repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 6px, transparent 6px 12px); }
+.pstage .sb.t { top: 0; border-bottom: 1px dashed rgba(255,255,255,.25); }
+.pstage .sb.b { bottom: 0; border-top: 1px dashed rgba(255,255,255,.25); }
+.pstage.nosafe .sb { display: none; }
+.pstage .fxpill { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; padding: 7px 14px 7px 7px; border-radius: 99px; color: #fff; font-size: 12px; white-space: nowrap; opacity: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.05)), rgba(16,18,30,.5); -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 10px 30px -10px rgba(0,0,0,.6); }
+.pstage .fxpill i { width: 24px; height: 24px; border-radius: 50%; background: var(--c, #9A9DAA); }
+.pstage .fxpill b { font-weight: 600; }
+.chatbox { position: relative; width: 600px; height: 900px; transform-origin: 0 0; }
+.pfoot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+.pfoot .btn { height: 30px; padding: 0 10px; font-size: 12.5px; }
+.pfoot .btn i { width: 7px; height: 7px; border-radius: 50%; }
+.pfoot .note { font-size: 12px; color: var(--t3); margin-left: auto; }
+
+/* ---- 弹幕列表（和 chat-list.html 同一套，缩小放进预览） ---- */
+.chat { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; --k: 1; }
+.chat.big { --k: 1.2; }
+.msg { position: relative; display: flex; align-items: flex-start; gap: calc(14px * var(--k)); --acc: rgba(255,255,255,.55); --acc2: #fff; }
+.at-r .msg { flex-direction: row-reverse; }
+.msg.lv-cap { --acc: #4A9BFF; --acc2: #A9D2FF; } .msg.lv-adm { --acc: #A774FF; --acc2: #DCC6FF; } .msg.lv-gov { --acc: #FF6A3D; --acc2: #FFD27A; } .msg.anchor { --acc: #FF6699; --acc2: #FFC2D6; }
+.msg .avw { position: relative; flex: none; width: calc(64px * var(--k)); height: calc(64px * var(--k)); margin-top: calc(4px * var(--k)); }
+.msg .av { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: #333; box-shadow: 0 4px 14px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.55); }
+.msg.guard .av, .msg.anchor .av { box-shadow: 0 4px 14px rgba(0,0,0,.4), 0 0 0 2.5px var(--acc); }
+.msg.framed .av { box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.msg .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.msg .fr { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
+.msg .g { position: relative; min-width: 0; max-width: calc(100% - 78px * var(--k)); padding: calc(10px * var(--k)) calc(20px * var(--k)) calc(12px * var(--k)); color: #fff; border-radius: calc(8px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k));
+  background: linear-gradient(135deg, rgba(255,255,255,.15), rgba(255,255,255,.05) 45%, rgba(255,255,255,.02)), rgba(16,18,30,.5); -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.16), 0 16px 36px -16px rgba(0,0,0,.55); }
+.at-r .msg .g { border-radius: calc(26px * var(--k)) calc(8px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k)); }
+.msg .g::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px; pointer-events: none; background: linear-gradient(140deg, rgba(255,255,255,.7), rgba(255,255,255,.12) 30%, rgba(255,255,255,.04) 60%, color-mix(in srgb, var(--acc) 55%, transparent)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.msg.guard .g::before, .msg.anchor .g::before { padding: 2px; background: linear-gradient(140deg, color-mix(in srgb, var(--acc2) 90%, transparent), color-mix(in srgb, var(--acc) 40%, transparent) 35%, rgba(255,255,255,.06) 65%, color-mix(in srgb, var(--acc) 85%, transparent)); }
+.msg .who { display: flex; align-items: center; gap: calc(7px * var(--k)); min-width: 0; height: calc(30px * var(--k)); }
+.at-r .msg .who { flex-direction: row-reverse; }
+.msg .nm { min-width: 0; font-size: calc(22px * var(--k)); font-weight: 600; color: rgba(255,255,255,.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg.guard .nm, .msg.anchor .nm { color: var(--acc2); font-weight: 700; }
+.msg .badge { flex: none; width: calc(30px * var(--k)); height: calc(30px * var(--k)); object-fit: contain; }
+.msg .fang { flex: none; display: inline-grid; place-items: center; width: calc(24px * var(--k)); height: calc(24px * var(--k)); border-radius: 50%; border: calc(2px * var(--k)) solid #F39A3D; color: #F39A3D; font-size: calc(14px * var(--k)); font-weight: 700; font-style: normal; line-height: 1; background: rgba(0,0,0,.25); }
+.msg .zb { flex: none; height: calc(26px * var(--k)); padding: 0 calc(10px * var(--k)); border-radius: calc(13px * var(--k)); display: inline-flex; align-items: center; background: #FF6699; color: #fff; font-size: calc(16px * var(--k)); font-weight: 700; }
+.msg .honor { flex: none; height: calc(22px * var(--k)); width: auto; }
+.msg .medal { flex: none; display: inline-flex; align-items: stretch; height: calc(26px * var(--k)); border-radius: calc(6px * var(--k)); overflow: hidden; font-size: calc(15px * var(--k)); font-weight: 600; line-height: 1; box-shadow: inset 0 0 0 1.5px var(--mb); }
+.msg .medal .mn { display: inline-flex; align-items: center; padding: 0 calc(7px * var(--k)); background: var(--mbg); color: #fff; }
+.msg .medal .ml { display: inline-flex; align-items: center; justify-content: center; min-width: calc(26px * var(--k)); padding: 0 calc(5px * var(--k)); background: rgba(255,255,255,.92); color: var(--mlv); font-weight: 700; }
+.msg .tx { margin-top: calc(4px * var(--k)); font-size: calc(29px * var(--k)); line-height: 1.38; font-weight: 500; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.msg .tx .em { height: 1.3em; width: auto; vertical-align: -0.3em; }
+</style>
+</head>
+<body>
+%%SPRITE%%
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="n-bubbles" viewBox="0 0 24 24"><path d="M4 5.5h11a1.5 1.5 0 011.5 1.5v6a1.5 1.5 0 01-1.5 1.5H9l-3.5 3v-3H4A1.5 1.5 0 012.5 13V7A1.5 1.5 0 014 5.5z"/><path d="M19 9h1a1.5 1.5 0 011.5 1.5V16a1.5 1.5 0 01-1.5 1.5h-1v2.5l-3-2.5h-4"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img src="assets/logo.svg" width="32" height="32" alt=""><span><div class="brand-name">星临</div><div class="brand-sub">STARFALL</div></span></div>
+    <div>
+      <div class="nav-label">工作台</div>
+      <nav class="nav" aria-label="主导航">
+        <a href="#"><svg class="i"><use href="#i-grid"/></svg>总览</a>
+        <a href="#"><svg class="i"><use href="#i-wand"/></svg>触发规则</a>
+        <a href="#"><svg class="i"><use href="#i-image"/></svg>素材库</a>
+        <a href="#"><svg class="i"><use href="#i-list"/></svg>事件记录</a>
+        <a href="#" aria-current="page"><svg class="i"><use href="#i-screen"/></svg>直播软件输出</a>
+      </nav>
+    </div>
+    <div>
+      <div class="nav-label">即将推出</div>
+      <nav class="nav"><a class="disabled" href="#"><svg class="i"><use href="#i-chart"/></svg>数据统计<span class="soon">第二期</span></a></nav>
+    </div>
+    <div>
+      <div class="nav-label">其他</div>
+      <nav class="nav">
+        <a href="#"><svg class="i"><use href="#i-demo"/></svg>特效页演示<svg class="i"><use href="#i-ext"/></svg></a>
+        <a href="#"><svg class="i"><use href="#i-gear"/></svg>设置</a>
+      </nav>
+    </div>
+    <div class="side-foot"><a class="acct" href="#"><span class="avatar" style="background:#2BB5A0">星</span><span class="acct-meta"><b>星临小助手</b><span>登录有效 · 剩余 171 天</span></span></a></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb">直播间 <b class="num">10086000</b></div>
+      <span class="live ok"><i></i>已连接</span>
+      <span class="livestate on"><i></i>直播中 · 2 小时 14 分</span>
+      <button class="search"><svg class="i"><use href="#i-search"/></svg>搜索或执行命令<span class="kbd">Ctrl K</span></button>
+      <button class="pausebtn"><svg class="i"><use href="#i-pause"/></svg><span>暂停所有特效</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="切换亮色 / 暗色"><svg class="i theme-light-only"><use href="#i-moon"/></svg><svg class="i theme-dark-only"><use href="#i-sun"/></svg></button>
+      <button class="icon-btn"><svg class="i"><use href="#i-logout"/></svg></button>
+    </header>
+
+    <section class="page">
+      <div class="page-head"><div><h1>直播软件输出</h1><p>把特效页和弹幕列表加到直播软件里。每个输出对应直播软件里的一个画面，比如竖屏直播、横屏录播。</p></div></div>
+
+      <div class="outbar" role="tablist">
+        <button class="otab" role="tab" aria-selected="true" data-out="p"><span class="dot"></span>竖屏直播<span class="res">1080×1920</span></button>
+        <button class="otab" role="tab" aria-selected="false" data-out="l"><span class="dot off"></span>横屏录播<span class="res">1920×1080</span></button>
+        <button class="otab add"><svg class="i"><use href="#i-plus"/></svg>新建输出</button>
+        <div class="omore"><button class="linkish">改名</button><button class="linkish" style="color: var(--t3)">删除这个输出</button></div>
+      </div>
+
+      <div class="o2">
+        <div class="o2-col">
+          <!-- ① 加到直播软件 -->
+          <div class="card">
+            <div class="card-h"><h2>加到直播软件</h2>
+              <span class="aside"><span class="seg" id="app"><button aria-pressed="true" data-v="livehime">B站直播姬</button><button aria-pressed="false" data-v="obs">OBS</button></span></span>
+            </div>
+
+            <div class="src" id="srcFx">
+              <div class="src-h">
+                <span class="src-ic fx"><svg class="i"><use href="#i-spark"/></svg></span>
+                <span class="src-t"><b>特效页</b><span>进场、礼物、上舰、弹幕回应的特效 · 铺满画面，放在最上层</span></span>
+                <span class="right"><span class="live"><i></i>在线 · 直播姬</span></span>
+              </div>
+              <div class="src-url">
+                <input class="inp" readonly value="https://starfall.example.com/overlay/?output=1&key=••••••••••" aria-label="特效页地址">
+                <button class="btn primary"><svg class="i"><use href="#i-copy"/></svg>复制地址</button>
+                <button class="btn ic" title="显示密钥"><svg class="i"><use href="#i-eye"/></svg></button>
+              </div>
+              <div class="src-f">
+                <span class="wh2">宽高填 <code class="fxwh">1080 × 1920</code></span>
+                <span class="caps"><span class="ok">✓ 透明视频</span><span class="ok">✓ 毛玻璃</span><span class="ok">✓ 声音</span></span>
+                <span class="links"><a class="linkish" href="#">在浏览器里查看</a><button class="linkish" style="color: var(--t3)">重置密钥</button></span>
+              </div>
+            </div>
+
+            <div class="src" id="srcDm">
+              <div class="src-h">
+                <span class="src-ic dm"><svg class="i"><use href="#n-bubbles"/></svg></span>
+                <span class="src-t"><b>弹幕列表 <span class="new">新</span></b><span>所有人的弹幕排成一列，最多 8 条 · 拖到画面左边或右边</span></span>
+                <span class="right"><span class="live off" id="dmLive"><i></i>不在线</span><button class="switch" role="switch" aria-checked="true" id="dmOn" aria-label="启用弹幕列表"></button></span>
+              </div>
+              <div class="src-url">
+                <input class="inp" readonly value="https://starfall.example.com/overlay/chat/?output=1&key=••••••••••" aria-label="弹幕列表地址">
+                <button class="btn primary"><svg class="i"><use href="#i-copy"/></svg>复制地址</button>
+                <button class="btn ic" title="显示密钥"><svg class="i"><use href="#i-eye"/></svg></button>
+              </div>
+              <div class="src-f">
+                <span class="wh2">宽高填 <code class="dmwh">600 × 900</code></span>
+                <span>高一点能放满 8 条，矮了就少显示几条</span>
+                <span class="links"><a class="linkish" href="#">在浏览器里查看</a></span>
+              </div>
+            </div>
+
+            <details class="howto" id="howto">
+              <summary><svg class="i"><use href="#i-chev"/></svg><span id="howtoT">在 B站直播姬中添加</span><span class="aside">第一次用时自动展开 · 菜单名称以实际版本为准</span></summary>
+              <ol class="steps" id="steps"></ol>
+            </details>
+          </div>
+
+          <!-- ② 特效页设置 -->
+          <div class="card">
+            <div class="card-h"><h2>特效页设置</h2><span class="aside">改了马上生效，不用刷新直播软件</span></div>
+            <div class="srows">
+              <div class="srow"><span class="lb">画布方向</span>
+                <div class="ctl"><div class="line"><span class="seg" id="orient"><button aria-pressed="true" data-v="p"><span class="shp" style="width:9px;height:14px"></span>竖屏</button><button aria-pressed="false" data-v="l"><span class="shp" style="width:15px;height:9px"></span>横屏</button></span></div></div>
+              </div>
+              <div class="srow"><span class="lb">分辨率<small>和直播软件里的宽高一致</small></span>
+                <div class="ctl">
+                  <div class="line"><span class="presets" id="presets"></span></div>
+                  <div class="line"><span class="wh3"><input class="inp" id="w" value="1080" aria-label="宽"><span>×</span><input class="inp" id="h" value="1920" aria-label="高"></span><span class="hint" id="ratio">比例 9:16</span></div>
+                </div>
+              </div>
+              <div class="srow" id="safeRow"><span class="lb">竖屏安全区<small>特效自动避开</small></span>
+                <div class="ctl">
+                  <div class="slider-row"><label for="st">顶部</label><input id="st" type="range" min="0" max="25" value="12"><output>12%</output></div>
+                  <div class="slider-row"><label for="sb">底部</label><input id="sb" type="range" min="0" max="45" value="40"><output>40%</output></div>
+                  <span class="hint">B站手机端竖屏直播时，顶部是主播信息，底部是弹幕和礼物栏。默认按实测：顶部 12%、底部 40%。</span>
+                </div>
+              </div>
+              <div class="srow"><span class="lb">特效大小</span>
+                <div class="ctl">
+                  <div class="slider-row"><label for="sc">整体缩放</label><input id="sc" type="range" min="60" max="160" step="5" value="100"><output>100%</output></div>
+                  <div class="slider-row"><label for="mx">左右边距</label><input id="mx" type="range" min="0" max="15" value="9"><output>9%</output></div>
+                </div>
+              </div>
+              <div class="srow"><span class="lb">兼容模式</span>
+                <div class="ctl"><div class="line"><select class="sel"><option>自动</option><option>始终开启</option><option>关闭</option></select><span class="hint">关掉毛玻璃、粒子等较重的效果。电脑性能一般或直播软件版本旧时用。</span></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ③ 弹幕列表设置 -->
+          <div class="card" id="dmCard">
+            <div class="card-h"><h2>弹幕列表设置</h2><span class="aside">改了马上生效</span></div>
+            <div class="srows">
+              <div class="srow"><span class="lb">对齐</span>
+                <div class="ctl"><div class="line"><span class="seg" id="side"><button aria-pressed="true" data-v="l">靠左</button><button aria-pressed="false" data-v="r">靠右</button></span><span class="hint">放在画面左边选靠左，右边选靠右（头像跟着换边）</span></div></div>
+              </div>
+              <div class="srow"><span class="lb">字号</span>
+                <div class="ctl"><div class="line"><span class="seg" id="size"><button aria-pressed="true" data-v="std">标准</button><button aria-pressed="false" data-v="big">大</button></span></div></div>
+              </div>
+              <div class="srow"><span class="lb">粉丝牌</span>
+                <div class="ctl"><div class="line"><span class="seg" id="medal"><button aria-pressed="true" data-v="own">只显示本直播间的</button><button aria-pressed="false" data-v="all">戴什么显示什么</button></span></div>
+                  <span class="hint" id="medalHint">戴别的直播间粉丝牌的观众，列表里不显示牌子</span></div>
+              </div>
+              <div class="srow"><span class="lb">条数</span>
+                <div class="ctl"><span class="hint" style="color: var(--t2)">最多 8 条。放不下时从最上面开始少显示几条。</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧：实时预览 -->
+        <div class="o2-prev">
+          <div class="card">
+            <div class="ptabs" role="tablist">
+              <button role="tab" aria-selected="true" data-p="fx">特效页</button>
+              <button role="tab" aria-selected="false" data-p="dm">弹幕列表</button>
+              <span class="aside" id="pAside">1080 × 1920 · 只在这里播放</span>
+            </div>
+            <div class="pv" id="pv"></div>
+            <div class="pfoot" id="pfoot"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const st = { out: 'p', app: 'livehime', orient: 'p', w: 1080, h: 1920, safeT: 12, safeB: 40, dmOn: true, side: 'l', size: 'std', medal: 'own', ptab: 'fx', alpha: false };
+const PRESETS = { p: [[1080, 1920, '推荐'], [720, 1280, '省性能'], [1440, 2560, '2K']], l: [[1920, 1080, '推荐'], [1280, 720, '省性能'], [2560, 1440, '2K']] };
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+const seg = (id, key, after) => { for (const b of $$(`#${id} button`)) b.onclick = () => { st[key] = b.dataset.v; after?.(); render(); }; };
+
+function steps() {
+  const fx = '<span class="tagsrc fx">特效页</span>', dm = '<span class="tagsrc dm">弹幕列表</span>';
+  const W = st.w, H = st.h, portrait = st.orient === 'p';
+  if (st.app === 'obs') return [
+    portrait ? `竖屏推流时，OBS 的 <b>设置 → 视频 → 基础分辨率</b> 也要设成 <code>${W}x${H}</code>。` : null,
+    `${fx}在 <b>来源</b> 里点 <b>+</b> → <b>浏览器</b>，URL 粘贴特效页地址，宽 <code>${W}</code> 高 <code>${H}</code>，勾选 <b>通过 OBS 控制音频</b>。`,
+    `${fx}取消勾选 <b>不可见时关闭源</b> 和 <b>场景变为活动状态时刷新浏览器</b>，拖到来源列表 <b>最上方</b>。`,
+    st.dmOn ? `${dm}再加一个 <b>浏览器</b> 来源，URL 粘贴弹幕列表地址，宽 <code>600</code> 高 <code>900</code>，拖到画面左边或右边。` : null,
+    `第一次用可以先打开 <a class="linkish" href="#">兼容性自检页</a>，确认特效和声音都正常。`,
+  ].filter(Boolean);
+  return [
+    portrait ? '在直播姬里切换到 <b>竖屏直播</b> 模式。' : null,
+    `${fx}点 <b>添加素材 → 浏览器</b>，粘贴特效页地址，宽高填 <code>${W}</code> × <code>${H}</code>，拖动 <b>铺满画面</b>，放到 <b>图层最上方</b>。`,
+    st.dmOn ? `${dm}再添加一个 <b>浏览器</b> 素材，粘贴弹幕列表地址，宽高填 <code>600</code> × <code>900</code>，拖到画面左边或右边。想改大小就改宽高数字或下面的「字号」，不要拉伸变形。` : null,
+    `第一次用可以先用浏览器素材打开 <a class="linkish" href="#">兼容性自检页</a>，确认特效和声音都正常。`,
+  ].filter(Boolean);
+}
+
+function render() {
+  for (const b of $$('.seg button')) { const k = { app: 'app', orient: 'orient', side: 'side', size: 'size', medal: 'medal' }[b.parentElement.id]; if (k) b.setAttribute('aria-pressed', String(st[k] === b.dataset.v)); }
+  for (const b of $$('.otab[data-out]')) b.setAttribute('aria-selected', String(b.dataset.out === st.out));
+  for (const b of $$('.ptabs button')) b.setAttribute('aria-selected', String(b.dataset.p === st.ptab));
+  $('#presets').innerHTML = PRESETS[st.orient].map(([w, h, t]) => `<button aria-pressed="${w === st.w && h === st.h}" data-w="${w}" data-h="${h}">${w}×${h}<small>${t}</small></button>`).join('');
+  for (const b of $$('#presets button')) b.onclick = () => { st.w = +b.dataset.w; st.h = +b.dataset.h; render(); };
+  $('#w').value = st.w; $('#h').value = st.h;
+  const g = gcd(st.w, st.h); $('#ratio').textContent = `比例 ${st.w / g}:${st.h / g}`;
+  $('#safeRow').style.display = st.orient === 'p' ? '' : 'none';
+  $('.fxwh').textContent = `${st.w} × ${st.h}`;
+  $('#howtoT').textContent = st.app === 'obs' ? '在 OBS 中添加' : '在 B站直播姬中添加';
+  $('#steps').innerHTML = steps().map((s) => `<li><span>${s}</span></li>`).join('');
+  $('#srcDm').classList.toggle('off', !st.dmOn);
+  $('#dmOn').setAttribute('aria-checked', String(st.dmOn));
+  $('#dmLive').innerHTML = st.dmOn ? '<i></i>不在线' : '<i></i>已关闭';
+  $('#dmCard').style.opacity = st.dmOn ? '' : '.5';
+  $('#medalHint').textContent = st.medal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B 站直播间里一样，戴哪个直播间的牌子就显示哪个';
+  renderPreview();
+}
+
+// ---------- 右侧预览 ----------
+let pvKey = '';
+function renderPreview() {
+  const key = [st.ptab, st.orient, st.w, st.h, st.safeT, st.safeB, st.alpha, st.side, st.size, st.medal, st.dmOn].join('|');
+  if (key === pvKey) return; pvKey = key;
+  const pv = $('#pv'), foot = $('#pfoot');
+  if (st.ptab === 'fx') {
+    $('#pAside').textContent = `${st.w} × ${st.h} · 只在这里播放`;
+    const W = st.orient === 'p' ? 300 : 420, H = Math.round(W * st.h / st.w);
+    pv.innerHTML = `<div class="pstage${st.alpha ? ' alpha' : ''}${st.orient === 'p' ? '' : ' nosafe'}" style="width:${W}px;height:${H}px"><span class="res">${st.w}×${st.h}</span>
+      <div class="sb t" style="height:${st.safeT}%">顶部信息栏</div><div class="sb b" style="height:${st.safeB}%">底部弹幕区</div><div class="fxpill" id="fxp"><i></i><span>欢迎 <b>长夜未央</b> 进入直播间</span></div></div>`;
+    foot.innerHTML = `${[['gov', '总督', 'var(--gov)'], ['cap', '舰长', 'var(--cap)'], ['fan', '粉丝牌', '#C770A4'], ['nor', '普通', 'var(--nor)']].map(([k, n, c]) => `<button class="btn" data-t="${c}"><i style="background:${c}"></i>${n}</button>`).join('')}<button class="btn" id="alpha" style="margin-left:auto">${st.alpha ? '直播画面背景' : '透明背景'}</button>`;
+    for (const b of $$('#pfoot [data-t]')) b.onclick = () => { const p = $('#fxp'); p.style.setProperty('--c', b.dataset.t); p.animate([{ opacity: 0, transform: 'translate(-50%,-30%) scale(.9)' }, { opacity: 1, transform: 'translate(-50%,-50%)', offset: .15 }, { opacity: 1, offset: .85 }, { opacity: 0, transform: 'translate(-50%,-60%)' }], { duration: 2400, fill: 'both' }); };
+    $('#alpha').onclick = () => { st.alpha = !st.alpha; render(); };
+  } else {
+    $('#pAside').textContent = st.dmOn ? '600 × 900 · 实时弹幕' : '弹幕列表已关闭';
+    const k = 300 / 600;
+    pv.innerHTML = `<div class="pstage${st.alpha ? ' alpha' : ''}" style="width:${600 * k}px;height:${900 * k}px"><div class="chatbox at-${st.side}" style="transform:scale(${k})"><div class="chat${st.size === 'big' ? ' big' : ''}" id="chat"></div></div></div>`;
+    foot.innerHTML = `<button class="btn" id="t1"><i style="background:var(--nor)"></i>测试弹幕</button><button class="btn" id="t2"><i style="background:var(--gov)"></i>大航海发言</button><button class="btn" id="alpha" style="margin-left:auto">${st.alpha ? '直播画面背景' : '透明背景'}</button>`;
+    $('#alpha').onclick = () => { st.alpha = !st.alpha; render(); };
+    $('#t1').onclick = () => add(PEOPLE[3], '这是一条测试弹幕[比心]');
+    $('#t2').onclick = () => add(PEOPLE[7], '晚上好，来陪主播了[鼓掌]');
+    for (const [i, t] of SEED) add(PEOPLE[i], t, true);
+  }
+}
+
+// ---------- 弹幕列表（编的观众） ----------
+const FRAMES = { gov: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', adm: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', cap: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const BADGES = { gov: `${BADGE}governor-DpDXKEdA.png`, adm: `${BADGE}supervisor-u43ElIjU.png`, cap: `${BADGE}captain-Bjw5Byb5.png` };
+const HONOR = { 12: 'f5f0cb238bfa8a4481fc67ee7e99c32e3b62ce83', 18: '256d22fcb8375155a29b01709960bfa74124ae1b', 25: '7e3c647c9b6abea76703f43fe89f0dd729a63954', 33: '8d0656d3a7a74480b2faf6c9488794e54d0da026', 68: 'ce6a2ca64b8cd945d14b49807124b7a8a4ea946d' };
+const EMOTS = { '[dog]': '4428c84e694fbf4e0ef6c06e958d9352c3582740', '[比心]': '4e029593562283f00d39b99e0557878c4199c71d', '[花]': '7dd2ef03e13998575e4d8a803c6e12909f94e72b', '[鼓掌]': 'd581d0bc30c8f9712b46ec02303579840c72c42d', '[吃瓜]': 'ffb53c252b085d042173379ac724694ce3196194' };
+function face(seed) {
+  const hues = [[18, 340], [200, 250], [150, 190], [35, 12], [270, 310], [90, 140], [320, 20], [220, 180]];
+  const [a, b] = hues[seed % hues.length];
+  return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${a} 85% 78%)"/><stop offset="1" stop-color="hsl(${b} 65% 55%)"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="41" r="18" fill="#fff" opacity=".92"/><path d="M18 94c4-20 18-30 32-30s28 10 32 30z" fill="#fff" opacity=".92"/></svg>`);
+}
+// medal: [名字, 等级, 是不是本直播间]
+const PEOPLE = [
+  { name: '路过的猫', honor: 12 },
+  { name: '晚风与你', medal: ['星临', 8, true], honor: 12 },
+  { name: '青柠汽水', mod: true, medal: ['星临', 17, true], honor: 25 },
+  { name: '今天也要早睡', medal: ['小鹿', 23, false], honor: 18 },
+  { name: '一只小土豆', medal: ['阿梓', 12, false] },
+  { name: '星河漫步', guard: 'cap', medal: ['星临', 27, true], honor: 33 },
+  { name: '不吃香菜的人', medal: ['星临', 31, true], honor: 25 },
+  { name: '长夜未央', guard: 'gov', medal: ['星临', 44, true], honor: 68, mod: true },
+];
+PEOPLE.forEach((p, i) => (p.face = face(i)));
+const SEED = [[0, '晚上好呀'], [4, '打卡[花]'], [5, '来了来了[dog]'], [3, '主播今天好好看[比心]'], [6, '前排[吃瓜]'], [7, '今天的歌单好棒[鼓掌]']];
+function medalColors(level, guard) {
+  const t = level <= 10 ? ['#5762A7', null] : level <= 20 ? ['#C770A4', null] : level <= 30 ? ['#3FB4F6', '#5FC7F4'] : level <= 40 ? ['#4C7DFF', '#58A1F8'] : level <= 50 ? ['#A773F1', '#D47AFF'] : ['#EC4F6E', '#F18087'];
+  return { bg: t[0], border: guard && t[1] ? t[1] : t[0], lv: t[0] };
+}
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const NR = 'referrerpolicy="no-referrer" onerror="this.remove()"';
+function add(p, text, quiet) {
+  const chat = $('#chat'); if (!chat) return;
+  const el = document.createElement('div');
+  el.className = ['msg', p.guard ? `guard lv-${p.guard} framed` : ''].join(' ');
+  let who = '';
+  if (p.guard) who += `<img class="badge" src="${BADGES[p.guard]}" alt="" ${NR}>`;
+  if (p.mod) who += '<i class="fang">房</i>';
+  if (p.medal && (st.medal === 'all' || p.medal[2])) { const c = medalColors(p.medal[1], Boolean(p.guard)); who += `<span class="medal" style="--mbg:${c.bg};--mb:${c.border};--mlv:${c.lv}"><span class="mn">${p.medal[0]}</span><span class="ml">${p.medal[1]}</span></span>`; }
+  if (p.honor && HONOR[p.honor]) who += `<img class="honor" src="https://i0.hdslb.com/bfs/live/${HONOR[p.honor]}.png" alt="" ${NR}>`;
+  who += `<span class="nm">${esc(p.name)}</span>`;
+  const tx = esc(text).replace(/\[[^\]]{1,12}\]/g, (m) => (EMOTS[m] ? `<img class="em" src="https://i0.hdslb.com/bfs/live/${EMOTS[m]}.png" alt="${m}" ${NR}>` : m));
+  el.innerHTML = `<div class="avw"><div class="av"><img src="${p.face}" alt=""></div>${p.guard ? `<img class="fr" src="${FRAMES[p.guard]}" alt="" ${NR}>` : ''}</div><div class="g"><div class="who">${who}</div><div class="tx">${tx}</div></div>`;
+  chat.append(el);
+  while (chat.children.length > 8 || (chat.offsetHeight > 900 && chat.children.length > 1)) chat.firstElementChild.remove();
+  if (!quiet) for (const e of [el.querySelector('.avw'), el.querySelector('.g')]) e.animate([{ opacity: 0, transform: 'translateY(16px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: 'cubic-bezier(.2,.9,.3,1)' });
+}
+
+// ---------- 交互 ----------
+seg('app', 'app'); seg('orient', 'orient', () => { [st.w, st.h] = PRESETS[st.orient][0]; });
+seg('side', 'side'); seg('size', 'size'); seg('medal', 'medal');
+for (const b of $$('.otab[data-out]')) b.onclick = () => { st.out = b.dataset.out; st.orient = st.out; [st.w, st.h] = PRESETS[st.orient][0]; st.app = st.out === 'l' ? 'obs' : 'livehime'; render(); };
+for (const b of $$('.ptabs button')) b.onclick = () => { st.ptab = b.dataset.p; render(); };
+$('#dmOn').onclick = () => { st.dmOn = !st.dmOn; render(); };
+for (const [id, key] of [['st', 'safeT'], ['sb', 'safeB']]) $(`#${id}`).oninput = (e) => { st[key] = +e.target.value; e.target.nextElementSibling.textContent = `${st[key]}%`; render(); };
+for (const id of ['sc', 'mx']) $(`#${id}`).oninput = (e) => (e.target.nextElementSibling.textContent = `${e.target.value}%`);
+$('#themeBtn').onclick = () => (document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+render();
+</script>
+</body>
+</html>

@@ -21,7 +21,7 @@ const LIVE_SINCE = now - (2 * 3600 + 14 * 60) * 1000;
 type Person = { uid: number; name: string; guard?: 0 | 1 | 2 | 3; honor?: number; medal?: number; mod?: boolean; score?: number };
 const P: Person[] = [
   { uid: 101, name: '长夜未央', guard: 1, honor: 68, medal: 44, score: 52000 },
-  { uid: 102, name: '月下独酌', guard: 2, honor: 53, medal: 38, score: 21000 },
+  { uid: 102, name: '月下独酌', guard: 2, mod: true, honor: 53, medal: 38, score: 21000 },
   { uid: 103, name: '白开水不加糖', honor: 61, medal: 22, score: 8800 },
   { uid: 104, name: '听雨的鲸', guard: 3, honor: 44, medal: 31, score: 3180 },
   { uid: 105, name: '半糖主义', guard: 3, honor: 37, medal: 27, score: 1330 },
@@ -53,7 +53,7 @@ const ctx = createContext(config, {
   },
   liveDeps: {
     getRoomInit: async () => ({ roomId: ROOM, shortId: 0, anchorUid: ANCHOR, liveStatus: 1, isPortrait: true, liveSince: LIVE_SINCE }),
-    getRoomAdmins: async () => [{ uid: 109, name: '青柠汽水', face: '' }],
+    getRoomAdmins: async () => [{ uid: 109, name: '青柠汽水', face: '' }, { uid: 102, name: '月下独酌', face: '' }],
     getDanmuInfo: async () => ({ token: 'demo', hosts: [{ host: '127.0.0.1', wssPort: 1 }] }),
     // 假的弹幕连接：一连上就推几条直播间数据（看过、高能榜、点赞、粉丝）
     createClient: (o) => {

@@ -3,6 +3,8 @@ import { describe as describeEvent, statusCls } from './events.ts';
 import { bigNum, clock, dateTime, fileSize, gcd, hms, seconds, setTimeZone, today, when } from './format.ts';
 import { identityOf, medalColors } from './identity.ts';
 import { placeWarnings, scaleRect } from './place.ts';
+import { sampleFor, whoText } from './danmu-who.ts';
+import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import type { EventDto, Viewer } from './types.ts';
 
 const v = (p: Partial<Viewer> = {}): Viewer => ({ uid: 1, name: '小星', guard: 0, isMod: false, mystery: false, ...p });
@@ -29,6 +31,8 @@ describe('事件说明', () => {
     expect(describeEvent(e({ kind: 'danmu', payload: { text: '晚上好' } }))).toBe('「晚上好」');
     expect(describeEvent(e({ kind: 'gift', payload: { giftName: '小花花', count: 10 } }))).toBe('送出 小花花 ×10');
     expect(describeEvent(e({ kind: 'guard', payload: { level: 3, months: 1, op: 'open' } }))).toBe('开通舰长 1 个月');
+    expect(describeEvent(e({ kind: 'guard', payload: { level: 3, months: 1, op: 'renew', price: 168_000 } }))).toBe('续费舰长 1 个月 · 168 元');
+    expect(describeEvent(e({ kind: 'sc', payload: { text: '晚上好', price: 30 } }))).toBe('醒目留言 30 元「晚上好」');
   });
   it('状态颜色', () => {
     expect(statusCls('played')).toBe('ok');
@@ -98,5 +102,25 @@ describe('素材位置和大小', () => {
     expect(placeWarnings(top, stage, safe, 'top', 0, 0, 100).into).toEqual([]);
     expect(placeWarnings(top, stage, safe, 'top', 0, 0, 150).into).toEqual(['底部弹幕区']);
     expect(placeWarnings(top, stage, safe, 'top', 60, 0, 100).out).toBe(true);
+  });
+});
+
+describe('弹幕规则：谁发的才算', () => {
+  const none = { ...DANMU_WHO_ALL, all: false };
+  it('一句话说明', () => {
+    expect(whoText(DANMU_WHO_ALL)).toBe('所有人');
+    expect(whoText({ ...none, anchor: true, mod: true })).toBe('主播、房管');
+    expect(whoText(danmuWhoFromOld('guard'))).toBe('大航海');
+    expect(whoText({ ...none, guards: [2, 1] })).toBe('总督、提督');
+    expect(whoText({ ...none, fanMin: 20 })).toBe('粉丝牌 20 级以上');
+    expect(whoText(danmuWhoFromOld('fan'))).toBe('房管、大航海、戴本房间粉丝牌');
+    expect(whoText({ ...none, uids: [1, 2] }, [{ uid: 1, name: '道具堡', face: null, guard: 3 }])).toBe('道具堡、2');
+    expect(whoText({ ...none, uids: [1, 2, 3] }, [{ uid: 1, name: '道具堡', face: null, guard: 3 }])).toBe('道具堡 等 3 人');
+    expect(whoText({ ...none, anchor: true, mod: true, guards: [1, 2, 3], uids: [9] })).toBe('主播、房管、大航海 等');
+  });
+  it('预览挑一个能触发的示例观众', () => {
+    expect(sampleFor({ ...none, guards: [1, 3] }).guard).toBe(1);
+    expect(sampleFor({ ...none, mod: true }).isMod).toBe(true);
+    expect(sampleFor({ ...none, fanMin: 30 }).medalLevel).toBe(30);
   });
 });

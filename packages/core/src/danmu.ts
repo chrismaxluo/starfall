@@ -10,21 +10,18 @@ export interface DanmuMatch {
   label: string;
 }
 
-/** 发送人是否满足条件 */
+/** 规则里点了这个人的名：勾了「主播」而 TA 是主播，或者 UID 在指定观众里 */
+export function whoNamed(who: DanmuWho, v: Viewer, anchorUid: number): boolean {
+  return (who.anchor && v.uid === anchorUid) || who.uids.includes(v.uid);
+}
+
+/** 发送人是否满足条件（多选，满足任意一项就算） */
 export function whoOk(who: DanmuWho, v: Viewer, anchorUid: number): boolean {
-  switch (who) {
-    case 'all':
-      return true;
-    case 'fan':
-      // 戴本房间粉丝牌；大航海、房管也算（他们一般都戴着牌子，没戴的也不应该被挡掉）
-      return isOwnMedal(v, anchorUid) || v.guard !== 0 || v.isMod;
-    case 'fan10':
-      return isOwnMedal(v, anchorUid) && v.medal!.level >= 10;
-    case 'guard':
-      return v.guard !== 0;
-    case 'mod':
-      return v.isMod;
-  }
+  if (who.all || whoNamed(who, v, anchorUid)) return true;
+  if (who.mod && v.isMod) return true;
+  if (v.guard !== 0 && who.guards.includes(v.guard)) return true;
+  if (who.honorMin != null && (v.honor ?? 0) >= who.honorMin) return true;
+  return who.fanMin !== null && isOwnMedal(v, anchorUid) && v.medal!.level >= who.fanMin;
 }
 
 export function keywordHit(rule: Pick<DanmuRule, 'keywords' | 'mode'>, text: string): boolean {
@@ -36,9 +33,13 @@ export function danmuLabel(rule: Pick<DanmuRule, 'keywords'>): string {
   return `弹幕 · 「${rule.keywords.slice(0, 3).join(' / ')}${rule.keywords.length > 3 ? ' …' : ''}」`;
 }
 
-export function matchDanmu(text: string, viewer: Viewer, rules: readonly DanmuRule[], anchorUid: number): DanmuMatch | null {
+/**
+ * onlyNamed：发送人是主播本人或登录的账号（默认不触发），这时只看点了 TA 名的规则。
+ */
+export function matchDanmu(text: string, viewer: Viewer, rules: readonly DanmuRule[], anchorUid: number, onlyNamed = false): DanmuMatch | null {
   for (const r of rules) {
-    if (!r.enabled || r.effectId === null || !whoOk(r.who, viewer, anchorUid) || !keywordHit(r, text)) continue;
+    if (!r.enabled || r.effectId === null || !keywordHit(r, text)) continue;
+    if (onlyNamed ? !whoNamed(r.who, viewer, anchorUid) : !whoOk(r.who, viewer, anchorUid)) continue;
     return { ruleId: r.id, effectId: r.effectId, globalCdSec: r.globalCdSec, userCdMin: r.userCdMin, label: danmuLabel(r) };
   }
   return null;

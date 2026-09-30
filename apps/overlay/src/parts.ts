@@ -1,5 +1,6 @@
 // 各个特效共用的部件：头像、粉丝牌、身份标签、欢迎语
 import type { PlayItem } from '@starfall/shared';
+import { GUARD_FRAMES } from '@starfall/shared/overlay';
 import { h } from './dom.ts';
 
 type PlayViewer = PlayItem['viewer'];
@@ -27,6 +28,18 @@ export function avatar(v: PlayViewer, size?: number): HTMLElement {
   return el;
 }
 
+/** 大航海观众的头像套上 B 站的头像框（框在头像外面一圈，加载失败就只显示头像） */
+export function withGuardFrame(av: HTMLElement, guard: number): HTMLElement {
+  const url = GUARD_FRAMES[guard as 1 | 2 | 3];
+  if (!url) return av;
+  const img = h('img', { class: 'av-frame' });
+  img.alt = '';
+  img.referrerPolicy = 'no-referrer';
+  img.onerror = () => img.remove();
+  img.src = url;
+  return h('span', { class: 'av-framed' }, av, img);
+}
+
 /** B 站头像用缩略图（原图可能有上千像素，下载和解码都浪费）；按 2 倍像素取，其他地址原样返回 */
 export function thumb(url: string, px: number): string {
   if (!/^https?:\/\/i\d\.hdslb\.com\//.test(url) || url.includes('@')) return url;
@@ -45,6 +58,30 @@ export function medal(v: PlayViewer): HTMLElement | null {
   if (!m || m.level <= 0) return null;
   const c = m.colors ?? fallbackColors(m.level, v.guard !== 0);
   return h('span', { class: 'medal', style: { '--mc': c.bg, '--ml': c.level, '--mb': c.border, '--mt': c.text } }, h('span', {}, m.name), h('b', {}, String(m.level)));
+}
+
+/**
+ * 名字前面放上荣耀等级勋章（和 B 站弹幕里一样放在名字前）：找到特效里的昵称（.name、.nm、宫廷的 .rx-nm），插在它前面。
+ * 没有勋章图（不知道等级、B 站的图读不到）就不放；图加载失败时去掉
+ */
+export function addHonor(root: HTMLElement, v: PlayViewer): void {
+  const url = v.honor?.url;
+  const nm = url ? root.querySelector<HTMLElement>('.name, .nm, .rx-nm') : null;
+  if (!url || !nm) return;
+  const img = h('img', { class: 'honor' });
+  img.alt = '';
+  img.referrerPolicy = 'no-referrer';
+  img.onerror = () => img.remove();
+  img.src = url;
+  // 宫廷的昵称是写出来的动画：勋章跟着昵称一起出现
+  if (nm.classList.contains('rx-nm')) {
+    img.classList.add('rx-f');
+    img.style.setProperty('--d', nm.style.getPropertyValue('--nd') || '0s');
+  }
+  // 勋章和昵称包在一起：昵称单独占一行的样式（晶礼）里勋章也在同一行
+  const pair = h('span', { class: 'honor-nm' });
+  nm.replaceWith(pair);
+  pair.append(img, nm);
 }
 
 /** 把欢迎语按昵称切开：昵称加粗放大，其余部分用小字 */

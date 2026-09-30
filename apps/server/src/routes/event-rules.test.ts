@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import { room } from '../db/schema.ts';
 import { testApp } from '../testing.ts';
 
@@ -12,14 +13,14 @@ const setup = async () => {
   const effectId = (name: string) => t.ctx.effects.list().find((e) => e.name === name)!.id;
   return { ...t, req, effectId };
 };
-const dmRule = (effectId: number, p: object = {}) => ({ keywords: ['生日快乐'], mode: 'contains', who: 'all', effectId, globalCdSec: 30, userCdMin: 10, enabled: true, ...p });
+const dmRule = (effectId: number, p: object = {}) => ({ keywords: ['生日快乐'], mode: 'contains', who: DANMU_WHO_ALL, effectId, globalCdSec: 30, userCdMin: 10, enabled: true, ...p });
 
 describe('弹幕规则接口', () => {
   it('新建、修改（关键词去重去空格）、调整顺序、删除', async () => {
     const t = await setup();
     const a = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('晶语')) })).json();
-    const b = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('门楼'), { keywords: [' 晚安 ', '晚安', '好梦'], who: 'fan' }) })).json();
-    expect(b).toMatchObject({ keywords: ['晚安', '好梦'], who: 'fan' });
+    const b = (await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('门楼'), { keywords: [' 晚安 ', '晚安', '好梦'], who: danmuWhoFromOld('fan') }) })).json();
+    expect(b).toMatchObject({ keywords: ['晚安', '好梦'], who: danmuWhoFromOld('fan') });
     const u = (await t.req({ method: 'PUT', url: `/api/rules/danmu/${a.id}`, payload: { mode: 'exact', enabled: false } })).json();
     expect(u).toMatchObject({ mode: 'exact', enabled: false, keywords: ['生日快乐'] });
     const order = (await t.req({ method: 'PUT', url: '/api/rules/danmu/order', payload: { ids: [b.id, a.id] } })).json();
@@ -35,6 +36,8 @@ describe('弹幕规则接口', () => {
     expect((await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(1, { keywords: [] }) })).statusCode).toBe(400);
     expect((await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(9999) })).json().error.message).toContain('9999');
     expect((await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(1, { who: 'vip' }) })).statusCode).toBe(400);
+    // 一种人都没选
+    expect((await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(1, { who: { ...DANMU_WHO_ALL, all: false } }) })).statusCode).toBe(400);
     expect((await t.req({ method: 'PUT', url: `/api/rules/danmu/${a.id}`, payload: { keywords: [' '] } })).statusCode).toBe(400);
     expect((await t.req({ method: 'PUT', url: '/api/rules/danmu/order', payload: { ids: [a.id, 999] } })).statusCode).toBe(400);
     expect((await t.req({ method: 'PUT', url: '/api/rules/danmu/999', payload: { enabled: false } })).statusCode).toBe(404);

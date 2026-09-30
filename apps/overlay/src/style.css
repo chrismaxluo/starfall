@@ -28,6 +28,9 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 
 .av { border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; flex-shrink: 0; overflow: hidden; }
 .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 大航海头像框：头像的 1.4 倍居中套在外面（GUARD_FRAME_SCALE），不跟着头像裁成圆 */
+.av-framed { position: relative; display: inline-grid; flex-shrink: 0; }
+.av-framed .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
 .medal { display: inline-flex; align-items: stretch; border-radius: 6px; overflow: hidden; color: var(--mt, #fff); border: 1.5px solid var(--mb); background: var(--mc); font-size: 18px; line-height: 26px; white-space: nowrap; }
 .medal span { padding: 0 8px; }
 .medal b { padding: 0 8px; background: var(--ml); font-family: var(--font-mono); font-weight: 600; }
@@ -36,6 +39,9 @@ html, body { margin: 0; height: 100%; background: transparent; color: #EDEDF1; f
 /* 昵称太长时截断加省略号（B 站昵称最长 16 个字；角落样式的宽度有限，超出会被画面边缘切掉） */
 .line .name { display: inline-block; max-width: 11em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 .line .say { font-weight: 400; }
+/* 荣耀等级勋章（B 站的图，36×16，原图是 3 倍大小）：放在昵称前面，高度跟着昵称的字号 */
+.honor-nm { display: inline-flex; align-items: center; flex: none; min-width: 0; max-width: 100%; vertical-align: bottom; }
+.honor { display: inline-block; flex: none; align-self: center; width: auto; height: 24px; margin-right: 8px; vertical-align: middle; }
 .glass {
   background: rgba(14, 15, 24, 0.55);
   backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);

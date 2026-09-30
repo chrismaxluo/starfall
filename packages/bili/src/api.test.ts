@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getAllGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
+import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getAllGifts, getGuardPage, getHonorMedals, getOnlineRank, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
 import { WbiSigner } from './wbi.ts';
 import { BiliApiError, BiliHttp } from './http.ts';
 
@@ -115,6 +115,48 @@ describe('接口字段转换', () => {
     const calls = mockFetch([{ body: { code: 0, data: { list: [{ id: 33647, name: '奇迹城堡', price: 1314000, coin_type: 'gold', img_basic: 'i4' }] } } }]);
     expect(await getAllGifts(new BiliHttp())).toEqual([{ id: 33647, name: '奇迹城堡', price: 1314000, paid: true, icon: 'i4' }]);
     expect(calls[0]).toContain('/giftPanel/giftConfig?platform=pc');
+  });
+
+  it('荣耀等级勋章：内容是一段 JSON 文本；只要 B 站图床的地址，不带登录信息', async () => {
+    const content = JSON.stringify({
+      wealth_level_medal: [
+        { id: 1, animated: 0, url: 'https://i0.hdslb.com/bfs/live/a.png', h: 16, w: 36 },
+        { id: 80, animated: 1, url: 'https://i0.hdslb.com/bfs/live/b.webp', h: 16, w: 36 },
+        { id: 2, animated: 0, url: 'https://evil.example/c.png' },
+        { id: 0, url: 'https://i0.hdslb.com/bfs/live/d.png' },
+      ],
+      danmu_bubble_bg: [],
+    });
+    const calls = mockFetch([{ body: { code: 0, data: { md5: 'x', content } } }, { body: { code: 0, data: { content: '不是 JSON' } } }]);
+    expect(await getHonorMedals(new BiliHttp({ SESSDATA: 'secret' }))).toEqual([
+      { level: 1, url: 'https://i0.hdslb.com/bfs/live/a.png', animated: false },
+      { level: 80, url: 'https://i0.hdslb.com/bfs/live/b.webp', animated: true },
+    ]);
+    expect(calls[0]).toContain('/xlive/general-interface/v1/content/get?key=wealth');
+    expect(calls[0]).not.toContain('secret');
+    await expect(getHonorMedals(new BiliHttp())).rejects.toMatchObject({ name: 'BiliApiError' });
+  });
+
+  it('高能榜：公开接口不带登录信息；大航海、荣耀等级、粉丝牌颜色', async () => {
+    const uinfo = { uid: 7, base: { name: '弦瑟', face: 'f7', is_mystery: false }, medal: { name: '桥耳朵', level: 35, ruid: 33623955, v2_medal_color_start: '#A', v2_medal_color_border: '#B', v2_medal_color_text: '#C', v2_medal_color_level: '#D' }, wealth: null, guard: null };
+    const calls = mockFetch([{ body: { code: 0, data: { onlineNum: 70, OnlineRankItem: [{ userRank: 1, uid: 7, name: '弦瑟', face: 'f7', score: 64, guard_level: 3, wealth_level: 29, is_mystery: false, uinfo }, { userRank: 2, uid: 0 }] } } }]);
+    const r = await getOnlineRank(new BiliHttp({ SESSDATA: 'secret' }), 30000, 20000, 2, 50);
+    expect(r).toEqual({ count: 70, items: [{ uid: 7, name: '弦瑟', face: 'f7', guard: 3, honor: 29, medal: { name: '桥耳朵', level: 35, anchorUid: 33623955, colors: { bg: '#A', level: '#D', border: '#B', text: '#C' } }, mystery: false, rank: 1, score: 64 }] });
+    expect(calls[0]).toContain('getOnlineGoldRank?ruid=20000&roomId=30000&page=2&pageSize=50');
+    expect(calls[0]).not.toContain('secret');
+  });
+
+  it('大航海榜：第 1 页带前 3 名；公开接口不带登录信息', async () => {
+    const item = (uid: number, level: number) => ({ uinfo: { uid, base: { name: `u${uid}`, face: '' }, guard: { level }, wealth: { level: 12 } } });
+    const calls = mockFetch([
+      { body: { code: 0, data: { info: { num: 33, page: 2 }, top3: [item(1, 1)], list: [item(2, 3)] } } },
+      { body: { code: 0, data: { info: { num: 33, page: 2 }, top3: [item(1, 1)], list: [item(3, 2)] } } },
+    ]);
+    const p1 = await getGuardPage(new BiliHttp({ SESSDATA: 'secret' }), 30000, 20000, 1);
+    expect(p1).toMatchObject({ total: 33, pages: 2, items: [{ uid: 1, guard: 1, honor: 12 }, { uid: 2, guard: 3 }] });
+    expect((await getGuardPage(new BiliHttp(), 30000, 20000, 2)).items.map((x) => x.uid)).toEqual([3]);
+    expect(calls[0]).toContain('guardTab/topListNew?roomid=30000&page=1&ruid=20000&page_size=30');
+    expect(calls[0]).not.toContain('secret');
   });
 
   it('用户信息', async () => {

@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 漫画登场</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<!-- 拟声字、台词：站酷庆科黄油体（SIL OFL 1.1，可免费商用），由 design/tools/fetch_fonts.py 下载到本地 -->
+<style>
+:root { --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  --bg: #0B0B10; --panel: #121218; --line: rgba(255,255,255,.08); --text: #EDEDF1; --mute: #A6A8B4; --dim: #80838F; --acc: #8D8BFF; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.app { height: 100%; display: grid; grid-template-columns: 320px 1fr; }
+.side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 22px 18px 40px; }
+.side h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.side h1 img { width: 22px; height: 22px; }
+.side .sub { color: var(--dim); font-size: 12.5px; line-height: 1.6; }
+.grp { margin-top: 18px; }
+.grp > b { display: block; font-size: 11.5px; letter-spacing: .12em; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: #0D0D12; padding: 3px; border-radius: 9px; border: 1px solid var(--line); }
+.seg button { flex: 1 1 30%; border: 0; background: transparent; padding: 7px 8px; border-radius: 7px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.seg button.on { background: #26262F; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.seg.big button { padding: 10px 8px; font-size: 13.5px; }
+.row { display: flex; gap: 8px; margin-top: 18px; }
+.btn { flex: 1; height: 38px; border-radius: 9px; border: 0; background: var(--acc); color: #0B0B12; font-weight: 600; font-size: 13.5px; }
+.btn.sec { background: #22222B; color: var(--text); }
+.btn.sec.on { background: rgba(61,214,140,.16); color: #3DD68C; }
+.note { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: #0D0D12; border: 1px solid var(--line); font-size: 12.5px; line-height: 1.75; color: var(--mute); }
+.note b { color: var(--text); font-weight: 600; }
+.view { position: relative; overflow: hidden; display: grid; place-items: center; }
+.frame { position: relative; flex: none; }
+.frame > .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+@media (max-width: 820px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100%; } .side { border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; } .view { height: 78vh; } }
+
+/* ================= 画布（1080×1920 竖屏） ================= */
+.stage { width: 1080px; height: 1920px; overflow: hidden; --st: 12%; --sb: 40%;
+  background-color: #15151C; background-image: linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%), linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%);
+  background-size: 64px 64px; background-position: 0 0, 32px 32px; box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+.stage.sc-room { background: radial-gradient(260px 260px at 18% 62%, rgba(255,170,90,.85), transparent 70%), radial-gradient(340px 300px at 86% 70%, rgba(90,160,255,.75), transparent 70%), radial-gradient(500px 420px at 60% 18%, rgba(210,120,255,.45), transparent 70%), linear-gradient(175deg, #2A2436, #151823 60%, #0E1017); }
+.person { position: absolute; left: 50%; top: 520px; width: 0; height: 0; }
+.stage.sc-clear .person { display: none; }
+.person::before { content: ""; position: absolute; left: -165px; top: 0; width: 330px; height: 380px; border-radius: 50% 50% 46% 46%; background: #6E5A50; }
+.person::after { content: ""; position: absolute; left: -380px; top: 420px; width: 760px; height: 900px; border-radius: 380px 380px 0 0; background: linear-gradient(90deg, #3A4A78, #7A4A8A); }
+.safe { position: absolute; left: 0; right: 0; z-index: 50; pointer-events: none; display: flex; align-items: center; justify-content: center; font-size: 22px; letter-spacing: .1em; color: rgba(255,255,255,.5); background: repeating-linear-gradient(45deg, rgba(255,255,255,.05) 0 14px, transparent 14px 28px); }
+.safe.top { top: 0; height: var(--st); border-bottom: 2px dashed rgba(255,255,255,.25); }
+.safe.bot { bottom: 0; height: var(--sb); border-top: 2px dashed rgba(255,255,255,.25); }
+.stage:not(.show-safe) .safe { display: none; }
+
+/* ================= 漫画登场 =================
+   --a：身份色（只有它是亮的），--a2：浅一点的身份色，--ink：墨色 */
+.mg { position: absolute; inset: 0; z-index: 10; pointer-events: none; --ink: #141416; --paper: #F7F7F3; }
+.mg.lv-cap { --a: #2F7CFF; --a2: #9CC8FF; }
+.mg.lv-adm { --a: #8C4BFF; --a2: #D4B8FF; }
+.mg.lv-gov { --a: #E4452B; --a2: #F7B733; }
+.mg-page { position: absolute; inset: 0; will-change: transform; }
+.mg-paper { position: absolute; inset: 0; background-color: var(--paper); }
+.mg-paper::after { content: ""; position: absolute; inset: 0; opacity: .5;
+  background: radial-gradient(circle, rgba(20, 20, 22, .55) 30%, transparent 34%) 0 0 / 16px 16px;
+  -webkit-mask: radial-gradient(130% 90% at 50% 50%, transparent 55%, #000 100%); mask: radial-gradient(130% 90% at 50% 50%, transparent 55%, #000 100%); }
+.mg-lines { position: absolute; inset: 0; }
+.mg-lines svg { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.mg-lines svg.on { display: block; }
+.mg-lines path { fill: var(--ink); }
+.mg-lines path.acc { fill: var(--a); }
+.mg-ink { position: absolute; left: 540px; top: 960px; width: 0; height: 0; }
+.mg-ink svg { position: absolute; left: -420px; top: -420px; width: 840px; height: 840px; overflow: visible; }
+.mg-ink path, .mg-ink circle { fill: var(--ink); }
+.mg-panel { position: absolute; overflow: hidden; }
+.mg-panel .in { position: absolute; inset: 0; }
+.mg-border { position: absolute; inset: 0; width: 1080px; height: 1920px; overflow: visible; }
+.mg-border polygon { fill: none; stroke: var(--ink); stroke-width: 12; stroke-linejoin: round; }
+.tone { position: absolute; inset: 0; background: radial-gradient(circle, var(--dot, rgba(0,0,0,.5)) 34%, transparent 38%) 0 0 / var(--ds, 14px) var(--ds, 14px); }
+/* 第一格：来者不善的"气场"：身份色底、一串往上冒的「轰」、竖排旁白 */
+.p1 .in { background: var(--a); }
+.p1 .tone { --dot: rgba(0, 0, 0, .3); -webkit-mask: linear-gradient(200deg, transparent 15%, #000); mask: linear-gradient(200deg, transparent 15%, #000); }
+.p1 .aura { position: absolute; inset: 0; background: repeating-linear-gradient(-78deg, transparent 0 26px, rgba(255, 255, 255, .16) 26px 30px); }
+.p1 .go { position: absolute; font-family: "ZCOOL QingKe HuangYou", sans-serif; color: var(--ink); -webkit-text-stroke: 8px var(--paper); paint-order: stroke fill; line-height: 1; }
+.p1 .nar { position: absolute; left: 40px; top: 60px; padding: 18px 12px; background: var(--paper); border: 5px solid var(--ink); writing-mode: vertical-rl; font-size: 40px; font-weight: 700; letter-spacing: .14em; color: var(--ink); box-shadow: 8px 8px 0 var(--ink); }
+/* 第二格：局部特写（网点） */
+.p2 .in { background: var(--ink); }
+.p2 .close { position: absolute; left: -40%; top: -55%; width: 180%; height: 180%; object-fit: cover; filter: grayscale(1) contrast(1.5) brightness(1.1); }
+.p2 .tone { --dot: rgba(0, 0, 0, .55); --ds: 12px; }
+.p2 .glint { position: absolute; width: 180px; height: 180px; }
+.p2 .glint svg { width: 100%; height: 100%; overflow: visible; }
+.p2 .glint path { fill: #fff; stroke: var(--a); stroke-width: 6; paint-order: stroke; }
+.p2 .speed { position: absolute; inset: 0; background: repeating-linear-gradient(-12deg, transparent 0 34px, rgba(255, 255, 255, .5) 34px 37px, transparent 37px 90px); mix-blend-mode: normal; }
+/* 第三格：完整头像 */
+.p3 .in { background: var(--paper); }
+.p3 .tone { --dot: var(--a); --ds: 18px; -webkit-mask: radial-gradient(circle at var(--cx) var(--cy), #000 0, rgba(0,0,0,.7) 180px, transparent 420px); mask: radial-gradient(circle at var(--cx) var(--cy), #000 0, rgba(0,0,0,.7) 180px, transparent 420px); }
+.p3 .avw { position: absolute; width: 0; height: 0; }
+.p3 .av { position: absolute; left: -110px; top: -110px; width: 220px; height: 220px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 8px var(--ink); background: #ccc; }
+.p3 .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.p3 .fr { position: absolute; left: -154px; top: -154px; width: 308px; height: 308px; }
+.p3 .mini svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.p3 .mini path { fill: var(--ink); opacity: .85; }
+/* 拟声字：黑字、白边、外面一圈黑边，身份色投影 */
+.mg-sfx { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.mg-sfx .w { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%) rotate(-10deg); white-space: nowrap; }
+.mg-sfx span { position: absolute; left: 0; top: 0; font-family: "ZCOOL QingKe HuangYou", sans-serif; font-size: 250px; line-height: 1; letter-spacing: -8px; white-space: nowrap; paint-order: stroke fill; }
+.mg-sfx .sh { color: var(--a); -webkit-text-stroke: 30px var(--a); transform: translate(16px, 18px); }
+.mg-sfx .o { color: var(--ink); -webkit-text-stroke: 34px var(--ink); }
+.mg-sfx .f { color: var(--ink); -webkit-text-stroke: 14px #fff; position: relative; }
+.mg-shard { position: absolute; width: 34px; height: 34px; background: var(--ink); clip-path: polygon(50% 0, 100% 100%, 0 70%); }
+.mg-shard.a { background: var(--a); }
+/* 喊话框 */
+.mg-bub { position: absolute; }
+.mg-bub svg { position: absolute; inset: -40px; width: calc(100% + 80px); height: calc(100% + 80px); overflow: visible; }
+.mg-bub svg path { fill: #fff; stroke: var(--ink); stroke-width: 9; stroke-linejoin: round; }
+.mg-bub .tx { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: "ZCOOL QingKe HuangYou", sans-serif; color: var(--ink); line-height: 1.12; }
+.mg-bub .tx b { font-weight: 400; color: var(--a); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+/* 角色介绍小框 */
+.mg-cap { position: absolute; padding: 16px 26px 18px; background: var(--ink); color: #fff; transform: rotate(-3deg); box-shadow: 10px 10px 0 var(--a); }
+.mg-cap .k { font-size: 26px; font-weight: 700; color: var(--a2); letter-spacing: .12em; }
+.mg-cap .n { font-family: "ZCOOL QingKe HuangYou", sans-serif; font-size: 58px; line-height: 1.1; margin-top: 2px; white-space: nowrap; }
+.mg-cap .m { font-size: 22px; opacity: .7; margin-top: 6px; letter-spacing: .06em; }
+.mg-flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+.mg-half { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1><img src="assets/logo.svg" alt="">漫画登场</h1>
+    <div class="sub">全屏入场特效 · 舰长、提督、总督用同一套动画，只换身份色和头像框，5 秒。头像框从 B 站加载。</div>
+    <div class="grp"><b>身份</b><div class="seg big" id="lv"></div></div>
+    <div class="grp"><b>昵称</b><div class="seg" id="nm"></div></div>
+    <div class="grp"><b>粉丝牌</b><div class="seg" id="md"></div></div>
+    <div class="grp"><b>背景</b><div class="seg" id="bg"></div></div>
+    <div class="row"><button class="btn" id="play">▶ 播放</button></div>
+    <div class="row"><button class="btn sec" id="loop">自动循环</button><button class="btn sec on" id="snd">声音</button><button class="btn sec" id="safe">安全区</button></div>
+    <div class="row"><button class="btn sec" id="slow">慢放（¼ 速度，看细节）</button></div>
+    <div class="note"><b>过程</b><br>① 翻到漫画页：白光一闪，墨迹炸开<br>② 集中线冲向中心（线条会抖，像手画的）<br>③ 三格分镜砰砰砰砸下：剪影 → 网点特写 → 完整头像<br>④ 拟声字「登场！！」砸进来，画面一震、碎片崩开<br>⑤ 喊话框「舰长 XXX 驾到！」和角色介绍<br>⑥ 整页沿斜线撕开、飞走</div>
+  </aside>
+  <main class="view" id="view">
+    <div class="frame" id="frame">
+      <div class="stage sc-room" id="stage">
+        <div class="person"></div>
+        <div class="safe top">顶部信息栏</div><div class="safe bot">底部弹幕区</div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const FACE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC9A8"/><stop offset="1" stop-color="#E0769A"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="40" r="18" fill="#fff" opacity=".92"/><circle cx="43" cy="38" r="2.6" fill="#333"/><circle cx="57" cy="38" r="2.6" fill="#333"/><path d="M18 92c4-20 18-30 32-30s28 10 32 30z" fill="#fff" opacity=".92"/></svg>');
+const FRAMES = { gov: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', adm: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', cap: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
+const LEVELS = { cap: '舰长', adm: '提督', gov: '总督' };
+const NAMES = { short: '道具堡', mid: '晚风与星河漫步', long: '今天也要早点睡觉的超长昵称啊' };
+const DUR = 5000;
+const st = { lv: 'cap', nm: 'short', md: 24, bg: 'room', loop: false, snd: true, safe: false, slow: false };
+/** 慢放：所有时间放慢 4 倍（看细节用） */
+const SLOW = () => (st.slow ? 4 : 1);
+
+/* ---------- 随机数（每次播放固定种子，形状稳定） ---------- */
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+/* ---------- 声音：现场合成 ---------- */
+let ac = null;
+function audio() { if (!st.snd) return null; ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; }
+function env(g, t, peak, att, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + att + dec); }
+function tone(f0, f1, dur, peak, type = 'sine') { const a = audio(); if (!a) return; const t = a.currentTime; const o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur); env(g, t, peak, 0.005, dur); o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.05); }
+function noise(dur, peak, type, f0, f1, q = 1) { const a = audio(); if (!a) return; const t = a.currentTime; const b = a.createBuffer(1, a.sampleRate * (dur + 0.1), a.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = a.createBufferSource(); s.buffer = b; const f = a.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur); const g = a.createGain(); env(g, t, peak, 0.01, dur); s.connect(f).connect(g).connect(a.destination); s.start(t); s.stop(t + dur + 0.1); }
+const sfx = {
+  page: () => { noise(0.3, 0.2, 'lowpass', 3000, 300); tone(110, 45, 0.25, 0.22); },
+  lines: () => noise(0.45, 0.1, 'bandpass', 600, 3200, 1.2),
+  slam: (k) => { tone(160 - k * 15, 50, 0.22, 0.28); noise(0.12, 0.16, 'lowpass', 2500, 400); },
+  boom: () => { tone(80, 28, 0.7, 0.4); noise(0.5, 0.25, 'lowpass', 1800, 120); tone(220, 110, 0.15, 0.08, 'square'); },
+  pop: () => { tone(500, 1300, 0.09, 0.12, 'triangle'); },
+  tear: () => noise(0.55, 0.14, 'bandpass', 900, 4200, 3),
+};
+
+/* ---------- 形状 ---------- */
+// 集中线：从画面外射向中心的黑色细三角，中间留白；三份略有不同，轮流显示（手画的"抖动"）
+function focusLines(seed, cx, cy, count, rMin, rVar, accEvery = 0) {
+  const r = rng(seed); let d = '', acc = '';
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + (r() - 0.5) * 0.05;
+    const inner = rMin + r() * rVar, outer = 1500, w = (0.004 + r() * 0.013);
+    const p = `M${cx + Math.cos(a - w) * outer},${cy + Math.sin(a - w) * outer}L${cx + Math.cos(a) * inner},${cy + Math.sin(a) * inner}L${cx + Math.cos(a + w) * outer},${cy + Math.sin(a + w) * outer}Z`;
+    if (accEvery && i % accEvery === 0) acc += p; else d += p;
+  }
+  return `<path d="${d}"/>${acc ? `<path class="acc" d="${acc}"/>` : ''}`;
+}
+function inkSplash(seed) {
+  const r = rng(seed); const n = 22; let d = '';
+  for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2, rr = 170 + r() * 110 + (i % 3 === 0 ? 70 : 0); const x = 420 + Math.cos(a) * rr, y = 420 + Math.sin(a) * rr; d += (i ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1); }
+  let drops = '';
+  for (let i = 0; i < 16; i++) { const a = r() * Math.PI * 2, rr = 300 + r() * 140; drops += `<circle cx="${420 + Math.cos(a) * rr}" cy="${420 + Math.sin(a) * rr}" r="${6 + r() * 22}"/>`; }
+  return `<svg viewBox="0 0 840 840"><path d="${d}Z"/>${drops}</svg>`;
+}
+function shoutBubble(w, hgt, seed) {
+  // 带尖角的喊话框：一圈尖刺
+  const r = rng(seed); const cx = w / 2 + 40, cy = hgt / 2 + 40, n = 26; let d = '';
+  for (let i = 0; i < n * 2; i++) { const a = (i / (n * 2)) * Math.PI * 2; const k = i % 2 ? 1 : 1.14 + r() * 0.1; const x = cx + Math.cos(a) * (w / 2) * k, y = cy + Math.sin(a) * (hgt / 2) * k; d += (i ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1); }
+  return `<svg viewBox="0 0 ${w + 80} ${hgt + 80}"><path d="${d}Z"/></svg>`;
+}
+const GLINT = '<svg viewBox="-50 -50 100 100"><path d="M0,-50 C4,-8 8,-4 50,0 C8,4 4,8 0,50 C-4,8 -8,4 -50,0 C-8,-4 -4,-8 0,-50Z"/></svg>';
+
+// 三格分镜（画布坐标）
+const PANELS = [
+  [[70, 330], [560, 300], [530, 800], [70, 830]],
+  [[590, 298], [1010, 272], [1010, 772], [560, 798]],
+  [[70, 860], [1010, 802], [1010, 1500], [70, 1540]],
+];
+const bbox = (p) => { const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]); return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }; };
+
+const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+function build(lv, name, medalLv) {
+  const L = LEVELS[lv];
+  const root = h('div', `mg lv-${lv}`);
+  const page = h('div', 'mg-page');
+  page.append(h('div', 'mg-paper'));
+  const lines = h('div', 'mg-lines', [11, 23, 37].map((s, i) => `<svg viewBox="0 0 1080 1920" class="${i ? '' : 'on'}">${focusLines(s, 540, 1000, 170, 380, 260, 9)}</svg>`).join(''));
+  page.append(lines, h('div', 'mg-ink', inkSplash(7)));
+  // 分镜
+  const panels = PANELS.map((p, i) => {
+    const b = bbox(p);
+    const el = h('div', `mg-panel p${i + 1}`);
+    Object.assign(el.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px`, clipPath: `polygon(${p.map(([x, y]) => `${x - b.x}px ${y - b.y}px`).join(',')})` });
+    const inn = h('div', 'in');
+    if (i === 0) {
+      const go = [[300, 330, 120, -8], [210, 170, 150, -12], [330, 40, 96, -5]].map(([x, y, fs, r]) => `<div class="go" style="left:${x}px;top:${y}px;font-size:${fs}px;transform:rotate(${r}deg)">轰</div>`).join('');
+      inn.innerHTML = `<div class="tone"></div><div class="aura"></div>${go}<div class="nar">这股气息……</div>`;
+    } else if (i === 1) {
+      inn.innerHTML = `<img class="close" src="${FACE}" alt=""><div class="tone"></div><div class="speed"></div><div class="glint" style="left:${b.w * 0.58}px;top:${b.h * 0.28}px">${GLINT}</div>`;
+    } else {
+      const cx = 360, cy = 360;
+      inn.style.setProperty('--cx', `${cx}px`); inn.style.setProperty('--cy', `${cy}px`);
+      inn.innerHTML = `<div class="mini"><svg viewBox="0 0 ${b.w} ${b.h}">${focusLines(5, cx, cy, 90, 200, 120)}</svg></div><div class="tone"></div><div class="avw" style="left:${cx}px;top:${cy}px"><div class="av"><img src="${FACE}" alt=""></div><img class="fr" src="${FRAMES[lv]}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"></div>`;
+    }
+    el.append(inn);
+    return el;
+  });
+  page.append(...panels);
+  page.append(h('div', '', `<svg class="mg-border" viewBox="0 0 1080 1920">${PANELS.map((p, i) => `<polygon data-i="${i}" points="${p.map((q) => q.join(',')).join(' ')}"/>`).join('')}</svg>`));
+  // 拟声字
+  const sfxEl = h('div', 'mg-sfx', '<div class="w"><span class="sh">登场！！</span><span class="o">登场！！</span><span class="f">登场！！</span></div>');
+  Object.assign(sfxEl.style, { left: '700px', top: '830px' });
+  page.append(sfxEl);
+  // 喊话框
+  const n = [...name].length;
+  const bw = 470, bh = 300;
+  // 喊话框里放不下太长的昵称：超过 12 个字显示前 12 个加「…」（角色介绍里是完整的）
+  const short = n > 12 ? [...name].slice(0, 12).join('') + '…' : name;
+  const sn = [...short].length;
+  const bub = h('div', 'mg-bub', shoutBubble(bw, bh, 3) + `<div class="tx"><div style="font-size:${Math.round(Math.max(24, Math.min(64, 380 / (sn + 2.6))))}px;white-space:nowrap"><b>${L}</b> ${short}</div><div style="font-size:92px">驾到！</div></div>`);
+  Object.assign(bub.style, { left: '520px', top: '1150px', width: `${bw}px`, height: `${bh}px` });
+  page.append(bub);
+  // 角色介绍
+  const cap = h('div', 'mg-cap', `<div class="k">【${L}】</div><div class="n" style="font-size:${Math.max(36, Math.min(58, 520 / n))}px">${name}</div><div class="m">粉丝牌 ${medalLv} 级 · 星临</div>`);
+  Object.assign(cap.style, { left: '96px', top: '1330px' });
+  page.append(cap);
+  root.append(page, h('div', 'mg-flash'));
+  return { root, page, lines, panels, sfxEl, bub, cap };
+}
+
+/* ---------- 播放 ---------- */
+let cur = null;
+function stop() { if (!cur) return; cur.timers.forEach(clearTimeout); clearInterval(cur.boil); cancelAnimationFrame(cur.rate); cur.root.remove(); cur = null; }
+function play() {
+  stop();
+  const lv = st.lv;
+  const b = build(lv, NAMES[st.nm], st.md);
+  $('#stage').append(b.root);
+  const timers = [];
+  cur = { root: b.root, timers, boil: 0, rate: 0 };
+  const at = (ms, fn) => timers.push(setTimeout(fn, ms * SLOW()));
+  // 慢放：新建的动画都按同样的倍数放慢
+  const rate = 1 / SLOW();
+  const keepRate = () => { if (!cur) return; for (const a of document.getAnimations()) if (a.playbackRate !== rate) a.playbackRate = rate; cur.rate = requestAnimationFrame(keepRate); };
+  if (rate !== 1) keepRate();
+  const q = (sel) => b.root.querySelector(sel);
+  const anim = (el, kf, o) => el.animate(kf, { fill: 'both', ...o });
+  const hit = 'cubic-bezier(.2,1.6,.35,1)';
+  const shake = (px, ms) => b.page.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${-px}px,${px * 0.6}px) rotate(-.4deg)` }, { transform: `translate(${px * 0.8}px,${-px * 0.7}px) rotate(.3deg)` }, { transform: `translate(${-px * 0.5}px,${-px * 0.4}px)` }, { transform: `translate(${px * 0.3}px,${px * 0.3}px)` }, { transform: 'translate(0,0)' }], { duration: ms, easing: 'ease-out', composite: 'add' });
+
+  // ① 翻到漫画页：白光一闪，纸面落下，墨迹炸开
+  anim(q('.mg-flash'), [{ opacity: 1 }, { opacity: 0 }], { duration: 260 });
+  anim(b.page, [{ transform: 'scale(1.08)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 220, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  anim(q('.mg-ink svg'), [{ transform: 'scale(.1)', opacity: 1 }, { transform: 'scale(1.25)', opacity: 1, offset: .55 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: 560, easing: 'cubic-bezier(.1,.8,.3,1)' });
+  // 撕开时会复制整页（复制不带动画状态）：墨迹用完直接藏起来
+  at(600, () => (q('.mg-ink').style.display = 'none'));
+  sfx.page();
+
+  // ② 集中线冲进来，之后一直"抖"
+  anim(b.lines, [{ transform: 'scale(1.5)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 260, delay: 300, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  at(300, sfx.lines);
+  const vs = b.lines.querySelectorAll('svg'); let k = 0;
+  cur.boil = setInterval(() => { vs[k].classList.remove('on'); k = (k + 1) % vs.length; vs[k].classList.add('on'); }, 85 * SLOW());
+
+  // ③ 三格分镜砸下
+  const from = ['translate(-160px,-90px) rotate(-7deg) scale(1.18)', 'translate(170px,-70px) rotate(6deg) scale(1.18)', 'translate(0,220px) rotate(-3deg) scale(1.12)'];
+  const border = q('.mg-border');
+  border.querySelectorAll('polygon').forEach((p) => (p.style.opacity = 0));
+  b.panels.forEach((el, i) => {
+    const t = 950 + i * 260;
+    anim(el, [{ transform: from[i], opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 190, delay: t, easing: hit });
+    at(t, () => {});
+    at(t + 150, () => { border.querySelector(`[data-i="${i}"]`).style.opacity = 1; shake(i === 2 ? 16 : 10, 220); sfx.slam(i); });
+  });
+  // 第一格的「轰」一个接一个冒出来
+  b.root.querySelectorAll('.p1 .go').forEach((g, i) => anim(g, [{ opacity: 0, translate: '0 40px', scale: '.6' }, { opacity: 1, translate: '0 0', scale: '1' }], { duration: 200, delay: 1040 + i * 90, easing: 'cubic-bezier(.2,1.6,.4,1)' }));
+  anim(q('.p1 .nar'), [{ opacity: 0, translate: '0 -30px' }, { opacity: 1, translate: '0 0' }], { duration: 220, delay: 1100, easing: 'ease-out' });
+  // 第二格的"眼神一亮"、第三格的头像
+  anim(q('.p2 .glint'), [{ transform: 'scale(0) rotate(-90deg)', opacity: 0 }, { transform: 'scale(1.2) rotate(0deg)', opacity: 1, offset: .6 }, { transform: 'scale(1) rotate(15deg)', opacity: 1 }], { duration: 420, delay: 1330, easing: 'ease-out' });
+  anim(q('.p3 .avw'), [{ transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: .6 }, { transform: 'scale(1)', opacity: 1 }], { duration: 380, delay: 1560, easing: 'ease-out' });
+
+  // ④ 拟声字砸进来：大震动、碎片崩开
+  const w = q('.mg-sfx .w');
+  anim(w, [{ transform: 'translate(-50%,-50%) rotate(-32deg) scale(3.4)', opacity: 0 }, { transform: 'translate(-50%,-50%) rotate(-10deg) scale(.94)', opacity: 1, offset: .7 }, { transform: 'translate(-50%,-50%) rotate(-10deg) scale(1)', opacity: 1 }], { duration: 260, delay: 1850, easing: 'cubic-bezier(.3,0,.2,1)' });
+  at(2030, () => {
+    shake(26, 360); sfx.boom();
+    anim(q('.mg-flash'), [{ opacity: 0 }, { opacity: .5, offset: .2 }, { opacity: 0 }], { duration: 220 });
+    const r = rng(99);
+    for (let i = 0; i < 16; i++) {
+      const s = h('div', `mg-shard${i % 4 === 0 ? ' a' : ''}`); b.sfxEl.append(s);
+      const a = r() * Math.PI * 2, d = 260 + r() * 320, sz = 0.6 + r() * 1.2;
+      s.animate([{ transform: `translate(-17px,-17px) scale(${sz}) rotate(0deg)`, opacity: 1 }, { transform: `translate(${Math.cos(a) * d - 17}px,${Math.sin(a) * d - 17}px) scale(${sz * 0.6}) rotate(${(r() - 0.5) * 720}deg)`, opacity: 0 }], { duration: 650 + r() * 250, easing: 'cubic-bezier(.1,.7,.3,1)', fill: 'forwards' });
+    }
+  });
+  // 停留时拟声字轻轻颤
+  at(2400, () => w.animate([{ transform: 'translate(-50%,-50%) rotate(-10deg) scale(1)' }, { transform: 'translate(calc(-50% + 3px),calc(-50% - 2px)) rotate(-9.4deg) scale(1.01)' }, { transform: 'translate(-50%,-50%) rotate(-10deg) scale(1)' }], { duration: 160, iterations: 10 }));
+
+  // ⑤ 喊话框和角色介绍
+  anim(b.bub, [{ transform: 'scale(.2) rotate(-12deg)', opacity: 0 }, { transform: 'scale(1.1) rotate(3deg)', opacity: 1, offset: .65 }, { transform: 'scale(1) rotate(0)', opacity: 1 }], { duration: 300, delay: 2480, easing: 'ease-out' });
+  at(2480, sfx.pop);
+  anim(b.cap, [{ transform: 'translateX(-520px) rotate(-3deg)', opacity: 0 }, { transform: 'translateX(14px) rotate(-3deg)', opacity: 1, offset: .75 }, { transform: 'translateX(0) rotate(-3deg)', opacity: 1 }], { duration: 300, delay: 2720, easing: 'cubic-bezier(.2,.9,.3,1)' });
+
+  // ⑥ 整页沿斜线撕开、飞走：提前复制两份（各留一半），先画好；撕开时藏起原来的页面。
+  //    复制不带动画状态：用到的元素最终状态都和样式里的默认值一致，墨迹已经藏起来了
+  const tearAt = 4050;
+  const tearPath = (top) => { const pts = []; for (let i = 0; i <= 12; i++) { const x = (i / 12) * 1080; const y = 1180 - (i / 12) * 520 + (i % 2 ? 26 : -26); pts.push(`${x}px ${y}px`); } return top ? `polygon(0 0, 1080px 0, ${pts.slice().reverse().join(',')})` : `polygon(${pts.join(',')}, 1080px 1920px, 0 1920px)`; };
+  const halves = [];
+  at(tearAt - 400, () => {
+    for (const top of [true, false]) {
+      const half = h('div', 'mg-half'); half.style.clipPath = tearPath(top); half.style.opacity = '0.001';
+      half.append(b.page.cloneNode(true)); b.root.insertBefore(half, q('.mg-flash')); halves.push(half);
+    }
+  });
+  at(tearAt, () => {
+    b.page.style.visibility = 'hidden';
+    halves.forEach((half, i) => {
+      half.style.opacity = '1';
+      half.animate([{ transform: 'none', opacity: 1 }, { transform: i ? 'translate(140px,300px) rotate(6deg)' : 'translate(-120px,-260px) rotate(-7deg)', opacity: 0 }], { duration: 850, easing: 'cubic-bezier(.5,0,.8,.6)', fill: 'forwards' });
+    });
+    sfx.tear();
+  });
+  at(DUR, () => { stop(); if (st.loop) setTimeout(play, 700); });
+}
+
+/* ---------- 控件 ---------- */
+function segs() {
+  const mk = (id, items, key) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const bt = h('button', st[key] == v ? 'on' : '', label); bt.onclick = () => { st[key] = typeof st[key] === 'number' ? Number(v) : v; sync(); if (key !== 'bg') play(); }; el.append(bt); } };
+  mk('#lv', [['cap', '舰长'], ['adm', '提督'], ['gov', '总督']], 'lv');
+  mk('#nm', [['short', '短昵称'], ['mid', '中等'], ['long', '很长']], 'nm');
+  mk('#md', [['8', '8 级'], ['24', '24 级'], ['41', '41 级']], 'md');
+  mk('#bg', [['room', '直播间'], ['clear', '透明格']], 'bg');
+}
+function sync() {
+  segs();
+  $('#stage').className = `stage sc-${st.bg}${st.safe ? ' show-safe' : ''}`;
+  $('#slow').classList.toggle('on', st.slow); $('#loop').classList.toggle('on', st.loop); $('#snd').classList.toggle('on', st.snd); $('#safe').classList.toggle('on', st.safe);
+}
+function fit() {
+  const v = $('#view'), f = $('#frame'), s = $('#stage');
+  const k = Math.min((v.clientWidth - 40) / 1080, (v.clientHeight - 40) / 1920);
+  f.style.width = `${1080 * k}px`; f.style.height = `${1920 * k}px`; s.style.transform = `scale(${k})`;
+}
+$('#play').onclick = play;
+$('#loop').onclick = () => { st.loop = !st.loop; sync(); if (st.loop && !cur) play(); };
+$('#snd').onclick = () => { st.snd = !st.snd; sync(); };
+$('#safe').onclick = () => { st.safe = !st.safe; sync(); };
+$('#slow').onclick = () => { st.slow = !st.slow; sync(); play(); };
+addEventListener('resize', fit);
+sync(); fit();
+document.fonts.load('250px "ZCOOL QingKe HuangYou"', '登场！').finally(() => setTimeout(play, 300));
+</script>
+</body>
+</html>

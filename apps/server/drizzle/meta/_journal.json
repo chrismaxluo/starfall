@@ -64,6 +64,41 @@
       "when": 1790696494474,
       "tag": "0008_feather",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790704072887,
+      "tag": "0009_guard_frame",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790705785192,
+      "tag": "0010_viewer_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790707877632,
+      "tag": "0011_danmu_who_multi",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790728046097,
+      "tag": "0012_svga_slots",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1790773805283,
+      "tag": "0013_honor_level",
+      "breakpoints": true
     }
   ]
 }

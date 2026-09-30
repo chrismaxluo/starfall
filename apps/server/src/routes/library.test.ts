@@ -190,6 +190,12 @@ describe('修改素材', () => {
     expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { sizePct: 60 } } })).json().effect).toMatchObject({ sizePct: 60 });
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 10 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { sizePct: 201 } })).statusCode).toBe(400);
+    // 大航海头像框：默认关闭
+    expect(effect).toMatchObject({ guardFrame: false });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { guardFrame: true } })).json()).toMatchObject({ guardFrame: true });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id } })).json().effect).toMatchObject({ guardFrame: true });
+    expect((await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, draft: { guardFrame: false } } })).json().effect).toMatchObject({ guardFrame: false });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { guardFrame: 'yes' } })).statusCode).toBe(400);
   });
 
   it('上下羽化：跟随全局时只对没有透明通道的素材生效，可以单独设置或关闭', async () => {
@@ -211,6 +217,32 @@ describe('修改素材', () => {
     expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { feather: 'soft' } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${opaque.id}`, payload: { featherPct: 41 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: '/api/settings', payload: { featherPct: 41 } })).statusCode).toBe(400);
+  });
+
+  it('SVGA 动态图层：上传时读出图层、按名字自动对应；播放时换成观众的头像、头像框、昵称', async () => {
+    const { req, upload } = await setup();
+    const { effect, asset } = (await upload('/api/assets', '进场.svga', media('slots.svga'))).json();
+    expect(asset.slots.map((s: { key: string }) => s.key)).toEqual(['deco', 'avatar', 'frame', 'badge', 'nickname', 'welcome']);
+    expect(effect.svgaMap).toEqual({ avatar: 'avatar', frame: 'frame', badge: 'badge', nickname: 'name', welcome: 'welcome' });
+    const dyn = async (viewer: object) => (await req({ method: 'POST', url: '/api/preview', payload: { effectId: effect.id, viewer } })).json().effect.visual.dyn as Array<{ key: string; role: string; url?: string; text?: string; w: number }>;
+    const cap = await dyn({ name: '道具堡', guard: 3, isMod: false, medalLevel: null });
+    const by = (d: typeof cap, k: string) => d.find((x) => x.key === k)!;
+    expect(by(cap, 'avatar')).toMatchObject({ role: 'avatar', w: 100, text: '道具堡' });
+    expect(by(cap, 'frame').url).toContain('80f732943cc3367029df65e267960d56736a82ee');
+    expect(by(cap, 'badge').url).toContain('captain');
+    expect(by(cap, 'nickname')).toMatchObject({ role: 'name', text: '道具堡' });
+    expect(by(cap, 'welcome').text).toContain('道具堡');
+    expect(cap.find((x) => x.key === 'deco')).toBeUndefined();
+    // 不是大航海：头像框、图标那一层藏起来
+    const nor = await dyn({ name: '路人', guard: 0, isMod: false, medalLevel: null });
+    expect([by(nor, 'frame').url, by(nor, 'badge').url]).toEqual(['', '']);
+    // 改成方形头像、装饰也换成昵称；非法的角色不行
+    const upd = (await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { svgaMap: { avatar: 'avatarSquare', deco: 'name' } } })).json();
+    expect(upd.svgaMap).toEqual({ avatar: 'avatarSquare', deco: 'name' });
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { svgaMap: { avatar: 'hat' } } })).statusCode).toBe(400);
+    // 换成 1.x 的文件：原来的设置里新文件没有的图层去掉，新图层按名字猜
+    const rep = (await upload(`/api/effects/${effect.id}/file`, 'v1.svga', media('slots-v1.svga'), 'PUT')).json();
+    expect(rep.svgaMap).toEqual({ head: 'avatar', nick: 'name', deco: 'name' });
   });
 
   it('音效：上传、选用、被使用时不能删除', async () => {

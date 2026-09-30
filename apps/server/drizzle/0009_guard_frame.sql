@@ -1,0 +1,1 @@
+ALTER TABLE `effects` ADD `guard_frame` integer DEFAULT false NOT NULL;

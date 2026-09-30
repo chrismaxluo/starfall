@@ -4,7 +4,7 @@ import { ref, watch } from 'vue';
 import { EV_ICON } from '../lib/events.ts';
 import type { TriggerKind } from '../lib/types.ts';
 
-const props = defineProps<{ kind: TriggerKind; img?: string | null }>();
+const props = defineProps<{ kind: TriggerKind | 'sc'; img?: string | null }>();
 const broken = ref(false);
 watch(() => props.img, () => (broken.value = false));
 </script>

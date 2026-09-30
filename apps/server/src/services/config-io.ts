@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, TIERS } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -24,7 +24,8 @@ import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
 
 export const CONFIG_FORMAT = 'starfall-config';
-export const CONFIG_VERSION = 1;
+/** 2：弹幕规则的发送人条件改成多选（旧版本导入不了新文件，会提示先升级） */
+export const CONFIG_VERSION = 2;
 /** zip 里配置文件的名称；素材文件放在 files/ 下 */
 export const CONFIG_ENTRY = 'starfall-config.json';
 
@@ -102,6 +103,9 @@ const EffectPart = z.object({
   sizePct: z.number().int().min(SIZE_MIN).max(SIZE_MAX).default(100),
   feather: z.enum(FEATHER_MODES).default('global'),
   featherPct: z.number().int().min(0).max(FEATHER_MAX).default(FEATHER_DEFAULT),
+  guardFrame: z.boolean().default(false),
+  honorBadge: z.boolean().default(false),
+  svgaMap: z.record(z.string().min(1).max(120), z.enum(SVGA_ROLES)).default({}),
 });
 
 const TierPart = z.object({ effect: effectRef, cooldownMin, enabled: z.boolean() });
@@ -119,7 +123,8 @@ const RulesPart = z.object({
       z.object({
         keywords: z.array(z.string().trim().min(1).max(30)).min(1).max(20),
         mode: z.enum(['contains', 'exact']),
-        who: z.enum(DANMU_WHO),
+        // 旧版本导出的是单选（字符串）
+        who: z.union([z.enum(DANMU_WHO_OLD).transform(danmuWhoFromOld), DanmuWhoSchema]),
         effect: effectRef,
         globalCdSec: z.number().int().min(0).max(3600),
         userCdMin: z.number().int().min(0).max(1440),
@@ -261,6 +266,9 @@ export class ConfigIO {
         sizePct: e.sizePct,
         feather: e.feather,
         featherPct: e.featherPct,
+        guardFrame: e.guardFrame,
+        honorBadge: e.honorBadge,
+        svgaMap: e.svgaMap,
       })),
       rules: {
         enter: {
@@ -487,7 +495,7 @@ export class ConfigIO {
       for (const e of file.effects) {
         const c = local.get(e.name);
         const assetId = idOfSha(e.asset);
-        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, fadeInMs: e.fadeInMs, fadeOutMs: e.fadeOutMs, offsetX: e.offsetX, offsetY: e.offsetY, sizePct: e.sizePct, feather: e.feather, featherPct: e.featherPct, updatedAt: Date.now() };
+        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, fadeInMs: e.fadeInMs, fadeOutMs: e.fadeOutMs, offsetX: e.offsetX, offsetY: e.offsetY, sizePct: e.sizePct, feather: e.feather, featherPct: e.featherPct, guardFrame: e.guardFrame, honorBadge: e.honorBadge, svgaMap: e.svgaMap, updatedAt: Date.now() };
         if (c) {
           if (c.builtin || e.builtin) continue;
           // 新文件缺失时保留本机的画面

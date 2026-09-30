@@ -28,6 +28,11 @@ describe('变量替换（F-AS-10）', () => {
     expect(fillText('{guard} {name} 驾临 · {medal} {level}', { viewer: v })).toBe('总督 长夜未央 驾临 · 咕惑宰 44');
   });
 
+  it('荣耀等级 {honor}：没有时为空', () => {
+    expect(fillText('荣耀 {honor} 级的 {name}', { viewer: viewer({ name: '长夜未央', honor: 68 }) })).toBe('荣耀 68 级的 长夜未央');
+    expect(fillText('{name} {honor}', { viewer: viewer({ name: '路过的猫' }) })).toBe('路过的猫');
+  });
+
   it('没有大航海时去掉多余空格', () => {
     expect(fillText('{guard} {name} 驾临', { viewer: viewer({ name: '路过的猫' }) })).toBe('路过的猫 驾临');
   });

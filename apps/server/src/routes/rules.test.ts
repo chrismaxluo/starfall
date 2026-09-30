@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { room } from '../db/schema.ts';
 import { testApp } from '../testing.ts';
 
 let close: Array<() => Promise<unknown>> = [];
@@ -80,6 +81,23 @@ describe('专属用户', () => {
     expect((await req({ method: 'DELETE', url: '/api/rules/exclusive/10001' })).statusCode).toBe(404);
   });
 
+  it('大航海等级只在记下它的直播间里算数（给后台头像套头像框）', async () => {
+    const { req, ctx, effectId } = await setup();
+    vi.stubGlobal('fetch', vi.fn(async () => card(10001, '小星')));
+    ctx.db.insert(room).values({ id: 1, roomId: 30000, anchorUid: 20000, anchorName: '主播' }).run();
+    // 直播时收到消息：在 30000 是舰长
+    ctx.viewers.remember({ uid: 10001, name: '小星', face: '' }, { level: 3, roomId: 30000 });
+    await req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10001, effectId: await effectId('晶耀'), cooldownMin: 0, until: null, enabled: true } });
+    expect((await req({ method: 'GET', url: '/api/rules/exclusive' })).json().exclusives[0]).toMatchObject({ uid: 10001, guard: 3 });
+    expect((await req({ method: 'GET', url: '/api/viewers/10001' })).json()).toMatchObject({ guard: 3 });
+    // 只更新昵称头像（按 UID 查询）不会清掉等级
+    ctx.viewers.remember({ uid: 10001, name: '小星星', face: '' });
+    expect(ctx.viewers.guardIn(10001)).toBe(3);
+    // 换了直播间：以前记的不算
+    ctx.db.update(room).set({ roomId: 40000 }).run();
+    expect((await req({ method: 'GET', url: '/api/rules/exclusive' })).json().exclusives[0]).toMatchObject({ guard: 0 });
+  });
+
   it('查不到昵称也能添加', async () => {
     const { req, effectId } = await setup();
     vi.stubGlobal('fetch', async () => { throw new Error('network down'); });
@@ -93,7 +111,7 @@ describe('按 UID 查询用户', () => {
     const { req } = await setup();
     const fetchMock = vi.fn(async () => card(10001, '小星'));
     vi.stubGlobal('fetch', fetchMock);
-    expect((await req({ method: 'GET', url: '/api/viewers/10001' })).json()).toEqual({ uid: 10001, name: '小星', face: 'https://i0.hdslb.com/10001.jpg' });
+    expect((await req({ method: 'GET', url: '/api/viewers/10001' })).json()).toEqual({ uid: 10001, name: '小星', face: 'https://i0.hdslb.com/10001.jpg', guard: 0, honor: 0 });
     await req({ method: 'GET', url: '/api/viewers/10001' });
     expect(fetchMock.mock.calls.filter((c) => String((c as unknown[])[0]).includes('card'))).toHaveLength(1);
 

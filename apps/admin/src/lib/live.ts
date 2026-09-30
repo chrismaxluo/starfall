@@ -1,7 +1,7 @@
 // 管理后台的实时连接：事件、队列、连接状态、特效页上下线
 import { setTimeZone } from './format.ts';
 import { OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
-import { refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
+import { FEED_KEEP, refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
@@ -94,7 +94,7 @@ function handle(m: Msg): void {
       break;
     case 'event':
       state.feed.unshift(m.event);
-      if (state.feed.length > 50) state.feed.length = 50;
+      if (state.feed.length > FEED_KEEP) state.feed.length = FEED_KEEP;
       for (const fn of eventListeners) fn(m.event);
       break;
     case 'event_status': {

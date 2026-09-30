@@ -14,6 +14,8 @@ export interface AssetDto {
   height: number | null;
   durationMs: number | null;
   hasAlpha: boolean;
+  /** SVGA 里可以替换的图层 */
+  slots?: Array<{ key: string; w: number; h: number }> | null;
   warnings: Array<'no_alpha' | 'large'>;
   createdAt: number;
 }
@@ -32,9 +34,18 @@ export interface SoundDto extends AssetDto {
 
 export type EnterBase = Omit<EnterRules, 'exclusives'>;
 
+/** 弹幕规则：带上指定观众的昵称头像 */
+export interface DanmuRuleDto extends DanmuRule {
+  people: Array<{ uid: number; name: string | null; face: string | null; guard: number; honor?: number }>;
+}
+
 export interface ExclusiveDto extends Exclusive {
   name: string | null;
   face: string | null;
+  /** 在当前直播间是大航海几级（0 不是或不知道） */
+  guard?: number;
+  /** 最近一次看到的荣耀等级（0 不知道） */
+  honor?: number;
   createdAt: number;
 }
 
@@ -144,11 +155,13 @@ export interface GiftConfig {
 export interface EventDto {
   id: number;
   ts: number;
-  kind: TriggerKind;
+  /** sc：醒目留言（只记录，不触发特效） */
+  kind: TriggerKind | 'sc';
   uid: number;
   uname: string;
   viewer: Viewer;
-  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string } | null;
+  /** price：上舰是金瓜子，醒目留言是元 */
+  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string; price?: number } | null;
   rule: string | null;
   effectId: number | null;
   status: PlayStatus;
@@ -160,6 +173,7 @@ export interface QueueBrief {
   effectName: string;
   viewerName: string;
   viewerFace: string | null;
+  viewerGuard?: number;
   giftImg?: string | null;
   /** 一句话说明，例如「舰长进场」「告白花束 ×1」 */
   detail: string;
@@ -210,6 +224,40 @@ export interface StatsDto {
   played: number;
   guardPlayed: number;
   composition: Record<'gov' | 'adm' | 'cap' | 'mod' | 'fan' | 'nor', number>;
+  /** 荣耀等级分布：1–20、21–40、41–60、61 级以上、没有或不知道 */
+  honor: Record<'l1' | 'l21' | 'l41' | 'l61' | 'none', number>;
+}
+
+/** B 站名单里的一位观众（高能榜、舰队名单） */
+export interface ListViewer {
+  uid: number;
+  name: string;
+  face: string;
+  guard: 0 | 1 | 2 | 3;
+  honor: number;
+  medal?: Medal;
+  mystery: boolean;
+}
+
+export interface OnlineDto {
+  live: boolean;
+  count: number;
+  items: Array<ListViewer & { rank: number; score: number }>;
+  updatedAt: number | null;
+}
+
+export interface GiftRankDto {
+  people: number;
+  /** 合计（金瓜子） */
+  gold: number;
+  /** gold：付费礼物 + 上舰 + 醒目留言（金瓜子）；times：付费礼物几次 */
+  rows: Array<{ uid: number; viewer: Viewer; gold: number; times: number; topGift: string; guards: number; guardGold: number; scs: number; scGold: number }>;
+}
+
+export interface FleetDto {
+  came: Array<{ uid: number; viewer: Viewer; times: number; lastTs: number }>;
+  fleet: { total: number; members: Array<{ uid: number; name: string; face: string; guard: number }>; updatedAt: number } | null;
+  fleetError: string | null;
 }
 
 export interface BlacklistEntry {

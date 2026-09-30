@@ -93,7 +93,7 @@
 | 22.1 | UID |
 | 22.2.1 / 22.2.2 | 昵称 / 头像地址（头像未登录也不打码） |
 | 22.3 | **粉丝牌**：.1 名称，.2 等级，.9 是否点亮（1 点亮，缺省为熄灭），.10 所属主播 UID，.11 大航海等级 ✅，.12 ⏳ 待确认，.15 ~ .19 新版颜色（背景、渐变、描边、文字、等级格，形如 `#919298CC`） |
-| 22.4.1 | 财富等级 |
+| 22.4.1 | **荣耀等级**（B 站字段名 wealth，界面上叫荣耀等级；0 级时整项缺省）✅ |
 | 22.6.1 | **大航海等级** ✅（P1 用 543 条真实进场验证：舰长进场时 22.6.1、22.3.11、9.9 均为 3） |
 
 **9 粉丝牌（旧结构）**：.1 所属主播 UID，.2 等级，.3 名称，.4 ~ .7 旧版颜色（整数），.8 是否点亮，.9 大航海等级 ✅，.12 所属直播间，.13 ⏳ 待确认。
@@ -104,7 +104,7 @@
 
 ### 5.3 `ENTRY_EFFECT` ✅ 结构 / ⏳ 大航海样本
 
-JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UID）、`face`（头像）、`privilege_type`（大航海等级，0 为无）、`copy_writing`（文案，昵称打码为 `<%S***%>`）、`web_basemap_url`（背景图）、`web_effective_time`（持续秒数）、`wealthy_info.level`（财富等级）、`identities`。
+JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UID）、`face`（头像）、`privilege_type`（大航海等级，0 为无）、`copy_writing`（文案，昵称打码为 `<%S***%>`）、`web_basemap_url`（背景图）、`web_effective_time`（持续秒数）、`wealthy_info.level`（荣耀等级）、`identities`。
 
 本次样本 `privilege_type` 为 0，是财富等级触发的进场特效，**不只是大航海才会有 `ENTRY_EFFECT`**。
 
@@ -123,6 +123,7 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 | `info[7]` | **大航海等级**：0 无，1 总督，2 提督，3 舰长 |
 | `info[0][15].user` | 新版结构化用户信息：`uid`、`base`（昵称头像）、`medal`、`guard`、`guard_leader`、`wealth`、`anon`（⏳ 可能是神秘人）、`title`、`uhead_frame` 等，**优先使用** |
 | `info[0][15].extra` | JSON 字符串，弹幕的附加信息 |
+| `info[16][0]` | **荣耀等级** ✅（`info[0][15].user.wealth` 实测是空的，用这一项） |
 
 本次样本来自一位**提督 + 房管、39 级粉丝牌**的观众：`info[7]` = 2，`info[2][2]` = 1，`info[3][0]` = 39，三处都对上了。
 
@@ -215,6 +216,66 @@ B 站的大航海图标是一个船锚，蓝色舰长、紫色提督、红金色
 - 30 × 30 的来源：直播间网页脚本 `bilibili.*.js` 里 `guardResource`：`{ guard_1, guard_2, guard_3 }`。
 - 60 × 60 的总督版本仍没收到过样本（总督很少；两次共听 8 个热门直播间约 5 分钟没遇到）。有了上面的 200 × 200 版就不再需要。
 - 不登录时「最近弹幕」接口（`dM/gethistory`）已经返回空列表，不能用。
+
+### 5.6.3 大航海头像框 ✅
+
+B 站给舰长、提督、总督的头像套一圈头像框（和船锚图标是一套配色）：200 × 200 透明 PNG，中间是直径约 144 像素的圆洞，圆心在图片中心（上方被徽章、下方被飘带压住一部分）。所以头像框要画成头像的 1.4 倍、居中套在外面。版权归哔哩哔哩所有：只在运行时引用。
+
+| 等级 | 样子 | 地址 |
+|---|---|---|
+| 总督 | 红银，带翅膀的盾牌 | `https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png` |
+| 提督 | 紫银，盾牌 | `https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png` |
+| 舰长 | 蓝银，船锚 | `https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png` |
+
+- 只有醒目留言带头像框：`SUPER_CHAT_MESSAGE`（以及 `av/v1/SuperChat/getMessageList` 接口）的 `user_info.face_frame`，和同一对象里的 `guard_level` 对应。2026-09-30 扫热门前 1000 个直播间当时挂着的醒目留言：舰长 4 次、提督 2 次，都是上表的地址；没有总督。
+- 总督的地址来自直播间大航海榜的网页（第 1 名总督头像外的 `background-image`）。
+- 弹幕、进场的 `uinfo.uhead_frame` 全是 `null`（2026-09-30 统计 400 条，其中提督 202 条）；大航海榜接口 `guardTab/topListNew`、用户卡片接口 `card/user` 里也没有。所以要按 `guard_level` 自己套框。
+- 网上旧资料里有更早的舰长框（`78e8a800…`）、提督框（`9b3cfee1…`），说明 B 站换过设计：用的地方要准备加载失败时只显示头像。
+- B 站图片支持 `@120w_120h.webp` 这样的后缀取缩略图（后台用）。
+
+### 5.6.1.1 上舰的价格 ✅
+
+- `USER_TOAST_MSG_V2.pay_info.price`、`USER_TOAST_MSG.price`：**实际支付**的价格（金瓜子），有折扣时是折扣价。2026-09-30 同一场里舰长有 138000、168000、198000 三种。
+- `GUARD_BUY.price`：原价（同一次购买，toast 是 168000，GUARD_BUY 是 198000）。只有 GUARD_BUY 到了时才用它。
+- 样本都是买 1 个月；买多个月时 price 是总价还是单价还没有样本（⏳），暂时按大小判断：超过这个等级一个月的最高价就当总价，否则乘月数。
+
+### 5.6.1.2 醒目留言 SUPER_CHAT_MESSAGE ✅（结构）
+
+和 `av/v1/SuperChat/getMessageList` 接口里的一条一样：`id`（编号，同一条可能推两次）、`uid`、`price`（**元**）、`message`、`start_time`（秒）、`time`（显示多少秒）、`user_info`（uname、face、guard_level、manager、face_frame）、`medal_info`、`uinfo`（新结构，带 wealth）。`SUPER_CHAT_MESSAGE_JPN` 是带日文翻译的同一条，不用。
+
+### 5.6.4 荣耀等级勋章 ✅
+
+荣耀等级（B 站字段名 wealth）在进场（`INTERACT_WORD_V2` 的 22.4.1）、高级进场（`ENTRY_EFFECT.wealthy_info.level`）、弹幕（`info[16][0]`）里都有；2026-09-30 抓到的 5 条送礼消息里没有。
+
+每一级一张勋章图（图标 + 数字 + 底色画在一起，36 × 16，原图 108 × 48）：直播间网页用的公开接口，不用登录。
+
+```
+GET https://api.live.bilibili.com/xlive/general-interface/v1/content/get?key=wealth
+→ data.content 是一段 JSON 文本：
+  wealth_level_medal: [{ id: 等级 1 ~ 80, url, w: 36, h: 16, animated: 0 / 1 }]   （80 级是动图 webp）
+  danmu_bubble_bg: 弹幕气泡背景（165 个）、player_icon（50 个）、wealth_level_url（荣耀等级说明页）
+```
+
+- 直播间网页按等级在 `wealth_level_medal` 里找 `id`，地址后面加 `@80q_54w_24h.webp` 取缩略图（和用户给的 68 级样本一致）。
+- 服务端每天读一次存下来；版权归哔哩哔哩所有，只在运行时引用。
+- 荣耀等级特权页（`activity-plat/static/20230526/…`）另有每 10 级一个的大图标（42 × 43），星临暂时没用。
+
+### 5.6.5 高能榜、大航海榜 ✅
+
+总览右侧面板用的两个名单接口（2026-09-30 用直播中的 21752762 实测）：
+
+```
+高能榜（在线观众）：GET https://api.live.bilibili.com/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=主播UID&roomId=房间号&page=1&pageSize=50
+→ data.onlineNum（在线人数，和 ONLINE_RANK_COUNT 一样）、data.OnlineRankItem[]：userRank、uid、name、face、score（贡献值）、guard_level、wealth_level（荣耀等级）、is_mystery、medalInfo、uinfo（和进场消息的新结构一样）
+   score 的单位是电池（实测一位观众：我们按礼物算 2850 电池，B 站 2860；他这场发了 225 条弹幕。盲盒按开出的礼物算，不按盲盒原价）。
+   名单只有这场贡献值大于 0 的人（接口自己的说明：「投喂、点赞、发弹幕均可上榜」）：实测 398 人在线时 31 人上榜，12 人在线时 4 人上榜；登录不登录拿到的一样，所以不用登录读。
+
+大航海榜（舰队名单）：GET https://api.live.bilibili.com/xlive/app-room/v2/guardTab/topListNew?roomid=房间号&page=1&ruid=主播UID&page_size=30&typ=5
+→ data.info.num（大航海总人数）、info.page（总页数）；第 1 页有 top3（前 3 名）+ list，之后每页只有 list。page_size 最大 30（填更大会变成 10）。
+   每人 uinfo：uid、base（昵称头像）、medal、guard.level、wealth。公开接口，不用登录；603 人的舰队读 21 页约 5 秒。
+```
+
+弹幕服务器也会推 `ONLINE_RANK_V3`（高能榜前几名，protobuf）、`ONLINE_RANK_COUNT`（在线人数），但名单不全，所以面板用上面的接口。
 
 ### 5.7 开播 / 下播
 

@@ -3,6 +3,7 @@ import EvIcon from '../components/EvIcon.vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import Icon from '../components/Icon.vue';
+import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
 import Seg from '../components/Seg.vue';
@@ -117,7 +118,7 @@ function setExclusive(e: EventDto): void {
       </div>
     </div>
     <div class="toolbar">
-      <Seg v-model="kind" label="事件类型" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物' }, { value: 'guard', label: '上舰' }]" />
+      <Seg v-model="kind" label="事件类型" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物' }, { value: 'guard', label: '上舰' }, { value: 'sc', label: '醒目留言' }]" />
       <div class="s"><Icon name="i-search" /><input v-model.trim="q" class="inp" maxlength="40" placeholder="搜索昵称或 UID" aria-label="搜索昵称或 UID" /></div>
       <select v-model="st" class="sel" style="width: 140px" aria-label="播放状态">
         <option value="all">全部状态</option><option value="played">已播放</option><option value="skip">未播放</option>
@@ -131,14 +132,14 @@ function setExclusive(e: EventDto): void {
             <td>{{ dateTime(e.ts) }}</td>
             <td>
               <span class="who" style="cursor: pointer" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
-                <Avatar :name="e.uname" :face="e.viewer.face" />
+                <Avatar :name="e.uname" :face="e.viewer.face" :guard="e.viewer.guard" />
                 <span><div>{{ e.uname }}<span v-if="isExcl(e.uid)" class="excl">专属</span></div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">{{ e.uid }}</div></span>
-                <IdTag :viewer="e.viewer" />
+                <span class="ids"><HonorMedal :level="e.viewer.honor" /><IdTag :viewer="e.viewer" /></span>
               </span>
             </td>
             <td><span class="evchip"><EvIcon :kind="e.kind" :img="e.payload?.icon" />{{ describe(e) }}</span></td>
             <td><template v-if="e.rule">{{ e.rule }}<template v-if="e.effectId"> → {{ effectById(e.effectId)?.name ?? '（素材已删除）' }}</template></template><span v-else style="color: var(--t3)">—</span></td>
-            <td><span class="st" :class="statusCls(e.status)">{{ statusText(e.status) }}</span></td>
+            <td><span v-if="e.kind === 'sc'" class="st skip">只记录</span><span v-else class="st" :class="statusCls(e.status)">{{ statusText(e.status) }}</span></td>
             <td class="row-act" style="white-space: nowrap"><button v-if="e.kind === 'enter' && e.uid > 0" class="btn" @click="setExclusive(e)">{{ isExcl(e.uid) ? '修改专属' : '设为专属' }}</button></td>
           </tr>
           <tr v-if="!rows.length && !loading">

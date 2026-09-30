@@ -4,8 +4,8 @@
 // 四种事件共用同一套判断（黑名单 → 匹配规则 → 暂停 → 开播 → 冷却 → 特效页在线），只有匹配规则、冷却、欢迎语变量、是否插队不同。
 import { Cooldowns, EnterMerger, GiftComboMerger, GuardDeduper, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchDanmu, matchEnter, matchGift, matchGuard, pickText } from '@starfall/core';
 import type { QueueItem, TextVars } from '@starfall/core';
-import { GUARD_NAMES, JUMP_GOLD } from '@starfall/shared';
-import type { PlayItem, PlayStatus, StdEvent, TriggerKind, Viewer } from '@starfall/shared';
+import { GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD } from '@starfall/shared';
+import type { PlayItem, PlayStatus, StdEvent, SvgaDyn, TriggerKind, Viewer } from '@starfall/shared';
 import { HttpError } from '../http.ts';
 import type { BlacklistStore } from './blacklist.ts';
 import type { EffectDto, EffectStore } from './effects.ts';
@@ -14,12 +14,16 @@ import type { EventLog } from './events.ts';
 import type { Hub } from './hub.ts';
 import type { LiveService } from './live.ts';
 import type { GiftCatalog } from './gifts.ts';
+import type { HonorMedals } from './honor.ts';
 import type { RoomStore } from './room.ts';
 import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
 import type { ViewerStore } from './viewers.ts';
 
-export type TriggerEvent = Exclude<StdEvent, { kind: 'live' }>;
+/** 会触发特效的事件（醒目留言现在只记录） */
+export type TriggerEvent = Exclude<StdEvent, { kind: 'live' | 'sc' }>;
+/** 醒目留言编号记多久（同一条可能推送两次） */
+const SC_DEDUPE_MS = 10 * 60_000;
 /** 欢迎语变量（除观众以外） */
 export type Vars = Omit<TextVars, 'viewer'> & {
   /** 礼物图（不进欢迎语，放进播放内容给礼物特效用） */
@@ -44,6 +48,11 @@ interface Judgement {
   jump: boolean;
 }
 
+/** 测试播放、预览用的观众 */
+const SAMPLE_VIEWER: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, honor: 28 };
+
+const honorOf = (level: number, url: string | undefined) => ({ level, ...(url ? { url } : {}) });
+
 /** 两次播放之间的间隔 */
 export const PLAY_GAP_MS = 300;
 const FLUSH_MS = 200;
@@ -65,6 +74,8 @@ interface QueueBrief {
   effectName: string;
   viewerName: string;
   viewerFace: string | null;
+  /** 大航海等级（0 不是），后台给头像套头像框 */
+  viewerGuard: number;
   detail: string;
   /** 礼物图（礼物特效才有） */
   giftImg: string | null;
@@ -104,6 +115,8 @@ export interface PipelineDeps {
   live: Pick<LiveService, 'onEvent' | 'status'>;
   /** 查礼物图；测试里可以不传 */
   gifts?: Pick<GiftCatalog, 'iconFor'>;
+  /** 查荣耀等级勋章图；测试里可以不传 */
+  honor?: Pick<HonorMedals, 'urlFor'>;
   room: RoomStore;
   settings: SettingsStore;
   enterRules: EnterRuleStore;
@@ -215,8 +228,20 @@ export class Pipeline {
       case 'danmu':
         this.process(ev);
         break;
+      case 'sc': {
+        // 只记录（算进礼物榜、显示在实时动态），不触发特效
+        for (const [id, at] of this.scSeen) if (now - at > SC_DEDUPE_MS) this.scSeen.delete(id);
+        if (this.scSeen.has(ev.scId)) {
+          this.raws.delete(ev.id);
+          break;
+        }
+        this.scSeen.set(ev.scId, now);
+        this.record(ev, null, 'no_rule');
+        break;
+      }
     }
   }
+  private readonly scSeen = new Map<string, number>();
 
   /** 取出等待超时的进场、连击结束的礼物、单独到达的 GUARD_BUY（定时调用） */
   flush(): void {
@@ -228,13 +253,16 @@ export class Pipeline {
   }
 
   private remember(v: Viewer): void {
-    if (v.uid <= 0 || !v.name || v.mystery || this.remembered.get(v.uid) === v.name) return;
-    this.remembered.set(v.uid, v.name);
+    const roomId = this.d.room.get()?.roomId;
+    // 昵称、大航海等级、荣耀等级都没变就不用再写
+    const key = `${v.name}|${v.guard}|${roomId}|${v.honor ?? 0}`;
+    if (v.uid <= 0 || !v.name || v.mystery || this.remembered.get(v.uid) === key) return;
+    this.remembered.set(v.uid, key);
     if (this.remembered.size > 50_000) this.remembered.clear();
-    this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '' });
+    this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '', ...(v.honor ? { honor: v.honor } : {}) }, roomId ? { level: v.guard, roomId } : undefined);
   }
 
-  private record(ev: TriggerEvent, hit: Judgement['hit'], status: PlayStatus): number {
+  private record(ev: TriggerEvent | Extract<StdEvent, { kind: 'sc' }>, hit: Judgement['hit'], status: PlayStatus): number {
     const raw = this.raws.get(ev.id)?.raw;
     this.raws.delete(ev.id);
     return this.d.log.record(ev, { roomId: this.d.room.get()?.roomId ?? null, sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
@@ -249,6 +277,9 @@ export class Pipeline {
     const live = this.d.live.status();
     const anchorUid = this.d.room.get()?.anchorUid ?? 0;
     const uid = ev.viewer.uid;
+    const blockedBy = this.d.blacklist.reason(uid);
+    /** 弹幕规则点了 TA 的名：主播本人、登录的账号也照样触发（手动拉黑的不算） */
+    let named = false;
     let hit: Judgement['hit'] = null;
     let inCooldown = false;
     let playedThisLive = false;
@@ -273,8 +304,10 @@ export class Pipeline {
         break;
       }
       case 'danmu': {
-        const m = matchDanmu(ev.text, ev.viewer, this.d.danmuRules.list(), anchorUid);
+        const auto = blockedBy === 'anchor' || blockedBy === 'account';
+        const m = matchDanmu(ev.text, ev.viewer, this.d.danmuRules.list(), anchorUid, auto);
         vars = { text: ev.text };
+        named = auto && m !== null;
         if (m) {
           const g = `danmu:${m.ruleId}`;
           const u = `danmu:${m.ruleId}:${uid}`;
@@ -320,7 +353,7 @@ export class Pipeline {
       }
     }
     const result = decide({
-      blocked: this.d.blacklist.reason(uid) !== null,
+      blocked: blockedBy !== null && !named,
       matched: Boolean(hit && effect),
       paused: !whatIf && this.d.settings.get('paused'),
       live: whatIf || live.live,
@@ -375,8 +408,31 @@ export class Pipeline {
     return !e.asset.hasAlpha && this.d.settings.get('featherOn') ? this.d.settings.get('featherPct') : 0;
   }
 
+  /** SVGA 图层替换成这位观众的头像、头像框、身份图标、荣耀勋章、昵称、欢迎语；不是大航海时头像框、图标那一层藏起来，没有荣耀等级时勋章那一层藏起来 */
+  private svgaDyn(effect: EffectDto, viewer: Viewer, text: string): SvgaDyn[] | undefined {
+    const a = effect.asset;
+    if (!a || a.ext !== 'svga' || !a.slots?.length) return undefined;
+    const g = viewer.guard;
+    const out: SvgaDyn[] = [];
+    for (const s of a.slots) {
+      const role = effect.svgaMap[s.key];
+      if (!role) continue;
+      const base = { key: s.key, role, w: s.w, h: s.h };
+      // 头像带上昵称：加载不到头像时用昵称的第一个字画一个
+      if (role === 'avatar' || role === 'avatarSquare') out.push({ ...base, url: viewer.face ?? '', text: viewer.name });
+      else if (role === 'frame') out.push({ ...base, url: g ? GUARD_FRAMES[g] : '' });
+      else if (role === 'badge') out.push({ ...base, url: g ? GUARD_BADGES[g] : '' });
+      else if (role === 'honor') out.push({ ...base, url: this.d.honor?.urlFor(viewer.honor) ?? '' });
+      else if (role === 'name') out.push({ ...base, text: viewer.name });
+      else out.push({ ...base, text });
+    }
+    return out.length ? out : undefined;
+  }
+
   private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {
     const a = effect.asset;
+    const text = fillText(pickText(effect.texts, kind, this.rng), { viewer, ...vars });
+    const dyn = this.svgaDyn(effect, viewer, text);
     return {
       id: `p${this.now()}-${++this.seq}`,
       kind,
@@ -385,7 +441,7 @@ export class Pipeline {
         name: effect.name,
         visual:
           effect.visual.type === 'asset' && a
-            ? { type: 'asset', url: a.url, ext: a.ext, kind: a.kind === 'audio' ? 'video' : a.kind, width: a.width, height: a.height, hasAlpha: a.hasAlpha }
+            ? { type: 'asset', url: a.url, ext: a.ext, kind: a.kind === 'audio' ? 'video' : a.kind, width: a.width, height: a.height, hasAlpha: a.hasAlpha, ...(dyn ? { dyn } : {}) }
             : { type: 'builtin_style', style: effect.visual.type === 'builtin_style' ? effect.visual.style : 'line' },
         showText: effect.showText,
         position: effect.position,
@@ -398,16 +454,19 @@ export class Pipeline {
         offsetY: effect.offsetY,
         sizePct: effect.sizePct,
         featherPct: this.featherOf(effect),
+        guardFrame: effect.guardFrame,
+        honorBadge: effect.honorBadge,
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },
-      text: fillText(pickText(effect.texts, kind, this.rng), { viewer, ...vars }),
+      text,
       viewer: {
         name: viewer.name,
         ...(viewer.face ? { face: viewer.face } : {}),
         guard: viewer.guard,
         isMod: viewer.isMod,
         ...(viewer.medal ? { medal: { name: viewer.medal.name, level: viewer.medal.level, ...(viewer.medal.colors ? { colors: viewer.medal.colors } : {}) } } : {}),
+        ...(viewer.honor ? { honor: honorOf(viewer.honor, this.d.honor?.urlFor(viewer.honor)) } : {}),
       },
       ...(kind === 'guard' && vars.op ? { guardOp: vars.op } : {}),
       ...(kind === 'gift' && vars.gift ? { gift: { name: vars.gift, count: vars.count ?? 1, ...(vars.giftImg ? { img: vars.giftImg } : {}) } } : {}),
@@ -504,7 +563,7 @@ export class Pipeline {
     if (this.d.settings.get('paused')) throw new HttpError(409, 'paused', '已暂停，恢复后才能测试');
     if (this.d.hub.overlayCount() === 0) throw new HttpError(409, 'no_overlay', '特效页不在线：请先把特效页地址加到直播软件的浏览器源里');
     const effect = this.d.effects.get(effectId);
-    const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
+    const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
     const item = this.playItem(effect, v, 'enter', {}, true);
     // 正在播的也是测试：直接换成新的，不用等它播完（真实观众的特效不打断）
     if (this.current?.q.payload.item.test) this.stopCurrent();
@@ -514,14 +573,14 @@ export class Pipeline {
 
   /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
   preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): PlayItem {
-    const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
+    const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
     return this.playItem(effect, v, kind, { ...SAMPLE_VARS[kind], ...vars }, true);
   }
 
   snapshot(): QueueSnapshot {
     const brief = (q: QueueItem<Queued>): QueueBrief => {
       const it = q.payload.item;
-      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test) };
+      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, viewerGuard: it.viewer.guard, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test) };
     };
     const c = this.current;
     return {

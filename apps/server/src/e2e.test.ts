@@ -71,6 +71,7 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
   const ctx = createContext(loadConfig({ STARFALL_DATA: dataDir }), {
     dbFile: ':memory:',
     fetchGifts: async () => [],
+    fetchHonor: async () => [],
     liveDeps: {
       getRoomInit: async () => ({ roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus, isPortrait: true }),
       getRoomAdmins: async () => [],

@@ -2,7 +2,8 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { EffectTexts, FeatherMode, Position, Tier } from '@starfall/shared';
+import type { DanmuWho, EffectTexts, FeatherMode, Position, SvgaRole, Tier } from '@starfall/shared';
+import type { SvgaSlot } from '../services/probe.ts';
 
 const now = sql`(unixepoch() * 1000)`;
 const bool = (name: string) => integer(name, { mode: 'boolean' });
@@ -48,6 +49,8 @@ export const assets = sqliteTable('assets', {
   height: integer('height'),
   durationMs: integer('duration_ms'),
   hasAlpha: bool('has_alpha').notNull().default(false),
+  /** SVGA 里可以替换的图层（其他类型为 null） */
+  slots: text('slots', { mode: 'json' }).$type<SvgaSlot[]>(),
   createdAt: integer('created_at').notNull().default(now),
 });
 
@@ -79,6 +82,11 @@ export const effects = sqliteTable('effects', {
   /** 上下羽化：跟随全局 / 自己设置 / 不羽化 */
   feather: text('feather').$type<FeatherMode>().notNull().default('global'),
   featherPct: integer('feather_pct').notNull().default(10),
+  /** 头像和欢迎语里，大航海观众的头像套上 B 站头像框 */
+  guardFrame: bool('guard_frame').notNull().default(false),
+  honorBadge: bool('honor_badge').notNull().default(false),
+  /** SVGA：图层名 → 播放时换成什么 */
+  svgaMap: text('svga_map', { mode: 'json' }).$type<Record<string, SvgaRole>>().notNull().default({}),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });
@@ -117,7 +125,8 @@ export const ruleDanmu = sqliteTable('rule_danmu', {
   sort: integer('sort').notNull(),
   keywords: text('keywords', { mode: 'json' }).$type<string[]>().notNull(),
   mode: text('mode', { enum: ['contains', 'exact'] }).notNull(),
-  who: text('who', { enum: ['all', 'fan', 'fan10', 'guard', 'mod'] }).notNull(),
+  /** 谁发的弹幕才算（多选，JSON）；以前是单选的字符串，升级时换成多选 */
+  who: text('who', { mode: 'json' }).$type<DanmuWho>().notNull(),
   effectId: integer('effect_id').references(() => effects.id, { onDelete: 'restrict' }),
   globalCdSec: integer('global_cd_sec').notNull(),
   userCdMin: integer('user_cd_min').notNull(),
@@ -190,7 +199,7 @@ export const events = sqliteTable(
     /** 哪个直播间的事件（换直播间后数据分开算） */
     roomId: integer('room_id'),
     sessionId: integer('session_id'),
-    kind: text('kind', { enum: ['enter', 'danmu', 'gift', 'guard'] }).notNull(),
+    kind: text('kind', { enum: ['enter', 'danmu', 'gift', 'guard', 'sc'] }).notNull(),
     uid: integer('uid').notNull(),
     uname: text('uname').notNull(),
     viewer: text('viewer', { mode: 'json' }).notNull(),
@@ -208,5 +217,10 @@ export const viewers = sqliteTable('viewers', {
   uid: integer('uid').primaryKey(),
   name: text('name').notNull(),
   face: text('face').notNull().default(''),
+  /** 最近一次在哪个直播间看到 TA 是大航海几级（0 不是）：只在同一个直播间里算数 */
+  guard: integer('guard').notNull().default(0),
+  guardRoom: integer('guard_room'),
+  /** 最近一次看到的荣耀等级（0 不知道） */
+  honor: integer('honor').notNull().default(0),
   updatedAt: integer('updated_at').notNull().default(now),
 });

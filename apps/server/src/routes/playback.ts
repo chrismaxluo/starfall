@@ -1,6 +1,6 @@
 // 播放控制、测试、模拟（需求 F-PL-05 ~ 06、F-RU-05）
 import type { FastifyInstance } from 'fastify';
-import { PLAY_STATUS } from '@starfall/shared';
+import { HONOR_LEVEL_MAX, PLAY_STATUS } from '@starfall/shared';
 import type { Viewer } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
@@ -17,6 +17,8 @@ const SimViewerSchema = z
     isMod: z.boolean().default(false),
     /** 粉丝牌等级；own 为假表示戴的是别的主播的牌子 */
     medal: z.object({ level: z.number().int().min(1).max(60), own: z.boolean().default(true) }).nullable().default(null),
+    /** 荣耀等级（0 没有） */
+    honor: z.number().int().min(0).max(HONOR_LEVEL_MAX).default(0),
   })
   .strict();
 
@@ -65,7 +67,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
         effectId: z.number().int().positive(),
         kind: z.enum(['enter', 'danmu', 'gift', 'guard']).default('enter'),
         viewer: z
-          .object({ name: z.string().max(40), guard: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), isMod: z.boolean(), medalLevel: z.number().int().min(1).max(60).nullable() })
+          .object({ name: z.string().max(40), guard: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), isMod: z.boolean(), medalLevel: z.number().int().min(1).max(60).nullable(), honor: z.number().int().min(0).max(HONOR_LEVEL_MAX) })
           .partial()
           .strict()
           .optional(),
@@ -97,8 +99,9 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   // 今天（按主播时区）的统计
   // 总览的统计：scope=live 本场（没开播时是上一场），scope=today 今天；只算当前直播间
-  app.get('/api/stats', async (req) => {
-    const { scope } = parseBody(z.object({ scope: z.enum(['live', 'today']).default('today') }), req.query);
+  /** 数据范围：scope=live 本场（没开播时是上一场），scope=today 今天；from 为 null 表示没有这段时间（从来没开播过） */
+  const range = (query: unknown) => {
+    const { scope } = parseBody(z.object({ scope: z.enum(['live', 'today']).default('today') }).passthrough(), query);
     const room = ctx.room.get();
     const live = ctx.live.status();
     const last = room ? ctx.live.lastSession(room.roomId) : null;
@@ -107,10 +110,42 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     if (scope === 'today') from = dayStart(ctx.pipeline.today(), ctx.config.timeZone);
     else if (live.live && live.liveSince !== null) from = live.liveSince;
     else if (last) [from, to] = [last.startedAt, last.endedAt];
-    const empty = { enterUnique: 0, guardUnique: 0, played: 0, guardPlayed: 0, composition: { gov: 0, adm: 0, cap: 0, mod: 0, fan: 0, nor: 0 } };
+    return { scope, room, live, last, from, to };
+  };
+
+  app.get('/api/stats', async (req) => {
+    const { scope, room, live, last, from, to } = range(req.query);
+    const empty = { enterUnique: 0, guardUnique: 0, played: 0, guardPlayed: 0, composition: { gov: 0, adm: 0, cap: 0, mod: 0, fan: 0, nor: 0 }, honor: { l1: 0, l21: 0, l41: 0, l61: 0, none: 0 } };
     const stats = room && from !== null ? ctx.log.stats(room.roomId, from, to, room.anchorUid) : empty;
     return { scope, roomId: room?.roomId ?? null, from, to, live: scope === 'live' && live.live, lastSession: last ? { startedAt: last.startedAt, endedAt: last.endedAt } : null, ...stats };
   });
+
+  // 总览右侧面板：礼物榜（按付费礼物总价值）
+  app.get('/api/stats/gifts', async (req) => {
+    const { scope, room, from, to } = range(req.query);
+    const r = room && from !== null ? ctx.log.giftRank(room.roomId, from, to) : { people: 0, gold: 0, rows: [] };
+    return { scope, from, to, ...r };
+  });
+
+  // 总览右侧面板：大航海（这段时间来了谁；舰队名单来自 B 站，读不到时只给来了的人）
+  app.get('/api/stats/fleet', async (req) => {
+    const { scope, room, from, to } = range(req.query);
+    const came = room && from !== null ? ctx.log.guardVisits(room.roomId, from, to) : [];
+    let fleet: { total: number; members: Array<{ uid: number; name: string; face: string; guard: number }>; updatedAt: number } | null = null;
+    let fleetError: string | null = null;
+    if (room) {
+      try {
+        const f = await ctx.audience.fleet();
+        fleet = { total: f.total, members: f.members.map((m) => ({ uid: m.uid, name: m.name, face: m.face, guard: m.guard })), updatedAt: f.updatedAt };
+      } catch (e) {
+        fleetError = (e as Error).message;
+      }
+    }
+    return { scope, from, to, came, fleet, fleetError };
+  });
+
+  // 总览右侧面板：在线观众（B 站高能榜）
+  app.get('/api/online', async () => ctx.audience.online());
 
   // 模拟一次事件（进场 / 弹幕 / 礼物 / 上舰）：只判断，不入队、不记录
   app.post('/api/simulate', async (req) => {
@@ -141,6 +176,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
       isMod: v.isMod,
       mystery: false,
       ...(v.medal ? { medal: { name: '粉丝牌', level: v.medal.level, anchorUid: v.medal.own ? anchorUid : -1 } } : {}),
+      ...(v.honor ? { honor: v.honor } : {}),
     };
     const base = { id: 'sim', ts: Date.now(), viewer };
     const ev: TriggerEvent =

@@ -30,6 +30,8 @@ export interface Viewer {
   isMod: boolean;
   /** 观众佩戴的粉丝牌（不一定属于本直播间） */
   medal?: Medal;
+  /** 荣耀等级（B 站消息里的字段叫 wealth）：没有或不知道时不填 */
+  honor?: number;
   /** 神秘人 */
   mystery: boolean;
 }
@@ -81,6 +83,19 @@ export interface GuardEvent extends EventBase {
   source: 'toast' | 'guard_buy';
   /** 同一次购买的几条消息共用的编号（B 站的支付流水号），用于去重 */
   dedupeKey?: string;
+  /** 这次一共花了多少（金瓜子）：toast 里是实际支付的价格（有折扣），GUARD_BUY 里是原价 */
+  priceGold?: number;
+}
+
+/** 醒目留言（SC）：现在只记录、算进礼物榜，不触发特效 */
+export interface ScEvent extends EventBase {
+  kind: 'sc';
+  viewer: Viewer;
+  text: string;
+  /** 价格（元） */
+  priceYuan: number;
+  /** B 站的醒目留言编号：同一条可能推送两次，用来去重 */
+  scId: string;
 }
 
 export interface LiveEvent extends EventBase {
@@ -88,7 +103,10 @@ export interface LiveEvent extends EventBase {
   live: boolean;
 }
 
-export type StdEvent = EnterEvent | DanmuEvent | GiftEvent | GuardEvent | LiveEvent;
+export type StdEvent = EnterEvent | DanmuEvent | GiftEvent | GuardEvent | ScEvent | LiveEvent;
+
+/** 会写进事件记录的事件类型（触发特效的四种 + 醒目留言） */
+export type EventKind = TriggerKind | 'sc';
 
 /** 会触发特效的事件类型 */
 export type TriggerKind = 'enter' | 'danmu' | 'gift' | 'guard';

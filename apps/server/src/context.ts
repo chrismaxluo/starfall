@@ -16,8 +16,12 @@ import { ConfigIO } from './services/config-io.ts';
 import { EffectStore } from './services/effects.ts';
 import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-rules.ts';
 import { EventLog } from './services/events.ts';
-import type { getRoomGifts } from '@starfall/bili';
+import { parseMessage } from '@starfall/bili';
+import type { getHonorMedals, getRoomGifts } from '@starfall/bili';
 import { GiftCatalog } from './services/gifts.ts';
+import { HonorMedals } from './services/honor.ts';
+import { AudienceService } from './services/audience.ts';
+import type { AudienceDeps } from './services/audience.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
 import type { LiveDeps } from './services/live.ts';
@@ -49,6 +53,8 @@ export interface AppContext {
   giftRules: GiftRuleStore;
   guardRules: GuardRuleStore;
   gifts: GiftCatalog;
+  honor: HonorMedals;
+  audience: AudienceService;
   outputs: OutputStore;
   blacklist: BlacklistStore;
   log: EventLog;
@@ -62,7 +68,7 @@ export interface AppContext {
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts; fetchHonor?: typeof getHonorMedals; audience?: Partial<Pick<AudienceDeps, 'fetchOnline' | 'fetchGuards' | 'sleep'>> } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -76,19 +82,21 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const roomInfo = new RoomInfoService({ room, live, http: () => account.anon, authHttp: () => account.http() }, opts.roomInfoDeps);
   const assets = new AssetStore(db, p, opts.maxUpload);
   const effects = new EffectStore(db, assets);
-  const viewers = new ViewerStore(db, () => account.anon);
+  const viewers = new ViewerStore(db, () => account.anon, Date.now, () => room.get()?.roomId ?? null);
   const enterRules = new EnterRuleStore(db, settings, viewers);
   const outputs = new OutputStore(db);
   const danmuRules = new DanmuRuleStore(db);
   const giftRules = new GiftRuleStore(db, settings);
   const guardRules = new GuardRuleStore(db);
   const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
+  const honor = new HonorMedals(settings, () => account.anon, opts.fetchHonor);
+  const audience = new AudienceService({ room, live, anon: () => account.anon, ...opts.audience });
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
   const overlayBuild = new BuildVersion(config.overlayDist);
   const adminBuild = new BuildVersion(config.adminDist);
   const hub = new Hub({ build: () => overlayBuild.current() });
-  const pipeline = new Pipeline({ live, gifts, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const pipeline = new Pipeline({ live, gifts, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
   const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
@@ -101,7 +109,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -120,10 +128,22 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
     }
   };
   ctx.assets.cleanTmp(0);
+  void ctx.assets.backfillSlots().catch((e: Error) => console.error('读取 SVGA 图层失败', e.message));
+  try {
+    // 以前记录的上舰补上价格（礼物榜要算）
+    const n = ctx.log.backfillGuardPrices((raw) => {
+      const ev = parseMessage(raw as Parameters<typeof parseMessage>[0], { newId: () => 'backfill', now: Date.now });
+      return ev?.kind === 'guard' ? ev.priceGold : undefined;
+    });
+    if (n) console.log(`补上了 ${n} 条上舰记录的价格`);
+  } catch (e) {
+    console.error('补上舰价格失败', (e as Error).message);
+  }
   ctx.backups.cleanPartial();
   prune();
   const timer = setInterval(prune, PRUNE_MS);
   ctx.gifts.start();
+  ctx.honor.start();
   ctx.pipeline.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));
   // 重新构建了特效页：告诉在线的页面，旧页面会在空闲时自动刷新
@@ -138,6 +158,7 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
     stopAdminBuild();
     ctx.roomInfo.stop();
     ctx.backups.stop();
+    ctx.honor.stop();
     ctx.pipeline.stop();
     ctx.live.stop();
   };

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DANMU_WHO_ALL } from '@starfall/shared';
 import type { EnterEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
 import { room } from '../db/schema.ts';
 import { testApp } from '../testing.ts';
@@ -317,7 +318,7 @@ describe('播放队列', () => {
     t.live.emit(enter({ uid: 2, guard: 2 }));
     t.live.emit(gf({ unitPrice: 20_000, count: 2 }, { uid: 3 }));
     const snap = t.p.snapshot();
-    expect(snap.playing).toMatchObject({ viewerFace: 'https://i0.hdslb.com/a.jpg', detail: '舰长进场', durationMs: 4000 });
+    expect(snap.playing).toMatchObject({ viewerFace: 'https://i0.hdslb.com/a.jpg', viewerGuard: 3, detail: '舰长进场', durationMs: 4000 });
     expect(snap.items.map((i) => i.detail)).toEqual(['小花花 ×2', '提督进场']);
     expect(snap.items[1]).toMatchObject({ viewerFace: null, effectName: '亭阁', durationMs: 6000 });
     // 移出排队的：这次不播，事件记录为已清空
@@ -403,7 +404,7 @@ const eff = (t: Awaited<ReturnType<typeof setup>>, name: string) => t.ctx.effect
 describe('弹幕', () => {
   it('命中关键词：播放素材，欢迎语里有弹幕内容；全局冷却内其他人不重复播，每人冷却内同一人不重复播', async () => {
     const t = await setup();
-    t.ctx.danmuRules.create({ keywords: ['生日快乐'], mode: 'contains', who: 'all', effectId: eff(t, '晶语'), globalCdSec: 30, userCdMin: 10, enabled: true });
+    t.ctx.danmuRules.create({ keywords: ['生日快乐'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '晶语'), globalCdSec: 30, userCdMin: 10, enabled: true });
     t.live.emit(dm('主播生日快乐！'));
     expect(t.plays()[0]).toMatchObject({ kind: 'danmu', text: '小星：主播生日快乐！', effect: { name: '晶语' } });
     vi.advanceTimersByTime(5000);
@@ -421,8 +422,8 @@ describe('弹幕', () => {
 
   it('发送人条件、从上到下命中第一条、调整顺序', async () => {
     const t = await setup();
-    const a = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'exact', who: 'guard', effectId: eff(t, '门楼'), globalCdSec: 0, userCdMin: 0, enabled: true });
-    const b = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'contains', who: 'all', effectId: eff(t, '一行字'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    const a = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'exact', who: { ...DANMU_WHO_ALL, all: false, guards: [1, 2, 3] }, effectId: eff(t, '门楼'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    const b = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '一行字'), globalCdSec: 0, userCdMin: 0, enabled: true });
     t.live.emit(dm('上船', { guard: 3 }));
     vi.advanceTimersByTime(5000);
     t.live.emit(dm('上船', { uid: 3 }));
@@ -430,6 +431,28 @@ describe('弹幕', () => {
     vi.advanceTimersByTime(5000);
     t.live.emit(dm('上船', { uid: 4, guard: 3 }));
     expect(t.events().map((e) => e.effectId)).toEqual([a.effectId, b.effectId, b.effectId]);
+  });
+
+  it('主播本人默认不触发；规则里勾了「主播」、或者指定了 UID 的照样触发；手动拉黑的一律不触发', async () => {
+    const t = await setup();
+    const none = { ...DANMU_WHO_ALL, all: false };
+    t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '一行字'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    const named = t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: { ...none, anchor: true, uids: [555] }, effectId: eff(t, '晶语'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    // 主播发的：跳过「所有人」那条（主播本人不触发），命中点了名的那条
+    t.live.emit(dm('开播啦', { uid: ANCHOR, name: '主播' }));
+    vi.advanceTimersByTime(5000);
+    // 「主播本人不触发」关掉以后：按顺序命中第一条
+    t.ctx.settings.set('blockAnchor', false);
+    t.live.emit(dm('开播啦', { uid: ANCHOR, name: '主播' }));
+    vi.advanceTimersByTime(5000);
+    // 手动拉进黑名单：点了名也不触发（记录里是按顺序命中的第一条）
+    t.ctx.blacklist.add({ uid: 555 });
+    t.live.emit(dm('开播啦', { uid: 555, name: '拉黑的' }));
+    expect(t.events().map((e) => [e.uid, e.status, e.effectId])).toEqual([
+      [ANCHOR, 'played', named.effectId],
+      [ANCHOR, 'played', eff(t, '一行字')],
+      [555, 'blacklist', eff(t, '一行字')],
+    ]);
   });
 });
 

@@ -3,7 +3,10 @@ import { reactive } from 'vue';
 import { get } from './api.ts';
 import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
-import type { DanmuRule, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+
+/** 实时动态在内存里留多少条（总览按类型筛选时从这里挑） */
+export const FEED_KEEP = 150;
 
 export const state = reactive({
   /** null：还没检查 */
@@ -16,7 +19,7 @@ export const state = reactive({
   sounds: [] as SoundDto[],
   enter: null as EnterBase | null,
   exclusives: [] as ExclusiveDto[],
-  danmu: [] as DanmuRule[],
+  danmu: [] as DanmuRuleDto[],
   gift: null as GiftRules | null,
   guard: null as GuardRules | null,
   outputs: [] as OutputDto[],
@@ -26,6 +29,8 @@ export const state = reactive({
   feed: [] as EventDto[],
   /** 实时连接是否在线 */
   wsOnline: false,
+  /** 荣耀等级勋章：等级 → B 站的图（读不到时是空的，界面上改成显示文字） */
+  honorMedals: {} as Record<number, string>,
   /** 从别的页面跳到"添加专属用户"时预填的 UID */
   pendingExclusive: null as number | null,
 });
@@ -49,7 +54,7 @@ export async function refreshRules(): Promise<void> {
   const [r, x, d, g, u] = await Promise.all([
     get<EnterBase>('/api/rules/enter'),
     get<{ exclusives: ExclusiveDto[] }>('/api/rules/exclusive'),
-    get<{ rules: DanmuRule[] }>('/api/rules/danmu'),
+    get<{ rules: DanmuRuleDto[] }>('/api/rules/danmu'),
     get<GiftRules>('/api/rules/gift'),
     get<GuardRules>('/api/rules/guard'),
   ]);
@@ -63,11 +68,17 @@ export async function refreshOutputs(): Promise<void> {
   state.outputs = (await get<{ outputs: OutputDto[] }>('/api/outputs')).outputs;
 }
 export async function refreshFeed(): Promise<void> {
-  state.feed = (await get<{ events: EventDto[] }>('/api/events?limit=30')).events;
+  state.feed = (await get<{ events: EventDto[] }>(`/api/events?limit=${FEED_KEEP}`)).events;
+}
+
+/** 读不到不影响别的功能 */
+export async function refreshHonorMedals(): Promise<void> {
+  const r = await get<{ medals: Array<{ level: number; url: string }> }>('/api/honor-medals').catch(() => null);
+  if (r) state.honorMedals = Object.fromEntries(r.medals.map((m) => [m.level, m.url]));
 }
 
 export async function loadAll(): Promise<void> {
-  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshFeed()]);
+  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshFeed(), refreshHonorMedals()]);
 }
 
 /** 全局弹窗：素材设置、快捷设置专属、新手引导、命令面板 */

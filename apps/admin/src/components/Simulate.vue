@@ -2,6 +2,7 @@
 // 模拟一次事件（F-RU-05）：看会命中哪条规则、播放哪个素材、为什么不播放；只判断，不入队、不记录。
 // 没开播也能模拟；命中后在预览小窗里播放（只在本地）
 import { computed, onMounted, ref, watch } from 'vue';
+import { HONOR_LEVEL_MAX } from '@starfall/shared';
 import { get, post } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
@@ -12,7 +13,7 @@ import type { GiftConfig, SimulateResult, TriggerKind } from '../lib/types.ts';
 
 const props = defineProps<{ kind: TriggerKind }>();
 const emit = defineEmits<{ preview: [PreviewRequest] }>();
-const who = ref({ identity: 'cap' as Identity, medal: 0, own: true });
+const who = ref({ identity: 'cap' as Identity, medal: 0, own: true, honor: 0 });
 const text = ref('生日快乐');
 const giftPick = ref<number | ''>('');
 const customBattery = ref(10);
@@ -26,7 +27,7 @@ const paidGifts = computed(() => catalog.value.filter((g) => g.paid));
 
 async function run(): Promise<void> {
   const w = who.value;
-  const viewer = { guard: w.identity === 'gov' ? 1 : w.identity === 'adm' ? 2 : w.identity === 'cap' ? 3 : 0, isMod: w.identity === 'mod', medal: w.medal > 0 ? { level: w.medal, own: w.own } : null };
+  const viewer = { guard: w.identity === 'gov' ? 1 : w.identity === 'adm' ? 2 : w.identity === 'cap' ? 3 : 0, isMod: w.identity === 'mod', medal: w.medal > 0 ? { level: w.medal, own: w.own } : null, honor: Math.max(0, Math.min(HONOR_LEVEL_MAX, Math.round(w.honor) || 0)) };
   let body: object = { kind: 'enter', viewer };
   let vars: PreviewRequest['vars'] = {};
   if (props.kind === 'danmu') {
@@ -48,7 +49,7 @@ async function run(): Promise<void> {
   // 会播放的话，在右侧预览里播一次，看看实际效果
   if (r?.effect && r.status === 'played') {
     const guardLv = props.kind === 'guard' ? guard.value.level : (viewer.guard as SampleViewer['guard']);
-    const sample: SampleViewer = { name: SAMPLES[w.identity].name, guard: guardLv, isMod: viewer.isMod, medalLevel: w.medal > 0 ? w.medal : null };
+    const sample: SampleViewer = { name: SAMPLES[w.identity].name, guard: guardLv, isMod: viewer.isMod, medalLevel: w.medal > 0 ? w.medal : null, honor: viewer.honor };
     emit('preview', { effectId: r.effect.id, viewer: sample, label: `模拟：${r.rule ?? ''}`, kind: props.kind, vars });
   }
 }
@@ -88,6 +89,7 @@ onMounted(async () => {
           <div class="suffix"><input v-model.number="who.medal" class="inp num" type="number" min="0" max="60" aria-label="粉丝牌等级" /><span>级牌子</span></div>
         </div>
         <label class="toggle-line" style="font-size: 12.5px"><input v-model="who.own" type="checkbox" style="accent-color: var(--accent)" />牌子是本直播间的（0 级表示没戴牌子）</label>
+        <div class="suffix"><input v-model.number="who.honor" class="inp num" type="number" min="0" :max="HONOR_LEVEL_MAX" aria-label="荣耀等级" /><span>级荣耀等级（0 表示没有）</span></div>
       </template>
       <button class="btn primary" style="justify-content: center" @click="run">{{ { enter: '模拟进场', danmu: '模拟弹幕', gift: '模拟送礼', guard: '模拟上舰' }[kind] }}</button>
     </div>

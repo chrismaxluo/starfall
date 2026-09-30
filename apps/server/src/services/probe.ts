@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { promisify } from 'node:util';
 import zlib from 'node:zlib';
 import protobuf from 'protobufjs';
+import yauzl from 'yauzl';
 
 const run = promisify(execFile);
 
@@ -64,11 +65,20 @@ export function sniff(ext: string, head: Buffer): boolean {
   }
 }
 
+/** SVGA 里可以替换的图层：图片的名字（imageKey）和原图大小 */
+export interface SvgaSlot {
+  key: string;
+  w: number;
+  h: number;
+}
+
 export interface ProbeResult {
   width: number | null;
   height: number | null;
   durationMs: number | null;
   hasAlpha: boolean;
+  /** 只有 SVGA 有：可以动态替换的图层 */
+  slots?: SvgaSlot[];
 }
 
 const EMPTY: ProbeResult = { width: null, height: null, durationMs: null, hasAlpha: false };
@@ -121,13 +131,35 @@ async function ffprobe(file: string, ext: string): Promise<ProbeResult> {
 const svgaRoot = protobuf.Root.fromJSON({
   nested: {
     MovieParams: { fields: { viewBoxWidth: { type: 'float', id: 1 }, viewBoxHeight: { type: 'float', id: 2 }, fps: { type: 'int32', id: 3 }, frames: { type: 'int32', id: 4 } } },
-    MovieEntity: { fields: { version: { type: 'string', id: 1 }, params: { type: 'MovieParams', id: 2 } } },
+    SpriteEntity: { fields: { imageKey: { type: 'string', id: 1 }, matteKey: { type: 'string', id: 3 } } },
+    MovieEntity: { fields: { version: { type: 'string', id: 1 }, params: { type: 'MovieParams', id: 2 }, images: { keyType: 'string', type: 'bytes', id: 3 }, sprites: { rule: 'repeated', type: 'SpriteEntity', id: 4 } } },
   },
-});
+} as protobuf.INamespace);
 
-function probeSvga(file: string): ProbeResult {
+/** PNG 的宽高（文件头里的 IHDR）；不是 PNG 时为 0 */
+function pngSize(b: Buffer | Uint8Array | undefined): { w: number; h: number } {
+  if (!b || b.length < 24 || b[0] !== 0x89 || b[1] !== 0x50) return { w: 0, h: 0 };
+  const v = Buffer.from(b.buffer, b.byteOffset, 24);
+  return { w: v.readUInt32BE(16), h: v.readUInt32BE(20) };
+}
+
+/** 图层：被精灵用到的图片（遮罩用的除外），按第一次出现的顺序 */
+function slotsOf(sprites: Array<{ imageKey?: string; matteKey?: string }>, size: (key: string) => { w: number; h: number }): SvgaSlot[] {
+  const mattes = new Set(sprites.map((s) => s.matteKey).filter(Boolean));
+  const seen = new Set<string>();
+  const out: SvgaSlot[] = [];
+  for (const sp of sprites) {
+    const k = sp.imageKey;
+    if (!k || seen.has(k) || mattes.has(k) || k.endsWith('.matte')) continue;
+    seen.add(k);
+    out.push({ key: k, ...size(k) });
+  }
+  return out.slice(0, 200);
+}
+
+async function probeSvga(file: string): Promise<ProbeResult> {
   const buf = fs.readFileSync(file);
-  if (buf.subarray(0, 2).toString('latin1') === 'PK') return { ...EMPTY, hasAlpha: true }; // 1.x 格式不解析
+  if (buf.subarray(0, 2).toString('latin1') === 'PK') return probeSvga1(file);
   const T = svgaRoot.lookupType('MovieEntity');
   // 限制解压后的大小：防止很小的压缩炸弹解压出几个 GB 把内存撑爆
   let raw: Buffer;
@@ -136,13 +168,62 @@ function probeSvga(file: string): ProbeResult {
   } catch {
     throw new Error('SVGA 文件损坏或解压后太大');
   }
-  const m = T.toObject(T.decode(raw), { defaults: false }) as { params?: { viewBoxWidth?: number; viewBoxHeight?: number; fps?: number; frames?: number } };
+  const m = T.toObject(T.decode(raw), { defaults: false }) as { params?: { viewBoxWidth?: number; viewBoxHeight?: number; fps?: number; frames?: number }; images?: Record<string, Uint8Array>; sprites?: Array<{ imageKey?: string; matteKey?: string }> };
   const p = m.params ?? {};
   return {
     width: p.viewBoxWidth ? Math.round(p.viewBoxWidth) : null,
     height: p.viewBoxHeight ? Math.round(p.viewBoxHeight) : null,
     durationMs: p.fps && p.frames ? Math.round((p.frames / p.fps) * 1000) : null,
     hasAlpha: true,
+    slots: slotsOf(m.sprites ?? [], (k) => pngSize(m.images?.[k])),
+  };
+}
+
+/** 1.x：zip 里的 movie.spec（JSON）和图片 */
+async function probeSvga1(file: string): Promise<ProbeResult> {
+  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.open(file, { lazyEntries: true }, (e, z) => (e || !z ? reject(e ?? new Error('zip')) : resolve(z))));
+  const files = new Map<string, Buffer>();
+  await new Promise<void>((resolve, reject) => {
+    let total = 0;
+    zip.on('entry', (entry: yauzl.Entry) => {
+      const name = entry.fileName;
+      // 只读 movie.spec 和图片的文件头（取宽高），不整个解压
+      const want = name === 'movie.spec' || name.endsWith('.png');
+      if (!want || entry.uncompressedSize > SVGA_MAX_BYTES) return zip.readEntry();
+      zip.openReadStream(entry, (e, st) => {
+        if (e || !st) return reject(e ?? new Error('zip'));
+        const chunks: Buffer[] = [];
+        let got = 0;
+        st.on('data', (c: Buffer) => {
+          got += c.length; total += c.length;
+          if (total > SVGA_MAX_BYTES) { st.destroy(); return reject(new Error('SVGA 文件解压后太大')); }
+          // 图片只留开头几十个字节（够读宽高）
+          if (name === 'movie.spec' || got - c.length < 64) chunks.push(c);
+        });
+        st.on('end', () => { files.set(name, Buffer.concat(chunks)); zip.readEntry(); });
+        st.on('error', reject);
+      });
+    });
+    zip.on('end', resolve);
+    zip.on('error', reject);
+    zip.readEntry();
+  });
+  zip.close();
+  const specBuf = files.get('movie.spec');
+  if (!specBuf) return { ...EMPTY, hasAlpha: true, slots: [] };
+  let spec: { movie?: { viewBox?: { width?: number; height?: number }; fps?: number; frames?: number }; images?: Record<string, string>; sprites?: Array<{ imageKey?: string; matteKey?: string }> };
+  try {
+    spec = JSON.parse(specBuf.toString('utf8'));
+  } catch {
+    throw new Error('SVGA 文件损坏（movie.spec 不是有效的 JSON）');
+  }
+  const mv = spec.movie ?? {};
+  return {
+    width: mv.viewBox?.width ? Math.round(mv.viewBox.width) : null,
+    height: mv.viewBox?.height ? Math.round(mv.viewBox.height) : null,
+    durationMs: mv.fps && mv.frames ? Math.round((mv.frames / mv.fps) * 1000) : null,
+    hasAlpha: true,
+    slots: slotsOf(spec.sprites ?? [], (k) => pngSize(files.get(`${spec.images?.[k] ?? k}.png`))),
   };
 }
 

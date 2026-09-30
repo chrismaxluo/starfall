@@ -360,9 +360,9 @@ function panel() {
       <div class="pfoot">只列出登录了 B 站的观众（B 站不提供完整在线名单）<span class="sp"></span>点一行可设置专属特效</div>`;
     seg($('#onlineF'), [['all', '全部'], ['guard', '大航海'], ['fan', '粉丝牌']], 'onlineF');
   } else if (st.tab === 'gift') {
-    B.innerHTML = `<div class="phead"><span>本场送礼 <b class="num">23</b> 人 · 合计 <b class="num">2,188</b> 元</span></div>
-      <div class="plist">${GIFTS.map(([n, y, c, g], i) => `<div class="prow"><span class="n${i < 3 ? ` rk r${i + 1}` : ''}">${i + 1}</span>${avatar(n, by(n).guard)}<span class="who"><b>${esc(n)}</b><span>送了 ${c} 次 · 最贵：${g}</span></span>${ids(by(n))}<span class="sc">${y.toLocaleString('zh-CN')}<small>元</small></span></div>`).join('')}</div>
-      <div class="pfoot">按礼物价值算（付费礼物，1 元 = 10 电池）<span class="sp"></span>本场 / 今天跟着上面的数据范围</div>`;
+    B.innerHTML = `<div class="phead"><span>本场送礼 <b class="num">23</b> 人 · 合计 <b class="num">21,880</b> 电池（2,188 元）</span></div>
+      <div class="plist">${GIFTS.map(([n, y, c, g], i) => `<div class="prow"><span class="n${i < 3 ? ` rk r${i + 1}` : ''}">${i + 1}</span>${avatar(n, by(n).guard)}<span class="who"><b>${esc(n)}</b><span>送了 ${c} 次 · 最贵：${g}</span></span>${ids(by(n))}<span class="sc">${Math.round(y * 10).toLocaleString('zh-CN')} 电池<small>${y.toLocaleString('zh-CN')} 元</small></span></div>`).join('')}</div>
+      <div class="pfoot">按付费礼物的价值算（10 电池 = 1 元）<span class="sp"></span>本场 / 今天跟着上面的数据范围</div>`;
   } else {
     B.innerHTML = `<div class="fleet"><span class="ring" style="--p:${(6 / 32) * 100}"><span>19%</span></span><div><b>舰队 32 人，本场来了 6 人</b><small>总督 1 · 提督 1 · 舰长 30（来自 B 站的大航海名单）</small></div></div>
       <div class="plist" style="max-height:220px">${FLEET_CAME.map(([n, c, t]) => `<div class="prow" style="grid-template-columns:30px minmax(0,1fr) auto auto">${avatar(n, by(n).guard)}<span class="who"><b>${esc(n)}</b><span>${GNAME[by(n).guard]} · 最后一次 ${t}</span></span>${ids(by(n))}<span class="sc">${c}<small>次进场</small></span></div>`).join('')}</div>

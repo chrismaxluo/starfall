@@ -265,10 +265,14 @@ GET https://api.live.bilibili.com/xlive/general-interface/v1/content/get?key=wea
 总览右侧面板用的两个名单接口（2026-09-30 用直播中的 21752762 实测）：
 
 ```
-高能榜（在线观众）：GET https://api.live.bilibili.com/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=主播UID&roomId=房间号&page=1&pageSize=50
-→ data.onlineNum（在线人数，和 ONLINE_RANK_COUNT 一样）、data.OnlineRankItem[]：userRank、uid、name、face、score（贡献值）、guard_level、wealth_level（荣耀等级）、is_mystery、medalInfo、uinfo（和进场消息的新结构一样）
+在线观众（直播间里的「在线观众」名单）：GET https://api.live.bilibili.com/xlive/general-interface/v1/rank/queryContributionRank?ruid=主播UID&room_id=房间号&page=1&page_size=100&type=online_rank&switch=contribution_rank
+→ data.count（在线人数）、data.item[]：rank、uid、name、face、score（贡献，单位电池）、guard_level、wealth_level（荣耀等级）、is_mystery、medal_info、uinfo
+   没贡献的观众也在（score 0）；最多 100 位，page 翻页无效（每页都是前 100）；登录不登录一样。实测 9 人在线给了 7 位（隐身之类的少数人不在）。
+   switch=entry_time_rank 是按进来的时间排。
+
+高能榜：GET https://api.live.bilibili.com/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=主播UID&roomId=房间号&page=1&pageSize=50
+→ 只有这场贡献值大于 0 的人（接口自己的说明：「投喂、点赞、发弹幕均可上榜」），星临现在不用它了。
    score 的单位是电池（实测一位观众：我们按礼物算 2850 电池，B 站 2860；他这场发了 225 条弹幕。盲盒按开出的礼物算，不按盲盒原价）。
-   名单只有这场贡献值大于 0 的人（接口自己的说明：「投喂、点赞、发弹幕均可上榜」）：实测 398 人在线时 31 人上榜，12 人在线时 4 人上榜；登录不登录拿到的一样，所以不用登录读。
 
 大航海榜（舰队名单）：GET https://api.live.bilibili.com/xlive/app-room/v2/guardTab/topListNew?roomid=房间号&page=1&ruid=主播UID&page_size=30&typ=5
 → data.info.num（大航海总人数）、info.page（总页数）；第 1 页有 top3（前 3 名）+ list，之后每页只有 list。page_size 最大 30（填更大会变成 10）。

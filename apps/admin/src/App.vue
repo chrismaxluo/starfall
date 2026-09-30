@@ -162,7 +162,7 @@ function reloadPage(): void {
         <div>
           <div class="nav-label">其他</div>
           <nav class="nav" aria-label="其他">
-            <a href="/overlay/?demo=1" target="_blank" rel="noopener"><Icon name="i-spark" />特效页演示<Icon name="i-ext" /></a>
+            <a href="/overlay/?demo=1" target="_blank" rel="noopener"><Icon name="i-demo" />特效页演示<Icon name="i-ext" /></a>
             <a href="#settings" :aria-current="route.page === 'settings' ? 'page' : 'false'"><Icon name="i-gear" />设置</a>
           </nav>
         </div>
@@ -196,7 +196,7 @@ function reloadPage(): void {
           <button class="icon-btn" aria-label="退出后台登录" title="退出后台登录" @click="logout"><Icon name="i-logout" /></button>
         </header>
         <div v-if="ui.newVersion && ui.newVersion !== ui.dismissedVersion" class="verbar" role="status">
-          <Icon name="i-spark" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>
+          <Icon name="i-update" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>
           <button class="btn" @click="ui.dismissedVersion = ui.newVersion">稍后</button><button class="btn primary" @click="reloadPage">刷新</button>
         </div>
         <div v-if="paused" class="pausebar">
@@ -231,7 +231,7 @@ function reloadPage(): void {
 
   <div class="toasts" aria-live="polite">
     <div v-for="t in toasts" :key="t.id" class="toast" :class="{ out: t.out }">
-      <Icon :name="t.kind === 'err' ? 'i-ban' : t.kind === 'info' ? 'i-spark' : 'i-check'" :style="t.kind === 'err' ? 'color:#D64545' : t.kind === 'info' ? 'color:var(--accent)' : ''" />{{ t.text }}
+      <Icon :name="t.kind === 'err' ? 'i-ban' : t.kind === 'info' ? 'i-info' : 'i-check'" :style="t.kind === 'err' ? 'color:#D64545' : t.kind === 'info' ? 'color:var(--accent)' : ''" />{{ t.text }}
     </div>
   </div>
 </template>

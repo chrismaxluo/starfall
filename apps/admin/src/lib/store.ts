@@ -5,6 +5,9 @@ import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
 import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
+/** 实时动态在内存里留多少条（总览按类型筛选时从这里挑） */
+export const FEED_KEEP = 150;
+
 export const state = reactive({
   /** null：还没检查 */
   authed: null as boolean | null,
@@ -65,7 +68,7 @@ export async function refreshOutputs(): Promise<void> {
   state.outputs = (await get<{ outputs: OutputDto[] }>('/api/outputs')).outputs;
 }
 export async function refreshFeed(): Promise<void> {
-  state.feed = (await get<{ events: EventDto[] }>('/api/events?limit=30')).events;
+  state.feed = (await get<{ events: EventDto[] }>(`/api/events?limit=${FEED_KEEP}`)).events;
 }
 
 /** 读不到不影响别的功能 */

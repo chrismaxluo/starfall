@@ -107,7 +107,7 @@ const TABS: Array<{ v: Ev; icon: string; name: string }> = [
   { v: 'enter', icon: 'i-users', name: '进场' },
   { v: 'danmu', icon: 'i-chat', name: '弹幕' },
   { v: 'gift', icon: 'i-gift', name: '礼物' },
-  { v: 'guard', icon: 'i-star', name: '上舰' },
+  { v: 'guard', icon: 'i-anchor', name: '上舰' },
 ];
 
 // ---------- 粉丝牌等级条 ----------

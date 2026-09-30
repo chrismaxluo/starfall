@@ -199,6 +199,86 @@ export async function getHonorMedals(http: BiliHttp): Promise<HonorMedal[]> {
     .map((m) => ({ level: m.id!, url: m.url!, animated: m.animated === 1 }));
 }
 
+/** 名单里的一位观众（高能榜、大航海榜共用） */
+export interface ListViewer {
+  uid: number;
+  name: string;
+  face: string;
+  /** 在这个直播间的大航海等级（0 不是） */
+  guard: 0 | 1 | 2 | 3;
+  /** 荣耀等级（0 不知道） */
+  honor: number;
+  medal?: { name: string; level: number; anchorUid: number; colors?: { bg: string; level: string; border: string; text: string } };
+  mystery: boolean;
+}
+
+interface RawUinfo {
+  uid?: number;
+  base?: { name?: string; face?: string; is_mystery?: boolean };
+  medal?: { name?: string; level?: number; ruid?: number; is_light?: number; v2_medal_color_start?: string; v2_medal_color_border?: string; v2_medal_color_text?: string; v2_medal_color_level?: string } | null;
+  wealth?: { level?: number } | null;
+  guard?: { level?: number } | null;
+}
+
+const guardOf = (n: unknown): ListViewer['guard'] => (n === 1 || n === 2 || n === 3 ? n : 0);
+
+function listViewer(u: RawUinfo | undefined, extra: { uid?: number; name?: string; face?: string; guard?: number; honor?: number; mystery?: boolean } = {}): ListViewer {
+  const m = u?.medal;
+  const colors = m?.v2_medal_color_start && m.v2_medal_color_border && m.v2_medal_color_text && m.v2_medal_color_level
+    ? { bg: m.v2_medal_color_start, level: m.v2_medal_color_level, border: m.v2_medal_color_border, text: m.v2_medal_color_text }
+    : undefined;
+  return {
+    uid: Number(u?.uid ?? extra.uid) || 0,
+    name: u?.base?.name || extra.name || '',
+    face: u?.base?.face || extra.face || '',
+    guard: guardOf(u?.guard?.level ?? extra.guard),
+    honor: Number(u?.wealth?.level ?? extra.honor) || 0,
+    ...(m?.name && m.level ? { medal: { name: m.name, level: m.level, anchorUid: Number(m.ruid) || 0, ...(colors ? { colors } : {}) } } : {}),
+    mystery: Boolean(u?.base?.is_mystery ?? extra.mystery),
+  };
+}
+
+export interface OnlineRank {
+  /** 在线人数（高能榜人数） */
+  count: number;
+  items: Array<ListViewer & { rank: number; score: number }>;
+}
+
+/** 高能榜（在直播间里、登录了 B 站的观众，按贡献排序）。不登录只返回第 1 名，所以要带登录 Cookie */
+export async function getOnlineRank(http: BiliHttp, roomId: number, anchorUid: number, page = 1, pageSize = 50): Promise<OnlineRank> {
+  const d = await http.getData<{ onlineNum?: number; OnlineRankItem?: Array<{ userRank?: number; uid?: number; name?: string; face?: string; score?: number; guard_level?: number; wealth_level?: number; is_mystery?: boolean; uinfo?: RawUinfo }> | null }>(
+    `${LIVE}/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=${anchorUid}&roomId=${roomId}&page=${page}&pageSize=${pageSize}`,
+    { referer: `https://live.bilibili.com/${roomId}` },
+  );
+  return {
+    count: Number(d.onlineNum) || 0,
+    items: (d.OnlineRankItem ?? []).map((x) => ({
+      ...listViewer(x.uinfo, { uid: x.uid, name: x.name, face: x.face, guard: x.guard_level, honor: x.wealth_level, mystery: x.is_mystery }),
+      rank: Number(x.userRank) || 0,
+      score: Number(x.score) || 0,
+    })).filter((x) => x.uid > 0),
+  };
+}
+
+export interface GuardPage {
+  /** 大航海总人数 */
+  total: number;
+  /** 一共几页 */
+  pages: number;
+  items: ListViewer[];
+}
+
+/** 大航海榜（舰队名单），一页最多 30 人；第 1 页另外带前 3 名。公开接口 */
+export async function getGuardPage(http: BiliHttp, roomId: number, anchorUid: number, page: number): Promise<GuardPage> {
+  type Item = { uinfo?: RawUinfo };
+  const d = await http.getData<{ info?: { num?: number; page?: number }; list?: Item[] | null; top3?: Item[] | null }>(
+    `${LIVE}/xlive/app-room/v2/guardTab/topListNew?roomid=${roomId}&page=${page}&ruid=${anchorUid}&page_size=30&typ=5`,
+    { auth: false, referer: `https://live.bilibili.com/${roomId}` },
+  );
+  const items = [...(page === 1 ? (d.top3 ?? []) : []), ...(d.list ?? [])].map((x) => listViewer(x.uinfo)).filter((x) => x.uid > 0);
+  return { total: Number(d.info?.num) || 0, pages: Number(d.info?.page) || 0, items };
+}
+
 export interface UserCard {
   uid: number;
   name: string;

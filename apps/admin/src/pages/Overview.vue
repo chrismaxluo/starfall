@@ -1,32 +1,28 @@
 <script setup lang="ts">
-// 总览：正在监控的直播间（标题、分区、主播、开播时间）、本场 / 今天的数据、实时动态、播放队列
+// 总览：正在监控的直播间（标题、分区、主播、开播时间）、本场 / 今天的数据、实时动态、右侧切换面板（播放队列、在线观众、礼物榜、大航海）
 import EvIcon from '../components/EvIcon.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
-import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
+import OvPanel from '../components/OvPanel.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
-import { del, get, post, put } from '../lib/api.ts';
+import { get } from '../lib/api.ts';
 import { describe, statusText } from '../lib/events.ts';
 import { bigNum, clock, duration, hms, when } from '../lib/format.ts';
 import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
-import { effectById, refreshSettings, state } from '../lib/store.ts';
-import { attempt } from '../lib/toast.ts';
-import type { EventDto, StatsDto, Viewer } from '../lib/types.ts';
+import { effectById, state } from '../lib/store.ts';
+import type { EventDto, StatsDto, TriggerKind, Viewer } from '../lib/types.ts';
 
-const PLAY_GAP_MS = 300;
-const Q_SHOW = 5;
 const stats = ref<StatsDto | null>(null);
 const menu = ref<{ viewer: Viewer; x: number; y: number } | null>(null);
 const now = ref(Date.now());
 const coverFailed = ref(false);
-const showQueueSet = ref(false);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let tick: ReturnType<typeof setInterval> | null = null;
 
@@ -47,7 +43,7 @@ const off = onLiveEvent(() => {
 });
 onMounted(() => {
   void loadStats();
-  // 直播时长、队列进度每秒更新
+  // 直播时长每秒更新
   tick = setInterval(() => (now.value = Date.now()), 1000);
 });
 onBeforeUnmount(() => {
@@ -95,9 +91,24 @@ const scopeText = computed(() => {
 });
 const COMP: Array<[Identity, string]> = [['gov', 'var(--gov)'], ['adm', 'var(--adm)'], ['cap', 'var(--cap)'], ['mod', 'var(--mod)'], ['fan', '#C770A4'], ['nor', 'var(--line-strong)']];
 const compTotal = computed(() => Object.values(stats.value?.composition ?? {}).reduce((a, b) => a + b, 0));
+const HONOR: Array<['l1' | 'l21' | 'l41' | 'l61' | 'none', string, string]> = [['l1', '1 – 20 级', '#8FA3C8'], ['l21', '21 – 40 级', '#6D8BE8'], ['l41', '41 – 60 级', '#9A7BE8'], ['l61', '61 级以上', '#E0A43C'], ['none', '没有 / 不知道', 'var(--line-strong)']];
+const honorTotal = computed(() => Object.values(stats.value?.honor ?? {}).reduce((a, b) => a + b, 0));
 
 // ---------- 实时动态 ----------
-const feed = computed(() => state.feed.slice(0, 12));
+const FEED_SHOW = 12;
+const kind = ref<'all' | TriggerKind>('all');
+const onlyGuard = ref(false);
+/** 鼠标停在列表上时先不滚动（方便点人），移开后再显示新的 */
+const frozen = ref<EventDto[] | null>(null);
+const filtered = computed(() => state.feed.filter((e) => (kind.value === 'all' || e.kind === kind.value) && (!onlyGuard.value || Number((e.viewer as Viewer).guard) > 0)));
+const feed = computed(() => frozen.value ?? filtered.value.slice(0, FEED_SHOW));
+const newWhileFrozen = computed(() => {
+  const f = frozen.value;
+  if (!f) return 0;
+  const top = f[0]?.id ?? 0;
+  return filtered.value.filter((e) => e.id > top).length;
+});
+watch([kind, onlyGuard], () => frozen.value && (frozen.value = filtered.value.slice(0, FEED_SHOW)));
 function rowText(e: EventDto): string {
   const parts = e.kind === 'enter' ? [] : [describe(e)];
   if (e.status === 'played' || e.status === 'queued') parts.push(`${e.status === 'played' ? '已播放' : '排队中'} ${effectById(e.effectId)?.name ?? ''}`);
@@ -105,35 +116,7 @@ function rowText(e: EventDto): string {
   else parts.push(e.status === 'blacklist' ? '黑名单，未播放' : '未触发特效');
   return parts.join(' · ');
 }
-
-// ---------- 播放队列 ----------
-const playing = computed(() => state.queue.playing);
-const left = computed(() => (playing.value ? Math.max(0, playing.value.startedAt + playing.value.durationMs - now.value) : 0));
-const progress = computed(() => (playing.value ? Math.min(100, ((now.value - playing.value.startedAt) / playing.value.durationMs) * 100) : 0));
-/** 每一项大约多久后开始播 */
-const upcoming = computed(() => {
-  let t = playing.value ? left.value + PLAY_GAP_MS : 0;
-  return state.queue.items.map((q) => {
-    const eta = t;
-    t += q.durationMs + PLAY_GAP_MS;
-    return { ...q, eta };
-  });
-});
-const eta = (ms: number) => (ms < 1000 ? '马上' : `约 ${Math.round(ms / 1000)} 秒后`);
-async function skip(): Promise<void> {
-  await attempt(() => post('/api/playback/skip'), '已跳过，开始播下一个');
-}
-async function clearQueue(): Promise<void> {
-  await attempt(() => post<{ cleared: number }>('/api/playback/clear'), '已清空排队');
-}
-async function removeItem(id: string, name: string): Promise<void> {
-  await attempt(() => del(`/api/playback/queue/${encodeURIComponent(id)}`), `已移出队列：${name}，这次不播放`);
-}
-async function saveSetting(patch: object, msg: string): Promise<void> {
-  // 成功失败都重新读取：失败时开关要回到原来的状态
-  await attempt(() => put('/api/settings', patch), msg);
-  await refreshSettings().catch(() => undefined);
-}
+const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x, y });
 </script>
 
 <template>
@@ -148,7 +131,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
     <div v-if="needSetup" class="guide">
       <b>开始使用：</b>
       <ol>
-        <li v-for="(x, i) in setupSteps" :key="x.name" :class="{ done: x.done }"><Icon :name="x.done ? 'i-check' : 'i-spark'" />{{ i + 1 }}. <a :href="x.href">{{ x.name }}</a></li>
+        <li v-for="(x, i) in setupSteps" :key="x.name" :class="{ done: x.done }"><Icon :name="x.done ? 'i-check' : 'i-todo'" />{{ i + 1 }}. <a :href="x.href">{{ x.name }}</a></li>
       </ol>
     </div>
 
@@ -185,37 +168,23 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
       <Seg :model-value="scope" label="数据范围" :options="[{ value: 'live', label: live ? '本场' : '上一场' }, { value: 'today', label: '今天' }]" @change="(v) => (picked = v)" />
     </div>
 
-    <div class="bento">
-      <div class="card span3">
-        <div class="card-h"><h2>进场人数 · 去重</h2></div>
-        <div class="kpi-row"><span class="kpi-v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span></div>
-        <div class="delta">其中大航海 <b class="num" style="color: var(--t1)">{{ stats?.guardUnique ?? 0 }}</b> 人</div>
-      </div>
-      <div class="card span3">
-        <div class="card-h"><h2>触发特效</h2></div>
-        <div class="kpi-row"><span class="kpi-v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span></div>
-        <div class="delta">其中大航海 <b class="num" style="color: var(--t1)">{{ stats?.guardPlayed ?? 0 }}</b> 次</div>
-      </div>
-      <div class="card span3 ov-kpi">
-        <div class="card-h"><h2>看过 · 高能榜</h2><span class="src">B站</span></div>
-        <div class="pair">
-          <div><small>看过</small><span class="kpi-v num">{{ live ? bigNum(info?.watched) : '—' }}</span></div>
-          <div><small>高能榜</small><span class="kpi-v num">{{ live ? bigNum(info?.rankCount) : '—' }}</span></div>
-        </div>
-        <div class="delta">{{ live ? 'B 站直播间的实时数据' : '开播后显示' }}</div>
-      </div>
-      <div class="card span3 ov-kpi">
-        <div class="card-h"><h2>点赞 · 粉丝</h2><span class="src">B站</span></div>
-        <div class="pair">
-          <div><small>点赞</small><span class="kpi-v num">{{ live ? bigNum(info?.likes) : '—' }}</span></div>
-          <div><small>粉丝</small><span class="kpi-v num">{{ bigNum(info?.followers) }}</span></div>
-        </div>
-        <div class="delta">{{ info?.fansClub ? `粉丝团 ${bigNum(info.fansClub)} 人` : live ? '点赞是本场累计' : '点赞开播后显示' }}</div>
-      </div>
+    <div class="card kstrip">
+      <div><small>进场人数 · 去重</small><span class="v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardUnique ?? 0 }}</b> 人</div></div>
+      <div><small>触发特效</small><span class="v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardPlayed ?? 0 }}</b> 次</div></div>
+      <div><small>看过<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.watched) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
+      <div><small>高能榜<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.rankCount) : '—' }}</span><div class="d">{{ live ? '现在在线、登录了的观众' : '开播后显示' }}</div></div>
+      <div><small>点赞<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.likes) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
+      <div><small>粉丝<span class="src">B站</span></small><span class="v num">{{ bigNum(info?.followers) }}</span><div class="d"><template v-if="info?.fansClub">粉丝团 <b class="num">{{ bigNum(info.fansClub) }}</b> 人</template><template v-else>&nbsp;</template></div></div>
+    </div>
 
+    <div class="bento">
       <div class="card span7" style="grid-row: span 2">
-        <div class="card-h"><h2>实时动态</h2><span class="aside">点任意一行可设置专属特效<span v-if="s?.live.connection === 'connected'" class="live" style="height: 22px"><i />LIVE</span></span></div>
-        <div class="feed">
+        <div class="card-h"><h2>实时动态</h2><span class="aside"><span v-if="frozen" class="hold"><i />暂停滚动{{ newWhileFrozen ? ` · 新来 ${newWhileFrozen} 条` : '' }}</span><template v-else>点任意一行可设置专属特效</template><span v-if="s?.live.connection === 'connected'" class="live" style="height: 22px"><i />LIVE</span></span></div>
+        <div class="fbar">
+          <Seg v-model="kind" label="实时动态筛选" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物' }, { value: 'guard', label: '上舰' }]" />
+          <label>只看大航海<Switch v-model="onlyGuard" label="只看大航海" /></label>
+        </div>
+        <div class="feed" @mouseenter="frozen = feed.slice()" @mouseleave="frozen = null">
           <div v-for="e in feed" :key="e.id" class="feed-row" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
             <Avatar :name="e.uname" :face="e.viewer.face" :guard="e.viewer.guard" />
             <span class="who">
@@ -227,53 +196,14 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
             <span class="rowact" aria-hidden="true"><Icon name="i-more" /></span>
           </div>
           <div v-if="!feed.length" class="soon-box" style="border: 0; background: none">
-            <b>还没有动态</b>开播后，观众进场、弹幕、礼物会实时出现在这里
+            <template v-if="kind !== 'all' || onlyGuard"><b>没有符合的动态</b>换个筛选试试（这里只看最近 {{ state.feed.length }} 条，更早的在「事件记录」里查）</template>
+            <template v-else><b>还没有动态</b>开播后，观众进场、弹幕、礼物会实时出现在这里</template>
           </div>
         </div>
       </div>
 
-      <div class="card span5">
-        <div class="card-h">
-          <h2>播放队列</h2>
-          <span class="aside">{{ playing ? `正在播 1 条 · 排队 ${state.queue.items.length} 条` : state.queue.items.length ? `排队 ${state.queue.items.length} 条` : '空闲' }}</span>
-        </div>
-        <div v-if="playing" class="ov-now">
-          <Avatar :name="playing.viewerName" :face="playing.viewerFace" :guard="playing.viewerGuard" />
-          <div style="min-width: 0">
-            <b>{{ playing.viewerName }}</b>
-            <div class="what"><EvIcon v-if="playing.kind !== 'enter'" :kind="playing.kind" :img="playing.giftImg" />{{ playing.detail }} · 播放 <b>{{ playing.effectName }}</b></div>
-          </div>
-          <span class="left num">还剩 {{ (left / 1000).toFixed(1) }} 秒</span>
-          <div class="bar"><i :style="{ width: `${progress}%` }" /></div>
-        </div>
-        <div v-if="upcoming.length" class="ov-q">
-          <div v-for="(q, i) in upcoming.slice(0, Q_SHOW)" :key="q.id" class="qrow">
-            <span class="n num">{{ i + 1 }}</span>
-            <Avatar :name="q.viewerName" :face="q.viewerFace" :guard="q.viewerGuard" />
-            <span class="who"><b>{{ q.viewerName }}</b><span><EvIcon v-if="q.kind !== 'enter'" :kind="q.kind" :img="q.giftImg" />{{ q.detail }} · {{ q.effectName }}</span></span>
-            <span class="eta num">{{ eta(q.eta) }}</span>
-            <button class="x" :aria-label="`把 ${q.viewerName} 移出队列`" title="移出队列（这次不播）" @click="removeItem(q.id, q.viewerName)"><Icon name="i-x" /></button>
-          </div>
-        </div>
-        <div v-if="!playing && !upcoming.length" class="ov-qempty"><b>现在没有排队</b>观众进场、送礼时会出现在这里，按顺序一个一个播放</div>
-        <div class="ov-qfoot">
-          <span v-if="upcoming.length > Q_SHOW">后面还有 <b class="num">{{ upcoming.length - Q_SHOW }}</b> 条</span>
-          <button class="linkish" :aria-expanded="showQueueSet" @click="showQueueSet = !showQueueSet">排队设置</button>
-          <span class="sp" />
-          <button v-if="playing" class="btn" @click="skip">跳过当前</button>
-          <ConfirmButton v-if="upcoming.length" label="清空排队" confirm-label="确认清空" cls="btn" @confirm="clearQueue" />
-        </div>
-        <div v-if="showQueueSet && state.settings" class="ov-qset">
-          <div class="toggle-line">高价值插队 <span class="hint">上舰和 1000 电池（100 元）以上的礼物排到最前面</span>
-            <Switch v-model="state.settings.queueJump" label="高价值插队" @change="(v) => saveSetting({ queueJump: v }, v ? '已开启高价值插队' : '已关闭高价值插队')" />
-          </div>
-          <div class="slider-row">
-            <label for="qMax">最多排队</label>
-            <input id="qMax" v-model.number="state.settings.queueMax" type="range" min="3" max="30" @change="saveSetting({ queueMax: state.settings!.queueMax }, `最多排队 ${state.settings!.queueMax} 条`)" />
-            <output>{{ state.settings.queueMax }} 条</output>
-          </div>
-          <span class="hint">播放顺序：上舰 → 礼物 → 进场 → 弹幕。排满后，先挤掉顺序最靠后、最早进来的一条。</span>
-        </div>
+      <div class="card span5 ov-panel">
+        <OvPanel :scope="scope" :guard-came="stats?.guardUnique" @pick="pick" />
       </div>
 
       <div class="card span5">
@@ -286,6 +216,16 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
         </div>
         <div class="legend">
           <div v-for="[k, c] in COMP" :key="k"><i :style="{ background: c }" />{{ k === 'nor' ? '普通观众' : IDENTITY[k].name }}<b class="num">{{ stats?.composition[k] ?? 0 }}</b></div>
+        </div>
+        <div class="sub-h">荣耀等级分布</div>
+        <div class="stack">
+          <template v-for="[k, , c] in HONOR" :key="k">
+            <i v-if="stats && stats.honor[k]" :style="{ width: `${Math.max((stats.honor[k] / honorTotal) * 100, 1.2)}%`, background: c }" />
+          </template>
+          <i v-if="!honorTotal" style="width: 100%; background: var(--hover)" />
+        </div>
+        <div class="legend">
+          <div v-for="[k, name, c] in HONOR" :key="k"><i :style="{ background: c }" />{{ name }}<b class="num">{{ stats?.honor[k] ?? 0 }}</b></div>
         </div>
       </div>
     </div>

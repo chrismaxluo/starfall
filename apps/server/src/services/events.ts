@@ -46,6 +46,28 @@ export interface EventStats {
   played: number;
   guardPlayed: number;
   composition: Record<'gov' | 'adm' | 'cap' | 'mod' | 'fan' | 'nor', number>;
+  /** 进场观众的荣耀等级分布（每人按最后一次进场时的等级） */
+  honor: Record<'l1' | 'l21' | 'l41' | 'l61' | 'none', number>;
+}
+
+/** 礼物榜的一行 */
+export interface GiftRankRow {
+  uid: number;
+  viewer: unknown;
+  /** 付费礼物总价值（金瓜子） */
+  gold: number;
+  /** 送了几次（连击合并后） */
+  times: number;
+  /** 单价最高的一件礼物 */
+  topGift: string;
+}
+
+/** 这段时间进场过的大航海 */
+export interface GuardVisit {
+  uid: number;
+  viewer: unknown;
+  times: number;
+  lastTs: number;
 }
 
 export class EventLog {
@@ -114,11 +136,15 @@ export class EventLog {
     const rows = db
       .prepare(
         `select json_extract(viewer, '$.guard') g, json_extract(viewer, '$.isMod') m, json_extract(viewer, '$.medal.anchorUid') a, json_extract(viewer, '$.medal.level') l
+         , json_extract(viewer, '$.honor') h
          from events where id in (select max(id) from events where ${where} and kind = 'enter' group by uid)`,
       )
-      .all(...args) as Array<{ g: number | null; m: number | null; a: number | null; l: number | null }>;
+      .all(...args) as Array<{ g: number | null; m: number | null; a: number | null; l: number | null; h: number | null }>;
     const composition = { gov: 0, adm: 0, cap: 0, mod: 0, fan: 0, nor: 0 };
+    const honor = { l1: 0, l21: 0, l41: 0, l61: 0, none: 0 };
     for (const r of rows) {
+      const h = Number(r.h) || 0;
+      honor[h >= 61 ? 'l61' : h >= 41 ? 'l41' : h >= 21 ? 'l21' : h >= 1 ? 'l1' : 'none']++;
       if (r.g === 1) composition.gov++;
       else if (r.g === 2) composition.adm++;
       else if (r.g === 3) composition.cap++;
@@ -126,7 +152,40 @@ export class EventLog {
       else if (r.a === anchorUid && (r.l ?? 0) > 0) composition.fan++;
       else composition.nor++;
     }
-    return { enterUnique, guardUnique: composition.gov + composition.adm + composition.cap, played, guardPlayed, composition };
+    return { enterUnique, guardUnique: composition.gov + composition.adm + composition.cap, played, guardPlayed, composition, honor };
+  }
+
+  /** 礼物榜：这段时间里每人送的付费礼物总价值，从高到低 */
+  giftRank(roomId: number, from: number, to: number | null, limit = 50): { people: number; gold: number; rows: GiftRankRow[] } {
+    const db = this.db.$client;
+    const args = [roomId, from, to ?? Number.MAX_SAFE_INTEGER];
+    const paid = `room_id = ? and ts >= ? and ts < ? and kind = 'gift' and json_extract(payload, '$.paid') = 1`;
+    const value = `json_extract(payload, '$.unitPrice') * json_extract(payload, '$.count')`;
+    const sum = db.prepare(`select count(distinct uid) people, coalesce(sum(${value}), 0) gold from events where ${paid}`).get(...args) as { people: number; gold: number };
+    const rows = db
+      .prepare(
+        `with g as (select id, uid, viewer, ${value} v, json_extract(payload, '$.unitPrice') p, json_extract(payload, '$.giftName') name from events where ${paid}),
+              top as (select uid, sum(v) gold, count(*) times, max(id) last from g group by uid order by gold desc, last desc limit ?)
+         select top.uid, top.gold, top.times, (select viewer from g where g.id = top.last) viewer,
+                (select name from g where g.uid = top.uid order by p desc, id desc limit 1) topGift
+         from top order by top.gold desc, top.last desc`,
+      )
+      .all(...args, limit) as Array<{ uid: number; gold: number; times: number; viewer: string; topGift: string | null }>;
+    return { people: sum.people, gold: sum.gold, rows: rows.map((r) => ({ uid: r.uid, viewer: JSON.parse(r.viewer), gold: r.gold, times: r.times, topGift: r.topGift ?? '' })) };
+  }
+
+  /** 这段时间进场过的大航海：进场几次、最后一次什么时候（按最后一次进场时的身份算） */
+  guardVisits(roomId: number, from: number, to: number | null): GuardVisit[] {
+    const db = this.db.$client;
+    const rows = db
+      .prepare(
+        `with e as (select id, uid, ts, viewer from events where room_id = ? and ts >= ? and ts < ? and kind = 'enter'),
+              last as (select uid, count(*) times, max(ts) lastTs, max(id) id from e group by uid)
+         select last.uid, last.times, last.lastTs, e.viewer from last join e on e.id = last.id
+         where cast(json_extract(e.viewer, '$.guard') as integer) > 0 order by last.lastTs desc`,
+      )
+      .all(roomId, from, to ?? Number.MAX_SAFE_INTEGER) as Array<{ uid: number; times: number; lastTs: number; viewer: string }>;
+    return rows.map((r) => ({ uid: r.uid, times: r.times, lastTs: r.lastTs, viewer: JSON.parse(r.viewer) }));
   }
 
   /** 本场已经播放过进场特效的 UID（服务重启后恢复"每场一次"）。排队中没播出来的不算 */

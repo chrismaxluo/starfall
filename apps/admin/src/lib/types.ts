@@ -222,6 +222,39 @@ export interface StatsDto {
   played: number;
   guardPlayed: number;
   composition: Record<'gov' | 'adm' | 'cap' | 'mod' | 'fan' | 'nor', number>;
+  /** 荣耀等级分布：1–20、21–40、41–60、61 级以上、没有或不知道 */
+  honor: Record<'l1' | 'l21' | 'l41' | 'l61' | 'none', number>;
+}
+
+/** B 站名单里的一位观众（高能榜、舰队名单） */
+export interface ListViewer {
+  uid: number;
+  name: string;
+  face: string;
+  guard: 0 | 1 | 2 | 3;
+  honor: number;
+  medal?: Medal;
+  mystery: boolean;
+}
+
+export interface OnlineDto {
+  live: boolean;
+  count: number;
+  items: Array<ListViewer & { rank: number; score: number }>;
+  updatedAt: number | null;
+}
+
+export interface GiftRankDto {
+  people: number;
+  /** 合计（金瓜子） */
+  gold: number;
+  rows: Array<{ uid: number; viewer: Viewer; gold: number; times: number; topGift: string }>;
+}
+
+export interface FleetDto {
+  came: Array<{ uid: number; viewer: Viewer; times: number; lastTs: number }>;
+  fleet: { total: number; members: Array<{ uid: number; name: string; face: string; guard: number }>; updatedAt: number } | null;
+  fleetError: string | null;
 }
 
 export interface BlacklistEntry {

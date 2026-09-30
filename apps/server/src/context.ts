@@ -19,6 +19,8 @@ import { EventLog } from './services/events.ts';
 import type { getHonorMedals, getRoomGifts } from '@starfall/bili';
 import { GiftCatalog } from './services/gifts.ts';
 import { HonorMedals } from './services/honor.ts';
+import { AudienceService } from './services/audience.ts';
+import type { AudienceDeps } from './services/audience.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
 import type { LiveDeps } from './services/live.ts';
@@ -51,6 +53,7 @@ export interface AppContext {
   guardRules: GuardRuleStore;
   gifts: GiftCatalog;
   honor: HonorMedals;
+  audience: AudienceService;
   outputs: OutputStore;
   blacklist: BlacklistStore;
   log: EventLog;
@@ -64,7 +67,7 @@ export interface AppContext {
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts; fetchHonor?: typeof getHonorMedals } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts; fetchHonor?: typeof getHonorMedals; audience?: Partial<Pick<AudienceDeps, 'fetchOnline' | 'fetchGuards' | 'sleep'>> } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -86,6 +89,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const guardRules = new GuardRuleStore(db);
   const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
   const honor = new HonorMedals(settings, () => account.anon, opts.fetchHonor);
+  const audience = new AudienceService({ room, live, anon: () => account.anon, auth: () => account.http(), ...opts.audience });
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
   const overlayBuild = new BuildVersion(config.overlayDist);
@@ -104,7 +108,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, honor, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;

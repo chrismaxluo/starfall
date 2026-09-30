@@ -127,7 +127,7 @@ const clashes = computed(() => {
         </span>
         <span class="acts">
           <button class="playmini" aria-label="上移（先匹配）" :disabled="i === 0" @click="move(i, -1)"><Icon name="i-up" /></button>
-          <button class="playmini" aria-label="下移" :disabled="i === state.danmu.length - 1" @click="move(i, 1)"><Icon name="i-down" /></button>
+          <button class="playmini" aria-label="下移" :disabled="i === state.danmu.length - 1" @click="move(i, 1)"><Icon name="i-chev" /></button>
           <button class="playmini" :aria-label="`预览弹幕「${r.keywords[0]}」`" @click="preview(r)"><svg><use href="#i-play" /></svg></button>
           <ConfirmButton label="" confirm-label="删除" cls="playmini" armed-cls="delb" aria-label="删除这条规则" @confirm="remove(r)"><Icon name="i-x" /></ConfirmButton>
           <Switch v-model="r.enabled" :label="`弹幕规则 ${i + 1}`" @change="(v) => patch(r, { enabled: v }, v ? '已打开这条弹幕规则' : '已关闭这条弹幕规则')" />

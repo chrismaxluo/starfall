@@ -36,7 +36,7 @@ const cmds = computed<Cmd[]>(() => {
   });
   return [
     ...tiers.map((id): Cmd => ({ g: '特效测试', icon: 'i-play', label: `预览${IDENTITY[id].name}进场特效`, kw: '测试 播放', run: preview(id) })),
-    { g: '特效测试', icon: 'i-spark', label: '打开特效页演示', kw: 'demo 测试', run: () => void open('/overlay/?demo=1', '_blank', 'noopener') },
+    { g: '特效测试', icon: 'i-demo', label: '打开特效页演示', kw: 'demo 测试', run: () => void open('/overlay/?demo=1', '_blank', 'noopener') },
     { g: '直播中', icon: 'i-pause', label: paused ? '恢复播放' : '暂停所有特效', kw: '暂停 恢复 紧急', kbd: 'Ctrl Shift P', run: () => void togglePause() },
     { g: '直播中', icon: 'i-x', label: '清空播放队列', kw: '排队', run: () => void clearQueue() },
     { g: '跳转', icon: 'i-grid', label: '总览', kw: '首页 实时动态', run: () => go('overview') },
@@ -44,7 +44,7 @@ const cmds = computed<Cmd[]>(() => {
     { g: '跳转', icon: 'i-user', label: '专属用户', kw: '触发规则 专属素材', run: () => go('rules', 'exclusive') },
     { g: '跳转', icon: 'i-chat', label: '弹幕规则', kw: '触发规则 关键词', run: () => go('rules', 'danmu') },
     { g: '跳转', icon: 'i-gift', label: '礼物规则', kw: '触发规则 价值 连击', run: () => go('rules', 'gift') },
-    { g: '跳转', icon: 'i-medal', label: '上舰规则', kw: '触发规则 开通 续费 舰长 提督 总督', run: () => go('rules', 'guard') },
+    { g: '跳转', icon: 'i-anchor', label: '上舰规则', kw: '触发规则 开通 续费 舰长 提督 总督', run: () => go('rules', 'guard') },
     { g: '跳转', icon: 'i-image', label: '素材库', kw: '上传 动画 视频', run: () => go('assets') },
     { g: '跳转', icon: 'i-image', label: '音效', kw: '素材库 声音', run: () => go('assets', 'sound') },
     { g: '跳转', icon: 'i-list', label: '事件记录', kw: '日志 历史', run: () => go('logs') },

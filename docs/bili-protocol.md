@@ -257,7 +257,7 @@ GET https://api.live.bilibili.com/xlive/general-interface/v1/content/get?key=wea
 ```
 高能榜（在线观众）：GET https://api.live.bilibili.com/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=主播UID&roomId=房间号&page=1&pageSize=50
 → data.onlineNum（在线人数，和 ONLINE_RANK_COUNT 一样）、data.OnlineRankItem[]：userRank、uid、name、face、score（贡献值）、guard_level、wealth_level（荣耀等级）、is_mystery、medalInfo、uinfo（和进场消息的新结构一样）
-   不带登录 Cookie 时只返回很少几个（实测 398 人在线时给了 31 个，有时只给第 1 名），所以用登录的账号读。
+   名单只有这场贡献值大于 0 的人（接口自己的说明：「投喂、点赞、发弹幕均可上榜」）：实测 398 人在线时 31 人上榜，12 人在线时 4 人上榜；登录不登录拿到的一样，所以不用登录读。
 
 大航海榜（舰队名单）：GET https://api.live.bilibili.com/xlive/app-room/v2/guardTab/topListNew?roomid=房间号&page=1&ruid=主播UID&page_size=30&typ=5
 → data.info.num（大航海总人数）、info.page（总页数）；第 1 页有 top3（前 3 名）+ list，之后每页只有 list。page_size 最大 30（填更大会变成 10）。

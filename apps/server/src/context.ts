@@ -89,7 +89,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const guardRules = new GuardRuleStore(db);
   const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
   const honor = new HonorMedals(settings, () => account.anon, opts.fetchHonor);
-  const audience = new AudienceService({ room, live, anon: () => account.anon, auth: () => account.http(), ...opts.audience });
+  const audience = new AudienceService({ room, live, anon: () => account.anon, ...opts.audience });
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
   const overlayBuild = new BuildVersion(config.overlayDist);

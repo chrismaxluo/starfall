@@ -238,6 +238,8 @@ describe('预览与统计', () => {
     // 别的直播间的事件不算
     t.ctx.db.$client.prepare("update events set room_id = 999 where uid = 5").run();
     enter(v(6, { guard: 1 }));
+    // 主播本人不算观众
+    enter(v(20000));
     const s = (await t.req({ method: 'GET', url: '/api/stats?scope=today' })).json();
     expect(s).toMatchObject({ scope: 'today', roomId: 30000, to: null, live: false, enterUnique: 5, guardUnique: 2, composition: { gov: 1, adm: 0, cap: 1, mod: 1, fan: 1, nor: 1 } });
     expect(s.from).toBeLessThanOrEqual(Date.now());

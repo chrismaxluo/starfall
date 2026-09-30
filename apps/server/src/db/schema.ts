@@ -2,7 +2,8 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { DanmuWho, EffectTexts, FeatherMode, Position, Tier } from '@starfall/shared';
+import type { DanmuWho, EffectTexts, FeatherMode, Position, SvgaRole, Tier } from '@starfall/shared';
+import type { SvgaSlot } from '../services/probe.ts';
 
 const now = sql`(unixepoch() * 1000)`;
 const bool = (name: string) => integer(name, { mode: 'boolean' });
@@ -48,6 +49,8 @@ export const assets = sqliteTable('assets', {
   height: integer('height'),
   durationMs: integer('duration_ms'),
   hasAlpha: bool('has_alpha').notNull().default(false),
+  /** SVGA 里可以替换的图层（其他类型为 null） */
+  slots: text('slots', { mode: 'json' }).$type<SvgaSlot[]>(),
   createdAt: integer('created_at').notNull().default(now),
 });
 
@@ -81,6 +84,8 @@ export const effects = sqliteTable('effects', {
   featherPct: integer('feather_pct').notNull().default(10),
   /** 头像和欢迎语里，大航海观众的头像套上 B 站头像框 */
   guardFrame: bool('guard_frame').notNull().default(false),
+  /** SVGA：图层名 → 播放时换成什么 */
+  svgaMap: text('svga_map', { mode: 'json' }).$type<Record<string, SvgaRole>>().notNull().default({}),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 });

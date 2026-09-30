@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -104,6 +104,7 @@ const EffectPart = z.object({
   feather: z.enum(FEATHER_MODES).default('global'),
   featherPct: z.number().int().min(0).max(FEATHER_MAX).default(FEATHER_DEFAULT),
   guardFrame: z.boolean().default(false),
+  svgaMap: z.record(z.string().min(1).max(120), z.enum(SVGA_ROLES)).default({}),
 });
 
 const TierPart = z.object({ effect: effectRef, cooldownMin, enabled: z.boolean() });
@@ -265,6 +266,7 @@ export class ConfigIO {
         feather: e.feather,
         featherPct: e.featherPct,
         guardFrame: e.guardFrame,
+        svgaMap: e.svgaMap,
       })),
       rules: {
         enter: {
@@ -491,7 +493,7 @@ export class ConfigIO {
       for (const e of file.effects) {
         const c = local.get(e.name);
         const assetId = idOfSha(e.asset);
-        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, fadeInMs: e.fadeInMs, fadeOutMs: e.fadeOutMs, offsetX: e.offsetX, offsetY: e.offsetY, sizePct: e.sizePct, feather: e.feather, featherPct: e.featherPct, guardFrame: e.guardFrame, updatedAt: Date.now() };
+        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, fadeInMs: e.fadeInMs, fadeOutMs: e.fadeOutMs, offsetX: e.offsetX, offsetY: e.offsetY, sizePct: e.sizePct, feather: e.feather, featherPct: e.featherPct, guardFrame: e.guardFrame, svgaMap: e.svgaMap, updatedAt: Date.now() };
         if (c) {
           if (c.builtin || e.builtin) continue;
           // 新文件缺失时保留本机的画面

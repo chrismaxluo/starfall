@@ -3,6 +3,7 @@ import type { LottiePlayer } from 'lottie-web';
 import type * as SvgaLib from 'svgaplayerweb';
 import type { PlayVisual } from '@starfall/shared';
 import { h } from './dom.ts';
+import { applyDyn } from './svga-dyn.ts';
 
 type AssetVisual = Extract<PlayVisual, { type: 'asset' }>;
 
@@ -85,6 +86,9 @@ function svga(v: AssetVisual): Media {
       p.clearsAfterStop = false;
       p.fillMode = 'Forward';
       p.setContentMode('AspectFit');
+      // 观众的头像、头像框、昵称等放进预留的图层（要在设置动画之前）
+      if (v.dyn?.length) await applyDyn(p, v.dyn);
+      if (stopped) return;
       p.setVideoItem(item);
       p.startAnimation();
       player = p;

@@ -4,8 +4,8 @@
 // 四种事件共用同一套判断（黑名单 → 匹配规则 → 暂停 → 开播 → 冷却 → 特效页在线），只有匹配规则、冷却、欢迎语变量、是否插队不同。
 import { Cooldowns, EnterMerger, GiftComboMerger, GuardDeduper, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchDanmu, matchEnter, matchGift, matchGuard, pickText } from '@starfall/core';
 import type { QueueItem, TextVars } from '@starfall/core';
-import { GUARD_NAMES, JUMP_GOLD } from '@starfall/shared';
-import type { PlayItem, PlayStatus, StdEvent, TriggerKind, Viewer } from '@starfall/shared';
+import { GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD } from '@starfall/shared';
+import type { PlayItem, PlayStatus, StdEvent, SvgaDyn, TriggerKind, Viewer } from '@starfall/shared';
 import { HttpError } from '../http.ts';
 import type { BlacklistStore } from './blacklist.ts';
 import type { EffectDto, EffectStore } from './effects.ts';
@@ -385,8 +385,30 @@ export class Pipeline {
     return !e.asset.hasAlpha && this.d.settings.get('featherOn') ? this.d.settings.get('featherPct') : 0;
   }
 
+  /** SVGA 图层替换成这位观众的头像、头像框、身份图标、昵称、欢迎语；不是大航海时头像框、图标那一层藏起来 */
+  private svgaDyn(effect: EffectDto, viewer: Viewer, text: string): SvgaDyn[] | undefined {
+    const a = effect.asset;
+    if (!a || a.ext !== 'svga' || !a.slots?.length) return undefined;
+    const g = viewer.guard;
+    const out: SvgaDyn[] = [];
+    for (const s of a.slots) {
+      const role = effect.svgaMap[s.key];
+      if (!role) continue;
+      const base = { key: s.key, role, w: s.w, h: s.h };
+      // 头像带上昵称：加载不到头像时用昵称的第一个字画一个
+      if (role === 'avatar' || role === 'avatarSquare') out.push({ ...base, url: viewer.face ?? '', text: viewer.name });
+      else if (role === 'frame') out.push({ ...base, url: g ? GUARD_FRAMES[g] : '' });
+      else if (role === 'badge') out.push({ ...base, url: g ? GUARD_BADGES[g] : '' });
+      else if (role === 'name') out.push({ ...base, text: viewer.name });
+      else out.push({ ...base, text });
+    }
+    return out.length ? out : undefined;
+  }
+
   private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {
     const a = effect.asset;
+    const text = fillText(pickText(effect.texts, kind, this.rng), { viewer, ...vars });
+    const dyn = this.svgaDyn(effect, viewer, text);
     return {
       id: `p${this.now()}-${++this.seq}`,
       kind,
@@ -395,7 +417,7 @@ export class Pipeline {
         name: effect.name,
         visual:
           effect.visual.type === 'asset' && a
-            ? { type: 'asset', url: a.url, ext: a.ext, kind: a.kind === 'audio' ? 'video' : a.kind, width: a.width, height: a.height, hasAlpha: a.hasAlpha }
+            ? { type: 'asset', url: a.url, ext: a.ext, kind: a.kind === 'audio' ? 'video' : a.kind, width: a.width, height: a.height, hasAlpha: a.hasAlpha, ...(dyn ? { dyn } : {}) }
             : { type: 'builtin_style', style: effect.visual.type === 'builtin_style' ? effect.visual.style : 'line' },
         showText: effect.showText,
         position: effect.position,
@@ -412,7 +434,7 @@ export class Pipeline {
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },
-      text: fillText(pickText(effect.texts, kind, this.rng), { viewer, ...vars }),
+      text,
       viewer: {
         name: viewer.name,
         ...(viewer.face ? { face: viewer.face } : {}),

@@ -31,6 +31,24 @@ export const SIZE_MAX = 200;
 export const FEATHER_MODES = ['global', 'custom', 'off'] as const;
 export type FeatherMode = (typeof FEATHER_MODES)[number];
 export const FEATHER_DEFAULT = 10;
+/** SVGA 的图层播放时换成什么：头像（圆形 / 方形）、头像框、身份图标（船锚）、昵称、欢迎语 */
+export const SVGA_ROLES = ['avatar', 'avatarSquare', 'frame', 'badge', 'name', 'welcome'] as const;
+export type SvgaRole = (typeof SVGA_ROLES)[number];
+/** 按图层名字猜它是什么（买来的 SVGA 常见写法：avatar / head / 头像、nickname / name、frame / kuang ……）；猜不出为 null */
+export function guessSvgaRole(key: string): SvgaRole | null {
+  const k = key.toLowerCase();
+  if (/frame|kuang|border|头像框|txk/.test(k)) return 'frame';
+  if (/avatar|head|touxiang|portrait|face|userpic|user_?img|头像|^tx\d*$/.test(k)) return 'avatar';
+  if (/badge|guard|anchor|medal|rank|身份|船锚|图标/.test(k)) return 'badge';
+  if (/nick|name|uname|昵称|用户名/.test(k)) return 'name';
+  if (/welcome|text|msg|message|desc|content|slogan|欢迎|文字|文案/.test(k)) return 'welcome';
+  return null;
+}
+export function guessSvgaMap(slots: Array<{ key: string }>): Record<string, SvgaRole> {
+  const out: Record<string, SvgaRole> = {};
+  for (const s of slots) { const r = guessSvgaRole(s.key); if (r) out[s.key] = r; }
+  return out;
+}
 
 export const EffectSchema = z.object({
   id: z.number().int().positive(),
@@ -66,6 +84,8 @@ export const EffectSchema = z.object({
   featherPct: z.number().int().min(0).max(FEATHER_MAX),
   /** 上传的素材：大航海观众的头像套上 B 站的头像框（头像和欢迎语里） */
   guardFrame: z.boolean(),
+  /** SVGA：图层名 → 播放时换成什么（没列出的图层不替换） */
+  svgaMap: z.record(z.string().min(1).max(120), z.enum(SVGA_ROLES)).refine((m) => Object.keys(m).length <= 60, { message: '图层太多' }),
 });
 export type Effect = z.infer<typeof EffectSchema>;
 

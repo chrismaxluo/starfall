@@ -75,7 +75,16 @@ describe('SVGA、Lottie 读取自身的元数据', () => {
     });
     const M = root.lookupType('M');
     const buf = zlib.deflateSync(M.encode(M.create({ version: '2.0', params: { viewBoxWidth: 750, viewBoxHeight: 1334, fps: 20, frames: 60 } })).finish());
-    expect(await probe(tmp('a.svga', buf), ALLOWED.svga!)).toEqual({ width: 750, height: 1334, durationMs: 3000, hasAlpha: true });
+    expect(await probe(tmp('a.svga', buf), ALLOWED.svga!)).toEqual({ width: 750, height: 1334, durationMs: 3000, hasAlpha: true, slots: [] });
+  });
+
+  it('SVGA：读出可以替换的图层和原图大小（2.x 和 1.x）', async () => {
+    const two = await probe(path.join(FIXTURES, 'media/slots.svga'), ALLOWED.svga!);
+    expect(two).toMatchObject({ width: 640, height: 180, durationMs: 2000 });
+    expect(two.slots).toEqual([{ key: 'deco', w: 50, h: 50 }, { key: 'avatar', w: 100, h: 100 }, { key: 'frame', w: 140, h: 140 }, { key: 'badge', w: 48, h: 48 }, { key: 'nickname', w: 300, h: 60 }, { key: 'welcome', w: 400, h: 40 }]);
+    const one = await probe(path.join(FIXTURES, 'media/slots-v1.svga'), ALLOWED.svga!);
+    expect(one).toMatchObject({ width: 640, height: 180, durationMs: 2000 });
+    expect(one.slots).toEqual([{ key: 'head', w: 100, h: 100 }, { key: 'nick', w: 300, h: 60 }, { key: 'deco', w: 50, h: 50 }]);
   });
 
   it('SVGA 压缩炸弹（解压后超过 64 MB）直接拒绝，不会把内存撑爆', async () => {

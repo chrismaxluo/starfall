@@ -61,8 +61,14 @@ export interface OutputDto {
   marginX: number;
   scale: number;
   liteMode: 'auto' | 'on' | 'off';
+  chatEnabled: boolean;
+  chatSide: 'left' | 'right';
+  chatSize: 'normal' | 'large';
+  chatMedal: 'own' | 'all';
   key: string;
   path: string;
+  /** 弹幕列表地址 */
+  chatPath: string;
 }
 
 export type AccountStatus = { loggedIn: false } | { loggedIn: true; uid: number; name: string; face: string; expiresAt: number | null };
@@ -205,6 +211,8 @@ export interface RoomInfo {
 
 export interface OverlayInfo {
   outputId: number;
+  /** fx：特效页；chat：弹幕列表 */
+  role: 'fx' | 'chat';
   since: number;
   env: Record<string, string | number | boolean | null> | null;
   lastError: string | null;

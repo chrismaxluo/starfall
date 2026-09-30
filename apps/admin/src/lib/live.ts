@@ -1,11 +1,15 @@
 // 管理后台的实时连接：事件、队列、连接状态、特效页上下线
 import { setTimeZone } from './format.ts';
-import { OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
+import { CHAT_MAX, OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
+import type { ChatItem } from '@starfall/shared/overlay';
 import { FEED_KEEP, refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
-  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null }
+  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[] }
+  /** 弹幕列表：新的一条、换直播间清空 */
+  | { type: 'chat'; item: ChatItem }
+  | { type: 'chat_clear' }
   /** 服务端的后台重新构建了 */
   | { type: 'version'; build: string }
   | { type: 'room_info'; info: RoomInfo | null }
@@ -20,6 +24,7 @@ type Msg =
 const eventListeners = new Set<(e: EventDto) => void>();
 const statusListeners = new Set<(id: number, s: PlayStatus) => void>();
 const resyncListeners = new Set<() => void>();
+const chatListeners = new Set<(item: ChatItem | null) => void>();
 
 /** 订阅新事件（事件记录页、总览统计） */
 export function onLiveEvent(fn: (e: EventDto) => void): () => void {
@@ -29,6 +34,12 @@ export function onLiveEvent(fn: (e: EventDto) => void): () => void {
 export function onLiveEventStatus(fn: (id: number, s: PlayStatus) => void): () => void {
   statusListeners.add(fn);
   return () => statusListeners.delete(fn);
+}
+
+/** 订阅新弹幕（弹幕列表预览）；null 表示清空 */
+export function onChat(fn: (item: ChatItem | null) => void): () => void {
+  chatListeners.add(fn);
+  return () => chatListeners.delete(fn);
 }
 
 /** 断线重连后（可能漏了事件）：事件记录页等重新加载 */
@@ -58,6 +69,7 @@ function handle(m: Msg): void {
       state.queue = m.queue;
       state.overlays = m.overlays;
       state.roomInfo = m.roomInfo;
+      state.chat = m.chat ?? [];
       // 重连：断开期间的事件和别处的修改都补回来
       if (hellos++ > 0) {
         void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs()]).catch(() => undefined);
@@ -90,7 +102,15 @@ function handle(m: Msg): void {
       break;
     case 'overlays':
       state.overlays = m.overlays;
-      if (state.status) state.status.overlays = m.overlays.length;
+      if (state.status) state.status.overlays = m.overlays.filter((x) => x.role !== 'chat').length;
+      break;
+    case 'chat':
+      state.chat = [...state.chat, m.item].slice(-CHAT_MAX);
+      for (const fn of chatListeners) fn(m.item);
+      break;
+    case 'chat_clear':
+      state.chat = [];
+      for (const fn of chatListeners) fn(null);
       break;
     case 'event':
       state.feed.unshift(m.event);

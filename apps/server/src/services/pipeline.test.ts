@@ -565,3 +565,53 @@ describe('播放确认', () => {
     expect(hub.playTimeouts(client, Date.now() + PLAY_ACK_MS)).toEqual([]);
   });
 });
+
+describe('弹幕列表', () => {
+  const chats = (sock: ReturnType<typeof fakeSock>) => sock.sent.filter((m) => m.type === 'chat').map((m) => (m as Extract<ServerToOverlay, { type: 'chat' }>).item);
+
+  it('所有人的弹幕都推给弹幕列表（没有规则、拉黑、暂停也推）；特效页收不到', async () => {
+    const t = await setup();
+    const chat = fakeSock();
+    t.hub.addOverlay(chat, t.ctx.outputs.list()[0]!, [], Date.now(), 'chat');
+    t.ctx.blacklist.add({ uid: 10002, name: '机器人' });
+    t.ctx.settings.set('paused', true);
+    t.live.emit(dm('晚上好'));
+    t.live.emit(dm('欢迎来到直播间', { uid: 10002, name: '机器人' }));
+    expect(chats(chat).map((c) => c.text)).toEqual(['晚上好', '欢迎来到直播间']);
+    expect(t.sock.sent.some((m) => m.type === 'chat')).toBe(false);
+    expect(chat.sent.some((m) => m.type === 'play')).toBe(false);
+  });
+
+  it('标出主播本人、本直播间粉丝牌；带上表情、荣耀等级；没头像时用记下的头像', async () => {
+    const t = await setup();
+    t.ctx.viewers.remember({ uid: 10003, name: '小月', face: 'https://i0.hdslb.com/face/3.jpg' });
+    t.live.emit({ ...dm('[dog]', { uid: ANCHOR, name: '主播', medal: medal(20, 999) }), emots: { '[dog]': 'https://i0.hdslb.com/dog.png' } });
+    t.live.emit({ ...dm('[好耶]', { uid: 10003, name: '小月', guard: 3, medal: medal(21), honor: 30 }), sticker: { url: 'https://i0.hdslb.com/haoye.png', width: 162, height: 162 } });
+    const [a, b] = t.hub.recentChat();
+    expect(a).toMatchObject({ text: '[dog]', emots: { '[dog]': 'https://i0.hdslb.com/dog.png' }, viewer: { anchor: true, medal: { level: 20, own: false } } });
+    expect(b).toMatchObject({ sticker: { width: 162 }, viewer: { anchor: false, guard: 3, face: 'https://i0.hdslb.com/face/3.jpg', medal: { level: 21, own: true }, honor: { level: 30 } } });
+  });
+
+  it('只记住最近 8 条；新打开的弹幕列表先收到这些；换直播间清空', async () => {
+    const t = await setup();
+    for (let i = 1; i <= 10; i++) t.live.emit(dm(`第 ${i} 条`));
+    const chat = fakeSock();
+    t.hub.addOverlay(chat, t.ctx.outputs.list()[0]!, [], Date.now(), 'chat');
+    const hello = chat.sent[0] as Extract<ServerToOverlay, { type: 'hello' }>;
+    expect(hello.chat?.map((c) => c.text)).toEqual(['第 3 条', '第 4 条', '第 5 条', '第 6 条', '第 7 条', '第 8 条', '第 9 条', '第 10 条']);
+    t.ctx.room.save({ roomId: 40000, shortId: 0, anchorUid: 1, anchorName: '别人' });
+    expect(chat.sent.at(-1)).toEqual({ type: 'chat_clear' });
+    expect(t.hub.recentChat()).toEqual([]);
+  });
+
+  it('特效页数量不算弹幕列表；设置变了两种页面都收到', async () => {
+    const t = await setup({ overlay: false });
+    const chat = fakeSock();
+    const o = t.ctx.outputs.list()[0]!;
+    t.hub.addOverlay(chat, o, [], Date.now(), 'chat');
+    expect(t.hub.overlayCount()).toBe(0);
+    expect(t.hub.overlayList()).toMatchObject([{ role: 'chat' }]);
+    t.hub.outputChanged({ ...o, chatSide: 'right' }, 'update');
+    expect(chat.sent.at(-1)).toMatchObject({ type: 'config', config: { chatSide: 'right', chatEnabled: true } });
+  });
+});

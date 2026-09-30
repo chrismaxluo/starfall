@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import ChatPreview from '../components/ChatPreview.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
-import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
+import { CHAT_SIZE } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
-import { refreshOutputs, state } from '../lib/store.ts';
+import { overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
-import type { OutputDto, OverlayConfig } from '../lib/types.ts';
+import type { OutputDto, OverlayConfig, OverlayInfo } from '../lib/types.ts';
 
 // 多个输出（F-OU-05）：记住上次选中的输出
 const SEL_KEY = 'sf.output';
@@ -30,10 +31,10 @@ watch(selId, (id) => {
   }
 });
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
-const online = (id: number) => state.overlays.some((x) => x.outputId === id);
+const online = (id: number) => state.overlays.some((x) => x.outputId === id && x.role !== 'chat');
 const cfg = computed<OverlayConfig | null>(() => {
   const x = o.value;
-  return x ? { outputId: x.id, name: x.name, app: x.app, orient: x.orient, width: x.width, height: x.height, safeTop: x.safeTop, safeBottom: x.safeBottom, marginX: x.marginX, scale: x.scale, liteMode: x.liteMode } : null;
+  return x ? overlayConfigOf(x) : null;
 });
 
 async function addOutput(): Promise<void> {
@@ -47,7 +48,9 @@ async function addOutput(): Promise<void> {
   state.outputs.push(r);
   selId.value = r.id;
 }
+const renaming = ref(false);
 async function rename(e: Event): Promise<void> {
+  renaming.value = false;
   const el = e.target as HTMLInputElement;
   const name = el.value.trim();
   if (!name) {
@@ -65,9 +68,29 @@ async function removeOutput(): Promise<void> {
   }
 }
 const stage = ref<InstanceType<typeof PreviewStage> | null>(null);
+const chatPv = ref<InstanceType<typeof ChatPreview> | null>(null);
 const showSafe = ref(true);
 const showKey = ref(false);
+const showChatKey = ref(false);
 const alphaBg = ref(false);
+
+// 右侧预览：特效页 / 弹幕列表（记住上次看的）
+const TAB_KEY = 'sf-out-tab';
+const readTab = (): 'fx' | 'chat' => {
+  try {
+    return localStorage.getItem(TAB_KEY) === 'chat' ? 'chat' : 'fx';
+  } catch {
+    return 'fx';
+  }
+};
+const ptab = ref<'fx' | 'chat'>(readTab());
+watch(ptab, (t) => {
+  try {
+    localStorage.setItem(TAB_KEY, t);
+  } catch {
+    /* 隐私模式下不记住 */
+  }
+});
 
 const PRESETS = {
   portrait: [[1080, 1920, '推荐'], [720, 1280, '省性能'], [1440, 2560, '2K']],
@@ -101,20 +124,24 @@ const ratio = computed(() => {
 const mismatch = computed(() => o.value && (o.value.orient === 'portrait') !== o.value.height > o.value.width);
 
 const url = computed(() => (o.value ? `${location.origin}${o.value.path}` : ''));
-const shownUrl = computed(() => (showKey.value || !o.value ? url.value : url.value.replace(o.value.key, '••••••••••')));
-async function copy(): Promise<void> {
+const chatUrl = computed(() => (o.value ? `${location.origin}${o.value.chatPath}` : ''));
+const mask = (u: string, show: boolean) => (show || !o.value ? u : u.replace(o.value.key, '••••••••••'));
+const shownUrl = computed(() => mask(url.value, showKey.value));
+const shownChatUrl = computed(() => mask(chatUrl.value, showChatKey.value));
+async function copy(which: 'fx' | 'chat'): Promise<void> {
   try {
-    await navigator.clipboard.writeText(url.value);
-    toast('已复制浏览器源地址');
+    await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : url.value);
+    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${CHAT_SIZE.width} × ${CHAT_SIZE.height}` : '已复制特效页地址');
   } catch {
-    showKey.value = true;
+    if (which === 'chat') showChatKey.value = true;
+    else showKey.value = true;
     toast('浏览器不允许自动复制，请手动选中地址复制', 'info');
   }
 }
 async function resetKey(): Promise<void> {
   const target = o.value;
   if (!target) return;
-  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：旧地址立即失效，请把新地址重新填到直播软件');
+  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：特效页、弹幕列表的旧地址立即失效，请把新地址重新填到直播软件');
   if (r) Object.assign(target, r);
 }
 
@@ -127,7 +154,20 @@ function test(id: Identity): void {
   const e = tierEffect(id);
   if (e) void stage.value?.play(e, SAMPLES[id]);
 }
-const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id));
+const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role !== 'chat'));
+const chats = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'chat'));
+/** 在线状态：「在线 · 直播姬」，几个同时在线时写个数 */
+function liveText(list: OverlayInfo[]): string {
+  if (!list.length) return '不在线';
+  if (list.length > 1) return `${list.length} 个在线`;
+  const env = list[0]!.env;
+  if (env?.view) return '在线 · 浏览器查看';
+  const host = String(env?.host ?? '');
+  return host.startsWith('OBS') ? '在线 · OBS' : host === 'B站直播姬' ? '在线 · 直播姬' : '在线';
+}
+// 添加步骤：特效页还没连上时展开，连上了就收起（切换输出时重新判断）
+const howtoOpen = ref(false);
+watch(() => o.value?.id, () => (howtoOpen.value = !overlays.value.length), { immediate: true });
 const stageStyle = computed(() => {
   if (!o.value) return {};
   const portrait = o.value.orient === 'portrait';
@@ -137,6 +177,9 @@ function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
   if (!env) return [];
   return [['透明视频', Boolean(env.webmVp9)], ['毛玻璃', Boolean(env.blur)], ['玻璃描边', Boolean(env.dynamicBorder)], ['声音', Boolean(env.audio)]];
 }
+/** 特效页运行环境（取直播软件里的那个，不取浏览器查看的） */
+const fxEnv = computed(() => (overlays.value.find((x) => !x.env?.view) ?? overlays.value[0])?.env ?? null);
+const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastError ?? null);
 </script>
 
 <template>
@@ -144,146 +187,218 @@ function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
     <div class="page-head">
       <div>
         <h1>直播软件输出</h1>
-        <p>把特效页作为浏览器源加到 OBS 或 B站直播姬里。画布方向和分辨率要和直播软件里的宽高一致。</p>
-      </div>
-      <div class="actions">
-        <span class="live" :class="overlays.length ? '' : 'off'"><i />{{ overlays.length ? `「${o.name}」特效页 ${overlays.length} 个在线` : `「${o.name}」特效页不在线` }}</span>
+        <p>把特效页和弹幕列表加到直播软件里。每个输出对应直播软件里的一个画面，比如竖屏直播、横屏录播。</p>
       </div>
     </div>
 
-    <div class="obs">
-      <div class="obs-col">
+    <div class="outbar" role="tablist" aria-label="输出">
+      <button v-for="x in state.outputs" :key="x.id" class="otab" role="tab" :aria-selected="x.id === o.id" @click="selId = x.id"><span class="dot" :class="{ off: !online(x.id) }" />{{ x.name }}<span class="res num">{{ x.width }}×{{ x.height }}</span></button>
+      <button class="otab add" @click="addOutput"><Icon name="i-plus" />新建输出</button>
+      <div class="omore">
+        <input v-if="renaming" :key="o.id" :ref="(el) => (el as HTMLInputElement | null)?.focus()" class="inp" :value="o.name" maxlength="40" aria-label="输出名称" @change="rename" @blur="renaming = false" @keydown.enter="(e) => (e.target as HTMLInputElement).blur()" @keydown.esc="renaming = false" />
+        <button v-else class="linkish" @click="renaming = true">改名</button>
+        <ConfirmButton v-if="state.outputs.length > 1" label="删除这个输出" confirm-label="确认删除？地址会失效" cls="linkish dim" armed-cls="delb" @confirm="removeOutput" />
+      </div>
+    </div>
+
+    <div class="o2">
+      <div class="o2-col">
+        <!-- ① 加到直播软件 -->
         <div class="card">
-          <div class="card-h"><h2>输出</h2><span class="aside">可以为不同场景各建一个，比如竖屏直播 + 横屏录播</span></div>
-          <div class="outs">
-            <button v-for="x in state.outputs" :key="x.id" :aria-pressed="x.id === o.id" @click="selId = x.id"><span class="dot" :class="{ off: !online(x.id) }" />{{ x.name }}<span class="num" style="color: var(--t3); font-size: 12px">{{ x.width }}×{{ x.height }}</span></button>
-            <button @click="addOutput"><Icon name="i-plus" />新建输出</button>
+          <div class="card-h">
+            <h2>加到直播软件</h2>
+            <span class="aside">
+              <span class="seg" role="group" aria-label="直播软件">
+                <button :aria-pressed="o.app === 'livehime'" @click="save({ app: 'livehime' })">B站直播姬</button>
+                <button :aria-pressed="o.app === 'obs'" @click="save({ app: 'obs' })">OBS</button>
+              </span>
+            </span>
           </div>
-          <div class="out-name">
-            <label for="outName">名称</label>
-            <input id="outName" :key="o.id" class="inp" :value="o.name" maxlength="40" @change="rename" @keydown.enter="(e) => (e.target as HTMLInputElement).blur()" />
-            <ConfirmButton v-if="state.outputs.length > 1" label="删除这个输出" confirm-label="确认删除？地址会失效" cls="linkish" armed-cls="delb" @confirm="removeOutput" />
+
+          <div class="srcbox">
+            <div class="src-h">
+              <span class="src-ic fx"><Icon name="i-spark" /></span>
+              <span class="src-t"><b>特效页</b><span>进场、礼物、上舰、弹幕回应的特效 · 铺满画面，放在最上层</span></span>
+              <span class="right"><span class="live" :class="overlays.length ? '' : 'off'"><i />{{ liveText(overlays) }}</span></span>
+            </div>
+            <div class="src-url">
+              <input class="inp" :value="shownUrl" readonly aria-label="特效页地址" @focus="(e) => showKey && (e.target as HTMLInputElement).select()" />
+              <button class="btn primary" @click="copy('fx')"><Icon name="i-copy" />复制地址</button>
+              <button class="btn ic" :title="showKey ? '隐藏密钥' : '显示密钥'" :aria-label="showKey ? '隐藏密钥' : '显示密钥'" @click="showKey = !showKey"><Icon :name="showKey ? 'i-eye-off' : 'i-eye'" /></button>
+            </div>
+            <div class="src-f">
+              <span class="wh2">宽高填 <code>{{ o.width }} × {{ o.height }}</code></span>
+              <span v-if="fxEnv" class="caps"><span v-for="[name, ok] in caps(fxEnv)" :key="name" :class="ok ? 'ok' : 'mid'">{{ ok ? '✓' : '!' }} {{ name }}</span><span v-if="fxEnv.lite" class="mid">兼容模式</span></span>
+              <span class="links">
+                <a class="linkish" :href="`${o.path}&view=1`" target="_blank" rel="noopener" title="深色背景、显示安全区和连接状态；只用来查看，直播软件里请用上面的地址">在浏览器里查看</a>
+                <ConfirmButton label="重置密钥" confirm-label="确认重置？两个地址都会失效" cls="linkish dim" armed-cls="delb" @confirm="resetKey" />
+              </span>
+            </div>
+            <div v-if="fxError" class="src-err">最近的问题：{{ fxError }}</div>
           </div>
+
+          <div class="srcbox" :class="{ off: !o.chatEnabled }">
+            <div class="src-h">
+              <span class="src-ic dm"><Icon name="i-chat" /></span>
+              <span class="src-t"><b>弹幕列表</b><span>所有人的弹幕排成一列，最多 8 条 · 拖到画面左边或右边</span></span>
+              <span class="right">
+                <span class="live" :class="o.chatEnabled && chats.length ? '' : 'off'"><i />{{ o.chatEnabled ? liveText(chats) : '已关闭' }}</span>
+                <button class="switch" role="switch" type="button" :aria-checked="o.chatEnabled" aria-label="启用弹幕列表" @click="save({ chatEnabled: !o.chatEnabled }, o.chatEnabled ? '已关闭弹幕列表：直播画面上不再显示' : '已打开弹幕列表')" />
+              </span>
+            </div>
+            <div class="src-url">
+              <input class="inp" :value="shownChatUrl" readonly aria-label="弹幕列表地址" @focus="(e) => showChatKey && (e.target as HTMLInputElement).select()" />
+              <button class="btn primary" @click="copy('chat')"><Icon name="i-copy" />复制地址</button>
+              <button class="btn ic" :title="showChatKey ? '隐藏密钥' : '显示密钥'" :aria-label="showChatKey ? '隐藏密钥' : '显示密钥'" @click="showChatKey = !showChatKey"><Icon :name="showChatKey ? 'i-eye-off' : 'i-eye'" /></button>
+            </div>
+            <div class="src-f">
+              <span class="wh2">宽高填 <code>{{ CHAT_SIZE.width }} × {{ CHAT_SIZE.height }}</code></span>
+              <span>高一点能放满 8 条，矮了就少显示几条</span>
+              <span class="links"><a class="linkish" :href="`${o.chatPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
+            </div>
+          </div>
+
+          <details class="howto" :open="howtoOpen" @toggle="(e) => (howtoOpen = (e.target as HTMLDetailsElement).open)">
+            <summary><Icon name="i-chev" /><span>{{ o.app === 'obs' ? '在 OBS 中添加' : '在 B站直播姬中添加' }}</span><span class="aside">特效页没连上时自动展开{{ o.app === 'livehime' ? ' · 菜单名称以实际版本为准' : '' }}</span></summary>
+            <ol v-if="o.app === 'obs'" class="steps">
+              <li v-if="o.orient === 'portrait'"><span>竖屏推流时，OBS 的 <b>设置 → 视频 → 基础分辨率</b> 也要设成 <code>{{ o.width }}x{{ o.height }}</code>。</span></li>
+              <li><span><em class="tagsrc fx">特效页</em>在 <b>来源</b> 里点 <b>+</b> → <b>浏览器</b>，命名为「星临特效」，URL 粘贴特效页地址，宽 <code>{{ o.width }}</code> 高 <code>{{ o.height }}</code>，勾选 <b>通过 OBS 控制音频</b>（特效的音效才会进入直播）。</span></li>
+              <li><span><em class="tagsrc fx">特效页</em>取消勾选 <b>不可见时关闭源</b> 和 <b>场景变为活动状态时刷新浏览器</b>，避免切场景时漏播；把它拖到来源列表 <b>最上方</b>。</span></li>
+              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再加一个 <b>浏览器</b> 来源，命名为「星临弹幕」，URL 粘贴弹幕列表地址，宽 <code>{{ CHAT_SIZE.width }}</code> 高 <code>{{ CHAT_SIZE.height }}</code>，拖到画面左边或右边。</span></li>
+              <li><span>第一次用可以先打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
+            </ol>
+            <ol v-else class="steps">
+              <li v-if="o.orient === 'portrait'"><span>在直播姬里切换到 <b>竖屏直播</b> 模式。</span></li>
+              <li><span><em class="tagsrc fx">特效页</em>点 <b>添加素材 → 浏览器</b>，粘贴特效页地址，宽高填 <code>{{ o.width }}</code> × <code>{{ o.height }}</code>，拖动 <b>铺满画面</b>，放到 <b>图层最上方</b>。</span></li>
+              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再添加一个 <b>浏览器</b> 素材，粘贴弹幕列表地址，宽高填 <code>{{ CHAT_SIZE.width }}</code> × <code>{{ CHAT_SIZE.height }}</code>，拖到画面左边或右边。想改大小就改宽高数字或下面的「字号」，不要拉伸变形。</span></li>
+              <li><span>第一次用可以先用浏览器素材打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
+            </ol>
+          </details>
         </div>
 
+        <!-- ② 特效页设置 -->
         <div class="card">
-          <div class="card-h"><h2>直播软件</h2><span class="aside">决定下方的添加步骤</span></div>
-          <div class="orients">
-            <button :aria-pressed="o.app === 'livehime'" @click="save({ app: 'livehime' })"><span class="shape" style="width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 11px; font-weight: 700">B</span><span><b>B站直播姬</b><span>电脑版 · 浏览器素材</span></span></button>
-            <button :aria-pressed="o.app === 'obs'" @click="save({ app: 'obs' })"><span class="shape" style="width: 26px; height: 26px; border-radius: 50%" /><span><b>OBS Studio</b><span>浏览器源</span></span></button>
-          </div>
-          <div class="field" style="margin-top: 16px">
-            <div class="toggle-line">兼容模式 <span class="hint">关闭毛玻璃、粒子等较重的效果，旧版内核或电脑性能一般时使用</span>
-              <select class="sel" style="width: 120px; margin-left: auto" aria-label="兼容模式" :value="o.liteMode" @change="(e) => save({ liteMode: (e.target as HTMLSelectElement).value as OutputDto['liteMode'] }, '兼容模式已修改')">
-                <option value="auto">自动</option><option value="on">始终开启</option><option value="off">关闭</option>
-              </select>
+          <div class="card-h"><h2>特效页设置</h2><span class="aside">改了马上生效，不用刷新直播软件</span></div>
+          <div class="srows">
+            <div class="srow">
+              <span class="lb">画布方向</span>
+              <div class="ctl"><div class="line">
+                <span class="seg" role="group" aria-label="画布方向">
+                  <button :aria-pressed="o.orient === 'portrait'" @click="setOrient('portrait')"><span class="shp" style="width: 9px; height: 14px" />竖屏</button>
+                  <button :aria-pressed="o.orient === 'landscape'" @click="setOrient('landscape')"><span class="shp" style="width: 15px; height: 9px" />横屏</button>
+                </span>
+                <span class="hint">{{ o.orient === 'portrait' ? '手机直播' : '电脑游戏直播' }}</span>
+              </div></div>
+            </div>
+            <div class="srow">
+              <span class="lb">分辨率<small>和直播软件里的宽高一致</small></span>
+              <div class="ctl">
+                <div class="presets">
+                  <button v-for="p in PRESETS[o.orient]" :key="p[2]" :aria-pressed="p[0] === o.width && p[1] === o.height" @click="save({ width: p[0], height: p[1] }, `分辨率：${p[0]}×${p[1]}`)">{{ p[0] }}×{{ p[1] }}<small>{{ p[2] }}</small></button>
+                </div>
+                <div class="line">
+                  <span class="wh3">
+                    <input class="inp num" type="number" min="320" max="7680" :value="o.width" aria-label="宽" @change="(e) => setSize(e, 'width')" /><span>×</span>
+                    <input class="inp num" type="number" min="320" max="7680" :value="o.height" aria-label="高" @change="(e) => setSize(e, 'height')" />
+                  </span>
+                  <span class="hint">{{ ratio }}<span v-if="mismatch" style="color: var(--gov)">　宽高和方向不一致，请检查</span></span>
+                </div>
+              </div>
+            </div>
+            <div v-if="o.orient === 'portrait'" class="srow">
+              <span class="lb">竖屏安全区<small>特效自动避开</small></span>
+              <div class="ctl">
+                <div class="slider-row"><label for="st">顶部</label><input id="st" v-model.number="o.safeTop" type="range" min="0" max="25" @change="save({ safeTop: o.safeTop })" /><output>{{ o.safeTop }}%</output></div>
+                <div class="slider-row"><label for="sb">底部</label><input id="sb" v-model.number="o.safeBottom" type="range" min="0" max="45" @change="save({ safeBottom: o.safeBottom })" /><output>{{ o.safeBottom }}%</output></div>
+                <span class="hint">B站手机端竖屏直播时，顶部是主播信息，底部是弹幕和礼物栏。默认按实测：顶部 12%、底部 40%。<label class="inline-ck"><input v-model="showSafe" type="checkbox" />预览里显示</label></span>
+              </div>
+            </div>
+            <div class="srow">
+              <span class="lb">特效大小<small>作用于所有规则</small></span>
+              <div class="ctl">
+                <div class="slider-row"><label for="scale">整体缩放</label><input id="scale" v-model.number="o.scale" type="range" min="60" max="160" step="5" @change="save({ scale: o.scale })" /><output>{{ o.scale }}%</output></div>
+                <div class="slider-row"><label for="mx">左右边距</label><input id="mx" v-model.number="o.marginX" type="range" min="0" max="15" @change="save({ marginX: o.marginX })" /><output>{{ o.marginX }}%</output></div>
+              </div>
+            </div>
+            <div class="srow">
+              <span class="lb">兼容模式</span>
+              <div class="ctl"><div class="line">
+                <select class="sel" aria-label="兼容模式" :value="o.liteMode" @change="(e) => save({ liteMode: (e.target as HTMLSelectElement).value as OutputDto['liteMode'] }, '兼容模式已修改')">
+                  <option value="auto">自动</option><option value="on">始终开启</option><option value="off">关闭</option>
+                </select>
+                <span class="hint">关掉毛玻璃、粒子等较重的效果。电脑性能一般或直播软件版本旧时用（弹幕列表也跟着用）。</span>
+              </div></div>
             </div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-h"><h2>画布</h2></div>
-          <div class="field">
-            <span class="flabel">方向</span>
-            <div class="orients">
-              <button :aria-pressed="o.orient === 'portrait'" @click="setOrient('portrait')"><span class="shape" style="width: 18px; height: 30px" /><span><b>竖屏</b><span>手机直播 · 默认</span></span></button>
-              <button :aria-pressed="o.orient === 'landscape'" @click="setOrient('landscape')"><span class="shape" style="width: 32px; height: 19px" /><span><b>横屏</b><span>电脑游戏直播</span></span></button>
+        <!-- ③ 弹幕列表设置 -->
+        <div class="card" :class="{ dimmed: !o.chatEnabled }">
+          <div class="card-h"><h2>弹幕列表设置</h2><span class="aside">{{ o.chatEnabled ? '改了马上生效' : '弹幕列表已关闭' }}</span></div>
+          <div class="srows">
+            <div class="srow">
+              <span class="lb">对齐</span>
+              <div class="ctl"><div class="line">
+                <span class="seg" role="group" aria-label="对齐">
+                  <button :aria-pressed="o.chatSide === 'left'" @click="save({ chatSide: 'left' })">靠左</button>
+                  <button :aria-pressed="o.chatSide === 'right'" @click="save({ chatSide: 'right' })">靠右</button>
+                </span>
+                <span class="hint">放在画面左边选靠左，右边选靠右（头像跟着换边）</span>
+              </div></div>
+            </div>
+            <div class="srow">
+              <span class="lb">字号</span>
+              <div class="ctl"><div class="line">
+                <span class="seg" role="group" aria-label="字号">
+                  <button :aria-pressed="o.chatSize === 'normal'" @click="save({ chatSize: 'normal' })">标准</button>
+                  <button :aria-pressed="o.chatSize === 'large'" @click="save({ chatSize: 'large' })">大</button>
+                </span>
+                <span class="hint">字号大时同样的高度放的条数少一些</span>
+              </div></div>
+            </div>
+            <div class="srow">
+              <span class="lb">粉丝牌</span>
+              <div class="ctl">
+                <div class="line">
+                  <span class="seg" role="group" aria-label="粉丝牌">
+                    <button :aria-pressed="o.chatMedal === 'own'" @click="save({ chatMedal: 'own' })">只显示本直播间的</button>
+                    <button :aria-pressed="o.chatMedal === 'all'" @click="save({ chatMedal: 'all' })">戴什么显示什么</button>
+                  </span>
+                </div>
+                <span class="hint">{{ o.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B 站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
+              </div>
+            </div>
+            <div class="srow">
+              <span class="lb">条数</span>
+              <div class="ctl"><span class="hint strong">最多 8 条。放不下时从最上面开始少显示几条。</span></div>
             </div>
           </div>
-          <div class="field" style="margin-top: 18px">
-            <span class="flabel">分辨率</span>
-            <div class="presets">
-              <button v-for="p in PRESETS[o.orient]" :key="p[2]" :aria-pressed="p[0] === o.width && p[1] === o.height" @click="save({ width: p[0], height: p[1] }, `分辨率：${p[0]}×${p[1]}`)">{{ p[0] }}×{{ p[1] }}<small>{{ p[2] }}</small></button>
-            </div>
-            <div class="wh" style="margin-top: 4px">
-              <div class="suffix"><input class="inp num" type="number" min="320" max="7680" :value="o.width" aria-label="宽" @change="(e) => setSize(e, 'width')" /><span>宽</span></div>
-              <span>×</span>
-              <div class="suffix"><input class="inp num" type="number" min="320" max="7680" :value="o.height" aria-label="高" @change="(e) => setSize(e, 'height')" /><span>高</span></div>
-            </div>
-            <span class="hint" style="font-size: 12px; color: var(--t3)">{{ ratio }}<span v-if="mismatch" style="color: var(--gov)">　宽高和方向不一致，请检查</span></span>
-          </div>
-        </div>
-
-        <div v-if="o.orient === 'portrait'" class="card">
-          <div class="card-h"><h2>竖屏安全区</h2><span class="aside">特效会自动避开这些区域</span></div>
-          <div class="field">
-            <div class="toggle-line">在预览中显示安全区 <Switch v-model="showSafe" label="显示安全区" /></div>
-            <div class="slider-row"><label for="st">顶部信息栏</label><input id="st" v-model.number="o.safeTop" type="range" min="0" max="25" @change="save({ safeTop: o.safeTop })" /><output>{{ o.safeTop }}%</output></div>
-            <div class="slider-row"><label for="sb">底部弹幕区</label><input id="sb" v-model.number="o.safeBottom" type="range" min="0" max="45" @change="save({ safeBottom: o.safeBottom })" /><output>{{ o.safeBottom }}%</output></div>
-            <span class="hint" style="font-size: 12px; color: var(--t3)">B站手机端竖屏直播时，顶部是主播信息和在线人数，底部是弹幕和礼物栏。默认值按手机端实测（顶部 12%、底部 40%）。</span>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-h"><h2>特效外观</h2><span class="aside">作用于所有规则</span></div>
-          <div class="field">
-            <div class="slider-row"><label for="scale">整体缩放</label><input id="scale" v-model.number="o.scale" type="range" min="60" max="160" step="5" @change="save({ scale: o.scale })" /><output>{{ o.scale }}%</output></div>
-            <div class="slider-row"><label for="mx">左右边距</label><input id="mx" v-model.number="o.marginX" type="range" min="0" max="15" @change="save({ marginX: o.marginX })" /><output>{{ o.marginX }}%</output></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-h"><h2>浏览器源地址</h2><span class="aside">地址里带访问密钥，不要公开</span></div>
-          <div class="url">
-            <input class="inp" :value="shownUrl" readonly aria-label="浏览器源地址" @focus="(e) => showKey && (e.target as HTMLInputElement).select()" />
-            <button class="btn" @click="copy"><Icon name="i-copy" />复制</button>
-            <button class="btn" @click="showKey = !showKey">{{ showKey ? '隐藏密钥' : '显示密钥' }}</button>
-          </div>
-          <div style="display: flex; gap: 16px; margin-top: 10px">
-            <a class="linkish" :href="`${o.path}&view=1`" target="_blank" rel="noopener" title="深色背景、显示安全区和连接状态；只用来查看，直播软件里请用上面的地址">在浏览器里查看</a>
-            <ConfirmButton label="重置密钥" confirm-label="确认重置？旧地址会立即失效" cls="linkish" armed-cls="delb" @confirm="resetKey" />
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-h"><h2>{{ o.app === 'obs' ? '在 OBS 中添加' : '在 B站直播姬中添加' }}</h2><span v-if="o.app === 'livehime'" class="aside">菜单名称以实际版本为准</span></div>
-          <ol v-if="o.app === 'obs'" class="steps">
-            <li v-if="o.orient === 'portrait'"><span>竖屏推流时，OBS 的 <b>设置 → 视频 → 基础分辨率</b> 也要设成 <code>{{ o.width }}x{{ o.height }}</code>。</span></li>
-            <li><span>在 OBS <b>来源</b> 里点 <b>+</b>，选择 <b>浏览器</b>，命名为「星临特效」。</span></li>
-            <li><span><b>URL</b> 粘贴上面的地址（点「复制」）。</span></li>
-            <li><span><b>宽度</b> 填 <code>{{ o.width }}</code>，<b>高度</b> 填 <code>{{ o.height }}</code>，要和这里的分辨率一致。</span></li>
-            <li><span>勾选 <b>通过 OBS 控制音频</b>，特效的音效才会进入直播。</span></li>
-            <li><span>取消勾选 <b>不可见时关闭源</b> 和 <b>场景变为活动状态时刷新浏览器</b>，避免切场景时漏播。</span></li>
-            <li><span>把「星临特效」拖到来源列表 <b>最上方</b>，让特效盖在画面最上层。</span></li>
-            <li><span>检查环境：用浏览器源打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>。</span></li>
-          </ol>
-          <ol v-else class="steps">
-            <li v-if="o.orient === 'portrait'"><span>在直播姬里切换到 <b>竖屏直播</b> 模式。</span></li>
-            <li><span>点 <b>添加素材</b>，选择 <b>浏览器</b>（网页）类素材。</span></li>
-            <li><span>地址栏粘贴上面的地址，宽高填 <code>{{ o.width }}</code> × <code>{{ o.height }}</code>。</span></li>
-            <li><span>拖动素材 <b>铺满画面</b>，并放到 <b>图层最上方</b>。</span></li>
-            <li><span>首次使用建议先用浏览器素材打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
-          </ol>
         </div>
       </div>
 
-      <div class="obs-prev">
+      <!-- 右侧：实时预览 -->
+      <div class="o2-prev">
         <div class="card">
-          <div class="card-h"><h2>实时预览</h2><span class="aside">{{ o.width }} × {{ o.height }} · 只在这里播放</span></div>
+          <div class="ptabs" role="tablist" aria-label="预览">
+            <button role="tab" :aria-selected="ptab === 'fx'" @click="ptab = 'fx'">特效页</button>
+            <button role="tab" :aria-selected="ptab === 'chat'" @click="ptab = 'chat'">弹幕列表</button>
+            <span class="aside">{{ ptab === 'fx' ? `${o.width} × ${o.height} · 只在这里播放` : o.chatEnabled ? `${CHAT_SIZE.width} × ${CHAT_SIZE.height} · 实时弹幕` : '弹幕列表已关闭' }}</span>
+          </div>
           <div class="ostage-wrap">
-            <PreviewStage ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && o.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
+            <PreviewStage v-if="ptab === 'fx'" ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && o.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
+            <ChatPreview v-else-if="cfg" ref="chatPv" :key="`c${o.id}`" :config="cfg" :alpha="alphaBg" />
           </div>
           <div class="prev-tools">
-            <button v-for="id in (['gov', 'cap', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', cap: '舰长', fan: '粉丝牌', nor: '普通' }[id as 'gov'] }}</button>
+            <template v-if="ptab === 'fx'">
+              <button v-for="id in (['gov', 'cap', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', cap: '舰长', fan: '粉丝牌', nor: '普通' }[id as 'gov'] }}</button>
+            </template>
+            <template v-else>
+              <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('normal')"><i style="background: var(--nor)" />测试弹幕</button>
+              <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('guard')"><i style="background: var(--gov)" />大航海发言</button>
+            </template>
             <button class="btn" style="margin-left: auto" @click="alphaBg = !alphaBg">{{ alphaBg ? '游戏画面背景' : '透明背景' }}</button>
           </div>
-        </div>
-        <div class="card" style="margin-top: 16px">
-          <div class="card-h"><h2>已连接的特效页</h2><span class="aside">特效页会自动上报运行环境</span></div>
-          <div class="clients">
-            <div v-for="(c, i) in overlays" :key="i" class="client">
-              <div class="top1">
-                <span class="live" style="height: 20px; padding: 0 8px"><i />在线</span>{{ c.env?.view ? '浏览器查看' : (c.env?.host ?? '特效页') }}
-                <span class="num">{{ c.env?.chrome ? `Chromium ${c.env.chrome}` : '' }}{{ c.env?.viewport ? ` · ${c.env.viewport}` : '' }} · {{ clock(c.since) }} 起</span>
-              </div>
-              <div class="caps">
-                <span v-for="[name, ok] in caps(c.env)" :key="name" :class="ok ? 'cap-ok' : 'cap-mid'">{{ ok ? '✓' : '!' }} {{ name }}</span>
-                <span v-if="c.env?.lite" class="cap-mid">兼容模式</span>
-              </div>
-              <div v-if="c.lastError" class="foot" style="color: var(--gov)">最近的问题：{{ c.lastError }}</div>
-            </div>
-            <div v-if="!overlays.length" class="soon-box" style="padding: 24px"><b>还没有特效页连上</b>按左边的步骤把地址加到直播软件，这里就会显示</div>
-          </div>
+          <p v-if="ptab === 'fx' && overlays.length" class="prev-note">特效页已连上 {{ clock(overlays[0]!.since) }} 起</p>
         </div>
       </div>
     </div>

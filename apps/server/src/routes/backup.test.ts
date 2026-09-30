@@ -156,6 +156,20 @@ describe('导入配置', () => {
     expect((await dst.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules[0].who).toEqual(danmuWhoFromOld('fan'));
   });
 
+  it('以前导出的文件没有弹幕列表的设置：用默认值；新文件带上这些设置', async () => {
+    const src = await setup();
+    await populate(src);
+    src.ctx.outputs.update(src.ctx.outputs.list()[1]!.id, { chatSide: 'right', chatMedal: 'all' });
+    const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
+    expect(f.outputs[1]).toMatchObject({ chatEnabled: true, chatSide: 'right', chatSize: 'normal', chatMedal: 'all' });
+    const old = structuredClone(f);
+    for (const o of old.outputs) for (const k of ['chatEnabled', 'chatSide', 'chatSize', 'chatMedal']) delete o[k];
+    const dst = await setup();
+    const { token } = (await importFile(dst, 'old.json', JSON.stringify(old))).json();
+    expect((await dst.req({ method: 'POST', url: `/api/backup/import/${token}` })).statusCode).toBe(200);
+    expect(dst.ctx.outputs.list()[1]).toMatchObject({ name: '横屏录播', chatEnabled: true, chatSide: 'left', chatMedal: 'own' });
+  });
+
   it('取消导入；无效的文件给出能看懂的错误', async () => {
     const t = await setup();
     const json = (await t.req({ method: 'GET', url: '/api/backup/export' })).body;

@@ -177,6 +177,11 @@ export const outputs = sqliteTable('outputs', {
   marginX: integer('margin_x').notNull().default(9),
   scale: integer('scale').notNull().default(100),
   liteMode: text('lite_mode', { enum: ['auto', 'on', 'off'] }).notNull().default('auto'),
+  // 弹幕列表（同一个输出的另一个浏览器源）
+  chatEnabled: integer('chat_enabled', { mode: 'boolean' }).notNull().default(true),
+  chatSide: text('chat_side', { enum: ['left', 'right'] }).notNull().default('left'),
+  chatSize: text('chat_size', { enum: ['normal', 'large'] }).notNull().default('normal'),
+  chatMedal: text('chat_medal', { enum: ['own', 'all'] }).notNull().default('own'),
   key: text('key').notNull().unique(),
   createdAt: integer('created_at').notNull().default(now),
 });

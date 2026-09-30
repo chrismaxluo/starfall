@@ -37,11 +37,13 @@ export class ViewerStore {
     return this.db.select().from(viewers).where(eq(viewers.uid, uid)).get();
   }
 
-  /** 记住昵称头像（honor 不传时保留以前记的）；guard：这次消息里 TA 在哪个直播间是大航海几级（不传时保留以前记的） */
+  /** 记住昵称头像（头像为空、honor 不传时保留以前记的）；guard：这次消息里 TA 在哪个直播间是大航海几级（不传时保留以前记的） */
   remember(v: Omit<ViewerCard, 'guard'>, guard?: { level: number; roomId: number }): void {
     if (v.uid <= 0 || !v.name) return;
     const values = { uid: v.uid, name: v.name, face: v.face, updatedAt: this.now(), ...(v.honor ? { honor: v.honor } : {}), ...(guard ? { guard: guard.level, guardRoom: guard.roomId } : {}) };
-    this.db.insert(viewers).values(values).onConflictDoUpdate({ target: viewers.uid, set: values }).run();
+    // 有的消息不带头像（例如 ENTRY_EFFECT、部分弹幕）：不要把以前记的头像清掉
+    const { face, ...rest } = values;
+    this.db.insert(viewers).values(values).onConflictDoUpdate({ target: viewers.uid, set: face ? values : rest }).run();
   }
 
   /** 在当前直播间是大航海几级（没见过、或者是在别的直播间记的，都算 0） */

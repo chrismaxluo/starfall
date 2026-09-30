@@ -1,4 +1,4 @@
-// 总览右侧面板的 B 站名单：在线观众（高能榜）、舰队（大航海榜）。只在后台打开这一页时按需读取，带缓存。
+// 总览右侧面板的 B 站名单：在线观众（高能榜：只列出这场投喂、点赞、发过弹幕的观众）、舰队（大航海榜）。只在后台打开这一页时按需读取，带缓存。
 // 头像、头像框等图片只记地址，后台运行时从 B 站加载。
 import { getGuardPage, getOnlineRank } from '@starfall/bili';
 import type { BiliHttp, ListViewer, OnlineRank } from '@starfall/bili';
@@ -35,8 +35,6 @@ export interface AudienceDeps {
   room: RoomStore;
   live: Pick<LiveService, 'status'>;
   anon: () => BiliHttp;
-  /** 登录的账号（没登录时为 null）：高能榜不登录只给第 1 名 */
-  auth: () => BiliHttp | null;
   fetchOnline?: typeof getOnlineRank;
   fetchGuards?: typeof getGuardPage;
   now?: () => number;
@@ -44,7 +42,7 @@ export interface AudienceDeps {
 }
 
 export class AudienceService {
-  private readonly d: Required<Omit<AudienceDeps, 'room' | 'live' | 'anon' | 'auth'>> & AudienceDeps;
+  private readonly d: Required<Omit<AudienceDeps, 'room' | 'live' | 'anon'>> & AudienceDeps;
   private onlineCache: { roomId: number; at: number; value: OnlineList } | null = null;
   private onlineLoading: Promise<OnlineList> | null = null;
   private fleetCache: { roomId: number; value: FleetList } | null = null;
@@ -67,7 +65,8 @@ export class AudienceService {
     const c = this.onlineCache;
     if (c && c.roomId === r.roomId && this.d.now() - c.at < ONLINE_TTL_MS) return c.value;
     this.onlineLoading ??= (async () => {
-      const http = this.d.auth() ?? this.d.anon();
+      // 高能榜是公开的，不用登录（登录了拿到的也一样）
+      const http = this.d.anon();
       const items: OnlineList['items'] = [];
       let count = 0;
       for (let page = 1; page <= ONLINE_PAGES; page++) {

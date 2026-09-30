@@ -244,11 +244,11 @@ export interface OnlineRank {
   items: Array<ListViewer & { rank: number; score: number }>;
 }
 
-/** 高能榜（在直播间里、登录了 B 站的观众，按贡献排序）。不登录只返回第 1 名，所以要带登录 Cookie */
+/** 高能榜：count 是在线人数（登录了 B 站的观众）；名单只列出这场投喂、点赞、发过弹幕的人（贡献值大于 0），按贡献排序。公开接口 */
 export async function getOnlineRank(http: BiliHttp, roomId: number, anchorUid: number, page = 1, pageSize = 50): Promise<OnlineRank> {
   const d = await http.getData<{ onlineNum?: number; OnlineRankItem?: Array<{ userRank?: number; uid?: number; name?: string; face?: string; score?: number; guard_level?: number; wealth_level?: number; is_mystery?: boolean; uinfo?: RawUinfo }> | null }>(
     `${LIVE}/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=${anchorUid}&roomId=${roomId}&page=${page}&pageSize=${pageSize}`,
-    { referer: `https://live.bilibili.com/${roomId}` },
+    { auth: false, referer: `https://live.bilibili.com/${roomId}` },
   );
   return {
     count: Number(d.onlineNum) || 0,

@@ -137,13 +137,13 @@ describe('接口字段转换', () => {
     await expect(getHonorMedals(new BiliHttp())).rejects.toMatchObject({ name: 'BiliApiError' });
   });
 
-  it('高能榜：带登录信息；大航海、荣耀等级、粉丝牌颜色', async () => {
+  it('高能榜：公开接口不带登录信息；大航海、荣耀等级、粉丝牌颜色', async () => {
     const uinfo = { uid: 7, base: { name: '弦瑟', face: 'f7', is_mystery: false }, medal: { name: '桥耳朵', level: 35, ruid: 33623955, v2_medal_color_start: '#A', v2_medal_color_border: '#B', v2_medal_color_text: '#C', v2_medal_color_level: '#D' }, wealth: null, guard: null };
     const calls = mockFetch([{ body: { code: 0, data: { onlineNum: 70, OnlineRankItem: [{ userRank: 1, uid: 7, name: '弦瑟', face: 'f7', score: 64, guard_level: 3, wealth_level: 29, is_mystery: false, uinfo }, { userRank: 2, uid: 0 }] } } }]);
     const r = await getOnlineRank(new BiliHttp({ SESSDATA: 'secret' }), 30000, 20000, 2, 50);
     expect(r).toEqual({ count: 70, items: [{ uid: 7, name: '弦瑟', face: 'f7', guard: 3, honor: 29, medal: { name: '桥耳朵', level: 35, anchorUid: 33623955, colors: { bg: '#A', level: '#D', border: '#B', text: '#C' } }, mystery: false, rank: 1, score: 64 }] });
     expect(calls[0]).toContain('getOnlineGoldRank?ruid=20000&roomId=30000&page=2&pageSize=50');
-    expect(calls[0]).toContain('SESSDATA=secret');
+    expect(calls[0]).not.toContain('secret');
   });
 
   it('大航海榜：第 1 页带前 3 名；公开接口不带登录信息', async () => {

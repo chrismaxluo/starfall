@@ -1,6 +1,6 @@
 // 播放控制、测试、模拟（需求 F-PL-05 ~ 06、F-RU-05）
 import type { FastifyInstance } from 'fastify';
-import { PLAY_STATUS } from '@starfall/shared';
+import { HONOR_LEVEL_MAX, PLAY_STATUS } from '@starfall/shared';
 import type { Viewer } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
@@ -17,6 +17,8 @@ const SimViewerSchema = z
     isMod: z.boolean().default(false),
     /** 粉丝牌等级；own 为假表示戴的是别的主播的牌子 */
     medal: z.object({ level: z.number().int().min(1).max(60), own: z.boolean().default(true) }).nullable().default(null),
+    /** 荣耀等级（0 没有） */
+    honor: z.number().int().min(0).max(HONOR_LEVEL_MAX).default(0),
   })
   .strict();
 
@@ -65,7 +67,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
         effectId: z.number().int().positive(),
         kind: z.enum(['enter', 'danmu', 'gift', 'guard']).default('enter'),
         viewer: z
-          .object({ name: z.string().max(40), guard: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), isMod: z.boolean(), medalLevel: z.number().int().min(1).max(60).nullable() })
+          .object({ name: z.string().max(40), guard: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), isMod: z.boolean(), medalLevel: z.number().int().min(1).max(60).nullable(), honor: z.number().int().min(0).max(HONOR_LEVEL_MAX) })
           .partial()
           .strict()
           .optional(),
@@ -141,6 +143,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
       isMod: v.isMod,
       mystery: false,
       ...(v.medal ? { medal: { name: '粉丝牌', level: v.medal.level, anchorUid: v.medal.own ? anchorUid : -1 } } : {}),
+      ...(v.honor ? { honor: v.honor } : {}),
     };
     const base = { id: 'sim', ts: Date.now(), viewer };
     const ev: TriggerEvent =

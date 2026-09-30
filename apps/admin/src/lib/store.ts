@@ -26,6 +26,8 @@ export const state = reactive({
   feed: [] as EventDto[],
   /** 实时连接是否在线 */
   wsOnline: false,
+  /** 荣耀等级勋章：等级 → B 站的图（读不到时是空的，界面上改成显示文字） */
+  honorMedals: {} as Record<number, string>,
   /** 从别的页面跳到"添加专属用户"时预填的 UID */
   pendingExclusive: null as number | null,
 });
@@ -66,8 +68,14 @@ export async function refreshFeed(): Promise<void> {
   state.feed = (await get<{ events: EventDto[] }>('/api/events?limit=30')).events;
 }
 
+/** 读不到不影响别的功能 */
+export async function refreshHonorMedals(): Promise<void> {
+  const r = await get<{ medals: Array<{ level: number; url: string }> }>('/api/honor-medals').catch(() => null);
+  if (r) state.honorMedals = Object.fromEntries(r.medals.map((m) => [m.level, m.url]));
+}
+
 export async function loadAll(): Promise<void> {
-  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshFeed()]);
+  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshFeed(), refreshHonorMedals()]);
 }
 
 /** 全局弹窗：素材设置、快捷设置专属、新手引导、命令面板 */

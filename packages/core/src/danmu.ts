@@ -20,6 +20,7 @@ export function whoOk(who: DanmuWho, v: Viewer, anchorUid: number): boolean {
   if (who.all || whoNamed(who, v, anchorUid)) return true;
   if (who.mod && v.isMod) return true;
   if (v.guard !== 0 && who.guards.includes(v.guard)) return true;
+  if (who.honorMin != null && (v.honor ?? 0) >= who.honorMin) return true;
   return who.fanMin !== null && isOwnMedal(v, anchorUid) && v.medal!.level >= who.fanMin;
 }
 

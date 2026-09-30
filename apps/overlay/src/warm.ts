@@ -28,7 +28,7 @@ export async function warmFonts(): Promise<void> {
 const sample = (style: string): PlayItem => ({
   id: `warm-${style}`,
   kind: 'enter',
-  effect: { id: 0, name: '', visual: { type: 'builtin_style', style }, showText: true, position: 'center', durationMs: WARM_MS, fadeIn: false, fadeOut: false, fadeInMs: 500, fadeOutMs: 500, offsetX: 0, offsetY: 0, sizePct: 100, featherPct: 0, guardFrame: false, sound: null, volume: 0 },
+  effect: { id: 0, name: '', visual: { type: 'builtin_style', style }, showText: true, position: 'center', durationMs: WARM_MS, fadeIn: false, fadeOut: false, fadeInMs: 500, fadeOutMs: 500, offsetX: 0, offsetY: 0, sizePct: 100, featherPct: 0, guardFrame: false, honorBadge: false, sound: null, volume: 0 },
   text: '欢迎舰长 星临观众 登船',
   viewer: { name: '星临观众', guard: 3, isMod: false, medal: { name: '星临', level: 21 } },
 });

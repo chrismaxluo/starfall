@@ -26,6 +26,14 @@ describe('进场合并（F-EN-10）', () => {
     expect(m.flush(5000)).toEqual([]);
   });
 
+  it('合并时荣耀等级取有的那个（只有高级进场消息里带着时也不丢）', () => {
+    const m = new EnterMerger();
+    m.push(ev(1, 'entry_effect', { honor: 37 }), 0);
+    expect(m.push(ev(1, 'interact'), 1300)[0]!.viewer.honor).toBe(37);
+    m.push(ev(2, 'entry_effect'), 0);
+    expect(m.push(ev(2, 'interact'), 1300)[0]!.viewer.honor).toBeUndefined();
+  });
+
   it('只有 ENTRY_EFFECT 时，等待 2 秒后单独输出', () => {
     const m = new EnterMerger();
     m.push(ev(1, 'entry_effect', { guard: 2 }), 0);

@@ -43,7 +43,7 @@ export type PlayVisual =
 /** SVGA 图层替换：图片给 url（空字符串 = 这一层藏起来），文字给 text（头像的 text 是昵称，加载不到头像时画首字）；w、h 是原图大小，按它画 */
 export interface SvgaDyn {
   key: string;
-  role: 'avatar' | 'avatarSquare' | 'frame' | 'badge' | 'name' | 'welcome';
+  role: 'avatar' | 'avatarSquare' | 'frame' | 'badge' | 'honor' | 'name' | 'welcome';
   w: number;
   h: number;
   url?: string;
@@ -74,6 +74,8 @@ export interface PlayItem {
     featherPct: number;
     /** 大航海观众的头像套上 B 站头像框 */
     guardFrame: boolean;
+    /** 名字旁边显示荣耀等级勋章 */
+    honorBadge: boolean;
     sound: { url: string } | null;
     volume: number;
   };
@@ -85,6 +87,8 @@ export interface PlayItem {
     guard: GuardLevel;
     isMod: boolean;
     medal?: { name: string; level: number; colors?: { bg: string; level: string; border: string; text: string } };
+    /** 荣耀等级；url 是这一级的勋章图（B 站的图，查不到时没有） */
+    honor?: { level: number; url?: string };
   };
   /** 上舰事件：开通还是续费（宫廷特效的印章用） */
   guardOp?: 'open' | 'renew';

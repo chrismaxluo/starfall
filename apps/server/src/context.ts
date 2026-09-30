@@ -16,8 +16,9 @@ import { ConfigIO } from './services/config-io.ts';
 import { EffectStore } from './services/effects.ts';
 import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-rules.ts';
 import { EventLog } from './services/events.ts';
-import type { getRoomGifts } from '@starfall/bili';
+import type { getHonorMedals, getRoomGifts } from '@starfall/bili';
 import { GiftCatalog } from './services/gifts.ts';
+import { HonorMedals } from './services/honor.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
 import type { LiveDeps } from './services/live.ts';
@@ -49,6 +50,7 @@ export interface AppContext {
   giftRules: GiftRuleStore;
   guardRules: GuardRuleStore;
   gifts: GiftCatalog;
+  honor: HonorMedals;
   outputs: OutputStore;
   blacklist: BlacklistStore;
   log: EventLog;
@@ -62,7 +64,7 @@ export interface AppContext {
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts; fetchHonor?: typeof getHonorMedals } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -83,12 +85,13 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const giftRules = new GiftRuleStore(db, settings);
   const guardRules = new GuardRuleStore(db);
   const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
+  const honor = new HonorMedals(settings, () => account.anon, opts.fetchHonor);
   const blacklist = new BlacklistStore({ db, settings, room, account });
   const log = new EventLog(db);
   const overlayBuild = new BuildVersion(config.overlayDist);
   const adminBuild = new BuildVersion(config.adminDist);
   const hub = new Hub({ build: () => overlayBuild.current() });
-  const pipeline = new Pipeline({ live, gifts, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const pipeline = new Pipeline({ live, gifts, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
   const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
@@ -101,7 +104,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, honor, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -125,6 +128,7 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   prune();
   const timer = setInterval(prune, PRUNE_MS);
   ctx.gifts.start();
+  ctx.honor.start();
   ctx.pipeline.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));
   // 重新构建了特效页：告诉在线的页面，旧页面会在空闲时自动刷新
@@ -139,6 +143,7 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
     stopAdminBuild();
     ctx.roomInfo.stop();
     ctx.backups.stop();
+    ctx.honor.stop();
     ctx.pipeline.stop();
     ctx.live.stop();
   };

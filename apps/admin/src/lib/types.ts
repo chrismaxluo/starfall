@@ -36,7 +36,7 @@ export type EnterBase = Omit<EnterRules, 'exclusives'>;
 
 /** 弹幕规则：带上指定观众的昵称头像 */
 export interface DanmuRuleDto extends DanmuRule {
-  people: Array<{ uid: number; name: string | null; face: string | null; guard: number }>;
+  people: Array<{ uid: number; name: string | null; face: string | null; guard: number; honor?: number }>;
 }
 
 export interface ExclusiveDto extends Exclusive {
@@ -44,6 +44,8 @@ export interface ExclusiveDto extends Exclusive {
   face: string | null;
   /** 在当前直播间是大航海几级（0 不是或不知道） */
   guard?: number;
+  /** 最近一次看到的荣耀等级（0 不知道） */
+  honor?: number;
   createdAt: number;
 }
 

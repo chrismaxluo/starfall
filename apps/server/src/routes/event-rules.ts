@@ -15,7 +15,7 @@ export function eventRuleRoutes(app: FastifyInstance, ctx: AppContext): void {
     ...r,
     people: r.who.uids.map((uid) => {
       const v = ctx.viewers.cached(uid);
-      return { uid, name: v?.name || null, face: v?.face || null, guard: ctx.viewers.guardIn(uid) };
+      return { uid, name: v?.name || null, face: v?.face || null, guard: ctx.viewers.guardIn(uid), honor: v?.honor ?? 0 };
     }),
   });
   /** 新加的指定观众：先查一次昵称头像（查不到也能加） */
@@ -43,6 +43,8 @@ export function eventRuleRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/rules/gift', async () => ctx.giftRules.get());
   app.put('/api/rules/gift', async (req) => ctx.giftRules.set(parseBody(GiftRulesInputSchema, req.body)));
+  /** 荣耀等级勋章（每级一张 B 站的图） */
+  app.get('/api/honor-medals', async () => ctx.honor.list());
   app.get<{ Querystring: { refresh?: string } }>('/api/gifts', async (req) => ({ gifts: await ctx.gifts.list(req.query.refresh === '1') }));
 
   app.get('/api/rules/guard', async () => ctx.guardRules.get());

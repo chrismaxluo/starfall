@@ -5,7 +5,7 @@ import { buildBuiltin, isFullStage } from './builtin.ts';
 import { h } from './dom.ts';
 import { buildMedia, fitSize } from './media.ts';
 import type { Media } from './media.ts';
-import { avatar, textLine, withGuardFrame } from './parts.ts';
+import { addHonor, avatar, textLine, withGuardFrame } from './parts.ts';
 import type { StageMetrics } from './stage.ts';
 
 /** 素材上的头像和欢迎语显示多久（素材更短时跟素材一起结束） */
@@ -56,6 +56,7 @@ export class Player {
       const full = isFullStage(e.visual.style);
       slot.classList.add(full ? 'full' : `pos-${e.position}`);
       const fx = buildBuiltin(item, e.visual.style, m);
+      if (e.honorBadge) addHonor(fx, item.viewer);
       slot.append(full ? fx : h('div', { class: 'z' }, fx));
     } else {
       slot.classList.add(`pos-${e.position}`);
@@ -75,7 +76,11 @@ export class Player {
       if (e.fadeIn) wrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: Math.min(e.fadeInMs, e.durationMs / 2), easing: 'ease-out', fill: 'backwards' });
       const fx = h('div', { class: 'fx fx-asset' }, wrap);
       // 头像和欢迎语只显示几秒，不跟着素材一直挂着
-      if (e.showText) fx.append(h('div', { class: 'card glass', style: { '--cd': `${Math.min(e.durationMs, CAPTION_MS)}ms` } }, e.guardFrame ? withGuardFrame(avatar(item.viewer), item.viewer.guard) : avatar(item.viewer), textLine(item.text, item.viewer.name)));
+      if (e.showText) {
+        const card = h('div', { class: 'card glass', style: { '--cd': `${Math.min(e.durationMs, CAPTION_MS)}ms` } }, e.guardFrame ? withGuardFrame(avatar(item.viewer), item.viewer.guard) : avatar(item.viewer), textLine(item.text, item.viewer.name));
+        if (e.honorBadge) addHonor(card, item.viewer);
+        fx.append(card);
+      }
       slot.append(fx);
     }
 

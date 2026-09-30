@@ -124,7 +124,7 @@ describe('数据库', () => {
     const db = openDb(file);
     seed(db);
     // 上传的素材：淡入淡出照旧（时长按以前的比例），位置、大小、羽化都是不调整
-    expect(db.select().from(effects).where(eq(effects.id, 1)).get()).toMatchObject({ name: '胡迪', position: 'bl', fadeIn: true, fadeOut: true, fadeInMs: 1000, fadeOutMs: 1600, durationCustom: false, offsetX: 0, offsetY: 0, sizePct: 100, feather: 'global', guardFrame: false });
+    expect(db.select().from(effects).where(eq(effects.id, 1)).get()).toMatchObject({ name: '胡迪', position: 'bl', fadeIn: true, fadeOut: true, fadeInMs: 1000, fadeOutMs: 1600, durationCustom: false, offsetX: 0, offsetY: 0, sizePct: 100, feather: 'global', guardFrame: false, honorBadge: false });
     // 星冕下线：舰长进场换成晶耀
     const tier = db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'cap')).get()!;
     expect(db.select().from(effects).where(eq(effects.id, tier.effectId!)).get()?.name).toBe('晶耀');

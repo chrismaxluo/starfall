@@ -14,6 +14,7 @@ import type { EventLog } from './events.ts';
 import type { Hub } from './hub.ts';
 import type { LiveService } from './live.ts';
 import type { GiftCatalog } from './gifts.ts';
+import type { HonorMedals } from './honor.ts';
 import type { RoomStore } from './room.ts';
 import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
@@ -43,6 +44,11 @@ interface Judgement {
   vars: Vars;
   jump: boolean;
 }
+
+/** 测试播放、预览用的观众 */
+const SAMPLE_VIEWER: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, honor: 28 };
+
+const honorOf = (level: number, url: string | undefined) => ({ level, ...(url ? { url } : {}) });
 
 /** 两次播放之间的间隔 */
 export const PLAY_GAP_MS = 300;
@@ -106,6 +112,8 @@ export interface PipelineDeps {
   live: Pick<LiveService, 'onEvent' | 'status'>;
   /** 查礼物图；测试里可以不传 */
   gifts?: Pick<GiftCatalog, 'iconFor'>;
+  /** 查荣耀等级勋章图；测试里可以不传 */
+  honor?: Pick<HonorMedals, 'urlFor'>;
   room: RoomStore;
   settings: SettingsStore;
   enterRules: EnterRuleStore;
@@ -231,12 +239,12 @@ export class Pipeline {
 
   private remember(v: Viewer): void {
     const roomId = this.d.room.get()?.roomId;
-    // 昵称、大航海等级都没变就不用再写
-    const key = `${v.name}|${v.guard}|${roomId}`;
+    // 昵称、大航海等级、荣耀等级都没变就不用再写
+    const key = `${v.name}|${v.guard}|${roomId}|${v.honor ?? 0}`;
     if (v.uid <= 0 || !v.name || v.mystery || this.remembered.get(v.uid) === key) return;
     this.remembered.set(v.uid, key);
     if (this.remembered.size > 50_000) this.remembered.clear();
-    this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '' }, roomId ? { level: v.guard, roomId } : undefined);
+    this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '', ...(v.honor ? { honor: v.honor } : {}) }, roomId ? { level: v.guard, roomId } : undefined);
   }
 
   private record(ev: TriggerEvent, hit: Judgement['hit'], status: PlayStatus): number {
@@ -385,7 +393,7 @@ export class Pipeline {
     return !e.asset.hasAlpha && this.d.settings.get('featherOn') ? this.d.settings.get('featherPct') : 0;
   }
 
-  /** SVGA 图层替换成这位观众的头像、头像框、身份图标、昵称、欢迎语；不是大航海时头像框、图标那一层藏起来 */
+  /** SVGA 图层替换成这位观众的头像、头像框、身份图标、荣耀勋章、昵称、欢迎语；不是大航海时头像框、图标那一层藏起来，没有荣耀等级时勋章那一层藏起来 */
   private svgaDyn(effect: EffectDto, viewer: Viewer, text: string): SvgaDyn[] | undefined {
     const a = effect.asset;
     if (!a || a.ext !== 'svga' || !a.slots?.length) return undefined;
@@ -399,6 +407,7 @@ export class Pipeline {
       if (role === 'avatar' || role === 'avatarSquare') out.push({ ...base, url: viewer.face ?? '', text: viewer.name });
       else if (role === 'frame') out.push({ ...base, url: g ? GUARD_FRAMES[g] : '' });
       else if (role === 'badge') out.push({ ...base, url: g ? GUARD_BADGES[g] : '' });
+      else if (role === 'honor') out.push({ ...base, url: this.d.honor?.urlFor(viewer.honor) ?? '' });
       else if (role === 'name') out.push({ ...base, text: viewer.name });
       else out.push({ ...base, text });
     }
@@ -431,6 +440,7 @@ export class Pipeline {
         sizePct: effect.sizePct,
         featherPct: this.featherOf(effect),
         guardFrame: effect.guardFrame,
+        honorBadge: effect.honorBadge,
         sound: effect.sound ? { url: effect.sound.url } : null,
         volume: effect.volume,
       },
@@ -441,6 +451,7 @@ export class Pipeline {
         guard: viewer.guard,
         isMod: viewer.isMod,
         ...(viewer.medal ? { medal: { name: viewer.medal.name, level: viewer.medal.level, ...(viewer.medal.colors ? { colors: viewer.medal.colors } : {}) } } : {}),
+        ...(viewer.honor ? { honor: honorOf(viewer.honor, this.d.honor?.urlFor(viewer.honor)) } : {}),
       },
       ...(kind === 'guard' && vars.op ? { guardOp: vars.op } : {}),
       ...(kind === 'gift' && vars.gift ? { gift: { name: vars.gift, count: vars.count ?? 1, ...(vars.giftImg ? { img: vars.giftImg } : {}) } } : {}),
@@ -537,7 +548,7 @@ export class Pipeline {
     if (this.d.settings.get('paused')) throw new HttpError(409, 'paused', '已暂停，恢复后才能测试');
     if (this.d.hub.overlayCount() === 0) throw new HttpError(409, 'no_overlay', '特效页不在线：请先把特效页地址加到直播软件的浏览器源里');
     const effect = this.d.effects.get(effectId);
-    const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
+    const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
     const item = this.playItem(effect, v, 'enter', {}, true);
     // 正在播的也是测试：直接换成新的，不用等它播完（真实观众的特效不打断）
     if (this.current?.q.payload.item.test) this.stopCurrent();
@@ -547,7 +558,7 @@ export class Pipeline {
 
   /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
   preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): PlayItem {
-    const v: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, ...viewer };
+    const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
     return this.playItem(effect, v, kind, { ...SAMPLE_VARS[kind], ...vars }, true);
   }
 

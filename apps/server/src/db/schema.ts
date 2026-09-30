@@ -84,6 +84,7 @@ export const effects = sqliteTable('effects', {
   featherPct: integer('feather_pct').notNull().default(10),
   /** 头像和欢迎语里，大航海观众的头像套上 B 站头像框 */
   guardFrame: bool('guard_frame').notNull().default(false),
+  honorBadge: bool('honor_badge').notNull().default(false),
   /** SVGA：图层名 → 播放时换成什么 */
   svgaMap: text('svga_map', { mode: 'json' }).$type<Record<string, SvgaRole>>().notNull().default({}),
   createdAt: integer('created_at').notNull().default(now),
@@ -219,5 +220,7 @@ export const viewers = sqliteTable('viewers', {
   /** 最近一次在哪个直播间看到 TA 是大航海几级（0 不是）：只在同一个直播间里算数 */
   guard: integer('guard').notNull().default(0),
   guardRoom: integer('guard_room'),
+  /** 最近一次看到的荣耀等级（0 不知道） */
+  honor: integer('honor').notNull().default(0),
   updatedAt: integer('updated_at').notNull().default(now),
 });

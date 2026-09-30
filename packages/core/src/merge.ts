@@ -29,6 +29,7 @@ export function mergeEnter(full: EnterEvent, effect: EnterEvent): EnterEvent {
       ...(full.viewer.face || effect.viewer.face ? { face: full.viewer.face || effect.viewer.face } : {}),
       guard: higherGuard(full.viewer.guard, effect.viewer.guard),
       isMod: full.viewer.isMod || effect.viewer.isMod,
+      ...(full.viewer.honor || effect.viewer.honor ? { honor: Math.max(full.viewer.honor ?? 0, effect.viewer.honor ?? 0) } : {}),
     },
   };
 }

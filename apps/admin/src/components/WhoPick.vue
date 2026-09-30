@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// 弹幕规则「谁发的才算」：点一下弹出多选（所有人、主播、房管、总督 / 提督 / 舰长、粉丝牌等级、指定观众），改了立即保存
+// 弹幕规则「谁发的才算」：点一下弹出多选（所有人、主播、房管、总督 / 提督 / 舰长、粉丝牌等级、荣耀等级、指定观众），改了立即保存
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
-import { DANMU_UIDS_MAX, MEDAL_LEVEL_MAX } from '@starfall/shared';
+import { DANMU_UIDS_MAX, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX } from '@starfall/shared';
 import type { DanmuWho } from '@starfall/shared';
 import { get } from '../lib/api.ts';
 import { whoText } from '../lib/danmu-who.ts';
@@ -39,7 +39,7 @@ const GUARDS = [
 
 /** 保存；一种人都没选时不保存，返回 false */
 function set(next: DanmuWho): boolean {
-  if (!(next.all || next.anchor || next.mod || next.guards.length || next.fanMin !== null || next.uids.length)) {
+  if (!(next.all || next.anchor || next.mod || next.guards.length || next.fanMin !== null || next.honorMin !== null || next.uids.length)) {
     toast('至少选一种人；不限的话选「所有人」', 'info');
     return false;
   }
@@ -72,6 +72,16 @@ function setFanMin(e: Event): void {
   const n = Math.round(Number((e.target as HTMLInputElement).value));
   if (!n || n < 1 || Math.min(MEDAL_LEVEL_MAX, n) === w.value.fanMin) return;
   set({ ...base(), fanMin: Math.min(MEDAL_LEVEL_MAX, n) });
+}
+/** 勾上荣耀等级时先填 20 级 */
+function toggleHonor(): boolean {
+  const b = base();
+  return set({ ...b, honorMin: !w.value.all && w.value.honorMin !== null ? null : (w.value.honorMin ?? 20) });
+}
+function setHonorMin(e: Event): void {
+  const n = Math.round(Number((e.target as HTMLInputElement).value));
+  if (!n || n < 1 || Math.min(HONOR_LEVEL_MAX, n) === w.value.honorMin) return;
+  set({ ...base(), honorMin: Math.min(HONOR_LEVEL_MAX, n) });
 }
 async function addUid(): Promise<void> {
   const v = uidIn.value.trim();
@@ -146,6 +156,10 @@ onBeforeUnmount(close);
       <div class="ckrow" :class="{ dim: w.all }">
         <label class="ck"><input type="checkbox" :checked="!w.all && w.fanMin !== null" @change="(e) => keep(e, toggleFan())" />戴本房间粉丝牌</label>
         <label v-if="!w.all && w.fanMin !== null" class="lv">至少 <input class="inp num" type="number" min="1" :max="MEDAL_LEVEL_MAX" :value="w.fanMin" aria-label="粉丝牌最低等级" @change="setFanMin" @keydown.enter="setFanMin" /> 级</label>
+      </div>
+      <div class="ckrow" :class="{ dim: w.all }">
+        <label class="ck"><input type="checkbox" :checked="!w.all && w.honorMin !== null" @change="(e) => keep(e, toggleHonor())" />荣耀等级</label>
+        <label v-if="!w.all && w.honorMin !== null" class="lv">至少 <input class="inp num" type="number" min="1" :max="HONOR_LEVEL_MAX" :value="w.honorMin" aria-label="荣耀等级最低等级" @change="setHonorMin" @keydown.enter="setHonorMin" /> 级</label>
       </div>
       <div class="uidbox" :class="{ dim: w.all }">
         <label class="ck"><input type="checkbox" :checked="uidsOn" @change="(e) => keep(e, toggleUids())" />指定观众</label>

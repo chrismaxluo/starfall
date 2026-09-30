@@ -256,6 +256,12 @@ svg.i { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: n
 .medal span { padding: 0 5px; }
 .medal b { padding: 0 5px; font-weight: 600; background: var(--ml); font-family: var(--font-mono); }
 
+/* 身份标签一组：荣耀勋章 + 大航海 / 粉丝牌 */
+.ids { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+/* B站荣耀等级勋章（B 站的图，36×16）；读不到图时用文字 */
+.honor { flex: none; height: 18px; width: auto; vertical-align: middle; }
+.honor-txt { font-style: normal; display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 99px; font-size: 11px; font-weight: 600; color: #fff; background: linear-gradient(90deg, #6D55C9, #9A7BE8); white-space: nowrap; }
+
 /* 身份构成 */
 .stack { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 2px; margin: 4px 0 16px; }
 .stack i { display: block; height: 100%; }

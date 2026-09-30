@@ -32,13 +32,14 @@ export const FEATHER_MODES = ['global', 'custom', 'off'] as const;
 export type FeatherMode = (typeof FEATHER_MODES)[number];
 export const FEATHER_DEFAULT = 10;
 /** SVGA 的图层播放时换成什么：头像（圆形 / 方形）、头像框、身份图标（船锚）、昵称、欢迎语 */
-export const SVGA_ROLES = ['avatar', 'avatarSquare', 'frame', 'badge', 'name', 'welcome'] as const;
+export const SVGA_ROLES = ['avatar', 'avatarSquare', 'frame', 'badge', 'honor', 'name', 'welcome'] as const;
 export type SvgaRole = (typeof SVGA_ROLES)[number];
 /** 按图层名字猜它是什么（买来的 SVGA 常见写法：avatar / head / 头像、nickname / name、frame / kuang ……）；猜不出为 null */
 export function guessSvgaRole(key: string): SvgaRole | null {
   const k = key.toLowerCase();
   if (/frame|kuang|border|头像框|txk/.test(k)) return 'frame';
   if (/avatar|head|touxiang|portrait|face|userpic|user_?img|头像|^tx\d*$/.test(k)) return 'avatar';
+  if (/honou?r|wealth|glory|rongyao|荣耀/.test(k)) return 'honor';
   if (/badge|guard|anchor|medal|rank|身份|船锚|图标/.test(k)) return 'badge';
   if (/nick|name|uname|昵称|用户名/.test(k)) return 'name';
   if (/welcome|text|msg|message|desc|content|slogan|欢迎|文字|文案/.test(k)) return 'welcome';
@@ -84,6 +85,8 @@ export const EffectSchema = z.object({
   featherPct: z.number().int().min(0).max(FEATHER_MAX),
   /** 上传的素材：大航海观众的头像套上 B 站的头像框（头像和欢迎语里） */
   guardFrame: z.boolean(),
+  /** 观众名字旁边显示 B 站的荣耀等级勋章（内置样式，或者叠加的头像和欢迎语里） */
+  honorBadge: z.boolean(),
   /** SVGA：图层名 → 播放时换成什么（没列出的图层不替换） */
   svgaMap: z.record(z.string().min(1).max(120), z.enum(SVGA_ROLES)).refine((m) => Object.keys(m).length <= 60, { message: '图层太多' }),
 });
@@ -146,11 +149,13 @@ export const DANMU_WHO_OLD = ['all', 'fan', 'fan10', 'guard', 'mod'] as const;
 
 /** 粉丝牌等级上限 */
 export const MEDAL_LEVEL_MAX = 120;
+/** 荣耀等级上限（B 站目前到 80 级） */
+export const HONOR_LEVEL_MAX = 80;
 /** 一条规则最多指定多少位观众 */
 export const DANMU_UIDS_MAX = 100;
 
 /**
- * 发送人条件（多选，满足任意一项就算）：所有人、主播、房管、总督 / 提督 / 舰长、戴本房间粉丝牌且不低于某级、指定观众。
+ * 发送人条件（多选，满足任意一项就算）：所有人、主播、房管、总督 / 提督 / 舰长、戴本房间粉丝牌且不低于某级、荣耀等级不低于某级、指定观众。
  * 点了名的（勾了主播、填了 UID）不受「主播本人不触发」「登录的账号不触发」限制；手动拉黑的照样不触发。
  */
 export const DanmuWhoSchema = z
@@ -161,13 +166,15 @@ export const DanmuWhoSchema = z
     guards: z.array(z.union([z.literal(1), z.literal(2), z.literal(3)])).max(3),
     /** 戴本房间粉丝牌、不低于这个等级；null 为不按粉丝牌 */
     fanMin: z.number().int().min(1).max(MEDAL_LEVEL_MAX).nullable(),
+    /** 荣耀等级不低于这个等级；null 为不按荣耀等级（旧配置没有这一项） */
+    honorMin: z.number().int().min(1).max(HONOR_LEVEL_MAX).nullable().default(null),
     uids: z.array(z.number().int().positive()).max(DANMU_UIDS_MAX),
   })
   .strict()
-  .refine((w) => w.all || w.anchor || w.mod || w.guards.length > 0 || w.fanMin !== null || w.uids.length > 0, { message: '至少选一种人' });
+  .refine((w) => w.all || w.anchor || w.mod || w.guards.length > 0 || w.fanMin !== null || w.honorMin !== null || w.uids.length > 0, { message: '至少选一种人' });
 export type DanmuWho = z.infer<typeof DanmuWhoSchema>;
 
-export const DANMU_WHO_ALL: DanmuWho = { all: true, anchor: false, mod: false, guards: [], fanMin: null, uids: [] };
+export const DANMU_WHO_ALL: DanmuWho = { all: true, anchor: false, mod: false, guards: [], fanMin: null, honorMin: null, uids: [] };
 
 /** 以前的单选换成多选（「戴本房间粉丝牌」以前也算上大航海和房管） */
 export function danmuWhoFromOld(w: (typeof DANMU_WHO_OLD)[number]): DanmuWho {

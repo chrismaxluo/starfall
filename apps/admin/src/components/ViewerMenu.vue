@@ -7,6 +7,7 @@ import { attempt, toast } from '../lib/toast.ts';
 import type { Viewer } from '../lib/types.ts';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
+import HonorMedal from './HonorMedal.vue';
 import IdTag from './IdTag.vue';
 
 const props = defineProps<{ viewer: Viewer; x: number; y: number }>();
@@ -57,7 +58,7 @@ async function block(): Promise<void> {
       <div class="mh">
         <Avatar :name="viewer.name" :face="viewer.face" :guard="viewer.guard" />
         <div><b>{{ viewer.name }}</b><span class="num">UID {{ viewer.uid }}</span></div>
-        <span style="margin-left: auto"><IdTag :viewer="viewer" /></span>
+        <span class="ids" style="margin-left: auto"><HonorMedal :level="viewer.honor" /><IdTag :viewer="viewer" /></span>
       </div>
       <button :disabled="viewer.uid <= 0" @click="exclusive"><Icon name="i-spark" />{{ isExcl ? '修改 TA 的专属特效' : '为 TA 设置专属特效' }}</button>
       <button :disabled="viewer.uid <= 0" @click="copy"><Icon name="i-copy" />复制 UID</button>

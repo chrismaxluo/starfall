@@ -1,6 +1,6 @@
 // 在线的特效页和管理后台（方案设计 9.3）。这里不关心 WebSocket 细节，只管"发给谁"。
-import { OVERLAY_CLOSE } from '@starfall/shared';
-import type { OverlayConfig, ServerToOverlay } from '@starfall/shared';
+import { CHAT_MAX, OVERLAY_CLOSE } from '@starfall/shared';
+import type { ChatItem, OverlayConfig, ServerToOverlay } from '@starfall/shared';
 import type { OutputRow } from './outputs.ts';
 
 export interface Sock {
@@ -8,9 +8,13 @@ export interface Sock {
   close(code?: number, reason?: string): void;
 }
 
+/** fx：特效页；chat：弹幕列表 */
+export type OverlayRole = 'fx' | 'chat';
+
 export interface OverlayClient {
   sock: Sock;
   outputId: number;
+  role: OverlayRole;
   since: number;
   /** 特效页上报的运行环境（直播软件、内核版本、能力检测） */
   env: Record<string, unknown> | null;
@@ -24,6 +28,7 @@ export const PLAY_ACK_MS = 5000;
 
 export interface OverlayInfo {
   outputId: number;
+  role: OverlayRole;
   since: number;
   env: Record<string, unknown> | null;
   lastError: string | null;
@@ -41,6 +46,10 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   marginX: o.marginX,
   scale: o.scale,
   liteMode: o.liteMode,
+  chatEnabled: o.chatEnabled,
+  chatSide: o.chatSide,
+  chatSize: o.chatSize,
+  chatMedal: o.chatMedal,
 });
 
 export class Hub {
@@ -49,6 +58,8 @@ export class Hub {
   private readonly overlays = new Set<OverlayClient>();
   private readonly admins = new Set<Sock>();
   private readonly overlayListeners = new Set<() => void>();
+  /** 最近的几条弹幕：弹幕列表刚打开（或刷新）时先显示这些 */
+  private chatRecent: ChatItem[] = [];
 
   constructor(opts: { build?: () => string | null } = {}) {
     this.build = opts.build ?? (() => null);
@@ -64,10 +75,11 @@ export class Hub {
     for (const fn of this.overlayListeners) fn();
   }
 
-  addOverlay(sock: Sock, output: OutputRow, preload: string[], now = Date.now()): OverlayClient {
-    const c: OverlayClient = { sock, outputId: output.id, since: now, env: null, lastError: null, pending: new Map() };
+  addOverlay(sock: Sock, output: OutputRow, preload: string[], now = Date.now(), role: OverlayRole = 'fx'): OverlayClient {
+    const c: OverlayClient = { sock, outputId: output.id, role, since: now, env: null, lastError: null, pending: new Map() };
     this.overlays.add(c);
-    send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
+    if (role === 'chat') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), chat: this.chatRecent });
+    else send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
     this.overlaysChanged();
     return c;
   }
@@ -81,20 +93,41 @@ export class Hub {
     this.overlaysChanged();
   }
 
+  /** 在线的特效页数量（不算弹幕列表） */
   overlayCount(): number {
-    return this.overlays.size;
+    return [...this.overlays].filter((c) => c.role === 'fx').length;
   }
 
   overlayList(): OverlayInfo[] {
-    return [...this.overlays].map((c) => ({ outputId: c.outputId, since: c.since, env: c.env, lastError: c.lastError }));
+    return [...this.overlays].map((c) => ({ outputId: c.outputId, role: c.role, since: c.since, env: c.env, lastError: c.lastError }));
   }
 
-  /** 发给所有特效页（所有输出同步播放） */
+  /** 发给所有特效页（所有输出同步播放）；版本更新也发给弹幕列表 */
   toOverlays(msg: ServerToOverlay, now = Date.now()): void {
     for (const c of this.overlays) {
+      if (c.role === 'chat' && msg.type !== 'version') continue;
       send(c.sock, msg);
       if (msg.type === 'play') c.pending.set(msg.item.id, { at: now, label: `${msg.item.effect.name} · ${msg.item.viewer.name}` });
     }
+  }
+
+  /** 新的一条弹幕：发给所有弹幕列表和管理后台（后台的预览用），记住最近的几条 */
+  toChat(item: ChatItem): void {
+    this.chatRecent = [...this.chatRecent, item].slice(-CHAT_MAX);
+    for (const c of this.overlays) if (c.role === 'chat') send(c.sock, { type: 'chat', item });
+    this.toAdmins({ type: 'chat', item });
+  }
+
+  /** 换了直播间：清空弹幕列表 */
+  clearChat(): void {
+    this.chatRecent = [];
+    for (const c of this.overlays) if (c.role === 'chat') send(c.sock, { type: 'chat_clear' });
+    this.toAdmins({ type: 'chat_clear' });
+  }
+
+  /** 最近的几条弹幕（管理后台打开时用） */
+  recentChat(): ChatItem[] {
+    return this.chatRecent;
   }
 
   /** 特效页回了"开始播放"：返回这次播放的说明和延迟；不是等待中的播放时返回 null */

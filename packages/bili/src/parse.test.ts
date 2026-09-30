@@ -69,6 +69,27 @@ describe('弹幕 DANMU_MSG', () => {
     expect(ev).toMatchObject({ kind: 'danmu', text: '主播生日快乐！', ts: 1790000004000 });
     if (ev?.kind !== 'danmu') throw new Error();
     expect(ev.viewer).toMatchObject({ uid: 10005, name: '测试提督', guard: 2, isMod: true, medal: { name: '测试牌', level: 39, anchorUid: FIXTURE_ANCHOR }, honor: 11 });
+    expect(ev.emots).toBeUndefined();
+    expect(ev.sticker).toBeUndefined();
+  });
+
+  // 表情的结构来自真实弹幕（extra.emots、info[0][13]），地址换成测试值
+  const withImages = (meta13: unknown, emots: unknown) => {
+    const raw = structuredClone(fixture('danmu_msg.guard-mod')) as { info: unknown[][] };
+    raw.info[0]![13] = meta13;
+    const m15 = raw.info[0]![15] as { extra: string };
+    m15.extra = JSON.stringify({ ...JSON.parse(m15.extra), emots });
+    return raw;
+  };
+  it('文字里的小表情：写法 → 图片地址（http 换成 https，只要 B 站图床的）', () => {
+    const ev = parseMessage(withImages('{}', { '[dog]': { url: 'http://i0.hdslb.com/bfs/live/dog.png', width: 20, height: 20 }, '[坏]': { url: 'https://evil.example/x.png' } }), ctx);
+    expect(ev).toMatchObject({ kind: 'danmu', emots: { '[dog]': 'https://i0.hdslb.com/bfs/live/dog.png' } });
+    if (ev?.kind !== 'danmu') throw new Error();
+    expect(ev.emots?.['[坏]']).toBeUndefined();
+  });
+  it('整条是表情包：info[0][13] 带图片地址和大小', () => {
+    const ev = parseMessage(withImages({ emoticon_unique: 'upower_[测试_好耶]', url: 'http://i0.hdslb.com/bfs/emote/haoye.png', width: 162, height: 162 }, null), ctx);
+    expect(ev).toMatchObject({ kind: 'danmu', sticker: { url: 'https://i0.hdslb.com/bfs/emote/haoye.png', width: 162, height: 162 } });
   });
 });
 

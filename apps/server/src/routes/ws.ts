@@ -77,15 +77,18 @@ function overlayAlive(socket: WebSocket, onDead: () => void, onTick: () => void)
 }
 
 export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
-  app.get<{ Querystring: { output?: string; key?: string } }>('/ws/overlay', { websocket: true }, (socket, req) => {
+  app.get<{ Querystring: { output?: string; key?: string; view?: string } }>('/ws/overlay', { websocket: true }, (socket, req) => {
     const output = ctx.outputs.verify(Number(req.query.output), String(req.query.key ?? ''));
     if (!output) {
       socket.close(OVERLAY_CLOSE.badKey, 'bad key');
       return;
     }
-    const client = ctx.hub.addOverlay(socket, output, preloadUrls(ctx));
-    const log = req.log.child({ output: output.id, ip: req.ip });
-    log.info('特效页已连接');
+    // 弹幕列表和特效页用同一个连接地址，多一个 view=chat
+    const role = req.query.view === 'chat' ? 'chat' : 'fx';
+    const what = role === 'chat' ? '弹幕列表' : '特效页';
+    const client = ctx.hub.addOverlay(socket, output, role === 'chat' ? [] : preloadUrls(ctx), Date.now(), role);
+    const log = req.log.child({ output: output.id, ip: req.ip, ...(role === 'chat' ? { view: 'chat' } : {}) });
+    log.info(`${what}已连接`);
     // 记录断开原因，方便排查"特效页不显示"
     let reason: string | null = null;
     const stop = keepAlive(socket, () => {
@@ -117,7 +120,7 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       else if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
       else if (msg.type === 'error') {
         ctx.hub.report(client, { lastError: msg.message });
-        log.warn({ id: msg.id }, `特效页报错：${msg.message}`);
+        log.warn({ id: msg.id }, `${what}报错：${msg.message}`);
       }
     });
     socket.on('close', (code) => {
@@ -125,7 +128,7 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       hb.stop();
       ctx.hub.removeOverlay(client);
       const minutes = Math.round((Date.now() - client.since) / 6000) / 10;
-      const msg = `特效页已断开：${reason ?? `页面关闭连接（${code}）`}，本次连接 ${minutes} 分钟`;
+      const msg = `${what}已断开：${reason ?? `页面关闭连接（${code}）`}，本次连接 ${minutes} 分钟`;
       if (reason) log.warn(msg);
       else log.info(msg);
     });
@@ -143,7 +146,7 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       return;
     }
     ctx.hub.addAdmin(socket);
-    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current() }));
+    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat() }));
     const stop = keepAlive(socket, () => ctx.hub.removeAdmin(socket));
     socket.on('close', () => {
       stop();

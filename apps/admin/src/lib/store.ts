@@ -3,7 +3,8 @@ import { reactive } from 'vue';
 import { get } from './api.ts';
 import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
-import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+import type { ChatItem } from '@starfall/shared/overlay';
+import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
 /** 实时动态在内存里留多少条（总览按类型筛选时从这里挑） */
 export const FEED_KEEP = 150;
@@ -24,6 +25,8 @@ export const state = reactive({
   guard: null as GuardRules | null,
   outputs: [] as OutputDto[],
   overlays: [] as OverlayInfo[],
+  /** 最近的几条弹幕（弹幕列表的预览用） */
+  chat: [] as ChatItem[],
   queue: { playing: null, items: [] } as QueueSnapshot,
   /** 实时动态（最新在前） */
   feed: [] as EventDto[],
@@ -37,6 +40,11 @@ export const state = reactive({
 
 export const effectById = (id: number | null | undefined) => (id ? state.effects.find((e) => e.id === id) : undefined);
 export const output = () => state.outputs[0];
+
+/** 输出的设置换成特效页、弹幕列表收到的格式（预览用） */
+export function overlayConfigOf(o: OutputDto): OverlayConfig {
+  return { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal };
+}
 
 export async function refreshStatus(): Promise<void> {
   state.status = await get<StatusSnapshot>('/api/status');

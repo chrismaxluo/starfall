@@ -48,7 +48,7 @@ export function thumb(url: string, px: number): string {
 }
 
 /** 粉丝牌颜色表（B 站没有下发颜色时使用，与设计预览一致） */
-function fallbackColors(level: number, guard: boolean) {
+export function fallbackColors(level: number, guard: boolean) {
   const t = level <= 10 ? ['#5762A7', null] : level <= 20 ? ['#C770A4', null] : level <= 30 ? ['#3FB4F6', '#5FC7F4'] : level <= 40 ? ['#4C7DFF', '#58A1F8'] : level <= 50 ? ['#A773F1', '#D47AFF'] : ['#EC4F6E', '#F18087'];
   return { bg: `${t[0]}99`, level: `${t[0]}E6`, border: guard && t[1] ? t[1] : `${t[0]}99`, text: '#FFFFFF' };
 }

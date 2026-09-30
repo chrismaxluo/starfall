@@ -139,7 +139,13 @@ const RulesPart = z.object({
   guard: z.object(Object.fromEntries((['gov', 'adm', 'cap'] as const).map((t) => [t, z.object({ open: effectRef, renew: effectRef, enabled: z.boolean() })])) as Record<'gov' | 'adm' | 'cap', z.ZodObject<{ open: typeof effectRef; renew: typeof effectRef; enabled: z.ZodBoolean }>>),
 });
 
-const OutputPart = OutputInputSchema;
+// 弹幕列表的设置是 v1.3 加的：以前导出的文件里没有，用默认值
+const OutputPart = OutputInputSchema.extend({
+  chatEnabled: OutputInputSchema.shape.chatEnabled.default(true),
+  chatSide: OutputInputSchema.shape.chatSide.default('left'),
+  chatSize: OutputInputSchema.shape.chatSize.default('normal'),
+  chatMedal: OutputInputSchema.shape.chatMedal.default('own'),
+});
 
 export const ConfigFileSchema = z.object({
   format: z.literal(CONFIG_FORMAT),
@@ -284,7 +290,7 @@ export class ConfigIO {
         guard: Object.fromEntries((['gov', 'adm', 'cap'] as const).map((t) => [t, { open: ref(guard[t].openEffectId), renew: ref(guard[t].renewEffectId), enabled: guard[t].enabled }])) as ConfigFile['rules']['guard'],
       },
       blacklist: this.d.blacklist.list().map((b) => ({ uid: b.uid, name: b.name, note: b.note })),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal })),
     };
   }
 

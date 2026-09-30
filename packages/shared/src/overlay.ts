@@ -34,6 +34,39 @@ export interface OverlayConfig {
   /** 特效整体缩放，百分比 */
   scale: number;
   liteMode: 'auto' | 'on' | 'off';
+  /** 弹幕列表：开关、对齐（靠左 / 靠右）、字号、粉丝牌（只显示本直播间的 / 戴什么显示什么） */
+  chatEnabled: boolean;
+  chatSide: 'left' | 'right';
+  chatSize: 'normal' | 'large';
+  chatMedal: 'own' | 'all';
+}
+
+/** 弹幕列表最多显示几条 */
+export const CHAT_MAX = 8;
+/** 弹幕列表浏览器源的建议宽高 */
+export const CHAT_SIZE = { width: 600, height: 900 } as const;
+
+/** 弹幕列表里的一条弹幕 */
+export interface ChatItem {
+  id: string;
+  ts: number;
+  viewer: {
+    uid: number;
+    name: string;
+    face?: string;
+    guard: GuardLevel;
+    isMod: boolean;
+    /** 主播本人 */
+    anchor: boolean;
+    /** own：本直播间的粉丝牌（设置成「只显示本直播间的」时只显示这种） */
+    medal?: { name: string; level: number; own: boolean; colors?: { bg: string; level: string; border: string; text: string } };
+    honor?: { level: number; url?: string };
+  };
+  text: string;
+  /** 文字里的小表情：写法 → 图片地址 */
+  emots?: Record<string, string>;
+  /** 表情包：显示这张图，不显示文字 */
+  sticker?: { url: string; width: number; height: number };
 }
 
 export type PlayVisual =
@@ -103,13 +136,17 @@ export const OVERLAY_BUILD_RE = /index-[\w-]+\.js/;
 
 export type ServerToOverlay =
   /** build：服务端现在的特效页版本；和页面自己的不一样时，页面会在空闲时自动刷新 */
-  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null }
+  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null; chat?: ChatItem[] }
   /** 特效页重新构建了（不用重启服务） */
   | { type: 'version'; build: string }
   | { type: 'config'; config: OverlayConfig }
   | { type: 'preload'; preload: string[] }
   | { type: 'play'; item: PlayItem }
   | { type: 'stop' }
+  /** 弹幕列表：新的一条弹幕 */
+  | { type: 'chat'; item: ChatItem }
+  /** 弹幕列表：换了直播间，清空 */
+  | { type: 'chat_clear' }
   /** 心跳：特效页据此判断连接是否还活着（浏览器里收不到协议层的 ping） */
   | { type: 'ping' };
 

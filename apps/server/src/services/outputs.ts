@@ -20,18 +20,24 @@ export const OutputInputSchema = z
     marginX: z.number().int().min(0).max(30),
     scale: z.number().int().min(50).max(200),
     liteMode: z.enum(['auto', 'on', 'off']),
+    chatEnabled: z.boolean(),
+    chatSide: z.enum(['left', 'right']),
+    chatSize: z.enum(['normal', 'large']),
+    chatMedal: z.enum(['own', 'all']),
   })
   .strict();
 export type OutputInput = z.infer<typeof OutputInputSchema>;
 export const OutputPatchSchema = OutputInputSchema.partial().strict();
 
 /** 新建输出的默认值：竖屏 1080×1920，安全区按手机竖屏实测（P0 报告） */
-const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto' };
+const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own' };
 
 const newKey = () => crypto.randomBytes(16).toString('base64url');
 
 /** 特效页地址（相对路径，界面上拼上当前访问的主机名） */
 export const overlayPath = (o: Pick<OutputRow, 'id' | 'key'>) => `/overlay/?output=${o.id}&key=${o.key}`;
+/** 弹幕列表地址：同一个特效页程序，多一个 chat=1 */
+export const chatPath = (o: Pick<OutputRow, 'id' | 'key'>) => `${overlayPath(o)}&chat=1`;
 
 export class OutputStore {
   private readonly db: Db;

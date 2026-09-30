@@ -104,7 +104,12 @@ const log = (ev: Ev, status: 'played' | 'no_rule' | 'cooldown', rule: string | n
 let t = now - 40 * 60_000;
 const at = (sec: number) => (t += sec * 1000);
 const enter = (n: string, s: 'played' | 'no_rule' | 'cooldown', rule: string | null, e: string | null, sec = 40) => log({ kind: 'enter', id: `e${t}`, ts: at(sec), source: 'interact', viewer: viewer(by(n)) }, s, rule, e);
-const danmu = (n: string, text: string, sec = 25) => log({ kind: 'danmu', id: `d${t}`, ts: at(sec), viewer: viewer(by(n)), text }, 'no_rule');
+const danmu = (n: string, text: string, sec = 25) => {
+  const ev = { kind: 'danmu' as const, id: `d${t}`, ts: at(sec), viewer: viewer(by(n)), text };
+  log(ev, 'no_rule');
+  // 弹幕列表里也放上这些
+  ctx.hub.toChat(ctx.pipeline.chatItem(ev));
+};
 const gift = (n: string, giftName: string, unitPrice: number, count: number, e: string | null, sec = 30) =>
   log({ kind: 'gift', id: `g${t}`, ts: at(sec), viewer: viewer(by(n)), giftId: 1, giftName, unitPrice, count, paid: true }, e ? 'played' : 'no_rule', e ? '礼物 · 单次 10 – 100 元' : null, e);
 
@@ -134,4 +139,22 @@ const app = await buildApp(ctx, { logger: false });
 await startBackground(ctx);
 await app.listen({ port: config.port, host: '127.0.0.1' });
 const out = ctx.outputs.list()[0]!;
-process.stdout.write(`演示服务已启动：http://127.0.0.1:${config.port}/\n后台密码：${ctx.initialPassword}\n特效页：http://127.0.0.1:${config.port}/overlay/?output=${out.id}&key=${out.key}\n`);
+process.stdout.write(`演示服务已启动：http://127.0.0.1:${config.port}/\n后台密码：${ctx.initialPassword}\n特效页：http://127.0.0.1:${config.port}/overlay/?output=${out.id}&key=${out.key}\n弹幕列表：http://127.0.0.1:${config.port}/overlay/?output=${out.id}&key=${out.key}&chat=1\n`);
+
+// 弹幕列表：每隔几秒来一条编的弹幕（只进弹幕列表，不触发特效、不写记录）
+const LINES = ['晚上好呀', '来了来了[dog]', '主播今天好好看[比心]', '这首歌好听！', '打卡[花]', '前排[吃瓜]', '刚下班，赶上了', '主播唱一首晴天吧', '666', '[鼓掌][鼓掌]', '今天播到几点呀', '笑死我了[大笑]'];
+const EMOTS: Record<string, string> = {
+  '[dog]': 'https://i0.hdslb.com/bfs/live/4428c84e694fbf4e0ef6c06e958d9352c3582740.png',
+  '[比心]': 'https://i0.hdslb.com/bfs/live/4e029593562283f00d39b99e0557878c4199c71d.png',
+  '[花]': 'https://i0.hdslb.com/bfs/live/7dd2ef03e13998575e4d8a803c6e12909f94e72b.png',
+  '[吃瓜]': 'https://i0.hdslb.com/bfs/live/ffb53c252b085d042173379ac724694ce3196194.png',
+  '[鼓掌]': 'https://i0.hdslb.com/bfs/live/d581d0bc30c8f9712b46ec02303579840c72c42d.png',
+  '[大笑]': 'https://i0.hdslb.com/bfs/live/e2589d086df0db8a7b5ca2b1273c02d31d4433d4.png',
+};
+let n = 0;
+setInterval(() => {
+  const p = P[(n * 7) % P.length]!;
+  const text = LINES[n++ % LINES.length]!;
+  const emots = Object.fromEntries(Object.entries(EMOTS).filter(([k]) => text.includes(k)));
+  ctx.hub.toChat(ctx.pipeline.chatItem({ kind: 'danmu', id: `live${n}`, ts: Date.now(), viewer: viewer(p), text, ...(Object.keys(emots).length ? { emots } : {}) }));
+}, 2500).unref();

@@ -60,7 +60,7 @@ async function saveRoom(): Promise<void> {
 const out = computed(() => output());
 const url = computed(() => (out.value ? `${location.origin}${out.value.path}` : ''));
 // 只算直播软件里的特效页，不算「在浏览器里查看」打开的
-const online = computed(() => state.overlays.some((x) => x.outputId === out.value?.id && !x.env?.view));
+const online = computed(() => state.overlays.some((x) => x.outputId === out.value?.id && x.role !== 'chat' && !x.env?.view));
 async function setApp(app: OutputDto['app']): Promise<void> {
   const o = out.value;
   if (!o || o.app === app) return;

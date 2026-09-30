@@ -72,6 +72,10 @@ describe('时间按主播所在时区显示', () => {
     expect(dateTime(ts)).toBe('09-27 04:00:00');
     expect(clock(ts)).toBe('04:00:00');
     expect(today()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // 开播时间这类「今天 / 昨天」也按这个时区，不按浏览器的
+    expect(when(ts, Date.UTC(2026, 8, 27, 1, 0))).toBe('今天 04:00');
+    expect(when(ts, Date.UTC(2026, 8, 27, 17, 0))).toBe('昨天 04:00');
+    expect(when(ts, Date.UTC(2026, 8, 29, 1, 0))).toBe('9月27日 04:00');
     setTimeZone('America/New_York');
     expect(dateTime(ts)).toBe('09-26 16:00:00');
     setTimeZone('Not/AZone');

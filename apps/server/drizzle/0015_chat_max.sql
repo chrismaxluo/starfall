@@ -1,0 +1,1 @@
+ALTER TABLE `outputs` ADD `chat_max` integer DEFAULT 8 NOT NULL;

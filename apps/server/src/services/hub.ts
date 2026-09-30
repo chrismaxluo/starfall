@@ -1,5 +1,5 @@
 // 在线的特效页和管理后台（方案设计 9.3）。这里不关心 WebSocket 细节，只管"发给谁"。
-import { CHAT_MAX, OVERLAY_CLOSE } from '@starfall/shared';
+import { CHAT_MAX_LIMIT, OVERLAY_CLOSE } from '@starfall/shared';
 import type { ChatItem, OverlayConfig, ServerToOverlay } from '@starfall/shared';
 import type { OutputRow } from './outputs.ts';
 
@@ -50,6 +50,7 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   chatSide: o.chatSide,
   chatSize: o.chatSize,
   chatMedal: o.chatMedal,
+  chatMax: o.chatMax,
 });
 
 export class Hub {
@@ -58,7 +59,7 @@ export class Hub {
   private readonly overlays = new Set<OverlayClient>();
   private readonly admins = new Set<Sock>();
   private readonly overlayListeners = new Set<() => void>();
-  /** 最近的几条弹幕：弹幕列表刚打开（或刷新）时先显示这些 */
+  /** 最近的几条弹幕（按能设的最多条数记）：弹幕列表刚打开（或刷新）时先显示这些，页面按自己的条数取最后几条 */
   private chatRecent: ChatItem[] = [];
 
   constructor(opts: { build?: () => string | null } = {}) {
@@ -113,7 +114,7 @@ export class Hub {
 
   /** 新的一条弹幕：发给所有弹幕列表和管理后台（后台的预览用），记住最近的几条 */
   toChat(item: ChatItem): void {
-    this.chatRecent = [...this.chatRecent, item].slice(-CHAT_MAX);
+    this.chatRecent = [...this.chatRecent, item].slice(-CHAT_MAX_LIMIT);
     for (const c of this.overlays) if (c.role === 'chat') send(c.sock, { type: 'chat', item });
     this.toAdmins({ type: 'chat', item });
   }

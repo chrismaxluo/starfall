@@ -85,6 +85,13 @@
       "when": 1790707877632,
       "tag": "0011_danmu_who_multi",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790728046097,
+      "tag": "0012_svga_slots",
+      "breakpoints": true
     }
   ]
 }

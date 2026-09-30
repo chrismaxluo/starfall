@@ -120,6 +120,7 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
     }
   };
   ctx.assets.cleanTmp(0);
+  void ctx.assets.backfillSlots().catch((e: Error) => console.error('读取 SVGA 图层失败', e.message));
   ctx.backups.cleanPartial();
   prune();
   const timer = setInterval(prune, PRUNE_MS);

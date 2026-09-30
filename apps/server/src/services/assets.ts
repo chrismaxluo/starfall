@@ -11,7 +11,7 @@ import type { Db } from '../db/index.ts';
 import { assets, effects } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 import { ALLOWED, probe, sniff } from './probe.ts';
-import type { AssetKind } from './probe.ts';
+import type { AssetKind, SvgaSlot } from './probe.ts';
 
 export const MAX_UPLOAD = MAX_UPLOAD_BYTES;
 /** 超过这个大小在界面提示"加载慢"（F-AS-04） */
@@ -33,6 +33,8 @@ export interface AssetDto {
   /** 界面提示：no_alpha 没有透明通道（会挡住画面），large 文件较大（加载慢） */
   warnings: Array<'no_alpha' | 'large'>;
   createdAt: number;
+  /** SVGA 里可以替换的图层 */
+  slots: SvgaSlot[] | null;
 }
 
 export const fileName = (a: Pick<AssetRow, 'sha256' | 'ext'>) => `${a.sha256}.${a.ext}`;
@@ -52,6 +54,7 @@ export function assetDto(a: AssetRow): AssetDto {
     height: a.height,
     durationMs: a.durationMs,
     hasAlpha: a.hasAlpha,
+    slots: a.slots ?? null,
     warnings,
     createdAt: a.createdAt,
   };
@@ -197,6 +200,21 @@ export class AssetStore {
     if (users.length) throw new HttpError(409, 'in_use', `还有 ${users.length} 个素材在使用，不能删除`, { usedBy: users });
     this.db.delete(assets).where(eq(assets.id, id)).run();
     fs.rmSync(this.path(a), { force: true });
+  }
+
+  /** 升级前上传的 SVGA 没有图层信息：重新读一遍文件补上（读不了的记成空列表，不再重试） */
+  async backfillSlots(): Promise<number> {
+    const rows = this.db.select().from(assets).where(eq(assets.ext, 'svga')).all().filter((a) => a.slots === null);
+    for (const a of rows) {
+      let slots: SvgaSlot[] = [];
+      try {
+        slots = (await probe(this.path(a), ALLOWED.svga!)).slots ?? [];
+      } catch {
+        /* 文件坏了：当作没有图层 */
+      }
+      this.db.update(assets).set({ slots }).where(eq(assets.id, a.id)).run();
+    }
+    return rows.length;
   }
 
   /** 改名：只改显示的名字，扩展名不变 */

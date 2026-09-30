@@ -3,7 +3,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
 import { FADE_MAX_MS, FADE_MIN_MS, FEATHER_MAX, OFFSET_MAX, SIZE_MAX, SIZE_MIN } from '@starfall/shared';
-import type { EffectTexts, FeatherMode, Position } from '@starfall/shared';
+import type { EffectTexts, FeatherMode, Position, SvgaRole } from '@starfall/shared';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { placeWarnings } from '../lib/place.ts';
@@ -64,6 +64,8 @@ function snapshot(e: EffectDto) {
     feather: e.feather,
     featherPct: e.featherPct,
     guardFrame: e.guardFrame,
+    // 每个图层都列出来，没设置的是「不替换」
+    svgaMap: Object.fromEntries((e.asset?.ext === 'svga' ? (e.asset.slots ?? []) : []).map((s) => [s.key, e.svgaMap[s.key] ?? ''])) as Record<string, SvgaRole | ''>,
   };
 }
 const d = ref(eff.value ? snapshot(eff.value) : null);
@@ -88,7 +90,7 @@ function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct), feather: v.feather, featherPct: Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))), guardFrame: v.guardFrame } : {}) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct), feather: v.feather, featherPct: Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))), guardFrame: v.guardFrame, ...(slots.value.length ? { svgaMap: Object.fromEntries(Object.entries(v.svgaMap).filter(([k, r]) => r && slots.value.some((s) => s.key === k))) as Record<string, SvgaRole> } : {}) } : {}) };
   // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
   if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
   const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
@@ -108,7 +110,7 @@ function replay(): void {
 }
 let replayTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom, d.value.guardFrame],
+  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom, d.value.guardFrame, JSON.stringify(d.value.svgaMap)],
   () => replay(),
 );
 watch(
@@ -291,6 +293,12 @@ watch(
 const meta = computed(() => (a.value ? `${a.value.ext.toUpperCase()}${a.value.width ? ` · ${a.value.width}×${a.value.height}` : ''} · ${seconds(a.value.durationMs)} · ${fileSize(a.value.size)}` : ''));
 const o = computed(() => output());
 
+// SVGA 的动态图层：每个图层选播放时换成什么
+const slots = computed(() => (a.value?.ext === 'svga' ? (a.value.slots ?? []) : []));
+const SVGA_ROLE_NAMES: Array<[SvgaRole | '', string]> = [['', '不替换'], ['avatar', '头像（圆形）'], ['avatarSquare', '头像（方形）'], ['frame', '头像框（大航海）'], ['badge', '身份图标（船锚）'], ['name', '昵称'], ['welcome', '欢迎语']];
+/** SVGA 里已经放了头像或昵称：一般不用再叠加头像和欢迎语 */
+const svgaHasPerson = computed(() => Object.values(d.value?.svgaMap ?? {}).some((r) => r === 'avatar' || r === 'avatarSquare' || r === 'name' || r === 'welcome'));
+
 // 上下羽化：跟随全局时只对没有透明通道的素材生效
 const globalFeather = computed(() => (a.value && !a.value.hasAlpha && state.settings?.featherOn ? state.settings.featherPct : 0));
 const featherOptions = computed<Array<{ value: FeatherMode; label: string }>>(() => [
@@ -382,6 +390,18 @@ onBeforeUnmount(() => {
               <div class="toggle-line fe-line">上下羽化 <Seg v-model="d.feather" label="上下羽化" :options="featherOptions" /></div>
               <div v-if="d.feather === 'custom'" class="slider-row off"><label for="edFe">羽化宽度</label><input id="edFe" v-model.number="d.featherPct" type="range" min="0" :max="FEATHER_MAX" step="1" /><output>{{ d.featherPct }}%</output></div>
               <span class="hint" style="font-size: 12px; color: var(--t3)">{{ featherHint }}</span>
+              <template v-if="slots.length">
+                <div class="toggle-line">动态图层 <span class="hint">SVGA 里预留的图层，播放时换成这位观众的头像、昵称等</span></div>
+                <div class="svga-slots">
+                  <label v-for="s in slots" :key="s.key" class="svga-slot">
+                    <span class="k num" :title="s.key">{{ s.key }}</span><span class="sz num">{{ s.w }}×{{ s.h }}</span>
+                    <select v-model="d.svgaMap[s.key]" class="sel sm" :aria-label="`图层 ${s.key} 换成`">
+                      <option v-for="[r, label] in SVGA_ROLE_NAMES" :key="r" :value="r">{{ label }}</option>
+                    </select>
+                  </label>
+                </div>
+                <span class="hint" style="font-size: 12px; color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
+              </template>
               <div v-if="a.warnings.includes('no_alpha')" class="warnbox">这个文件没有透明通道，在直播软件里会带背景色，挡住直播画面。建议导出成带透明通道的 WebM（VP9）。</div>
               <div v-if="a.warnings.includes('large')" class="warnbox">文件超过 10 MB，首次加载可能会慢一点，建议压缩。</div>
             </template>
@@ -393,7 +413,7 @@ onBeforeUnmount(() => {
 
           <div class="ed-sec">
             <h3><span class="n">2</span>头像和欢迎语</h3>
-            <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">素材里已经画好文字的话可以关掉</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
+            <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">{{ svgaHasPerson ? 'SVGA 里已经放了头像或昵称，一般不用再叠加' : '素材里已经画好文字的话可以关掉' }}</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
             <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B 站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
             <template v-if="!a || d.showText">
               <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>

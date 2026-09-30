@@ -14,6 +14,8 @@ export interface AssetDto {
   height: number | null;
   durationMs: number | null;
   hasAlpha: boolean;
+  /** SVGA 里可以替换的图层 */
+  slots?: Array<{ key: string; w: number; h: number }> | null;
   warnings: Array<'no_alpha' | 'large'>;
   createdAt: number;
 }

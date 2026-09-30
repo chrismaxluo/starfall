@@ -2,8 +2,8 @@
 import path from 'node:path';
 import { eq, inArray, like } from 'drizzle-orm';
 import { bandLabel, danmuLabel, giftBandLabel, sortedBands, sortedGiftBands } from '@starfall/core';
-import { EffectSchema, TIER_NAMES } from '@starfall/shared';
-import type { Effect } from '@starfall/shared';
+import { EffectSchema, TIER_NAMES, guessSvgaMap } from '@starfall/shared';
+import type { Effect, SvgaRole } from '@starfall/shared';
 import type { Readable } from 'node:stream';
 import type { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -28,7 +28,7 @@ export interface EffectDto extends Effect {
   updatedAt: number;
 }
 
-export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true, durationCustom: true, fadeIn: true, fadeOut: true, fadeInMs: true, fadeOutMs: true, offsetX: true, offsetY: true, sizePct: true, feather: true, featherPct: true, guardFrame: true })
+export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true, durationCustom: true, fadeIn: true, fadeOut: true, fadeInMs: true, fadeOutMs: true, offsetX: true, offsetY: true, sizePct: true, feather: true, featherPct: true, guardFrame: true, svgaMap: true })
   .partial()
   .strict();
 export type EffectPatch = z.infer<typeof EffectPatchSchema>;
@@ -42,6 +42,13 @@ const clampDuration = (ms: number | null, fallback: number) => (ms ? Math.min(30
 export function playDuration(assetMs: number | null | undefined, custom: boolean, durationMs: number): number {
   if (!assetMs) return durationMs;
   return custom ? Math.min(durationMs, assetMs) : assetMs;
+}
+
+/** 换了 SVGA 文件：新文件里还有的图层保留原来的设置，其他的按名字猜 */
+function remapSvga(old: Record<string, SvgaRole>, slots: Array<{ key: string }>): Record<string, SvgaRole> {
+  const out = guessSvgaMap(slots);
+  for (const s of slots) if (old[s.key]) out[s.key] = old[s.key]!;
+  return out;
 }
 
 export class EffectStore {
@@ -121,6 +128,7 @@ export class EffectStore {
       feather: r.feather,
       featherPct: r.featherPct,
       guardFrame: r.guardFrame,
+      svgaMap: r.svgaMap,
       asset: asset ? assetDto(asset) : null,
       sound: sound ? assetDto(sound) : null,
       usedBy,
@@ -180,7 +188,7 @@ export class EffectStore {
     const name = this.uniqueName(path.parse(a.filename).name);
     const r = this.db
       .insert(effects)
-      .values({ name, assetId: a.id, showText: false, texts: { enter: ['{name} 来了'] }, position: 'center', durationMs: clampDuration(a.durationMs, 5000), fadeIn: false, fadeOut: false })
+      .values({ name, assetId: a.id, showText: false, texts: { enter: ['{name} 来了'] }, position: 'center', durationMs: clampDuration(a.durationMs, 5000), fadeIn: false, fadeOut: false, svgaMap: guessSvgaMap(a.slots ?? []) })
       .returning()
       .get();
     return this.get(r.id);
@@ -206,7 +214,7 @@ export class EffectStore {
     const { asset } = await this.assets.ingest(stream, filename, ['video', 'image', 'fx']);
     this.db
       .update(effects)
-      .set({ assetId: asset.id, style: null, durationMs: clampDuration(asset.durationMs, r.durationMs), durationCustom: false, updatedAt: Date.now() })
+      .set({ assetId: asset.id, style: null, durationMs: clampDuration(asset.durationMs, r.durationMs), durationCustom: false, svgaMap: remapSvga(r.svgaMap, asset.slots ?? []), updatedAt: Date.now() })
       .where(eq(effects.id, id))
       .run();
     if (r.assetId !== asset.id) this.assets.removeIfUnused(r.assetId);

@@ -52,7 +52,7 @@ const levels = computed(() => {
   return [1, 2, 3].filter((g) => n(g)).map((g) => `${GUARD_TEXT[g]} ${n(g)}`).join(' · ');
 });
 const pct = computed(() => (fleet.value?.total ? Math.min(100, Math.round((came.value.length / fleet.value.total) * 100)) : 0));
-const asViewer = (m: { uid: number; name: string; face: string; guard: number }): Viewer => ({ uid: m.uid, name: m.name, ...(m.face ? { face: m.face } : {}), guard: m.guard as Viewer['guard'], isMod: false, mystery: false });
+const asViewer = (m: { uid: number; name: string; face: string; guard: number; isMod?: boolean }): Viewer => ({ uid: m.uid, name: m.name, ...(m.face ? { face: m.face } : {}), guard: m.guard as Viewer['guard'], isMod: Boolean(m.isMod), mystery: false });
 const where = computed(() => (props.scope === 'live' ? '本场' : '今天'));
 </script>
 

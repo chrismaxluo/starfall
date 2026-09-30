@@ -242,7 +242,7 @@ export interface ListViewer {
 export interface OnlineDto {
   live: boolean;
   count: number;
-  items: Array<ListViewer & { rank: number; score: number }>;
+  items: Array<ListViewer & { rank: number; score: number; isMod: boolean }>;
   updatedAt: number | null;
 }
 
@@ -256,7 +256,7 @@ export interface GiftRankDto {
 
 export interface FleetDto {
   came: Array<{ uid: number; viewer: Viewer; times: number; lastTs: number }>;
-  fleet: { total: number; members: Array<{ uid: number; name: string; face: string; guard: number }>; updatedAt: number } | null;
+  fleet: { total: number; members: Array<{ uid: number; name: string; face: string; guard: number; isMod: boolean }>; updatedAt: number } | null;
   fleetError: string | null;
 }
 

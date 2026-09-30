@@ -20,20 +20,21 @@ const PAGE_GAP_MS = 150;
 export interface OnlineList {
   live: boolean;
   count: number;
-  items: OnlineRank['items'];
+  /** isMod：本直播间房管（B 站的名单里没有，按房管名单补上） */
+  items: Array<OnlineRank['items'][number] & { isMod: boolean }>;
   updatedAt: number | null;
 }
 
 export interface FleetList {
   total: number;
   /** 读到的名单（人特别多时只有前面一部分） */
-  members: ListViewer[];
+  members: Array<ListViewer & { isMod: boolean }>;
   updatedAt: number;
 }
 
 export interface AudienceDeps {
   room: RoomStore;
-  live: Pick<LiveService, 'status'>;
+  live: Pick<LiveService, 'status' | 'isMod'>;
   anon: () => BiliHttp;
   fetchOnline?: typeof getOnlineRank;
   fetchGuards?: typeof getGuardPage;
@@ -72,7 +73,7 @@ export class AudienceService {
       for (let page = 1; page <= ONLINE_PAGES; page++) {
         const p = await this.d.fetchOnline(http, r.roomId, r.anchorUid, page, 50);
         count = p.count;
-        items.push(...p.items.filter((x) => !items.some((y) => y.uid === x.uid)));
+        items.push(...p.items.filter((x) => !items.some((y) => y.uid === x.uid)).map((x) => ({ ...x, isMod: this.d.live.isMod(x.uid) })));
         if (p.items.length < 50 || items.length >= count) break;
         await this.d.sleep(PAGE_GAP_MS);
       }
@@ -95,12 +96,12 @@ export class AudienceService {
     if (c && c.roomId === r.roomId && this.d.now() - c.value.updatedAt < FLEET_TTL_MS) return c.value;
     this.fleetLoading ??= (async () => {
       const http = this.d.anon();
-      const members: ListViewer[] = [];
+      const members: FleetList['members'] = [];
       let total = 0;
       for (let page = 1; page <= FLEET_PAGES; page++) {
         const p = await this.d.fetchGuards(http, r.roomId, r.anchorUid, page);
         total = p.total;
-        for (const m of p.items) if (!members.some((x) => x.uid === m.uid)) members.push(m);
+        for (const m of p.items) if (!members.some((x) => x.uid === m.uid)) members.push({ ...m, isMod: this.d.live.isMod(m.uid) });
         if (page >= p.pages || !p.items.length) break;
         await this.d.sleep(PAGE_GAP_MS);
       }

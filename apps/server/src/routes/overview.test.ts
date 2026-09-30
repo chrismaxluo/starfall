@@ -109,10 +109,13 @@ describe('总览右侧面板', () => {
     expect((await t.req({ method: 'GET', url: '/api/online' })).json()).toEqual({ live: false, count: 0, items: [], updatedAt: null });
     expect(t.fetchOnline).not.toHaveBeenCalled();
     t.goLive();
+    // B 站的名单里没有房管，按本直播间的房管名单补上
+    vi.spyOn(t.ctx.live, 'isMod').mockImplementation((uid) => uid === 2);
     const r = (await t.req({ method: 'GET', url: '/api/online' })).json();
     expect(r).toMatchObject({ live: true, count: 70 });
     expect(r.items).toHaveLength(70);
-    expect(r.items[0]).toMatchObject({ uid: 1, rank: 1, score: 100, honor: 10 });
+    expect(r.items[0]).toMatchObject({ uid: 1, rank: 1, score: 100, honor: 10, isMod: false });
+    expect(r.items[1]).toMatchObject({ uid: 2, isMod: true });
     expect(t.fetchOnline).toHaveBeenCalledTimes(2);
     await t.req({ method: 'GET', url: '/api/online' });
     expect(t.fetchOnline).toHaveBeenCalledTimes(2);

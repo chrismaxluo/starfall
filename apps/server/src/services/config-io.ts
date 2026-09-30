@@ -104,6 +104,7 @@ const EffectPart = z.object({
   feather: z.enum(FEATHER_MODES).default('global'),
   featherPct: z.number().int().min(0).max(FEATHER_MAX).default(FEATHER_DEFAULT),
   guardFrame: z.boolean().default(false),
+  honorBadge: z.boolean().default(false),
   svgaMap: z.record(z.string().min(1).max(120), z.enum(SVGA_ROLES)).default({}),
 });
 
@@ -266,6 +267,7 @@ export class ConfigIO {
         feather: e.feather,
         featherPct: e.featherPct,
         guardFrame: e.guardFrame,
+        honorBadge: e.honorBadge,
         svgaMap: e.svgaMap,
       })),
       rules: {
@@ -493,7 +495,7 @@ export class ConfigIO {
       for (const e of file.effects) {
         const c = local.get(e.name);
         const assetId = idOfSha(e.asset);
-        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, fadeInMs: e.fadeInMs, fadeOutMs: e.fadeOutMs, offsetX: e.offsetX, offsetY: e.offsetY, sizePct: e.sizePct, feather: e.feather, featherPct: e.featherPct, guardFrame: e.guardFrame, svgaMap: e.svgaMap, updatedAt: Date.now() };
+        const values = { showText: e.showText, texts: e.texts, soundAssetId: soundOf(e.sound), volume: e.volume, position: e.position, durationMs: e.durationMs, durationCustom: e.durationCustom, fadeIn: e.fadeIn, fadeOut: e.fadeOut, fadeInMs: e.fadeInMs, fadeOutMs: e.fadeOutMs, offsetX: e.offsetX, offsetY: e.offsetY, sizePct: e.sizePct, feather: e.feather, featherPct: e.featherPct, guardFrame: e.guardFrame, honorBadge: e.honorBadge, svgaMap: e.svgaMap, updatedAt: Date.now() };
         if (c) {
           if (c.builtin || e.builtin) continue;
           // 新文件缺失时保留本机的画面

@@ -33,7 +33,7 @@ const TEXT_TABS: Array<{ value: TextKey; label: string }> = [
   { value: 'guard', label: '上舰时' },
   { value: 'danmu', label: '弹幕时' },
 ];
-const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{text}', '{gift}', '{count}', '{value}', '{months}', '{op}', '{act}'];
+const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{honor}', '{text}', '{gift}', '{count}', '{value}', '{months}', '{op}', '{act}'];
 // 宫廷特效铺满画面，位置只分偏上 / 居中 / 偏下
 const ROYAL_POSITIONS: Array<{ value: Position; label: string }> = [
   { value: 'top', label: '偏上' },
@@ -64,6 +64,7 @@ function snapshot(e: EffectDto) {
     feather: e.feather,
     featherPct: e.featherPct,
     guardFrame: e.guardFrame,
+    honorBadge: e.honorBadge,
     // 每个图层都列出来，没设置的是「不替换」
     svgaMap: Object.fromEntries((e.asset?.ext === 'svga' ? (e.asset.slots ?? []) : []).map((s) => [s.key, e.svgaMap[s.key] ?? ''])) as Record<string, SvgaRole | ''>,
   };
@@ -90,7 +91,7 @@ function patch() {
   const v = d.value!;
   const texts: EffectTexts = { enter: lines(v.texts.enter).length ? lines(v.texts.enter) : ['{name} 来了'] };
   for (const k of ['gift', 'guard', 'danmu'] as const) if (lines(v.texts[k]).length) texts[k] = lines(v.texts[k]);
-  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct), feather: v.feather, featherPct: Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))), guardFrame: v.guardFrame, ...(slots.value.length ? { svgaMap: Object.fromEntries(Object.entries(v.svgaMap).filter(([k, r]) => r && slots.value.some((s) => s.key === k))) as Record<string, SvgaRole> } : {}) } : {}) };
+  const base = { showText: v.showText, texts, soundAssetId: v.soundAssetId, volume: v.volume, position: v.position, fadeIn: v.fadeIn, fadeOut: v.fadeOut, fadeInMs: fadeMs(v.fadeInS), fadeOutMs: fadeMs(v.fadeOutS), honorBadge: v.honorBadge, ...(a.value ? { offsetX: clampOff(v.offsetX), offsetY: clampOff(v.offsetY), sizePct: clampSize(v.sizePct), feather: v.feather, featherPct: Math.min(FEATHER_MAX, Math.max(0, Math.round(v.featherPct || 0))), guardFrame: v.guardFrame, ...(slots.value.length ? { svgaMap: Object.fromEntries(Object.entries(v.svgaMap).filter(([k, r]) => r && slots.value.some((s) => s.key === k))) as Record<string, SvgaRole> } : {}) } : {}) };
   // 有时长的素材默认按素材本身时长播放；手动设置时不超过素材本身
   if (timed.value && !v.durationCustom) return { ...base, durationCustom: false };
   const durationMs = Math.round(Math.min(maxSeconds.value, Math.max(0.5, v.seconds || 0)) * 1000);
@@ -110,7 +111,7 @@ function replay(): void {
 }
 let replayTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom, d.value.guardFrame, JSON.stringify(d.value.svgaMap)],
+  () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom, d.value.guardFrame, d.value.honorBadge, JSON.stringify(d.value.svgaMap)],
   () => replay(),
 );
 watch(
@@ -295,7 +296,7 @@ const o = computed(() => output());
 
 // SVGA 的动态图层：每个图层选播放时换成什么
 const slots = computed(() => (a.value?.ext === 'svga' ? (a.value.slots ?? []) : []));
-const SVGA_ROLE_NAMES: Array<[SvgaRole | '', string]> = [['', '不替换'], ['avatar', '头像（圆形）'], ['avatarSquare', '头像（方形）'], ['frame', '头像框（大航海）'], ['badge', '身份图标（船锚）'], ['name', '昵称'], ['welcome', '欢迎语']];
+const SVGA_ROLE_NAMES: Array<[SvgaRole | '', string]> = [['', '不替换'], ['avatar', '头像（圆形）'], ['avatarSquare', '头像（方形）'], ['frame', '头像框（大航海）'], ['badge', '身份图标（船锚）'], ['honor', '荣耀等级勋章'], ['name', '昵称'], ['welcome', '欢迎语']];
 /** SVGA 里已经放了头像或昵称：一般不用再叠加头像和欢迎语 */
 const svgaHasPerson = computed(() => Object.values(d.value?.svgaMap ?? {}).some((r) => r === 'avatar' || r === 'avatarSquare' || r === 'name' || r === 'welcome'));
 
@@ -400,7 +401,7 @@ onBeforeUnmount(() => {
                     </select>
                   </label>
                 </div>
-                <span class="hint" style="font-size: 12px; color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
+                <span class="hint" style="font-size: 12px; color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来；荣耀等级勋章按观众的等级换图，没有等级时藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
               </template>
               <div v-if="a.warnings.includes('no_alpha')" class="warnbox">这个文件没有透明通道，在直播软件里会带背景色，挡住直播画面。建议导出成带透明通道的 WebM（VP9）。</div>
               <div v-if="a.warnings.includes('large')" class="warnbox">文件超过 10 MB，首次加载可能会慢一点，建议压缩。</div>
@@ -415,12 +416,13 @@ onBeforeUnmount(() => {
             <h3><span class="n">2</span>头像和欢迎语</h3>
             <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">{{ svgaHasPerson ? 'SVGA 里已经放了头像或昵称，一般不用再叠加' : '素材里已经画好文字的话可以关掉' }}</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
             <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B 站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
+            <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前面放上 B 站的荣耀等级勋章（和弹幕里的一样），没有荣耀等级的观众不显示</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
             <template v-if="!a || d.showText">
               <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
               <div class="vars"><button v-for="v in VARS" :key="v" type="button" @click="insertVar(v)">{{ v }}</button></div>
-              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：月数 {months}、开通 / 续费 {op}、上舰 / 续费 {act}</span>
+              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}、荣耀等级 {honor}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：月数 {months}、开通 / 续费 {op}、上舰 / 续费 {act}</span>
             </template>
           </div>
 

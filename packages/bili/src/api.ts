@@ -178,6 +178,27 @@ export async function getAllGifts(http: BiliHttp): Promise<GiftConfig[]> {
   return (d.list ?? []).filter((g) => g?.id).map(toGift);
 }
 
+/** 荣耀等级勋章：每级一张图（数字画在图上），animated 为动图 */
+export interface HonorMedal {
+  level: number;
+  url: string;
+  animated: boolean;
+}
+
+/** 荣耀等级勋章列表（直播间网页自己用的公开接口，不用登录；B 站里这个等级叫 wealth） */
+export async function getHonorMedals(http: BiliHttp): Promise<HonorMedal[]> {
+  const d = await http.getData<{ content?: string }>(`${LIVE}/xlive/general-interface/v1/content/get?key=wealth`, { auth: false });
+  let c: { wealth_level_medal?: Array<{ id?: number; url?: string; animated?: number }> };
+  try {
+    c = JSON.parse(d.content ?? '{}');
+  } catch {
+    throw new BiliApiError(-1, '荣耀等级勋章列表格式不对');
+  }
+  return (c.wealth_level_medal ?? [])
+    .filter((m) => Number.isInteger(m?.id) && (m.id ?? 0) > 0 && /^https:\/\/[\w.-]+\.hdslb\.com\//.test(m.url ?? ''))
+    .map((m) => ({ level: m.id!, url: m.url!, animated: m.animated === 1 }));
+}
+
 export interface UserCard {
   uid: number;
   name: string;

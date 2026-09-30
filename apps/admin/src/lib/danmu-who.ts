@@ -21,6 +21,7 @@ export function whoText(w: DanmuWho, people: DanmuPerson[] = []): string {
   if (w.guards.length === 3) parts.push('大航海');
   else for (const g of [...w.guards].sort()) parts.push(GUARD[g]);
   if (w.fanMin !== null) parts.push(w.fanMin <= 1 ? '戴本房间粉丝牌' : `粉丝牌 ${w.fanMin} 级以上`);
+  if (w.honorMin !== null) parts.push(`荣耀 ${w.honorMin} 级以上`);
   if (w.uids.length) {
     const names = w.uids.map((uid) => people.find((p) => p.uid === uid)?.name || String(uid));
     parts.push(names.length <= 2 ? names.join('、') : `${names[0]} 等 ${names.length} 人`);
@@ -33,5 +34,6 @@ export function sampleFor(w: DanmuWho): SampleViewer {
   if (w.all || w.fanMin !== null) return w.fanMin !== null && w.fanMin > 21 ? { ...SAMPLES.fan, medalLevel: w.fanMin } : SAMPLES.fan;
   if (w.guards.length) return [SAMPLES.cap, SAMPLES.gov, SAMPLES.adm, SAMPLES.cap][Math.min(...w.guards)]!;
   if (w.mod) return SAMPLES.mod;
+  if (w.honorMin !== null) return { ...SAMPLES.nor, honor: Math.max(28, w.honorMin) };
   return SAMPLES.nor;
 }

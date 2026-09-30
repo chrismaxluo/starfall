@@ -3,6 +3,7 @@ import EvIcon from '../components/EvIcon.vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import Icon from '../components/Icon.vue';
+import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
 import Seg from '../components/Seg.vue';
@@ -133,7 +134,7 @@ function setExclusive(e: EventDto): void {
               <span class="who" style="cursor: pointer" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
                 <Avatar :name="e.uname" :face="e.viewer.face" :guard="e.viewer.guard" />
                 <span><div>{{ e.uname }}<span v-if="isExcl(e.uid)" class="excl">专属</span></div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">{{ e.uid }}</div></span>
-                <IdTag :viewer="e.viewer" />
+                <span class="ids"><HonorMedal :level="e.viewer.honor" /><IdTag :viewer="e.viewer" /></span>
               </span>
             </td>
             <td><span class="evchip"><EvIcon :kind="e.kind" :img="e.payload?.icon" />{{ describe(e) }}</span></td>

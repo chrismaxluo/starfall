@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
+import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
@@ -221,7 +222,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
               <b>{{ e.uname }}</b>
               <span><EvIcon v-if="e.kind !== 'enter'" :kind="e.kind" :img="e.payload?.icon" />{{ rowText(e) }}</span>
             </span>
-            <IdTag :viewer="e.viewer" />
+            <span class="ids"><HonorMedal :level="e.viewer.honor" /><IdTag :viewer="e.viewer" /></span>
             <time class="num">{{ clock(e.ts) }}</time>
             <span class="rowact" aria-hidden="true"><Icon name="i-more" /></span>
           </div>

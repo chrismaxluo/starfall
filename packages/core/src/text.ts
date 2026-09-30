@@ -39,6 +39,7 @@ export function fillText(template: string, v: TextVars): string {
     guard: guard ? GUARD_NAMES[guard] : '',
     medal: v.viewer.medal?.name ?? '',
     level: v.viewer.medal ? String(v.viewer.medal.level) : '',
+    honor: v.viewer.honor ? String(v.viewer.honor) : '',
     text: v.text ?? '',
     gift: v.gift ?? '',
     count: v.count !== undefined ? String(v.count) : '',

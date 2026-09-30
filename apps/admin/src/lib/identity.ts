@@ -32,6 +32,8 @@ export interface SampleViewer {
   guard: 0 | 1 | 2 | 3;
   isMod: boolean;
   medalLevel: number | null;
+  /** 荣耀等级（0 没有）；不填用服务端的示例等级 */
+  honor?: number;
 }
 
 export const SAMPLES: Record<Identity, SampleViewer> = {

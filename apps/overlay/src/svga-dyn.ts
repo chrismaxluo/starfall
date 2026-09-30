@@ -83,14 +83,19 @@ function text(d: SvgaDyn): string {
 }
 
 /**
- * 头像框、图标：自己加载好（不带来源地址）再画成图片交给播放器。
+ * 头像框、图标、荣耀勋章：自己加载好（不带来源地址）再画成图片交给播放器。
  * 不能直接把 B 站的地址给播放器：播放器加载时会带上页面地址，被 B 站的防盗链拒绝，浏览器报 ORB 错误、画面出错
  */
 async function picture(d: SvgaDyn): Promise<string> {
   const img = d.url ? await loadImage(d.url) : null;
   if (!img) return EMPTY();
   const [c, x] = canvas(d.w, d.h);
-  x.drawImage(img, 0, 0, d.w, d.h);
+  if (d.role === 'honor') {
+    // 荣耀勋章是扁的（36×16）：按原比例放进图层，居中，不拉伸
+    const s = Math.min(d.w / img.naturalWidth, d.h / img.naturalHeight);
+    const w = img.naturalWidth * s, hh = img.naturalHeight * s;
+    x.drawImage(img, (d.w - w) / 2, (d.h - hh) / 2, w, hh);
+  } else x.drawImage(img, 0, 0, d.w, d.h);
   try {
     return c.toDataURL('image/png');
   } catch {

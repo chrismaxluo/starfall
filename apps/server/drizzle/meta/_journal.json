@@ -92,6 +92,13 @@
       "when": 1790728046097,
       "tag": "0012_svga_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1790773805283,
+      "tag": "0013_honor_level",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { attempt } from '../lib/toast.ts';
 import Avatar from './Avatar.vue';
 import ConfirmButton from './ConfirmButton.vue';
 import EffSwatch from './EffSwatch.vue';
+import HonorMedal from './HonorMedal.vue';
 import IdTag from './IdTag.vue';
 
 const emit = defineEmits<{ close: [] }>();
@@ -42,7 +43,7 @@ async function remove(): Promise<void> {
       <div class="qh">
         <Avatar :name="q.name" :face="q.face" :guard="q.viewer?.guard" />
         <div><b>{{ existing ? '修改' : '为' }} {{ q.name }} {{ existing ? '的专属素材' : '设置专属素材' }}</b><span class="num">UID {{ q.uid }}</span></div>
-        <span v-if="q.viewer" style="margin-left: auto"><IdTag :viewer="q.viewer" /></span>
+        <span v-if="q.viewer" class="ids" style="margin-left: auto"><HonorMedal :level="q.viewer.honor" /><IdTag :viewer="q.viewer" /></span>
       </div>
       <div class="qb">
         <div class="field">

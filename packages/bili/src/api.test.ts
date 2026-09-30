@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getAllGifts, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
+import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getAllGifts, getHonorMedals, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
 import { WbiSigner } from './wbi.ts';
 import { BiliApiError, BiliHttp } from './http.ts';
 
@@ -115,6 +115,26 @@ describe('接口字段转换', () => {
     const calls = mockFetch([{ body: { code: 0, data: { list: [{ id: 33647, name: '奇迹城堡', price: 1314000, coin_type: 'gold', img_basic: 'i4' }] } } }]);
     expect(await getAllGifts(new BiliHttp())).toEqual([{ id: 33647, name: '奇迹城堡', price: 1314000, paid: true, icon: 'i4' }]);
     expect(calls[0]).toContain('/giftPanel/giftConfig?platform=pc');
+  });
+
+  it('荣耀等级勋章：内容是一段 JSON 文本；只要 B 站图床的地址，不带登录信息', async () => {
+    const content = JSON.stringify({
+      wealth_level_medal: [
+        { id: 1, animated: 0, url: 'https://i0.hdslb.com/bfs/live/a.png', h: 16, w: 36 },
+        { id: 80, animated: 1, url: 'https://i0.hdslb.com/bfs/live/b.webp', h: 16, w: 36 },
+        { id: 2, animated: 0, url: 'https://evil.example/c.png' },
+        { id: 0, url: 'https://i0.hdslb.com/bfs/live/d.png' },
+      ],
+      danmu_bubble_bg: [],
+    });
+    const calls = mockFetch([{ body: { code: 0, data: { md5: 'x', content } } }, { body: { code: 0, data: { content: '不是 JSON' } } }]);
+    expect(await getHonorMedals(new BiliHttp({ SESSDATA: 'secret' }))).toEqual([
+      { level: 1, url: 'https://i0.hdslb.com/bfs/live/a.png', animated: false },
+      { level: 80, url: 'https://i0.hdslb.com/bfs/live/b.webp', animated: true },
+    ]);
+    expect(calls[0]).toContain('/xlive/general-interface/v1/content/get?key=wealth');
+    expect(calls[0]).not.toContain('secret');
+    await expect(getHonorMedals(new BiliHttp())).rejects.toMatchObject({ name: 'BiliApiError' });
   });
 
   it('用户信息', async () => {

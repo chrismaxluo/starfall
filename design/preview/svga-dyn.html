@@ -56,8 +56,9 @@ button { cursor: pointer; }
 <div class="app">
   <aside class="side">
     <h1><img src="assets/logo.svg" alt="">SVGA 动态图层</h1>
-    <div class="sub">和特效页用同一个播放器、同样的替换规则：SVGA 里预留的图层，播放时换成进场观众的头像、头像框、船锚图标、昵称和欢迎语。</div>
+    <div class="sub">和特效页用同一个播放器、同样的替换规则：SVGA 里预留的图层，播放时换成进场观众的头像、头像框、船锚图标、荣耀等级勋章、昵称和欢迎语。</div>
     <div class="grp"><b>进场观众</b><div class="seg" id="lv"></div></div>
+    <div class="grp"><b>荣耀等级</b><div class="seg" id="hn"></div></div>
     <div class="grp"><b>昵称</b><div class="seg" id="nm"></div></div>
     <div class="grp"><b>头像</b><div class="seg" id="face"></div></div>
     <div class="grp"><b>背景</b><div class="seg" id="bg"></div></div>
@@ -68,7 +69,7 @@ button { cursor: pointer; }
     </div>
     <div class="grp"><b>图层（每层换成什么）</b><div class="layers" id="layers"></div></div>
     <div class="row"><button class="btn" id="play">▶ 重播</button><button class="btn sec on" id="loop">循环</button></div>
-    <div class="note"><b>测试样本</b>是用程序生成的几个占位方块，只为了看"替换"对不对：<code>avatar</code> 头像、<code>frame</code> 头像框、<code>badge</code> 船锚图标、<code>nickname</code> 昵称、<code>welcome</code> 欢迎语，左上角黄色小方块 <code>deco</code> 是不替换的装饰。<br>不是大航海的观众，头像框和图标那两层会藏起来。</div>
+    <div class="note"><b>测试样本</b>是用程序生成的几个占位方块，只为了看"替换"对不对：<code>avatar</code> 头像、<code>frame</code> 头像框、<code>badge</code> 船锚图标、<code>nickname</code> 昵称、<code>welcome</code> 欢迎语，左上角黄色小方块 <code>deco</code> 是不替换的装饰（可以在下面把它改成「荣耀等级勋章」看看效果）。<br>不是大航海的观众，头像框和图标那两层会藏起来；没有荣耀等级的观众，荣耀勋章那一层会藏起来。</div>
   </aside>
   <main class="view">
     <div class="stagebox">
@@ -84,11 +85,13 @@ const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) 
 const FRAMES = { 1: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', 2: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', 3: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
 const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
 const BADGES = { 1: `${BADGE}governor-DpDXKEdA.png`, 2: `${BADGE}supervisor-u43ElIjU.png`, 3: `${BADGE}captain-Bjw5Byb5.png` };
+/* 荣耀等级勋章（B 站的图，只引用地址）：后台里是服务端每天从 B 站读一次，这里只放几个示例等级 */
+const HONOR = { 9: 'https://i0.hdslb.com/bfs/live/9c4cb36748ef273aeef40acf66b01ffaab9bf571.png', 28: 'https://i0.hdslb.com/bfs/live/62fe89aef112353cfd97016b4b2cc653438642ac.png', 68: 'https://i0.hdslb.com/bfs/live/ce6a2ca64b8cd945d14b49807124b7a8a4ea946d.png', 80: 'https://i0.hdslb.com/bfs/live/6da9d5d7e68722cb7ec018c4f15dcbe15937ce8f.webp' };
 const LV = { cap: [3, '舰长'], adm: [2, '提督'], gov: [1, '总督'], nor: [0, '普通观众'] };
 const NAMES = { short: '道具堡', mid: '晚风与星河漫步', long: '今天也要早点睡觉的超长昵称啊' };
 const FACES = { bili: 'https://i0.hdslb.com/bfs/face/member/noface.jpg', none: '' };
-const ROLES = [['', '不替换'], ['avatar', '头像（圆形）'], ['avatarSquare', '头像（方形）'], ['frame', '头像框（大航海）'], ['badge', '船锚图标'], ['name', '昵称'], ['welcome', '欢迎语']];
-const st = { lv: 'cap', nm: 'short', face: 'none', bg: 'room', src: 'sample', loop: true };
+const ROLES = [['', '不替换'], ['avatar', '头像（圆形）'], ['avatarSquare', '头像（方形）'], ['frame', '头像框（大航海）'], ['badge', '船锚图标'], ['honor', '荣耀等级勋章'], ['name', '昵称'], ['welcome', '欢迎语']];
+const st = { hn: '68', lv: 'cap', nm: 'short', face: 'none', bg: 'room', src: 'sample', loop: true };
 let video = null, player = null, slots = [], map = {}, pickedUrl = '';
 
 /* ---------- 和服务端一样：按图层名字猜它是什么 ---------- */
@@ -96,6 +99,7 @@ function guess(key) {
   const k = key.toLowerCase();
   if (/frame|kuang|border|头像框|txk/.test(k)) return 'frame';
   if (/avatar|head|touxiang|portrait|face|userpic|user_?img|头像|^tx\d*$/.test(k)) return 'avatar';
+  if (/honou?r|wealth|glory|rongyao|荣耀/.test(k)) return 'honor';
   if (/badge|guard|anchor|medal|rank|身份|船锚|图标/.test(k)) return 'badge';
   if (/nick|name|uname|昵称|用户名/.test(k)) return 'name';
   if (/welcome|text|msg|message|desc|content|slogan|欢迎|文字|文案/.test(k)) return 'welcome';
@@ -128,7 +132,8 @@ function text(d) {
   return c.toDataURL('image/png');
 }
 // 头像框、图标也自己加载（不带来源地址）画成图片：直接给播放器 B 站地址会被防盗链拒绝（ORB）
-async function picture(d) { const img = d.url ? await loadImage(d.url) : null; if (!img) return EMPTY(); const [c, x] = canvas(d.w, d.h); x.drawImage(img, 0, 0, d.w, d.h); try { return c.toDataURL('image/png'); } catch { return EMPTY(); } }
+async function picture(d) { const img = d.url ? await loadImage(d.url) : null; if (!img) return EMPTY(); const [c, x] = canvas(d.w, d.h);
+  if (d.role === 'honor') { const s = Math.min(d.w / img.naturalWidth, d.h / img.naturalHeight), w = img.naturalWidth * s, hh = img.naturalHeight * s; x.drawImage(img, (d.w - w) / 2, (d.h - hh) / 2, w, hh); } else x.drawImage(img, 0, 0, d.w, d.h); try { return c.toDataURL('image/png'); } catch { return EMPTY(); } }
 async function applyDyn(p, dyn) {
   const words = dyn.filter((d) => d.role === 'name' || d.role === 'welcome').map((d) => d.text || '').join('');
   if (words) await Promise.race([document.fonts.load(`700 40px ${FONT}`, words).catch(() => {}), new Promise((r) => setTimeout(r, 1000))]);
@@ -193,6 +198,7 @@ async function play() {
     if (role === 'avatar' || role === 'avatarSquare') return { ...d, url: face, text: name };
     if (role === 'frame') return { ...d, url: g ? FRAMES[g] : '' };
     if (role === 'badge') return { ...d, url: g ? BADGES[g] : '' };
+    if (role === 'honor') return { ...d, url: HONOR[st.hn] || '' };
     if (role === 'name') return { ...d, text: name };
     return { ...d, text: welcome };
   });
@@ -210,6 +216,7 @@ async function play() {
 function segs() {
   const mk = (id, items, key, after) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const b = h('button', st[key] === v ? 'on' : '', label); b.onclick = () => { st[key] = v; segs(); after(); }; el.append(b); } };
   mk('#lv', [['cap', '舰长'], ['adm', '提督'], ['gov', '总督'], ['nor', '普通观众']], 'lv', play);
+  mk('#hn', [['0', '没有'], ['9', '9 级'], ['28', '28 级'], ['68', '68 级'], ['80', '80 级（动图）']], 'hn', play);
   mk('#nm', [['short', '短昵称'], ['mid', '中等'], ['long', '很长']], 'nm', play);
   mk('#face', [['none', '没有头像（用首字）'], ['bili', 'B 站默认头像']], 'face', play);
   mk('#bg', [['room', '直播间'], ['clear', '透明格']], 'bg', () => $('#stage').classList.toggle('clear', st.bg === 'clear'));

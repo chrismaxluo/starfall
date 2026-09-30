@@ -6,6 +6,7 @@ import CdPick from '../components/CdPick.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import EffectPicker from '../components/EffectPicker.vue';
 import Icon from '../components/Icon.vue';
+import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import Medal from '../components/Medal.vue';
 import Seg from '../components/Seg.vue';
@@ -319,7 +320,7 @@ onMounted(() => void refreshRules());
           <div v-if="showRecent" class="picker">
             <label v-for="v in recentViewers" :key="v.uid" :style="state.exclusives.some((x) => x.uid === v.uid) ? 'opacity:.5' : ''">
               <input type="radio" name="expk" :disabled="state.exclusives.some((x) => x.uid === v.uid)" @change="((draft!.uid = String(v.uid)), (showRecent = false), lookup())" />
-              <Avatar :name="v.name" :face="v.face" :guard="v.guard" />{{ v.name }}<IdTag :viewer="v" /><span class="uid num">{{ state.exclusives.some((x) => x.uid === v.uid) ? '已是专属' : v.uid }}</span>
+              <Avatar :name="v.name" :face="v.face" :guard="v.guard" />{{ v.name }}<span class="ids"><HonorMedal :level="v.honor" /><IdTag :viewer="v" /></span><span class="uid num">{{ state.exclusives.some((x) => x.uid === v.uid) ? '已是专属' : v.uid }}</span>
             </label>
             <div v-if="!recentViewers.length" style="padding: 10px; color: var(--t3); font-size: 12.5px">还没有进场记录，开播后这里会列出最近进场的观众</div>
           </div>
@@ -338,7 +339,7 @@ onMounted(() => void refreshRules());
             <tbody>
               <tr v-for="x in exList" :key="x.uid" :style="flashUid === x.uid ? 'outline: 2px solid var(--accent-ring)' : ''">
                 <td><span class="who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" :guard="x.guard" /><span><div>{{ x.name ?? '（昵称未知）' }}</div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">UID {{ x.uid }}</div></span></span></td>
-                <td><IdTag v-if="viewerOf(x.uid)" :viewer="viewerOf(x.uid)!" /><span v-else style="color: var(--t3)">—</span></td>
+                <td><span v-if="viewerOf(x.uid) || x.honor" class="ids"><HonorMedal :level="viewerOf(x.uid)?.honor || x.honor" /><IdTag v-if="viewerOf(x.uid)" :viewer="viewerOf(x.uid)!" /></span><span v-else style="color: var(--t3)">—</span></td>
                 <td><EffectPicker v-model="x.effectId" @change="(id) => updateEx(x, { effectId: id }, `${x.name ?? x.uid} 的专属素材改为「${effectById(id)?.name}」`)" /></td>
                 <td><CdPick v-if="!once" v-model="x.cooldownMin" @change="(v) => updateEx(x, { cooldownMin: v }, cdMsg(x.name ?? String(x.uid), v))" /><span v-else class="inline-hint">每场一次</span></td>
                 <td>

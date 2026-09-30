@@ -57,6 +57,18 @@ describe('弹幕匹配', () => {
     expect(matchDanmu('生日快乐', anchor, [rule({ id: 1 })], ANCHOR, true)).toBeNull();
   });
 
+  it('发送人条件：荣耀等级不低于某级（和别的条件满足任意一项就算）', () => {
+    const none: DanmuWho = { ...DANMU_WHO_ALL, all: false };
+    const h30 = viewer({ uid: 8, honor: 30 });
+    const h29 = viewer({ uid: 9, honor: 29 });
+    const w: DanmuWho = { ...none, honorMin: 30 };
+    expect([h30, h29, viewer()].map((v) => whoOk(w, v, ANCHOR))).toEqual([true, false, false]);
+    expect(whoOk({ ...w, mod: true }, viewer({ uid: 4, isMod: true }), ANCHOR)).toBe(true);
+    // 旧数据里没有这一项：当作不按荣耀等级
+    const { honorMin: _h, ...old } = { ...none, fanMin: 1 };
+    expect(whoOk(old as DanmuWho, h30, ANCHOR)).toBe(false);
+  });
+
   it('关键词重复提示；标签最多显示 3 个关键词', () => {
     expect(keywordClashes([rule({ keywords: ['晚安', '好梦'] }), rule({ keywords: ['生日'] }), rule({ keywords: ['好梦', '好梦'] })])).toEqual({ 好梦: [1, 3] });
     expect(matchDanmu('d', viewer(), [rule({ keywords: ['a', 'b', 'c', 'd'] })], ANCHOR)?.label).toBe('弹幕 · 「a / b / c …」');

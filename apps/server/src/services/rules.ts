@@ -104,7 +104,7 @@ export class EnterRuleStore {
       .all()
       .map((r) => {
         const v = this.viewers.cached(r.uid);
-        return { ...toExclusive(r), name: v?.name ?? null, face: v?.face ?? null, guard: this.viewers.guardIn(r.uid), createdAt: r.createdAt };
+        return { ...toExclusive(r), name: v?.name ?? null, face: v?.face ?? null, guard: this.viewers.guardIn(r.uid), honor: v?.honor ?? 0, createdAt: r.createdAt };
       });
   }
 

@@ -94,6 +94,9 @@
 
 /* ---- 弹幕回应 ---- */
 .gx-dm { display: flex; align-items: center; gap: 14px; padding: 10px 30px 10px 10px; --as: 52px; max-width: 900px; }
+.g .honor { height: 26px; margin-right: 10px; }
+.gx-big .honor { height: 38px; margin-right: 12px; }
+.gx-dm .honor { height: 22px; margin-right: 8px; }
 .gx-dm .nm { font-size: 26px; color: color-mix(in srgb, var(--acc) 55%, #fff); flex: none; max-width: 8em; margin-right: -8px; }
 .gx-dm .say { font-size: 26px; color: #fff; overflow: hidden; text-overflow: ellipsis; }
 

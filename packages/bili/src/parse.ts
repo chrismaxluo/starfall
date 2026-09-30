@@ -43,8 +43,15 @@ function viewerFromPb(u: PbUserInfo | undefined, fallback: { uid?: number; name?
     guard: guardOf(u, fallback, ctx),
     isMod: uid > 0 && (ctx.isMod?.(uid) ?? false),
     ...(medal ? { medal } : {}),
+    ...honorOf(u?.wealth?.level),
     mystery: false,
   };
+}
+
+/** 荣耀等级（B 站叫 wealth）：0 或者没有就不填 */
+function honorOf(n: unknown): { honor?: number } {
+  const v = Number(n);
+  return Number.isInteger(v) && v > 0 ? { honor: v } : {};
 }
 
 export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
@@ -62,7 +69,7 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
     }
 
     case 'ENTRY_EFFECT': {
-      const d = raw.data as { uid?: number; face?: string; privilege_type?: number; copy_writing?: string } | undefined;
+      const d = raw.data as { uid?: number; face?: string; privilege_type?: number; copy_writing?: string; wealthy_info?: { level?: number } } | undefined;
       if (!d?.uid) return null;
       // 文案形如 "欢迎舰长 <%昵称%> 进入直播间"，昵称在 <% %> 之间
       const name = /<%(.*?)%>/.exec(d.copy_writing ?? '')?.[1] ?? '';
@@ -72,6 +79,7 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
         ...(d.face ? { face: d.face } : {}),
         guard: toGuard(d.privilege_type),
         isMod: ctx.isMod?.(d.uid) ?? false,
+        ...honorOf(d.wealthy_info?.level),
         mystery: false,
       };
       return { kind: 'enter', id: ctx.newId(), ts: ctx.now(), viewer, source: 'entry_effect' };
@@ -104,6 +112,8 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
         guard: toGuard(ext?.guard?.level ?? info[7]),
         isMod: user?.[2] === 1 || (ctx.isMod?.(uid) ?? false),
         ...(medal ? { medal } : {}),
+        // 第 17 项是 [荣耀等级]
+        ...honorOf((info[16] as unknown[] | undefined)?.[0]),
         mystery: false,
       };
       const ts = Number((meta as unknown[] | undefined)?.[4]) || ctx.now();

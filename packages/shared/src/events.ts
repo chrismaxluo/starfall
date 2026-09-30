@@ -30,6 +30,8 @@ export interface Viewer {
   isMod: boolean;
   /** 观众佩戴的粉丝牌（不一定属于本直播间） */
   medal?: Medal;
+  /** 荣耀等级（B 站消息里的字段叫 wealth）：没有或不知道时不填 */
+  honor?: number;
   /** 神秘人 */
   mystery: boolean;
 }

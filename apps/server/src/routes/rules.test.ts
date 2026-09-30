@@ -111,7 +111,7 @@ describe('按 UID 查询用户', () => {
     const { req } = await setup();
     const fetchMock = vi.fn(async () => card(10001, '小星'));
     vi.stubGlobal('fetch', fetchMock);
-    expect((await req({ method: 'GET', url: '/api/viewers/10001' })).json()).toEqual({ uid: 10001, name: '小星', face: 'https://i0.hdslb.com/10001.jpg', guard: 0 });
+    expect((await req({ method: 'GET', url: '/api/viewers/10001' })).json()).toEqual({ uid: 10001, name: '小星', face: 'https://i0.hdslb.com/10001.jpg', guard: 0, honor: 0 });
     await req({ method: 'GET', url: '/api/viewers/10001' });
     expect(fetchMock.mock.calls.filter((c) => String((c as unknown[])[0]).includes('card'))).toHaveLength(1);
 

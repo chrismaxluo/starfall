@@ -28,7 +28,7 @@ export interface EffectDto extends Effect {
   updatedAt: number;
 }
 
-export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true, durationCustom: true, fadeIn: true, fadeOut: true, fadeInMs: true, fadeOutMs: true, offsetX: true, offsetY: true, sizePct: true, feather: true, featherPct: true, guardFrame: true, svgaMap: true })
+export const EffectPatchSchema = EffectSchema.pick({ name: true, showText: true, texts: true, soundAssetId: true, volume: true, position: true, durationMs: true, durationCustom: true, fadeIn: true, fadeOut: true, fadeInMs: true, fadeOutMs: true, offsetX: true, offsetY: true, sizePct: true, feather: true, featherPct: true, guardFrame: true, honorBadge: true, svgaMap: true })
   .partial()
   .strict();
 export type EffectPatch = z.infer<typeof EffectPatchSchema>;
@@ -128,6 +128,7 @@ export class EffectStore {
       feather: r.feather,
       featherPct: r.featherPct,
       guardFrame: r.guardFrame,
+      honorBadge: r.honorBadge,
       svgaMap: r.svgaMap,
       asset: asset ? assetDto(asset) : null,
       sound: sound ? assetDto(sound) : null,

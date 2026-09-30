@@ -38,6 +38,14 @@ describe('进场 INTERACT_WORD_V2', () => {
     expect(guard(enter(FIXTURE_ANCHOR, 3), ctx)).toBe(0);
   });
 
+  it('荣耀等级：来自 uinfo.wealth；0 级或者没有时不填', () => {
+    const enter = (wealth?: number) => ({ cmd: 'INTERACT_WORD_V2', data: { pb: encodePb('InteractWord', { uid: 10009, uname: '路人', msgType: 1, uinfo: { uid: 10009, base: { name: '路人' }, ...(wealth !== undefined ? { wealth: { level: wealth } } : {}) } }) } });
+    const honor = (raw: object) => { const ev = parseMessage(raw, ctx); if (ev?.kind !== 'enter') throw new Error(); return ev.viewer.honor; };
+    expect(honor(enter(53))).toBe(53);
+    expect(honor(enter(0))).toBeUndefined();
+    expect(honor(enter())).toBeUndefined();
+  });
+
   it('关注消息、未登录（UID 为 0）的消息不产生进场事件', () => {
     expect(parseMessage(fixture('interact_word_v2.follow'), ctx)).toBeNull();
     expect(parseMessage(fixture('interact_word_v2.anonymous'), ctx)).toBeNull();
@@ -50,8 +58,8 @@ describe('进场 ENTRY_EFFECT', () => {
     expect(ev).toMatchObject({ kind: 'enter', source: 'entry_effect', viewer: { uid: 10001, name: '测试舰长', guard: 3 } });
   });
 
-  it('财富等级触发的进场特效：没有大航海', () => {
-    expect(parseMessage(fixture('entry_effect.wealth'), ctx)).toMatchObject({ viewer: { uid: 10004, name: '测试富', guard: 0 } });
+  it('荣耀等级触发的进场特效：没有大航海，荣耀等级来自 wealthy_info', () => {
+    expect(parseMessage(fixture('entry_effect.wealth'), ctx)).toMatchObject({ viewer: { uid: 10004, name: '测试富', guard: 0, honor: 37 } });
   });
 });
 
@@ -60,7 +68,7 @@ describe('弹幕 DANMU_MSG', () => {
     const ev = parseMessage(fixture('danmu_msg.guard-mod'), ctx);
     expect(ev).toMatchObject({ kind: 'danmu', text: '主播生日快乐！', ts: 1790000004000 });
     if (ev?.kind !== 'danmu') throw new Error();
-    expect(ev.viewer).toMatchObject({ uid: 10005, name: '测试提督', guard: 2, isMod: true, medal: { name: '测试牌', level: 39, anchorUid: FIXTURE_ANCHOR } });
+    expect(ev.viewer).toMatchObject({ uid: 10005, name: '测试提督', guard: 2, isMod: true, medal: { name: '测试牌', level: 39, anchorUid: FIXTURE_ANCHOR }, honor: 11 });
   });
 });
 

@@ -122,7 +122,8 @@ JSON 格式，主要字段：`uid`（未登录为 0）、`target_id`（主播 UI
 | `info[3]` | 粉丝牌：`[等级, 名称, 主播昵称, 直播间号, 颜色, …]`，没戴为空数组 |
 | `info[7]` | **大航海等级**：0 无，1 总督，2 提督，3 舰长 |
 | `info[0][15].user` | 新版结构化用户信息：`uid`、`base`（昵称头像）、`medal`、`guard`、`guard_leader`、`wealth`、`anon`（⏳ 可能是神秘人）、`title`、`uhead_frame` 等，**优先使用** |
-| `info[0][15].extra` | JSON 字符串，弹幕的附加信息 |
+| `info[0][15].extra` | JSON 字符串，弹幕的附加信息；其中 `emots` 是文字里的小表情：`{"[dog]": {"url": "http://i0.hdslb.com/bfs/live/….png", "width": 20, "height": 20, …}}`，没有时为 `null`（弹幕列表用它把 `[dog]` 换成图片） |
+| `info[0][12]` / `info[0][13]` | 弹幕类型（1 为表情包）/ 表情包：`{"emoticon_unique": "upower_[…]", "url": "…", "width": …, "height": …}`，普通弹幕是字符串 `"{}"`；表情包弹幕的 `info[1]` 是表情名（如 `[xxx_好耶]`） |
 | `info[16][0]` | **荣耀等级** ✅（`info[0][15].user.wealth` 实测是空的，用这一项） |
 
 本次样本来自一位**提督 + 房管、39 级粉丝牌**的观众：`info[7]` = 2，`info[2][2]` = 1，`info[3][0]` = 39，三处都对上了。

@@ -7,7 +7,7 @@ import { post } from '../lib/api.ts';
 import { scaleRect } from '../lib/place.ts';
 import type { Rect } from '../lib/place.ts';
 import type { SampleViewer } from '../lib/identity.ts';
-import { output } from '../lib/store.ts';
+import { output, overlayConfigOf } from '../lib/store.ts';
 import { toast } from '../lib/toast.ts';
 import type { EffectDto, TriggerKind } from '../lib/types.ts';
 
@@ -19,7 +19,7 @@ let pending: unknown = null;
 const cfg = computed<OverlayConfig | null>(() => {
   if (props.config) return props.config;
   const o = output();
-  return o ? { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode } : null;
+  return o ? overlayConfigOf(o) : null;
 });
 const src = computed(() => `/overlay/?preview=1${props.safe ? '&debug=1' : ''}`);
 

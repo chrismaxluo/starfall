@@ -55,6 +55,37 @@ function honorOf(n: unknown): { honor?: number } {
   return Number.isInteger(v) && v > 0 ? { honor: v } : {};
 }
 
+/** 只接受 B 站图床的图片地址，统一换成 https */
+function biliImg(u: unknown): string | null {
+  if (typeof u !== 'string') return null;
+  const url = u.replace(/^http:\/\//, 'https://');
+  return /^https:\/\/[\w.-]+\.hdslb\.com\//.test(url) ? url : null;
+}
+
+/**
+ * 弹幕里的图片：info[0][15].extra.emots 是文字里的小表情（写法 → { url }），
+ * info[0][13] 是整条表情包（{ url, width, height }，普通弹幕是字符串 "{}"）
+ */
+function danmuImages(meta: unknown[] | undefined): { emots?: Record<string, string>; sticker?: { url: string; width: number; height: number } } {
+  const out: { emots?: Record<string, string>; sticker?: { url: string; width: number; height: number } } = {};
+  const big = meta?.[13] as { url?: unknown; width?: unknown; height?: unknown } | undefined;
+  const bigUrl = big && typeof big === 'object' ? biliImg(big.url) : null;
+  if (bigUrl) out.sticker = { url: bigUrl, width: Number(big!.width) || 0, height: Number(big!.height) || 0 };
+  let extra: { emots?: Record<string, { url?: unknown }> | null } = {};
+  try {
+    extra = JSON.parse(String((meta?.[15] as { extra?: unknown } | undefined)?.extra ?? '{}')) as typeof extra;
+  } catch {
+    /* 格式不对就当没有表情 */
+  }
+  const emots: Record<string, string> = {};
+  for (const [k, v] of Object.entries(extra.emots ?? {})) {
+    const url = biliImg(v?.url);
+    if (url && k.length <= 40) emots[k] = url;
+  }
+  if (Object.keys(emots).length) out.emots = emots;
+  return out;
+}
+
 export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
   switch (raw.cmd) {
     case 'INTERACT_WORD_V2': {
@@ -118,7 +149,8 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
         mystery: false,
       };
       const ts = Number((meta as unknown[] | undefined)?.[4]) || ctx.now();
-      return { kind: 'danmu', id: ctx.newId(), ts, viewer, text: String(info[1] ?? '') };
+      const { emots, sticker } = danmuImages(meta);
+      return { kind: 'danmu', id: ctx.newId(), ts, viewer, text: String(info[1] ?? ''), ...(emots ? { emots } : {}), ...(sticker ? { sticker } : {}) };
     }
 
     case 'SEND_GIFT_V2': {

@@ -54,6 +54,10 @@ export interface DanmuEvent extends EventBase {
   kind: 'danmu';
   viewer: Viewer;
   text: string;
+  /** 文字里的小表情：写法（如 [dog]）→ 图片地址 */
+  emots?: Record<string, string>;
+  /** 整条弹幕是一个表情包（B 站的大表情）：显示这张图，不显示文字 */
+  sticker?: { url: string; width: number; height: number };
 }
 
 export interface GiftEvent extends EventBase {

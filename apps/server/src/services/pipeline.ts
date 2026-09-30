@@ -4,8 +4,8 @@
 // 四种事件共用同一套判断（黑名单 → 匹配规则 → 暂停 → 开播 → 冷却 → 特效页在线），只有匹配规则、冷却、欢迎语变量、是否插队不同。
 import { Cooldowns, EnterMerger, GiftComboMerger, GuardDeduper, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchDanmu, matchEnter, matchGift, matchGuard, pickText } from '@starfall/core';
 import type { QueueItem, TextVars } from '@starfall/core';
-import { GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD } from '@starfall/shared';
-import type { PlayItem, PlayStatus, StdEvent, SvgaDyn, TriggerKind, Viewer } from '@starfall/shared';
+import { GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD, isOwnMedal } from '@starfall/shared';
+import type { ChatItem, DanmuEvent, PlayItem, PlayStatus, StdEvent, SvgaDyn, TriggerKind, Viewer } from '@starfall/shared';
 import { HttpError } from '../http.ts';
 import type { BlacklistStore } from './blacklist.ts';
 import type { EffectDto, EffectStore } from './effects.ts';
@@ -170,6 +170,7 @@ export class Pipeline {
       this.merger = new EnterMerger();
       this.combo = new GiftComboMerger();
       this.guards = new GuardDeduper();
+      this.d.hub.clearChat();
     });
     this.flushTimer = setInterval(() => this.guard('取出合并中的事件', () => this.flush()), FLUSH_MS);
   }
@@ -226,6 +227,8 @@ export class Pipeline {
         for (const e of this.guards.push(ev, now)) this.process(e);
         break;
       case 'danmu':
+        // 弹幕列表显示所有人的弹幕（不看规则、黑名单、暂停）
+        this.guard('推送弹幕列表', () => this.d.hub.toChat(this.chatItem(ev)));
         this.process(ev);
         break;
       case 'sc': {
@@ -250,6 +253,30 @@ export class Pipeline {
     for (const e of this.combo.flush(now)) this.process(e);
     for (const e of this.guards.flush(now)) this.process(e);
     for (const [id, r] of this.raws) if (now - r.at > RAW_TTL_MS) this.raws.delete(id);
+  }
+
+  /** 弹幕列表里的一条：标出主播本人、是不是本直播间的粉丝牌；消息里没带头像时用记下的 */
+  chatItem(ev: DanmuEvent): ChatItem {
+    const v = ev.viewer;
+    const anchorUid = this.d.room.get()?.anchorUid ?? 0;
+    const face = v.face || this.d.viewers.cached(v.uid)?.face || '';
+    return {
+      id: ev.id,
+      ts: ev.ts,
+      viewer: {
+        uid: v.uid,
+        name: v.name,
+        ...(face ? { face } : {}),
+        guard: v.guard,
+        isMod: v.isMod,
+        anchor: anchorUid > 0 && v.uid === anchorUid,
+        ...(v.medal && v.medal.level > 0 ? { medal: { name: v.medal.name, level: v.medal.level, own: isOwnMedal(v, anchorUid), ...(v.medal.colors ? { colors: v.medal.colors } : {}) } } : {}),
+        ...(v.honor ? { honor: honorOf(v.honor, this.d.honor?.urlFor(v.honor)) } : {}),
+      },
+      text: ev.text,
+      ...(ev.emots ? { emots: ev.emots } : {}),
+      ...(ev.sticker ? { sticker: ev.sticker } : {}),
+    };
   }
 
   private remember(v: Viewer): void {

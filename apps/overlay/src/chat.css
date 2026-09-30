@@ -1,0 +1,74 @@
+/* 弹幕列表：从 design/preview/chat-list.html 移植。尺寸按 600 宽的浏览器源设计，字号「大」整体放大 1.2 倍（--k）。 */
+:root {
+  --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; color: #fff; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+/* 在浏览器里查看：深色背景 */
+html.chat-view, html.chat-view body { background: radial-gradient(60% 40% at 25% 60%, rgba(255,170,90,.35), transparent 70%), radial-gradient(60% 40% at 85% 70%, rgba(90,160,255,.3), transparent 70%), #121320; }
+
+.chat-root { position: fixed; inset: 0; overflow: hidden; --k: 1; }
+.chat-root.large { --k: 1.2; }
+.chat-root.off .chat { display: none; }
+.chat { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; }
+
+.msg { position: relative; display: flex; align-items: flex-start; gap: calc(14px * var(--k)); --acc: rgba(255,255,255,.55); --acc2: #fff; }
+.side-right .msg { flex-direction: row-reverse; }
+.msg.lv-3 { --acc: #4A9BFF; --acc2: #A9D2FF; }
+.msg.lv-2 { --acc: #A774FF; --acc2: #DCC6FF; }
+.msg.lv-1 { --acc: #FF6A3D; --acc2: #FFD27A; }
+.msg.anchor { --acc: #FF6699; --acc2: #FFC2D6; }
+
+/* 头像（大航海套 B 站头像框） */
+.msg .avw { position: relative; flex: none; width: calc(64px * var(--k)); height: calc(64px * var(--k)); margin-top: calc(4px * var(--k)); }
+.msg .av { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: grid; place-items: center; color: #fff; font-weight: 600; font-size: calc(27px * var(--k)); box-shadow: 0 4px 14px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.55); }
+.msg.guard .av, .msg.anchor .av { box-shadow: 0 4px 14px rgba(0,0,0,.4), 0 0 0 2.5px var(--acc); }
+.msg .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.msg .av-framed { position: absolute; inset: 0; }
+.msg .av-framed .av { box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.msg .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
+
+/* 气泡 */
+.msg .g { position: relative; min-width: 0; max-width: calc(100% - 78px * var(--k)); padding: calc(10px * var(--k)) calc(20px * var(--k)) calc(12px * var(--k));
+  border-radius: calc(8px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k));
+  background: linear-gradient(135deg, rgba(255,255,255,.15), rgba(255,255,255,.05) 45%, rgba(255,255,255,.02)), rgba(16,18,30,.5);
+  -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.16), 0 16px 36px -16px rgba(0,0,0,.55); }
+.side-right .msg .g { border-radius: calc(26px * var(--k)) calc(8px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k)); }
+.msg .g::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px; pointer-events: none;
+  background: linear-gradient(140deg, rgba(255,255,255,.7), rgba(255,255,255,.12) 30%, rgba(255,255,255,.04) 60%, color-mix(in srgb, var(--acc) 55%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+/* 大航海、主播：描边和柔光换成身份色 */
+.msg.guard .g::before, .msg.anchor .g::before { padding: 2px; background: linear-gradient(140deg, color-mix(in srgb, var(--acc2) 90%, transparent), color-mix(in srgb, var(--acc) 40%, transparent) 35%, rgba(255,255,255,.06) 65%, color-mix(in srgb, var(--acc) 85%, transparent)); }
+.msg .gl { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.msg.guard .gl::before, .msg.anchor .gl::before { content: ""; position: absolute; left: -20%; top: -120%; width: 70%; height: 260%; background: radial-gradient(closest-side, color-mix(in srgb, var(--acc) 60%, transparent), transparent); opacity: .45; }
+.side-right .msg .gl::before { left: auto; right: -20%; }
+.msg .sheen { position: absolute; top: -30%; bottom: -30%; left: 0; width: 30%; opacity: 0; transform: translateX(-120%) skewX(-18deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent); }
+
+/* 第一行：身份 + 昵称 */
+.msg .who { position: relative; display: flex; align-items: center; gap: calc(7px * var(--k)); min-width: 0; height: calc(30px * var(--k)); }
+.side-right .msg .who { flex-direction: row-reverse; }
+.msg .nm { min-width: 0; font-size: calc(22px * var(--k)); font-weight: 600; color: rgba(255,255,255,.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg.guard .nm, .msg.anchor .nm { color: var(--acc2); font-weight: 700; }
+.msg .badge { flex: none; width: calc(30px * var(--k)); height: calc(30px * var(--k)); object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+.msg .fang { flex: none; display: inline-grid; place-items: center; width: calc(24px * var(--k)); height: calc(24px * var(--k)); border-radius: 50%; border: calc(2px * var(--k)) solid #F39A3D; color: #F39A3D; font-size: calc(14px * var(--k)); font-weight: 700; font-style: normal; line-height: 1; background: rgba(0,0,0,.25); }
+.msg .zb { flex: none; height: calc(26px * var(--k)); padding: 0 calc(10px * var(--k)); border-radius: calc(13px * var(--k)); display: inline-flex; align-items: center; background: #FF6699; color: #fff; font-size: calc(16px * var(--k)); font-weight: 700; letter-spacing: .06em; }
+.msg .honor { flex: none; height: calc(22px * var(--k)); width: auto; }
+/* B 站粉丝牌：名字 | 等级（颜色用 B 站下发的，没有时按等级） */
+.msg .medal { flex: none; display: inline-flex; align-items: stretch; height: calc(26px * var(--k)); border-radius: calc(6px * var(--k)); overflow: hidden; font-size: calc(15px * var(--k)); font-weight: 600; line-height: 1; box-shadow: inset 0 0 0 1.5px var(--mb); }
+.msg .medal span { display: inline-flex; align-items: center; padding: 0 calc(7px * var(--k)); background: var(--mc); color: var(--mt); }
+.msg .medal b { display: inline-flex; align-items: center; justify-content: center; min-width: calc(26px * var(--k)); padding: 0 calc(5px * var(--k)); background: rgba(255,255,255,.92); color: var(--ml); font-weight: 700; }
+
+/* 第二行：弹幕内容（小表情显示成图，表情包单独一张大图） */
+.msg .tx { position: relative; margin-top: calc(4px * var(--k)); font-size: calc(29px * var(--k)); line-height: 1.38; font-weight: 500; word-break: break-word; text-shadow: 0 1px 6px rgba(0,0,0,.3);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.msg .tx .em { height: 1.3em; width: auto; vertical-align: -0.3em; margin: 0 .04em; }
+.msg .sticker { display: block; margin-top: calc(6px * var(--k)); height: calc(120px * var(--k)); width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,.35)); }
+.side-right .msg .sticker { margin-left: auto; }
+
+/* 兼容模式：不用毛玻璃 */
+.lite .msg .g { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,.04) 45%), rgba(16,18,28,.84); }
+
+/* 配置错误提示（地址不对时才显示） */
+.notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; }
+.notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }

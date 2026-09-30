@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · SVGA 动态图层</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<!-- SVGA 播放器（svgaplayerweb 2.3.2，和特效页用的同一个）、测试样本：放在 assets/svga/（不进仓库），这样复制：
+  mkdir -p design/preview/assets/svga
+  cp node_modules/.pnpm/svgaplayerweb@2.3.2/node_modules/svgaplayerweb/build/svga.min.js design/preview/assets/svga/
+  cp fixtures/media/slots.svga design/preview/assets/svga/ -->
+<script src="assets/svga/svga.min.js"></script>
+<style>
+:root { --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace;
+  --bg: #0B0B10; --panel: #121218; --line: rgba(255,255,255,.08); --text: #EDEDF1; --mute: #A6A8B4; --dim: #80838F; --acc: #8D8BFF; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.app { min-height: 100%; display: grid; grid-template-columns: 340px 1fr; }
+.side { background: var(--panel); border-right: 1px solid var(--line); padding: 22px 18px 40px; }
+.side h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.side h1 img { width: 22px; height: 22px; }
+.sub { color: var(--dim); font-size: 12.5px; line-height: 1.6; }
+.grp { margin-top: 18px; }
+.grp > b { display: block; font-size: 11.5px; letter-spacing: .12em; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: #0D0D12; padding: 3px; border-radius: 9px; border: 1px solid var(--line); }
+.seg button { flex: 1 1 22%; border: 0; background: transparent; padding: 7px 6px; border-radius: 7px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.seg button.on { background: #26262F; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.row { display: flex; gap: 8px; margin-top: 14px; }
+.btn { flex: 1; height: 38px; border-radius: 9px; border: 0; background: var(--acc); color: #0B0B12; font-weight: 600; font-size: 13.5px; }
+.btn.sec { background: #22222B; color: var(--text); }
+.btn.sec.on { background: rgba(61,214,140,.16); color: #3DD68C; }
+.file { display: block; margin-top: 8px; font-size: 12.5px; color: var(--mute); }
+.file input { margin-top: 6px; width: 100%; font-size: 12px; }
+.layers { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.layer { display: grid; grid-template-columns: minmax(0, 1fr) 64px 132px; gap: 8px; align-items: center; font-size: 12.5px; }
+.layer .k { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer .s { color: var(--dim); font-family: var(--font-mono); font-size: 11.5px; text-align: right; }
+.layer select { height: 30px; border-radius: 7px; border: 1px solid var(--line); background: #0D0D12; padding: 0 6px; font-size: 12.5px; }
+.note { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: #0D0D12; border: 1px solid var(--line); font-size: 12.5px; line-height: 1.75; color: var(--mute); }
+.note b { color: var(--text); }
+.note code { font-family: var(--font-mono); color: #C9C8FF; }
+.view { display: grid; place-items: center; padding: 30px; }
+.stagebox { width: min(100%, 900px); display: grid; gap: 10px; }
+.stage { position: relative; width: 100%; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.12);
+  background: radial-gradient(420px 260px at 20% 30%, rgba(255,170,90,.55), transparent 70%), radial-gradient(520px 320px at 85% 70%, rgba(90,160,255,.5), transparent 70%), linear-gradient(170deg, #2A2436, #151823 60%, #0E1017); }
+.stage.clear { background-color: #15151C; background-image: linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%), linear-gradient(45deg, #1C1C25 25%, transparent 25%, transparent 75%, #1C1C25 75%); background-size: 32px 32px; background-position: 0 0, 16px 16px; }
+#player { position: absolute; inset: 0; }
+.cap { font-size: 12px; color: var(--dim); font-family: var(--font-mono); text-align: center; }
+.err { color: #FF8A8A; font-size: 12.5px; margin-top: 8px; }
+@media (max-width: 860px) { .app { grid-template-columns: 1fr; } .side { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1><img src="assets/logo.svg" alt="">SVGA 动态图层</h1>
+    <div class="sub">和特效页用同一个播放器、同样的替换规则：SVGA 里预留的图层，播放时换成进场观众的头像、头像框、船锚图标、昵称和欢迎语。</div>
+    <div class="grp"><b>进场观众</b><div class="seg" id="lv"></div></div>
+    <div class="grp"><b>昵称</b><div class="seg" id="nm"></div></div>
+    <div class="grp"><b>头像</b><div class="seg" id="face"></div></div>
+    <div class="grp"><b>背景</b><div class="seg" id="bg"></div></div>
+    <div class="grp"><b>SVGA 文件</b>
+      <div class="seg" id="src"></div>
+      <label class="file">也可以选你电脑上的 SVGA 试试（只在这个页面里播放，不会上传）<input type="file" id="pick" accept=".svga"></label>
+      <div class="err" id="err"></div>
+    </div>
+    <div class="grp"><b>图层（每层换成什么）</b><div class="layers" id="layers"></div></div>
+    <div class="row"><button class="btn" id="play">▶ 重播</button><button class="btn sec on" id="loop">循环</button></div>
+    <div class="note"><b>测试样本</b>是用程序生成的几个占位方块，只为了看"替换"对不对：<code>avatar</code> 头像、<code>frame</code> 头像框、<code>badge</code> 船锚图标、<code>nickname</code> 昵称、<code>welcome</code> 欢迎语，左上角黄色小方块 <code>deco</code> 是不替换的装饰。<br>不是大航海的观众，头像框和图标那两层会藏起来。</div>
+  </aside>
+  <main class="view">
+    <div class="stagebox">
+      <div class="stage" id="stage"><div id="player"></div></div>
+      <div class="cap" id="cap"></div>
+    </div>
+  </main>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+// B 站的大航海头像框、船锚图标（版权归 B 站，只在运行时加载）
+const FRAMES = { 1: 'https://i0.hdslb.com/bfs/live/39164ebfdd39db3d284b1221765e7e57f5a49958.png', 2: 'https://i0.hdslb.com/bfs/live/09937c3beb0608e267a50ac3c7125c3f2d709098.png', 3: 'https://i0.hdslb.com/bfs/live/80f732943cc3367029df65e267960d56736a82ee.png' };
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const BADGES = { 1: `${BADGE}governor-DpDXKEdA.png`, 2: `${BADGE}supervisor-u43ElIjU.png`, 3: `${BADGE}captain-Bjw5Byb5.png` };
+const LV = { cap: [3, '舰长'], adm: [2, '提督'], gov: [1, '总督'], nor: [0, '普通观众'] };
+const NAMES = { short: '道具堡', mid: '晚风与星河漫步', long: '今天也要早点睡觉的超长昵称啊' };
+const FACES = { bili: 'https://i0.hdslb.com/bfs/face/member/noface.jpg', none: '' };
+const ROLES = [['', '不替换'], ['avatar', '头像（圆形）'], ['avatarSquare', '头像（方形）'], ['frame', '头像框（大航海）'], ['badge', '船锚图标'], ['name', '昵称'], ['welcome', '欢迎语']];
+const st = { lv: 'cap', nm: 'short', face: 'none', bg: 'room', src: 'sample', loop: true };
+let video = null, player = null, slots = [], map = {}, pickedUrl = '';
+
+/* ---------- 和服务端一样：按图层名字猜它是什么 ---------- */
+function guess(key) {
+  const k = key.toLowerCase();
+  if (/frame|kuang|border|头像框|txk/.test(k)) return 'frame';
+  if (/avatar|head|touxiang|portrait|face|userpic|user_?img|头像|^tx\d*$/.test(k)) return 'avatar';
+  if (/badge|guard|anchor|medal|rank|身份|船锚|图标/.test(k)) return 'badge';
+  if (/nick|name|uname|昵称|用户名/.test(k)) return 'name';
+  if (/welcome|text|msg|message|desc|content|slogan|欢迎|文字|文案/.test(k)) return 'welcome';
+  return '';
+}
+
+/* ---------- 和特效页一样：准备替换内容（apps/overlay/src/svga-dyn.ts） ---------- */
+const GRADS = [['#6E6BF2', '#3C39B8'], ['#E0689B', '#A83C6A'], ['#2FA6A0', '#1C6E6A'], ['#E58B3A', '#A85A1C'], ['#5B8DEF', '#2F5CB8'], ['#9A6BE0', '#6A3FB0']];
+const FONT = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+let emptyUrl = '';
+const EMPTY = () => (emptyUrl ||= Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).toDataURL('image/png'));
+const thumb = (url, px) => (!/^https?:\/\/i\d\.hdslb\.com\//.test(url) || url.includes('@') ? url : `${url}@${Math.min(512, Math.ceil((px * 2) / 32) * 32)}w_${Math.min(512, Math.ceil((px * 2) / 32) * 32)}h.webp`);
+function canvas(w, hh) { const k = Math.min(2, 1024 / Math.max(w, hh, 1)); const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(hh * k)); const x = c.getContext('2d'); x.scale(k, k); return [c, x]; }
+function loadImage(url, ms = 2500) { return new Promise((res) => { const img = new Image(); img.crossOrigin = 'anonymous'; img.referrerPolicy = 'no-referrer'; const t = setTimeout(() => res(null), ms); img.onload = () => (clearTimeout(t), res(img)); img.onerror = () => (clearTimeout(t), res(null)); img.src = url; }); }
+async function avatar(d) {
+  const [c, x] = canvas(d.w, d.h); const s = Math.min(d.w, d.h), ox = (d.w - s) / 2, oy = (d.h - s) / 2;
+  if (d.role === 'avatar') { x.beginPath(); x.arc(d.w / 2, d.h / 2, s / 2, 0, Math.PI * 2); x.clip(); }
+  const img = d.url ? await loadImage(thumb(d.url, s)) : null;
+  if (img) { const m = Math.min(img.naturalWidth, img.naturalHeight); x.drawImage(img, (img.naturalWidth - m) / 2, (img.naturalHeight - m) / 2, m, m, ox, oy, s, s); }
+  else { const n = d.text || '?'; const [g1, g2] = GRADS[[...n].reduce((a, ch) => a + ch.charCodeAt(0), 0) % GRADS.length]; const g = x.createLinearGradient(ox, oy, ox + s, oy + s); g.addColorStop(0, g1); g.addColorStop(1, g2); x.fillStyle = g; x.fillRect(ox, oy, s, s); x.fillStyle = '#fff'; x.font = `600 ${s * 0.44}px ${FONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText([...n][0] || '?', d.w / 2, d.h / 2 + s * 0.02); }
+  return c.toDataURL('image/png');
+}
+function text(d) {
+  const [c, x] = canvas(d.w, d.h); const t = d.text || ''; let size = Math.max(10, d.h * 0.72);
+  x.font = `700 ${size}px ${FONT}`; while (size > 10 && x.measureText(t).width > d.w * 0.96) { size -= 1; x.font = `700 ${size}px ${FONT}`; }
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+  x.shadowColor = 'rgba(0,0,0,.45)'; x.shadowBlur = size * 0.18; x.shadowOffsetY = size * 0.05;
+  x.strokeStyle = 'rgba(10,10,20,.72)'; x.lineWidth = Math.max(2, size * 0.14); x.strokeText(t, d.w / 2, d.h / 2);
+  x.shadowColor = 'transparent'; x.fillStyle = '#fff'; x.fillText(t, d.w / 2, d.h / 2);
+  return c.toDataURL('image/png');
+}
+// 头像框、图标也自己加载（不带来源地址）画成图片：直接给播放器 B 站地址会被防盗链拒绝（ORB）
+async function picture(d) { const img = d.url ? await loadImage(d.url) : null; if (!img) return EMPTY(); const [c, x] = canvas(d.w, d.h); x.drawImage(img, 0, 0, d.w, d.h); try { return c.toDataURL('image/png'); } catch { return EMPTY(); } }
+async function applyDyn(p, dyn) {
+  const words = dyn.filter((d) => d.role === 'name' || d.role === 'welcome').map((d) => d.text || '').join('');
+  if (words) await Promise.race([document.fonts.load(`700 40px ${FONT}`, words).catch(() => {}), new Promise((r) => setTimeout(r, 1000))]);
+  await Promise.all(dyn.map(async (d) => {
+    let src;
+    if (d.role === 'avatar' || d.role === 'avatarSquare') src = await avatar(d);
+    else if (d.role === 'name' || d.role === 'welcome') src = text(d);
+    else src = await picture(d);
+    p.setImage(src, d.key);
+  }));
+}
+
+/* ---------- 图层列表 ---------- */
+function pngSize(bytes) { if (!bytes || bytes.length < 24 || bytes[0] !== 0x89) return [0, 0]; const v = new DataView(bytes.buffer, bytes.byteOffset); return [v.getUint32(16), v.getUint32(20)]; }
+function readSlots(v) {
+  // 播放器解析出来的：images 是 base64 或 Uint8Array；sprites 里有 imageKey
+  const mattes = new Set((v.sprites || []).map((s) => s.matteKey).filter(Boolean));
+  const seen = new Set(), out = [];
+  for (const sp of v.sprites || []) {
+    const k = sp.imageKey; if (!k || seen.has(k) || mattes.has(k) || k.endsWith('.matte')) continue; seen.add(k);
+    let img = v.images?.[k], w = 0, hh = 0;
+    if (typeof img === 'string') { try { const b = Uint8Array.from(atob(img.replace(/^data:[^,]+,/, '')), (c) => c.charCodeAt(0)); [w, hh] = pngSize(b); } catch {} }
+    else if (img instanceof Uint8Array) [w, hh] = pngSize(img);
+    // 取不到时按精灵第一帧的大小
+    if (!w) { const f = sp.frames?.find((x) => x.layout?.width); w = Math.round(f?.layout.width || 0); hh = Math.round(f?.layout.height || 0); }
+    out.push({ key: k, w, h: hh });
+  }
+  return out;
+}
+function drawLayers() {
+  const box = $('#layers'); box.innerHTML = '';
+  if (!slots.length) { box.innerHTML = '<div class="sub">这个 SVGA 里没有可以替换的图层</div>'; return; }
+  for (const s of slots) {
+    const row = h('label', 'layer', `<span class="k" title="${s.key}">${s.key}</span><span class="s">${s.w}×${s.h}</span>`);
+    const sel = h('select'); sel.innerHTML = ROLES.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); sel.value = map[s.key] || '';
+    sel.onchange = () => { map[s.key] = sel.value; play(); };
+    row.append(sel); box.append(row);
+  }
+}
+
+/* ---------- 播放 ---------- */
+function load(url) {
+  $('#err').textContent = '';
+  return new Promise((resolve, reject) => new SVGA.Parser().load(url, resolve, reject));
+}
+async function open() {
+  try {
+    video = await load(st.src === 'sample' ? new URL('assets/svga/slots.svga', location.href).href : pickedUrl);
+  } catch (e) { $('#err').textContent = `打不开这个文件：${e?.message || e}`; return; }
+  slots = readSlots(video); map = Object.fromEntries(slots.map((s) => [s.key, guess(s.key)]));
+  const p = video.videoSize || {};
+  $('#stage').style.aspectRatio = `${p.width || 16} / ${p.height || 9}`;
+  $('#cap').textContent = `${Math.round(p.width)}×${Math.round(p.height)} · ${video.frames} 帧 · ${video.FPS} 帧/秒 · ${slots.length} 个图层`;
+  drawLayers(); play();
+}
+async function play() {
+  if (!video) return;
+  const [g, lvName] = LV[st.lv], name = NAMES[st.nm], face = FACES[st.face];
+  const welcome = g ? `欢迎${lvName} ${name} 进入直播间` : `${name} 来了`;
+  const dyn = slots.filter((s) => map[s.key]).map((s) => {
+    const role = map[s.key], d = { key: s.key, role, w: s.w || 100, h: s.h || 100 };
+    if (role === 'avatar' || role === 'avatarSquare') return { ...d, url: face, text: name };
+    if (role === 'frame') return { ...d, url: g ? FRAMES[g] : '' };
+    if (role === 'badge') return { ...d, url: g ? BADGES[g] : '' };
+    if (role === 'name') return { ...d, text: name };
+    return { ...d, text: welcome };
+  });
+  player?.stopAnimation(true); player?.clear();
+  $('#player').innerHTML = '';
+  player = new SVGA.Player('#player');
+  player.loops = st.loop ? 0 : 1; player.clearsAfterStop = false; player.fillMode = 'Forward';
+  player.setContentMode('AspectFit');
+  player.clearDynamicObjects();
+  await applyDyn(player, dyn);
+  player.setVideoItem(video); player.startAnimation();
+}
+
+/* ---------- 控件 ---------- */
+function segs() {
+  const mk = (id, items, key, after) => { const el = $(id); el.innerHTML = ''; for (const [v, label] of items) { const b = h('button', st[key] === v ? 'on' : '', label); b.onclick = () => { st[key] = v; segs(); after(); }; el.append(b); } };
+  mk('#lv', [['cap', '舰长'], ['adm', '提督'], ['gov', '总督'], ['nor', '普通观众']], 'lv', play);
+  mk('#nm', [['short', '短昵称'], ['mid', '中等'], ['long', '很长']], 'nm', play);
+  mk('#face', [['none', '没有头像（用首字）'], ['bili', 'B 站默认头像']], 'face', play);
+  mk('#bg', [['room', '直播间'], ['clear', '透明格']], 'bg', () => $('#stage').classList.toggle('clear', st.bg === 'clear'));
+  mk('#src', [['sample', '测试样本'], ...(pickedUrl ? [['picked', '我选的文件']] : [])], 'src', open);
+}
+$('#pick').onchange = (e) => { const f = e.target.files?.[0]; if (!f) return; if (pickedUrl) URL.revokeObjectURL(pickedUrl); pickedUrl = URL.createObjectURL(f); st.src = 'picked'; segs(); open(); };
+$('#play').onclick = play;
+$('#loop').onclick = () => { st.loop = !st.loop; $('#loop').classList.toggle('on', st.loop); play(); };
+segs(); open();
+</script>
+</body>
+</html>

@@ -59,8 +59,8 @@ async function avatar(d: SvgaDyn): Promise<string> {
   try {
     return c.toDataURL('image/png');
   } catch {
-    // 图片不允许跨域读取（画布被污染）：直接用原图
-    return d.url ? thumb(d.url, s) : EMPTY();
+    // 图片不允许跨域读取（画布被污染）：这一层藏起来，不把远程地址交给播放器
+    return EMPTY();
   }
 }
 
@@ -82,7 +82,23 @@ function text(d: SvgaDyn): string {
   return c.toDataURL('image/png');
 }
 
-/** 把替换内容准备好并交给播放器（在开始播放前调用） */
+/**
+ * 头像框、图标：自己加载好（不带来源地址）再画成图片交给播放器。
+ * 不能直接把 B 站的地址给播放器：播放器加载时会带上页面地址，被 B 站的防盗链拒绝，浏览器报 ORB 错误、画面出错
+ */
+async function picture(d: SvgaDyn): Promise<string> {
+  const img = d.url ? await loadImage(d.url) : null;
+  if (!img) return EMPTY();
+  const [c, x] = canvas(d.w, d.h);
+  x.drawImage(img, 0, 0, d.w, d.h);
+  try {
+    return c.toDataURL('image/png');
+  } catch {
+    return EMPTY();
+  }
+}
+
+/** 把替换内容准备好并交给播放器（在开始播放前调用）：给播放器的都是画好的图片，不给远程地址 */
 export async function applyDyn(player: Target, dyn: SvgaDyn[]): Promise<void> {
   // 等字体加载好再画字（最多等 1 秒）
   const words = dyn.filter((d) => d.role === 'name' || d.role === 'welcome').map((d) => d.text ?? '').join('');
@@ -91,10 +107,7 @@ export async function applyDyn(player: Target, dyn: SvgaDyn[]): Promise<void> {
     let src: string;
     if (d.role === 'avatar' || d.role === 'avatarSquare') src = await avatar(d);
     else if (d.role === 'name' || d.role === 'welcome') src = text(d);
-    else if (d.url) {
-      // 头像框、图标：先加载好（缓存住），开始播放时就能显示；加载不到就藏起来
-      src = (await loadImage(d.url)) ? d.url : EMPTY();
-    } else src = EMPTY();
+    else src = await picture(d);
     player.setImage(src, d.key);
   }));
 }

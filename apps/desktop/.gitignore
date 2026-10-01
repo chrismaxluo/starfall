@@ -1,0 +1,4 @@
+# 打包过程的中间文件和安装包
+stage/
+stage-res/
+release/

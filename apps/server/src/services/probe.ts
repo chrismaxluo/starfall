@@ -83,9 +83,11 @@ export interface ProbeResult {
 
 const EMPTY: ProbeResult = { width: null, height: null, durationMs: null, hasAlpha: false };
 
+// 电脑版自带 ffprobe.exe，用环境变量指过去；服务器上用系统装的
+const FFPROBE = process.env.STARFALL_FFPROBE || 'ffprobe';
 let ffprobeOk: boolean | null = null;
 async function hasFfprobe(): Promise<boolean> {
-  if (ffprobeOk === null) ffprobeOk = await run('ffprobe', ['-version']).then(() => true, () => false);
+  if (ffprobeOk === null) ffprobeOk = await run(FFPROBE, ['-version']).then(() => true, () => false);
   return ffprobeOk;
 }
 
@@ -114,7 +116,7 @@ async function ffprobe(file: string, ext: string): Promise<ProbeResult> {
   let stdout = '';
   for (const [i, f] of formats.entries()) {
     try {
-      ({ stdout } = await run('ffprobe', ['-v', 'error', '-protocol_whitelist', 'file', '-f', f, '-show_entries', 'stream=codec_type,width,height,pix_fmt,duration:stream_tags=alpha_mode:format=duration', '-of', 'json', file], { timeout: 20_000 }));
+      ({ stdout } = await run(FFPROBE, ['-v', 'error', '-protocol_whitelist', 'file', '-f', f, '-show_entries', 'stream=codec_type,width,height,pix_fmt,duration:stream_tags=alpha_mode:format=duration', '-of', 'json', file], { timeout: 20_000 }));
       break;
     } catch (e) {
       if (i === formats.length - 1) throw e;

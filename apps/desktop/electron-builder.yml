@@ -1,0 +1,40 @@
+# 打包设置（electron-builder）：在 GitHub 的 Windows 电脑上运行，见 .github/workflows/desktop.yml
+# 命名规则见 docs/desktop.md：安装包 Starfall-<版本>-win-x64-setup.exe，主程序 Starfall.exe，显示名「星临」
+appId: io.github.chrismaxluo.starfall
+productName: Starfall
+copyright: Copyright © 2026 chrismaxluo · GPL-3.0
+directories:
+  app: stage
+  output: release
+  buildResources: resources
+extraResources:
+  - from: stage-res
+    to: .
+asar: true
+npmRebuild: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+  executableName: Starfall
+  artifactName: Starfall-${version}-win-x64-setup.${ext}
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: 星临
+  uninstallDisplayName: 星临
+  deleteAppDataOnUninstall: false
+  installerLanguages: [zh_CN]
+  language: '2052'
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+# 生成 app-update.yml，让程序到 GitHub 发布页检查更新（上传由打包流程自己做）
+publish:
+  provider: github
+  owner: chrismaxluo
+  repo: starfall

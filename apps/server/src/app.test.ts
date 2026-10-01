@@ -75,6 +75,61 @@ describe('后台登录（F-UI-10）', () => {
   });
 });
 
+describe('电脑版（STARFALL_DESKTOP=1）', () => {
+  const desktop = async () => {
+    const t = await testApp({}, { STARFALL_DESKTOP: '1', STARFALL_HOST: '0.0.0.0', STARFALL_TRUST_PROXY: '127.0.0.1' });
+    close.push(() => t.app.close());
+    return t;
+  };
+
+  it('只听本机地址、不信任代理；不生成初始密码', async () => {
+    const { ctx, dataDir } = await desktop();
+    expect(ctx.config).toMatchObject({ desktop: true, host: '127.0.0.1', trustProxy: false });
+    expect(ctx.initialPassword).toBeNull();
+    const fs = await import('node:fs');
+    expect(fs.existsSync(`${dataDir}/initial-password.txt`)).toBe(false);
+  });
+
+  it('后台不用登录', async () => {
+    const { app } = await desktop();
+    const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { host: '127.0.0.1:17520' } });
+    expect(me.statusCode).toBe(200);
+    expect(me.json()).toEqual({ ok: true, desktop: true });
+    expect((await app.inject({ method: 'GET', url: '/api/outputs', headers: { host: 'localhost:17520' } })).statusCode).toBe(200);
+  });
+
+  it('不是本机地址的请求一律拒绝（防 DNS 重绑定），特效页和素材也一样', async () => {
+    const { app } = await desktop();
+    for (const url of ['/api/outputs', '/overlay/', '/files/x.png', '/']) {
+      expect((await app.inject({ method: 'GET', url, headers: { host: 'evil.example:17520' } })).statusCode, url).toBe(403);
+    }
+    expect((await app.inject({ method: 'GET', url: '/api/health', headers: { host: '[::1]:17520' } })).statusCode).toBe(200);
+  });
+
+  it('接口只接受同源页面：其他网站发来的请求拒绝', async () => {
+    const { app } = await desktop();
+    const host = '127.0.0.1:17520';
+    const req = (headers: Record<string, string>, url = '/api/playback/clear') => app.inject({ method: 'POST', url, headers: { host, ...headers } });
+    expect((await req({ origin: 'https://evil.example' })).statusCode).toBe(403);
+    expect((await req({ origin: 'http://127.0.0.1:9999' })).statusCode).toBe(403);
+    expect((await req({ 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
+    expect((await req({ 'sec-fetch-site': 'same-site' })).statusCode).toBe(403);
+    expect((await req({ origin: 'null' })).statusCode).toBe(403);
+    expect((await req({ origin: 'https://evil.example' }, '/%61pi/playback/clear')).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: '/ws/admin', headers: { host, origin: 'https://evil.example' } })).statusCode).toBe(403);
+    // 同源页面、本机程序（没有 Origin）照常
+    expect((await app.inject({ method: 'GET', url: '/api/outputs', headers: { host, origin: `http://${host}`, 'sec-fetch-site': 'same-origin' } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/outputs', headers: { host } })).statusCode).toBe(200);
+  });
+
+  it('服务器版照旧：要登录，/api/auth/me 标明不是电脑版', async () => {
+    const { app, login } = await setup();
+    expect((await app.inject({ method: 'GET', url: '/api/outputs', headers: { host: 'evil.example' } })).statusCode).toBe(401);
+    const req = await login();
+    expect((await req({ method: 'GET', url: '/api/auth/me' })).json()).toEqual({ ok: true, desktop: false });
+  });
+});
+
 describe('特效页静态文件', () => {
   it('构建后由服务提供；入口页不缓存，带哈希的资源长期缓存', async () => {
     const fsm = await import('node:fs');

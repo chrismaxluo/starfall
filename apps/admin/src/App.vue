@@ -45,7 +45,7 @@ let poll: ReturnType<typeof setInterval> | null = null;
 
 async function boot(): Promise<void> {
   try {
-    await get('/api/auth/me');
+    state.desktop = (await get<{ desktop?: boolean }>('/api/auth/me')).desktop === true;
   } catch {
     state.authed = false;
     return;
@@ -193,7 +193,7 @@ function reloadPage(): void {
           <button class="icon-btn" aria-label="切换亮色 / 暗色" @click="(e) => toggleTheme((e.currentTarget as HTMLElement).getBoundingClientRect().left + 17, (e.currentTarget as HTMLElement).getBoundingClientRect().top + 17)">
             <Icon name="i-moon" class="theme-light-only" /><Icon name="i-sun" class="theme-dark-only" />
           </button>
-          <button class="icon-btn" aria-label="退出后台登录" title="退出后台登录" @click="logout"><Icon name="i-logout" /></button>
+          <button v-if="!state.desktop" class="icon-btn" aria-label="退出后台登录" title="退出后台登录" @click="logout"><Icon name="i-logout" /></button>
         </header>
         <div v-if="ui.newVersion && ui.newVersion !== ui.dismissedVersion" class="verbar" role="status">
           <Icon name="i-update" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>

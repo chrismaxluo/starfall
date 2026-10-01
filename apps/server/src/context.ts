@@ -74,7 +74,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   seed(db);
   const secret = Secret.load(p.secretKey);
   const settings = new SettingsStore(db);
-  const auth = new AdminAuth(settings, secret, config.dataDir);
+  const auth = new AdminAuth(settings, secret, config.dataDir, config.desktop);
   const initialPassword = auth.ensurePassword();
   const account = new BiliAccount(db, secret);
   const room = new RoomStore(db);

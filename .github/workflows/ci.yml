@@ -43,4 +43,11 @@ jobs:
           node-version-file: .nvmrc
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
+      # 和电脑版安装包里同一个 ffprobe，读取素材尺寸、时长的测试要用
+      - name: 下载 ffprobe
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-8.1.zip -OutFile ff.zip
+          Expand-Archive ff.zip -DestinationPath $env:RUNNER_TEMP/ff
+          (Get-ChildItem $env:RUNNER_TEMP/ff -Recurse -Filter ffprobe.exe | Select-Object -First 1).DirectoryName >> $env:GITHUB_PATH
       - run: pnpm test

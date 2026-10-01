@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @starfall/server dev",
-    "build": "pnpm -r --filter './apps/*' build",
+    "build": "pnpm -r --filter \"./apps/*\" build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck",

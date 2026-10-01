@@ -11,7 +11,15 @@ extraResources:
   - from: stage-res
     to: .
 asar: true
-npmRebuild: true
+# better-sqlite3 自带 Windows 的预编译版本（N-API，Electron 里直接能用），不用重新编译
+npmRebuild: false
+# 只留中文和英文的界面资源（Electron 默认带几十种语言）
+electronLanguages: [zh-CN, en-US]
+files:
+  - '**/*'
+  # better-sqlite3 的源代码和其他系统的版本用不上
+  - '!node_modules/better-sqlite3/{deps,src,build,docs,benchmark}/**'
+  - '!node_modules/better-sqlite3/prebuilds/!(win32-x64.node)'
 win:
   target:
     - target: nsis

@@ -88,6 +88,7 @@ jobs:
             apps/desktop/release/*.exe
             apps/desktop/release/*.blockmap
             apps/desktop/release/*.yml
+            !apps/desktop/release/builder-*.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -98,7 +99,9 @@ jobs:
         run: |
           tag="$GITHUB_REF_NAME"
           cd apps/desktop/release
-          files=(*.exe *.exe.blockmap *.yml)
+          shopt -s nullglob
+          # 安装包、差量更新用的 blockmap、自动更新查版本用的 latest.yml / beta.yml
+          files=(*.exe *.exe.blockmap latest*.yml beta*.yml alpha*.yml)
           ls -la "${files[@]}"
           if gh release view "$tag" > /dev/null 2>&1; then
             gh release upload "$tag" "${files[@]}" --clobber

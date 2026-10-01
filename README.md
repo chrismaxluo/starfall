@@ -187,7 +187,7 @@ pnpm build        # 构建管理后台与特效页
 
 ## 快速开始
 
-**环境要求**：一台 Linux 服务器（已在 Debian 12 验证）、Node.js 24+、可访问 B 站；推荐安装 ffmpeg，用于检测上传视频的透明通道与时长。
+**环境要求**：一台 Linux 服务器（已在 Debian 12 验证）、Node.js 24+、可访问 B 站。
 
 ```bash
 git clone https://github.com/chrismaxluo/starfall.git /opt/starfall

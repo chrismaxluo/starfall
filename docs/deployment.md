@@ -9,7 +9,6 @@
 | 操作系统 | Linux，已在 Debian 12 上验证 |
 | Node.js | 24 或更高 |
 | pnpm | 通过 Node.js 自带的 Corepack 启用，版本由 `package.json` 指定 |
-| ffmpeg | 推荐安装。上传视频时用来检测透明通道和时长；没有安装时也能用，但不会提醒「素材没有透明背景」 |
 | 内存 | 512 MB 以上（服务运行时约占 100 ~ 200 MB） |
 | 网络 | 能访问 B 站；开放一个端口（默认 17520）给直播软件和浏览器 |
 
@@ -18,7 +17,7 @@
 ```bash
 # Node.js 24（NodeSource 官方源）
 curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-apt install -y nodejs git ffmpeg
+apt install -y nodejs git
 
 corepack enable
 ```

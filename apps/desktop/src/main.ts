@@ -19,7 +19,7 @@ const USER_DIR = app.getPath('userData');
 const DATA_DIR = path.join(USER_DIR, 'data');
 const LOG_DIR = path.join(USER_DIR, 'logs');
 const STATE_FILE = path.join(USER_DIR, 'desktop.json');
-/** 管理后台、特效页、数据库迁移文件、ffprobe：打包时放在安装目录的 resources 下 */
+/** 管理后台、特效页、数据库迁移文件：打包时放在安装目录的 resources 下 */
 const RES = app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), '..', 'stage-res');
 const ICON = path.join(__dirname, 'icon.ico');
 
@@ -125,7 +125,6 @@ function canListen(p: number): Promise<boolean> {
 let crashes: number[] = [];
 
 function startServer(): Promise<void> {
-  const ffprobe = path.join(RES, 'bin', 'ffprobe.exe');
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     STARFALL_DESKTOP: '1',
@@ -135,7 +134,6 @@ function startServer(): Promise<void> {
     STARFALL_OVERLAY_DIST: path.join(RES, 'overlay'),
     STARFALL_MIGRATIONS: path.join(RES, 'drizzle'),
   };
-  if (fs.existsSync(ffprobe)) env.STARFALL_FFPROBE = ffprobe;
   return new Promise((resolve, reject) => {
     let ready = false;
     const child = utilityProcess.fork(path.join(__dirname, 'server.cjs'), [], { serviceName: `${NAME}服务`, stdio: 'pipe', env, execArgv: ['--enable-source-maps'] });

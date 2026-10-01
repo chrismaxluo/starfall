@@ -11,6 +11,8 @@ extraResources:
   - from: stage-res
     to: .
 asar: true
+# 最高压缩：安装包更小，打包慢一点（安装和运行速度不受影响）
+compression: maximum
 # better-sqlite3 自带 Windows 的预编译版本（N-API，Electron 里直接能用），不用重新编译
 npmRebuild: false
 # 只留中文和英文的界面资源（Electron 默认带几十种语言）

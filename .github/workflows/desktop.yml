@@ -17,10 +17,6 @@ permissions:
 concurrency:
   group: desktop-${{ github.ref }}
 
-env:
-  # 读取素材尺寸、时长用的 ffprobe（FFmpeg 官网推荐的 Windows 版，LGPL）
-  FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-8.1.zip
-
 jobs:
   build:
     name: 打包 Windows 安装包
@@ -61,16 +57,6 @@ jobs:
       - name: 准备打包文件
         working-directory: apps/desktop
         run: npm run build
-
-      - name: 下载 ffprobe
-        shell: pwsh
-        run: |
-          Invoke-WebRequest $env:FFMPEG_URL -OutFile ff.zip
-          Expand-Archive ff.zip -DestinationPath ff
-          $bin = New-Item -ItemType Directory -Force apps/desktop/stage-res/bin
-          Copy-Item (Get-ChildItem ff -Recurse -Filter ffprobe.exe | Select-Object -First 1).FullName $bin
-          Copy-Item (Get-ChildItem ff -Recurse -Filter LICENSE.txt | Select-Object -First 1).FullName (Join-Path $bin FFMPEG-LICENSE.txt)
-          & (Join-Path $bin ffprobe.exe) -version | Select-Object -First 1
 
       - name: 安装运行时依赖
         working-directory: apps/desktop/stage

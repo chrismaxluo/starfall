@@ -22,7 +22,7 @@ RestartSec=3
 Environment=NODE_OPTIONS=--max-old-space-size=256
 MemoryMax=450M
 UMask=0077
-# 以专用账号运行，只能写数据目录：即使上传文件的处理环节（ffprobe 等）被利用，也碰不到系统和其他服务
+# 以专用账号运行，只能写数据目录：即使上传文件的处理环节被利用，也碰不到系统和其他服务
 User=starfall
 Group=starfall
 ReadWritePaths=/opt/starfall/data

@@ -60,7 +60,7 @@
 `.github/workflows/desktop.yml`，在 GitHub 的 Windows 电脑上运行：
 
 1. 推送版本标签：`git tag -a v1.4.0-beta.1 -m "…" && git push origin v1.4.0-beta.1`
-2. GitHub 自动：装依赖 → 构建后台和特效页 → 打包本机服务 → 下载 ffprobe → electron-builder 打成安装包
+2. GitHub 自动：装依赖 → 构建后台和特效页 → 打包本机服务 → electron-builder 打成安装包
 3. 上传到发布页：标签带 `-`（测试版）标成「预发布」，不会变成首页的最新版本
 4. 只想试打包：在 GitHub 的 Actions 页面手动运行「打包电脑版」，安装包在那次运行的页面下载（保留 14 天）
 
@@ -76,6 +76,6 @@
 | `scripts/build.mjs` | 把三个入口各打成一个文件，准备好要放进安装包的文件 |
 | `electron-builder.yml` | 安装包设置 |
 
-本机服务通过环境变量切到电脑版：`STARFALL_DESKTOP=1`（只听 127.0.0.1、不用密码、只认本机地址和同源页面）、`STARFALL_DATA`、`STARFALL_PORT`、`STARFALL_ADMIN_DIST`、`STARFALL_OVERLAY_DIST`、`STARFALL_MIGRATIONS`、`STARFALL_FFPROBE`。
+本机服务通过环境变量切到电脑版：`STARFALL_DESKTOP=1`（只听 127.0.0.1、不用密码、只认本机地址和同源页面）、`STARFALL_DATA`、`STARFALL_PORT`、`STARFALL_ADMIN_DIST`、`STARFALL_OVERLAY_DIST`、`STARFALL_MIGRATIONS`。
 
 `apps/desktop` 不在 pnpm 工作区里：Electron、electron-builder 这些打包工具只在 GitHub 打包时安装，服务器上 `pnpm install` 不会下载它们。

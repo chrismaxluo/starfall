@@ -40,6 +40,10 @@ export const state = reactive({
 
 export const effectById = (id: number | null | undefined) => (id ? state.effects.find((e) => e.id === id) : undefined);
 export const output = () => state.outputs[0];
+/** 加到直播软件里的特效页（不算弹幕列表，也不算「在浏览器里查看」打开的页面） */
+export const isFxLive = (x: OverlayInfo) => x.role !== 'chat' && !x.view && !x.env?.view;
+/** 「在浏览器里查看」打开的特效页 */
+export const isFxView = (x: OverlayInfo) => x.role !== 'chat' && Boolean(x.view || x.env?.view);
 
 /** 输出的设置换成特效页、弹幕列表收到的格式（预览用） */
 export function overlayConfigOf(o: OutputDto): OverlayConfig {
@@ -94,6 +98,8 @@ export const ui = reactive({
   editorId: null as number | null,
   wizard: false,
   palette: false,
+  /** 扫码登录 B站（侧边栏、登录失效提醒条） */
+  qr: false,
   /** 预览小窗：点规则的 ▶、命令面板里的「预览某身份进场特效」 */
   preview: null as PreviewRequest | null,
   quick: null as { uid: number; name: string; face?: string | undefined; viewer?: Viewer } | null,

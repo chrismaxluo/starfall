@@ -9,7 +9,7 @@ import { CHAT_MAX_LIMIT, CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
-import { overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
+import { isFxLive, isFxView, overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { OutputDto, OverlayConfig, OverlayInfo } from '../lib/types.ts';
 
@@ -31,7 +31,7 @@ watch(selId, (id) => {
   }
 });
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
-const online = (id: number) => state.overlays.some((x) => x.outputId === id && x.role !== 'chat');
+const online = (id: number) => state.overlays.some((x) => x.outputId === id && isFxLive(x));
 const cfg = computed<OverlayConfig | null>(() => {
   const x = o.value;
   return x ? overlayConfigOf(x) : null;
@@ -163,14 +163,15 @@ function test(id: Identity): void {
   const e = tierEffect(id);
   if (e) void stage.value?.play(e, SAMPLES[id]);
 }
-const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role !== 'chat'));
+const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && isFxLive(x)));
+/** 「在浏览器里查看」打开的页面：能看特效，但不算加到了直播软件 */
+const viewing = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && isFxView(x)));
 const chats = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'chat'));
 /** 在线状态：「在线 · 直播姬」，几个同时在线时写个数 */
 function liveText(list: OverlayInfo[]): string {
   if (!list.length) return '不在线';
   if (list.length > 1) return `${list.length} 个在线`;
   const env = list[0]!.env;
-  if (env?.view) return '在线 · 浏览器查看';
   const host = String(env?.host ?? '');
   return host.startsWith('OBS') ? '在线 · OBS' : host === 'B站直播姬' ? '在线 · 直播姬' : '在线';
 }
@@ -187,7 +188,7 @@ function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
   return [['透明视频', Boolean(env.webmVp9)], ['毛玻璃', Boolean(env.blur)], ['玻璃描边', Boolean(env.dynamicBorder)], ['声音', Boolean(env.audio)]];
 }
 /** 特效页运行环境（取直播软件里的那个，不取浏览器查看的） */
-const fxEnv = computed(() => (overlays.value.find((x) => !x.env?.view) ?? overlays.value[0])?.env ?? null);
+const fxEnv = computed(() => overlays.value[0]?.env ?? null);
 const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastError ?? null);
 </script>
 
@@ -243,6 +244,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                 <ConfirmButton label="重置密钥" confirm-label="确认重置？两个地址都会失效" cls="linkish dim" armed-cls="delb" @confirm="resetKey" />
               </span>
             </div>
+            <div v-if="viewing.length && !overlays.length" class="src-note">浏览器里正在查看特效页，但这不算加到了直播软件：直播画面里要另外添加上面的地址</div>
             <div v-if="fxError" class="src-err">最近的问题：{{ fxError }}</div>
           </div>
 

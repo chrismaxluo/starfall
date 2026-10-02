@@ -88,6 +88,8 @@ export interface LiveStatus {
   connection: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopped';
   connectionDetail: string | null;
   reason: 'ok' | 'no_room' | 'not_logged_in' | 'offline';
+  /** B 站说登录已失效，要重新扫码 */
+  loginInvalid?: boolean;
   adminCount: number;
 }
 
@@ -214,6 +216,8 @@ export interface OverlayInfo {
   outputId: number;
   /** fx：特效页；chat：弹幕列表 */
   role: 'fx' | 'chat';
+  /** 浏览器查看页：不算加到了直播软件 */
+  view?: boolean;
   since: number;
   env: Record<string, string | number | boolean | null> | null;
   lastError: string | null;

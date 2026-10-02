@@ -1,14 +1,16 @@
 <script setup lang="ts">
-// 冷却时间：点一下弹出常用选项（不限 / 1 / 5 / 10 / 30 分钟 / 1 小时），也可以自己填。unit 为 sec 时单位是秒
+// 多久内只播一次：点一下弹出常用选项（每次都播 / 1 / 5 / 10 / 30 分钟 / 1 小时），也可以自己填。unit 为 sec 时单位是秒
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import Icon from './Icon.vue';
 
-const props = withDefaults(defineProps<{ unit?: 'min' | 'sec'; hint?: string; options?: number[]; max?: number; allowZero?: boolean }>(), {
+const props = withDefaults(defineProps<{ unit?: 'min' | 'sec'; hint?: string; options?: number[]; max?: number; allowZero?: boolean; after?: string }>(), {
   unit: 'min',
   hint: '同一个观众这段时间里再来，不重复播放',
   options: undefined,
   max: undefined,
   allowZero: true,
+  /** 跟在按钮后面的字（例如「内只播一次」）：选了「每次都播」时不显示，免得读成反话 */
+  after: '',
 });
 const model = defineModel<number>({ required: true });
 const emit = defineEmits<{ change: [value: number] }>();
@@ -20,7 +22,7 @@ const opts = computed(() => props.options ?? (props.unit === 'min' ? [0, 1, 5, 1
 const limit = computed(() => props.max ?? (props.unit === 'min' ? 1440 : 3600));
 
 function text(v: number): string {
-  if (v === 0 && props.allowZero) return '不限';
+  if (v === 0 && props.allowZero) return '每次都播';
   if (props.unit === 'sec') return `${v} 秒`;
   return v >= 60 && v % 60 === 0 ? `${v / 60} 小时` : `${v} 分钟`;
 }
@@ -56,7 +58,7 @@ onBeforeUnmount(close);
 </script>
 
 <template>
-  <button ref="btn" type="button" class="cdpick" :aria-label="`${hint}：${text(model)}`" :aria-expanded="open" @click.stop="toggle">{{ text(model) }}<Icon name="i-chev" /></button>
+  <button ref="btn" type="button" class="cdpick" :aria-label="`${hint}：${text(model)}`" :aria-expanded="open" @click.stop="toggle">{{ text(model) }}<Icon name="i-chev" /></button><template v-if="after && !(model === 0 && allowZero)">{{ ' ' + after }}</template>
   <Teleport to="body">
     <div v-if="open" ref="pop" class="cdpop" :style="{ left: `${pos.left}px`, top: `${pos.top}px` }">
       <div class="lbl">{{ hint }}</div>

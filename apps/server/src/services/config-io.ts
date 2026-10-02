@@ -15,6 +15,7 @@ import type { Db } from '../db/index.ts';
 import { assets, effects, ruleDanmu, ruleExclusive } from '../db/schema.ts';
 import type { Settings } from '../db/seed.ts';
 import { HttpError } from '../http.ts';
+import { issueText } from '../zod-text.ts';
 import type { AssetRow, AssetStore } from './assets.ts';
 import type { BlacklistStore } from './blacklist.ts';
 import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rules.ts';
@@ -194,7 +195,7 @@ export function parseConfigFile(text: string): ConfigFile {
   const r = ConfigFileSchema.safeParse(json);
   if (!r.success) {
     const i = r.error.issues[0]!;
-    throw new HttpError(400, 'invalid_config', `配置文件内容有误：${i.path.join('.') || '（根）'} ${i.message}`);
+    throw new HttpError(400, 'invalid_config', `配置文件内容有误：${issueText(i)}（位置 ${i.path.join('.') || '最外层'}）`);
   }
   return r.data;
 }

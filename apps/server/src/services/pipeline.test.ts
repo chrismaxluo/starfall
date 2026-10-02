@@ -15,7 +15,7 @@ function fakeLive() {
   return {
     state,
     onEvent: (fn: (ev: StdEvent, raw: unknown) => void) => (listeners.add(fn), () => listeners.delete(fn)),
-    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, adminCount: 0 }),
+    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, loginInvalid: false, adminCount: 0 }),
     emit: (ev: StdEvent, raw?: unknown) => { for (const fn of listeners) fn(ev, raw); },
   };
 }

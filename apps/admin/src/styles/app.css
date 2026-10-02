@@ -855,6 +855,14 @@ td .excl { font-size: 11px; color: var(--accent); background: var(--accent-soft)
 [data-theme="dark"] .pausebar { color: #FF8A8A; }
 .pausebar span { color: var(--t2); }
 .pausebar .btn:first-of-type { margin-left: auto; }
+.alertbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 24px; font-size: 13px; border-bottom: 1px solid; }
+.alertbar svg { width: 15px; height: 15px; flex: none; }
+.alertbar span { color: var(--t2); }
+.alertbar .btn:first-of-type { margin-left: auto; }
+.alertbar.red { background: rgba(214, 69, 69, .1); border-color: rgba(214, 69, 69, .3); color: #C03A3A; }
+[data-theme="dark"] .alertbar.red { color: #FF8A8A; }
+.alertbar.amber { background: var(--gov-soft); border-color: color-mix(in srgb, var(--gov) 30%, transparent); color: var(--gov); }
+.top .fxlamp { text-decoration: none; }
 body.paused .stage-label::after { content: "  · 已暂停"; color: #FF8A8A; }
 
 /* ============ 事件记录 ============ */

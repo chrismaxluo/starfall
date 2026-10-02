@@ -133,7 +133,7 @@ onMounted(async () => {
         <span v-else class="gico">{{ [...s.giftName][0] ?? '礼' }}</span>
         <div class="body">
           <div class="nm">{{ s.giftName || `礼物 ${s.giftId}` }}<span v-if="giftOf(s.giftId)" class="pr">{{ battery(giftOf(s.giftId)!.price) }} / 个（{{ yuan(giftOf(s.giftId)!.price) }}）</span></div>
-          <EffectPicker v-model="s.effectId" @change="(id) => save(`「${s.giftName}」改为播放「${effectById(id)?.name}」`)" />
+          <EffectPicker v-model="s.effectId" kind="gift" @change="(id) => save(`「${s.giftName}」改为播放「${effectById(id)?.name}」`)" />
         </div>
         <div class="side">
           <Switch v-model="s.enabled" :label="`指定礼物 ${s.giftName}`" @change="(v) => save(v ? `已打开「${s.giftName}」` : `已关闭「${s.giftName}」，按价值分段处理`)" />
@@ -172,7 +172,7 @@ onMounted(async () => {
       <div v-for="(b, i) in bands" :key="b.fromGold" class="rl" :class="{ off: !b.enabled }">
         <span class="who"><span class="tag">{{ battery(b.fromGold) }}+</span></span>
         <span class="say">
-          一次送出 <b>{{ bandLabel(i) }}</b><span class="hint">（{{ bandYuan(i) }}）</span> 时，播放 <EffectPicker v-model="b.effectId" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" />
+          一次送出 <b>{{ bandLabel(i) }}</b><span class="hint">（{{ bandYuan(i) }}）</span> 时，播放 <EffectPicker v-model="b.effectId" kind="gift" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" />
           <span v-if="jumps(b.fromGold)" class="hint">· 会插队优先播放</span>
           <span v-if="!b.enabled" class="offnote">已关闭：{{ bandLabel(i) }}的礼物不播放特效</span>
         </span>

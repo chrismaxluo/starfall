@@ -142,7 +142,7 @@ const clashes = computed(() => {
             </span></span>
             <input class="kwin" placeholder="+ 加关键词" title="输入后按回车或点别处就会添加；多个词用逗号或空格隔开" aria-label="添加关键词" maxlength="200" @keydown.enter.prevent="(e) => addKeyword(r, e)" @blur="(e) => addKeyword(r, e)" />
           </span>
-          时，播放 <EffectPicker v-model="r.effectId" @change="(id) => ((flash = r.id), patch(r, { effectId: id }, `改为播放「${effectById(id)?.name}」`))" />
+          时，播放 <EffectPicker v-model="r.effectId" kind="danmu" @change="(id) => ((flash = r.id), patch(r, { effectId: id }, `改为播放「${effectById(id)?.name}」`))" />
           <span class="line2">
             <WhoPick :model-value="r.who" :people="r.people" :block-anchor="state.settings?.blockAnchor" @change="(w) => setWho(r, w)" />
             发的才算；所有人合计 <CdPick :model-value="r.globalCdSec" unit="sec" hint="不管谁发，这段时间里只播一次" after="内只播一次" @change="(v) => setCd(r, 'globalCdSec', v)" />，同一个人 <CdPick :model-value="r.userCdMin" hint="同一个人这段时间里再发，不重复播放" after="内只播一次" @change="(v) => setCd(r, 'userCdMin', v)" />

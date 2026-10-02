@@ -217,6 +217,12 @@ importers:
       '@starfall/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      lottie-web:
+        specifier: ^5.13.0
+        version: 5.13.0
+      svgaplayerweb:
+        specifier: 2.3.2
+        version: 2.3.2
       vue:
         specifier: ^3.5.43
         version: 3.5.43(typescript@6.0.3)

@@ -8,10 +8,12 @@ import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { placeWarnings } from '../lib/place.ts';
 import { SAMPLES, STYLES } from '../lib/identity.ts';
-import type { Identity } from '../lib/identity.ts';
+import type { Identity, SampleViewer } from '../lib/identity.ts';
+import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
+import { builtinThumb } from '../lib/thumbs.ts';
 import { effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
-import type { AssetDto, EffectDto, SoundDto } from '../lib/types.ts';
+import type { AssetDto, EffectDto, SoundDto, TriggerKind } from '../lib/types.ts';
 import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
 import PreviewStage from './PreviewStage.vue';
@@ -33,7 +35,20 @@ const TEXT_TABS: Array<{ value: TextKey; label: string }> = [
   { value: 'guard', label: '上舰时' },
   { value: 'danmu', label: '弹幕时' },
 ];
-const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{honor}', '{text}', '{gift}', '{count}', '{value}', '{months}', '{op}', '{act}'];
+/** 欢迎语里能用的变量：按钮写中文，点了插入 {变量}；只显示当前这类欢迎语能用的 */
+const VAR_COMMON = [
+  { key: 'name', label: '昵称' },
+  { key: 'guard', label: '大航海身份' },
+  { key: 'medal', label: '粉丝牌名' },
+  { key: 'level', label: '粉丝牌等级' },
+  { key: 'honor', label: '荣耀等级' },
+];
+const VARS_OF: Record<TextKey, Array<{ key: string; label: string }>> = {
+  enter: VAR_COMMON,
+  danmu: [...VAR_COMMON, { key: 'text', label: '弹幕内容' }],
+  gift: [...VAR_COMMON, { key: 'gift', label: '礼物名' }, { key: 'count', label: '数量' }, { key: 'value', label: '价值（元）' }],
+  guard: [...VAR_COMMON, { key: 'act', label: '上舰 / 续费' }, { key: 'op', label: '开通 / 续费' }, { key: 'months', label: '月数' }],
+};
 // 宫廷特效铺满画面，位置只分偏上 / 居中 / 偏下
 const ROYAL_POSITIONS: Array<{ value: Position; label: string }> = [
   { value: 'top', label: '偏上' },
@@ -98,17 +113,69 @@ function patch() {
   return timed.value ? { ...base, durationCustom: true, durationMs } : { ...base, durationMs };
 }
 
-/** 示例观众：按这个素材用在哪条规则选（总督规则用总督观众） */
-const sample = computed(() => {
+/** 示例观众：默认按这个素材用在哪条规则选（总督规则用总督观众），也可以手动换 */
+type Who = 'auto' | 'gov' | 'cap' | 'nor' | 'long';
+const who = ref<Who>('auto');
+const WHO_OPTIONS: Array<{ value: Who; label: string }> = [
+  { value: 'auto', label: '按规则' },
+  { value: 'gov', label: '总督' },
+  { value: 'cap', label: '舰长' },
+  { value: 'nor', label: '普通' },
+  { value: 'long', label: '长昵称' },
+];
+const LONG_NAME: SampleViewer = { name: '一只特别特别能熬夜的小猫咪', guard: 0, isMod: false, medalLevel: 12 };
+const sample = computed((): SampleViewer => {
+  if (who.value === 'long') return LONG_NAME;
+  if (who.value !== 'auto') return SAMPLES[who.value];
   const u = (eff.value?.usedBy ?? []).map((x) => x.label).join(' ');
   const id: Identity = /总督/.test(u) ? 'gov' : /提督/.test(u) ? 'adm' : /舰长/.test(u) ? 'cap' : /房管/.test(u) ? 'mod' : /粉丝牌/.test(u) ? 'fan' : 'cap';
   return SAMPLES[id];
 });
-const KIND_OF_TAB: Record<TextKey, 'enter' | 'gift' | 'guard' | 'danmu'> = { enter: 'enter', gift: 'gift', guard: 'guard', danmu: 'danmu' };
+/** 按哪类事件预览：默认按素材平时的用途（礼物特效带礼物图、弹幕特效带弹幕内容），和欢迎语的标签联动 */
+const KIND_OPTIONS: Array<{ value: TriggerKind; label: string }> = [
+  { value: 'enter', label: '进场' },
+  { value: 'danmu', label: '弹幕' },
+  { value: 'gift', label: '礼物' },
+  { value: 'guard', label: '上舰' },
+];
+const pvKind = ref<TriggerKind>(usualKind(eff.value));
+txTab.value = pvKind.value;
+watch(txTab, (t) => (pvKind.value = t));
+watch(pvKind, (k) => {
+  txTab.value = k;
+  replay();
+});
+watch(who, () => replay());
 function replay(): void {
   if (!eff.value || !d.value) return;
-  void stage.value?.play(eff.value.id, sample.value, patch(), KIND_OF_TAB[txTab.value]).then(() => setTimeout(checkSafe, 300));
+  const k = pvKind.value;
+  // 上舰示例按示例观众的身份（普通观众按舰长）
+  const vars = k === 'guard' ? { ...PREVIEW_BY_KIND.guard.vars, guardLevel: (sample.value.guard || 3) as 1 | 2 | 3 } : PREVIEW_BY_KIND[k].vars;
+  void stage.value?.play(eff.value.id, sample.value, patch(), k, vars).then(() => setTimeout(checkSafe, 300));
 }
+/** 欢迎语示例：用示例观众把第一句填好（和特效页里显示的一样） */
+const textExample = computed(() => {
+  if (!d.value) return '';
+  const tpl = lines(d.value.texts[txTab.value])[0] ?? lines(d.value.texts.enter)[0] ?? '{name} 来了';
+  const v = sample.value;
+  const vars = PREVIEW_BY_KIND[txTab.value].vars ?? {};
+  const guard = txTab.value === 'guard' ? v.guard || 3 : v.guard;
+  const map: Record<string, string> = {
+    name: v.name,
+    guard: guard ? (['', '总督', '提督', '舰长'] as const)[guard] : '',
+    medal: v.medalLevel ? '星临' : '',
+    level: v.medalLevel ? String(v.medalLevel) : '',
+    honor: String(v.honor ?? 30),
+    text: vars.text ?? '',
+    gift: vars.gift ?? '',
+    count: vars.count !== undefined ? String(vars.count) : '',
+    value: vars.valueGold !== undefined ? `${vars.valueGold / 1000} 元` : '',
+    months: vars.months !== undefined ? String(vars.months) : '',
+    op: vars.op === 'renew' ? '续费' : vars.op ? '开通' : '',
+    act: vars.op === 'renew' ? '续费' : vars.op ? '上舰' : '',
+  };
+  return tpl.replace(/\{(\w+)\}/g, (m, k: string) => (k in map ? map[k]! : m)).replace(/ {2,}/g, ' ').trim();
+});
 let replayTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
   () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom, d.value.guardFrame, d.value.honorBadge, JSON.stringify(d.value.svgaMap)],
@@ -388,6 +455,10 @@ onBeforeUnmount(() => {
             <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :disabled="dirty" :title="dirty ? '先保存再发送到直播' : ''" @confirm="attempt(() => post('/api/playback/test', { effectId: eff!.id }), '已发送到直播画面')" />
           </div>
           <span v-if="a && !ro" class="hint" style="font-size: 12px; color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>
+          <div class="pv-opts">
+            <div class="pv-opt"><span>按</span><Seg v-model="pvKind" label="按哪类事件预览" :options="KIND_OPTIONS" /><span>预览</span></div>
+            <div class="pv-opt"><span>示例观众</span><Seg v-model="who" label="示例观众" :options="WHO_OPTIONS" /></div>
+          </div>
           <span class="hint" style="font-size: 12px; color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
         </div>
         <div class="ed-set" :class="{ readonly: ro }">
@@ -426,7 +497,7 @@ onBeforeUnmount(() => {
               <div v-if="a.warnings.includes('large')" class="warnbox">文件超过 10 MB，首次加载可能会慢一点，建议压缩。</div>
             </template>
             <div v-else class="filecard">
-              <span class="vt" :style="{ background: STYLES[eff.visual.type === 'builtin_style' ? eff.visual.style : 'line']?.grad }" />
+              <span class="vt" :style="{ background: STYLES[eff.visual.type === 'builtin_style' ? eff.visual.style : 'line']?.grad }"><img v-if="eff.visual.type === 'builtin_style'" :src="builtinThumb(eff.visual.style, true)" alt="" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit" /></span>
               <span><b>内置样式 · {{ STYLES[eff.visual.type === 'builtin_style' ? eff.visual.style : 'line']?.name }}</b><span>由特效页绘制，自带头像和欢迎语</span></span>
             </div>
           </div>
@@ -440,8 +511,8 @@ onBeforeUnmount(() => {
               <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
-              <div class="vars"><button v-for="v in VARS" :key="v" type="button" @click="insertVar(v)">{{ v }}</button></div>
-              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}、荣耀等级 {honor}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：月数 {months}、开通 / 续费 {op}、上舰 / 续费 {act}</span>
+              <div class="vars"><span class="vars-l">插入</span><button v-for="v in VARS_OF[txTab]" :key="v.key" type="button" :title="`插入 {${v.key}}`" @click="insertVar(`{${v.key}}`)">{{ v.label }}</button></div>
+              <div class="tx-ex"><span>效果</span>{{ textExample }}</div>
             </template>
           </div>
 

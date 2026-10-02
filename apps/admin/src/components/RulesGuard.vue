@@ -51,13 +51,13 @@ function preview(row: (typeof ROWS)[number], op: 'open' | 'renew'): void {
       <div v-for="row in ROWS" :key="row.key" class="rl" :class="{ off: !state.guard[row.key].enabled }">
         <span class="who"><IdTag :identity="row.key" /></span>
         <span v-if="!separate(row.key)" class="say">
-          有人<b>开通或续费{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" @change="(id) => setBoth(row, id)" />
+          有人<b>开通或续费{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" kind="guard" @change="(id) => setBoth(row, id)" />
           <button class="linkish sm" @click="split[row.key] = true">续费用别的特效</button>
           <span v-if="!state.guard[row.key].enabled" class="offnote">已关闭：{{ row.name }}上舰不播放特效</span>
         </span>
         <span v-else class="say">
-          有人<b>开通{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" @change="(id) => save(`开通${row.name}：${effectById(id)?.name}`)" />；
-          <b>续费</b>时，播放 <EffectPicker v-model="state.guard[row.key].renewEffectId" @change="(id) => save(`续费${row.name}：${effectById(id)?.name}`)" />
+          有人<b>开通{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" kind="guard" @change="(id) => save(`开通${row.name}：${effectById(id)?.name}`)" />；
+          <b>续费</b>时，播放 <EffectPicker v-model="state.guard[row.key].renewEffectId" kind="guard" @change="(id) => save(`续费${row.name}：${effectById(id)?.name}`)" />
           <button class="linkish sm" @click="merge(row)">改回同一个</button>
           <span v-if="!state.guard[row.key].enabled" class="offnote">已关闭：{{ row.name }}上舰不播放特效</span>
         </span>

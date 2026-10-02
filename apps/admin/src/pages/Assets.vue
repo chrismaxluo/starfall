@@ -6,7 +6,8 @@ import Icon from '../components/Icon.vue';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { route } from '../lib/route.ts';
-import { STYLES } from '../lib/identity.ts';
+import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
+import { builtinThumb, thumbOf } from '../lib/thumbs.ts';
 import { refreshEffects, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { AssetDto, EffectDto, SoundDto } from '../lib/types.ts';
@@ -89,12 +90,37 @@ function meta(e: EffectDto): string {
   const a = e.asset;
   return a ? `${a.ext.toUpperCase()}${a.width ? ` · ${a.width}×${a.height}` : ''} · ${seconds(a.durationMs)} · ${fileSize(a.size)}` : '文件已丢失';
 }
+// 卡片封面：视频取中间一帧（开头常是渐入、几乎全黑），SVGA / Lottie 渲染中间一帧
+const covers = reactive(new Map<number, string | null>());
+watch(
+  () => state.effects.map((e) => e.asset?.url ?? '').join(),
+  () => {
+    for (const e of state.effects) {
+      if (!e.asset || e.asset.kind === 'image' || covers.has(e.id)) continue;
+      covers.set(e.id, null);
+      void thumbOf(e).then((u) => covers.set(e.id, u));
+    }
+  },
+  { immediate: true },
+);
+/** 鼠标停在卡片上时从头播放，移开后回到中间那一帧 */
 function hoverVideo(ev: MouseEvent, play: boolean): void {
   const v = (ev.currentTarget as HTMLElement).querySelector('video');
   if (!v) return;
-  if (play) return void v.play().catch(() => undefined);
+  if (play) {
+    v.currentTime = 0;
+    return void v.play().catch(() => undefined);
+  }
   v.pause();
-  v.currentTime = 0;
+  if (Number.isFinite(v.duration)) v.currentTime = v.duration / 2;
+}
+const midFrame = (ev: Event) => {
+  const v = ev.target as HTMLVideoElement;
+  if (Number.isFinite(v.duration) && v.paused) v.currentTime = v.duration / 2;
+};
+/** 卡片右上角的 ▶：按它平时的用途预览 */
+function previewCard(e: EffectDto): void {
+  ui.preview = { effectId: e.id, label: e.usedBy.length ? `用于 ${e.usedBy.map((u) => u.label).join('、')}` : '还没有规则在用', ...PREVIEW_BY_KIND[usualKind(e)] };
 }
 
 // 音效试听
@@ -198,16 +224,14 @@ onBeforeUnmount(() => {
         <div v-for="e in mine" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)" @mouseenter="(ev) => hoverVideo(ev, true)" @mouseleave="(ev) => hoverVideo(ev, false)">
           <div class="ethumb" :class="{ alpha: e.asset?.hasAlpha }">
             <template v-if="e.asset">
-              <video v-if="e.asset.kind === 'video'" class="thumb-media" :src="e.asset.url" muted loop playsinline preload="metadata" />
+              <video v-if="e.asset.kind === 'video'" class="thumb-media" :src="e.asset.url" :poster="covers.get(e.id) ?? undefined" muted loop playsinline preload="metadata" @loadedmetadata="midFrame" />
               <img v-else-if="e.asset.kind === 'image'" class="thumb-media" :src="e.asset.url" alt="" loading="lazy" />
+              <img v-else-if="covers.get(e.id)" class="thumb-media" :src="covers.get(e.id)!" alt="" />
               <span v-else class="thumb-icon"><Icon name="i-spark" /></span>
               <div class="fmt"><span>{{ e.asset.ext.toUpperCase() }}</span><span v-if="!e.asset.hasAlpha" class="warn">无透明</span></div>
             </template>
-            <div v-else class="mpos pos-center">
-              <div class="mini" :class="`tpl-${e.visual.type === 'builtin_style' ? e.visual.style : 'line'}`" :style="{ '--edge': STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.edge }">
-                <span class="avatar" :style="{ background: STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.grad }">星</span><span><b>{{ e.name }}</b></span>
-              </div>
-            </div>
+            <img v-else-if="e.visual.type === 'builtin_style'" class="thumb-media cover" :src="builtinThumb(e.visual.style)" alt="" loading="lazy" />
+            <button type="button" class="card-play" :aria-label="`预览 ${e.name}`" title="预览" @click.stop="previewCard(e)"><svg><use href="#i-play" /></svg></button>
           </div>
           <div class="meta">
             <input v-if="renameKey === `e:${e.id}`" v-model="renameText" v-focus class="inp rn" maxlength="40" aria-label="新名字" @click.stop @keydown.enter.prevent="commitRename" @keydown.esc.prevent="renameKey = ''" @blur="commitRename" />
@@ -227,11 +251,8 @@ onBeforeUnmount(() => {
       <div class="ecards">
         <div v-for="e in builtin" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)">
           <div class="ethumb">
-            <div class="mpos pos-center">
-              <div class="mini" :class="`tpl-${e.visual.type === 'builtin_style' ? e.visual.style : 'line'}`" :style="{ '--edge': STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.edge }">
-                <span class="avatar" :style="{ background: STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.grad }">星</span><span><b>{{ e.name }}</b></span>
-              </div>
-            </div>
+            <img v-if="e.visual.type === 'builtin_style'" class="thumb-media cover" :src="builtinThumb(e.visual.style)" alt="" loading="lazy" />
+            <button type="button" class="card-play" :aria-label="`预览 ${e.name}`" title="预览" @click.stop="previewCard(e)"><svg><use href="#i-play" /></svg></button>
           </div>
           <div class="meta">
             <b>{{ e.name }}<em>内置</em></b><span>{{ meta(e) }}</span>

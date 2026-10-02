@@ -7,7 +7,7 @@ import { refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { attempt } from '../lib/toast.ts';
 import Avatar from './Avatar.vue';
 import ConfirmButton from './ConfirmButton.vue';
-import EffSwatch from './EffSwatch.vue';
+import EffThumb from './EffThumb.vue';
 import HonorMedal from './HonorMedal.vue';
 import IdTag from './IdTag.vue';
 
@@ -49,7 +49,7 @@ async function remove(): Promise<void> {
         <div class="field">
           <span class="flabel">选择素材 <span class="hint">TA 进场时会优先播放这个</span></span>
           <div class="qgrid">
-            <button v-for="e in state.effects" :key="e.id" type="button" :aria-pressed="e.id === sel" @click="sel = e.id"><EffSwatch :effect="e" /><span>{{ e.name }}</span></button>
+            <button v-for="e in state.effects" :key="e.id" type="button" :aria-pressed="e.id === sel" @click="sel = e.id"><EffThumb :effect="e" /><span>{{ e.name }}</span></button>
           </div>
         </div>
         <div class="field">

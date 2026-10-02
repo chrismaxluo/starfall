@@ -586,12 +586,13 @@ export class Pipeline {
   }
 
   /** 测试播放：把素材发到直播画面，不经过规则（界面上需要二次确认） */
-  test(effectId: number, viewer?: Partial<Viewer>): { id: string } {
+  /** 发到直播画面测试：effect 可以是还没保存的样子（素材设置里改了一半也能测）；kind / vars 和预览一样 */
+  test(effect: number | EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): { id: string } {
     if (this.d.settings.get('paused')) throw new HttpError(409, 'paused', '已暂停，恢复后才能测试');
     if (this.d.hub.overlayCount() === 0) throw new HttpError(409, 'no_overlay', '特效页不在线：请先把特效页地址加到直播软件的浏览器源里');
-    const effect = this.d.effects.get(effectId);
+    const e = typeof effect === 'number' ? this.d.effects.get(effect) : effect;
     const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
-    const item = this.playItem(effect, v, 'enter', {}, true);
+    const item = this.playItem(e, v, kind, kind === 'enter' && !vars ? {} : { ...SAMPLE_VARS[kind], ...vars }, true);
     // 正在播的也是测试：直接换成新的，不用等它播完（真实观众的特效不打断）
     if (this.current?.q.payload.item.test) this.stopCurrent();
     this.enqueue(item, null, true, '测试播放');

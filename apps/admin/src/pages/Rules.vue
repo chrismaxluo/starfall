@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 触发规则：四类事件（进场 / 弹幕 / 礼物 / 上舰）分开设置，每条规则写成一句话：谁、做了什么时，播放哪个特效
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { MEDAL_LEVEL_MAX } from '@starfall/shared';
 import Avatar from '../components/Avatar.vue';
 import CdPick from '../components/CdPick.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
@@ -22,8 +23,9 @@ import { SAMPLES, medalColors } from '../lib/identity.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { route } from '../lib/route.ts';
 import { effectById, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { EnterBase, ExclusiveDto, MedalBand, Tier, TierRule, Viewer } from '../lib/types.ts';
+import { pushEsc } from '../lib/esc.ts';
 
 type Ev = 'enter' | 'danmu' | 'gift' | 'guard';
 const EVS: Ev[] = ['enter', 'danmu', 'gift', 'guard'];
@@ -44,11 +46,12 @@ function bandLabel(i: number): string {
 }
 
 /** 保存档位、分档、冷却方式（每次修改立即保存） */
-async function save(msg: string): Promise<void> {
+async function save(msg: string, undo?: () => Promise<unknown>): Promise<void> {
   if (!rules.value) return;
   try {
     state.enter = await put<EnterBase>('/api/rules/enter', rules.value);
-    toast(msg);
+    if (undo) undoable(msg, undo);
+    else toast(msg);
     void refreshEffects();
   } catch (e) {
     toast(e instanceof Error ? e.message : String(e), 'err');
@@ -114,7 +117,7 @@ const TABS: Array<{ v: Ev; icon: string; name: string }> = [
 const levelBar = computed(() => {
   const asc = [...bands.value].reverse();
   return asc.map((b, i) => {
-    const to = asc[i + 1] ? asc[i + 1]!.fromLevel - 1 : 60;
+    const to = asc[i + 1] ? asc[i + 1]!.fromLevel - 1 : MEDAL_LEVEL_MAX;
     const last = !asc[i + 1];
     return { b, from: b.fromLevel, to, label: last ? `${b.fromLevel} 级以上` : to === b.fromLevel ? `${b.fromLevel} 级` : `${b.fromLevel} – ${to} 级`, color: medalColors(b.fromLevel).level };
   });
@@ -130,7 +133,7 @@ const addMsg = ref<{ text: string; err: boolean }>({ text: '分出来的新一�
 function addBand(): void {
   const v = Number(addLevel.value);
   if (!rules.value) return;
-  if (!(v >= 2 && v <= 60) || !Number.isInteger(v)) return void (addMsg.value = { text: '请输入 2 – 60 之间的等级', err: true });
+  if (!(v >= 2 && v <= MEDAL_LEVEL_MAX) || !Number.isInteger(v)) return void (addMsg.value = { text: `请输入 2 – ${MEDAL_LEVEL_MAX} 之间的等级`, err: true });
   if (rules.value.bands.some((b) => b.fromLevel === v)) return void (addMsg.value = { text: `已经在 ${v} 级处分过段了`, err: true });
   const parent = bands.value.find((b) => b.fromLevel < v) ?? bands.value[bands.value.length - 1]!;
   rules.value.bands.push({ fromLevel: v, effectId: parent.effectId, cooldownMin: parent.cooldownMin, enabled: parent.enabled });
@@ -142,8 +145,13 @@ function addBand(): void {
 function removeBand(b: MedalBand, i: number): void {
   if (!rules.value || rules.value.bands.length <= 1) return;
   const label = bandLabel(i);
+  const before = rules.value.bands.map((x) => ({ ...x }));
   rules.value.bands = rules.value.bands.filter((x) => x.fromLevel !== b.fromLevel);
-  void save(`已删除 ${label}这一段，这些等级并入相邻的一段`);
+  void save(`已删除 ${label}这一段，这些等级并入相邻的一段`, async () => {
+    if (!rules.value) return;
+    rules.value.bands = before;
+    await save(`已恢复 ${label}这一段`);
+  });
 }
 
 // ---------- 专属用户 ----------
@@ -215,13 +223,27 @@ async function updateEx(x: ExclusiveDto, patch: Partial<ExclusiveDto>, msg: stri
   void refreshEffects();
 }
 async function removeEx(x: ExclusiveDto): Promise<void> {
-  if (await attempt(() => del(`/api/rules/exclusive/${x.uid}`), `已移除：${x.name ?? x.uid}，之后按身份档位播放`)) {
+  if (await attempt(() => del(`/api/rules/exclusive/${x.uid}`))) {
     state.exclusives = state.exclusives.filter((y) => y.uid !== x.uid);
     void refreshEffects();
+    undoable(`已移除：${x.name ?? x.uid}，之后按身份的规则播放`, async () => {
+      await post('/api/rules/exclusive', { uid: x.uid, effectId: x.effectId, cooldownMin: x.cooldownMin, until: x.until, enabled: x.enabled });
+      await refreshRules();
+      void refreshEffects();
+      toast(`已恢复 ${x.name ?? x.uid} 的专属特效`);
+    });
   }
 }
 // 有效期
 const datePop = ref<{ x: ExclusiveDto; left: number; top: number; value: string } | null>(null);
+let offDateEsc: (() => void) | null = null;
+watch(
+  () => datePop.value !== null,
+  (on) => {
+    offDateEsc?.();
+    offDateEsc = on ? pushEsc(() => (datePop.value = null)) : null;
+  },
+);
 function openDate(e: MouseEvent, x: ExclusiveDto): void {
   const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
   datePop.value = { x, left: Math.min(r.left, innerWidth - 272), top: Math.min(r.bottom + 6, innerHeight - 190), value: x.until ?? '' };
@@ -347,7 +369,7 @@ onMounted(() => void refreshRules());
                 </td>
                 <td><Switch v-model="x.enabled" :label="`启用 ${x.name ?? x.uid}`" @change="(v) => updateEx(x, { enabled: v }, v ? '已启用' : '已停用，TA 会按身份档位播放')" /></td>
                 <td style="white-space: nowrap">
-                  <button class="playmini" aria-label="预览" @click="preview(x.effectId, { name: x.name ?? '专属观众', guard: 0, isMod: false, medalLevel: null }, x.name ?? String(x.uid))"><svg><use href="#i-play" /></svg></button>
+                  <button class="playmini" aria-label="预览" title="预览" @click="preview(x.effectId, { name: x.name ?? '专属观众', guard: 0, isMod: false, medalLevel: null }, x.name ?? String(x.uid))"><svg><use href="#i-play" /></svg></button>
                   <ConfirmButton label="" confirm-label="确认移除" cls="moreb" :aria-label="`移除 ${x.name ?? x.uid}`" @confirm="removeEx(x)"><Icon name="i-x" /></ConfirmButton>
                 </td>
               </tr>
@@ -368,7 +390,7 @@ onMounted(() => void refreshRules());
             <span v-if="!rules.tiers[g.tier].enabled" class="offnote">{{ TIER_OFF.guard }}</span>
           </span>
           <span class="acts">
-            <button class="playmini" :aria-label="`预览${g.cond}进场`" @click="preview(rules.tiers[g.tier].effectId, tierSample(g.tier), `${g.cond}进场`)"><svg><use href="#i-play" /></svg></button>
+            <button class="playmini" :aria-label="`预览${g.cond}进场`" :title="`预览${g.cond}进场`" @click="preview(rules.tiers[g.tier].effectId, tierSample(g.tier), `${g.cond}进场`)"><svg><use href="#i-play" /></svg></button>
             <Switch v-model="rules.tiers[g.tier].enabled" :label="`${g.cond}进场特效`" @change="(v) => save(v ? `已打开${g.cond}进场特效` : `已关闭${g.cond}进场特效，TA 们会按房管、粉丝牌或其他观众处理`)" />
           </span>
         </div>
@@ -384,7 +406,7 @@ onMounted(() => void refreshRules());
             <span v-if="!rules.tiers.mod.enabled" class="offnote">{{ TIER_OFF.mod }}</span>
           </span>
           <span class="acts">
-            <button class="playmini" aria-label="预览房管进场" @click="preview(rules.tiers.mod.effectId, SAMPLES.mod, '房管进场')"><svg><use href="#i-play" /></svg></button>
+            <button class="playmini" aria-label="预览房管进场" title="预览房管进场" @click="preview(rules.tiers.mod.effectId, SAMPLES.mod, '房管进场')"><svg><use href="#i-play" /></svg></button>
             <Switch v-model="rules.tiers.mod.enabled" label="房管进场特效" @change="(v) => save(v ? '已打开房管进场特效' : '已关闭房管进场特效')" />
           </span>
         </div>
@@ -397,9 +419,9 @@ onMounted(() => void refreshRules());
             <span>{{ x.label }} · {{ x.b.enabled ? (effectById(x.b.effectId)?.name ?? '未选择') : '已关闭' }}</span>
           </button>
         </div>
-        <div class="lvticks"><span v-for="x in levelBar" :key="x.from" :style="{ left: `${((x.from - 1) / 59) * 100}%` }">{{ x.from }}</span><span style="left: 100%">60</span></div>
+        <div class="lvticks"><span v-for="x in levelBar" :key="x.from" :style="{ left: `${((x.from - 1) / (MEDAL_LEVEL_MAX - 1)) * 100}%` }">{{ x.from }}</span><span style="left: 100%">{{ MEDAL_LEVEL_MAX }}</span></div>
         <div class="lvadd">
-          <Icon name="i-plus" />在 <input v-model.number="addLevel" class="inp num" type="number" min="2" max="60" placeholder="31" aria-label="从几级开始分一段" @keydown.enter="addBand" /> 级处再分一段
+          <Icon name="i-plus" />在 <input v-model.number="addLevel" class="inp num" type="number" min="2" :max="MEDAL_LEVEL_MAX" placeholder="31" aria-label="从几级开始分一段" @keydown.enter="addBand" /> 级处再分一段
           <button class="btn" @click="addBand">分段</button>
           <span class="hint" :style="{ color: addMsg.err ? '#D64545' : '' }">{{ addMsg.text }}</span>
         </div>
@@ -413,8 +435,8 @@ onMounted(() => void refreshRules());
             <span v-if="!b.enabled" class="offnote">已关闭：这些观众按其他观众处理</span>
           </span>
           <span class="acts">
+            <button class="playmini" :aria-label="`预览粉丝牌 ${bandLabel(i)}进场`" :title="`预览粉丝牌 ${bandLabel(i)}进场`" @click="preview(b.effectId, { ...SAMPLES.fan, medalLevel: b.fromLevel }, `粉丝牌 ${bandLabel(i)}进场`)"><svg><use href="#i-play" /></svg></button>
             <ConfirmButton v-if="bands.length > 1" label="删除" confirm-label="确认删除" cls="playmini" :aria-label="`删除粉丝牌 ${bandLabel(i)}这一段`" title="删除这一段（并入相邻的一段），再点一次确认" @confirm="removeBand(b, i)"><Icon name="i-x" /></ConfirmButton>
-            <button class="playmini" :aria-label="`预览粉丝牌 ${bandLabel(i)}进场`" @click="preview(b.effectId, { ...SAMPLES.fan, medalLevel: b.fromLevel }, `粉丝牌 ${bandLabel(i)}进场`)"><svg><use href="#i-play" /></svg></button>
             <Switch v-model="b.enabled" :label="`粉丝牌 ${bandLabel(i)}进场特效`" @change="(v) => save(v ? `已打开粉丝牌 ${bandLabel(i)}` : `已关闭粉丝牌 ${bandLabel(i)}，这些观众按其他观众处理`)" />
           </span>
         </div>
@@ -430,7 +452,7 @@ onMounted(() => void refreshRules());
             <span v-if="!rules.tiers.nor.enabled" class="offnote">{{ TIER_OFF.nor }}</span>
           </span>
           <span class="acts">
-            <button class="playmini" aria-label="预览其他观众进场" @click="preview(rules.tiers.nor.effectId, SAMPLES.nor, '其他观众进场')"><svg><use href="#i-play" /></svg></button>
+            <button class="playmini" aria-label="预览其他观众进场" title="预览其他观众进场" @click="preview(rules.tiers.nor.effectId, SAMPLES.nor, '其他观众进场')"><svg><use href="#i-play" /></svg></button>
             <Switch v-model="rules.tiers.nor.enabled" label="其他观众进场特效" @change="(v) => save(v ? '已打开其他观众进场特效' : '已关闭其他观众进场特效')" />
           </span>
         </div>

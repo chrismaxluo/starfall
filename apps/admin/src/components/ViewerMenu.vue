@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // 观众菜单：设置专属、复制 UID、加入黑名单（总览实时动态、事件记录）
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { post } from '../lib/api.ts';
+import { del, post } from '../lib/api.ts';
 import { state, ui } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { Viewer } from '../lib/types.ts';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
@@ -48,7 +48,12 @@ async function copy(): Promise<void> {
 }
 async function block(): Promise<void> {
   emit('close');
-  await attempt(() => post('/api/blacklist', { uid: props.viewer.uid, name: props.viewer.name }), `已把 ${props.viewer.name} 加入黑名单，TA 不会再触发特效`);
+  const v = props.viewer;
+  if (!(await attempt(() => post('/api/blacklist', { uid: v.uid, name: v.name })))) return;
+  undoable(`已把 ${v.name} 加入黑名单，TA 不会再触发特效`, async () => {
+    await del(`/api/blacklist/${v.uid}`);
+    toast(`已把 ${v.name} 移出黑名单`);
+  });
 }
 </script>
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import type { DanmuRule, DanmuWho, GiftEvent, GiftRules, GuardEvent, GuardRules } from '@starfall/shared';
 import { GiftComboMerger, GuardDeduper } from './combo.ts';
-import { keywordClashes, matchDanmu, whoNamed, whoOk } from './danmu.ts';
+import { keywordClashes, matchDanmu, shadowedKeywords, whoNamed, whoOk } from './danmu.ts';
 import { giftBandLabel, matchGift, sortedGiftBands, yuanText } from './gift.ts';
 import { matchGuard } from './guard.ts';
 import { ANCHOR, medal, viewer } from './testing.ts';
@@ -15,6 +15,9 @@ describe('弹幕匹配', () => {
     expect(matchDanmu('上船', viewer(), [rule({ keywords: ['上船'], mode: 'exact' })], ANCHOR)).not.toBeNull();
     expect(matchDanmu(' 上船 ', viewer(), [rule({ keywords: ['上船'], mode: 'exact' })], ANCHOR)).not.toBeNull();
     expect(matchDanmu('我要上船', viewer(), [rule({ keywords: ['上船'], mode: 'exact' })], ANCHOR)).toBeNull();
+    // 英文不分大小写、全角半角一样
+    expect(matchDanmu('AWSL！', viewer(), [rule({ keywords: ['awsl'] })], ANCHOR)).not.toBeNull();
+    expect(matchDanmu('ａｗｓｌ', viewer(), [rule({ keywords: ['AWSL'], mode: 'exact' })], ANCHOR)).not.toBeNull();
   });
 
   it('从上到下，命中第一条即停；停用和没选素材的跳过', () => {
@@ -186,5 +189,17 @@ describe('上舰去重', () => {
     expect(d.push(guardEv({ op: 'renew', dedupeKey: 'late-pay', id: 'v1' }), 4600)).toHaveLength(0);
     // 之后真正的另一次购买照常输出
     expect(d.push(guardEv({ dedupeKey: 'pay-2' }), 20_000)).toHaveLength(1);
+  });
+});
+
+describe('被前面的规则抢先的关键词', () => {
+  it('前面「包含」规则的词在这个词里面：这个词轮不到', () => {
+    const rules = [rule({ id: 1, keywords: ['晚安'] }), rule({ id: 2, keywords: ['晚安啦', '早安'] }), rule({ id: 3, keywords: ['晚安'], mode: 'exact' })];
+    expect(shadowedKeywords(rules)).toEqual({ 1: [{ word: '晚安啦', by: 0, byWord: '晚安' }], 2: [{ word: '晚安', by: 0, byWord: '晚安' }] });
+  });
+  it('前面的规则关着、或者是「整条就是」时不算抢先（除非后面也是整条一样的词）', () => {
+    expect(shadowedKeywords([rule({ keywords: ['晚安'], enabled: false }), rule({ keywords: ['晚安啦'] })])).toEqual({});
+    expect(shadowedKeywords([rule({ keywords: ['晚安'], mode: 'exact' }), rule({ keywords: ['晚安啦'] })])).toEqual({});
+    expect(shadowedKeywords([rule({ keywords: ['AWSL'], mode: 'exact' }), rule({ keywords: ['awsl'], mode: 'exact' })])).toEqual({ 1: [{ word: 'awsl', by: 0, byWord: 'AWSL' }] });
   });
 });

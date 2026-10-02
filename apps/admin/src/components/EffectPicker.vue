@@ -5,9 +5,11 @@ import { upload } from '../lib/api.ts';
 import { PREVIEW_BY_KIND } from '../lib/preview.ts';
 import { effectById, refreshEffects, state, ui } from '../lib/store.ts';
 import { toast } from '../lib/toast.ts';
+import { checkFile } from '../lib/upload-check.ts';
 import type { AssetDto, EffectDto, TriggerKind } from '../lib/types.ts';
 import EffThumb from './EffThumb.vue';
 import Icon from './Icon.vue';
+import { pushEsc } from '../lib/esc.ts';
 
 /** kind：这个选择框用在哪类事件上（预览时按它播放：礼物带礼物图、弹幕带弹幕内容） */
 const props = withDefaults(defineProps<{ kind?: TriggerKind }>(), { kind: 'enter' });
@@ -46,7 +48,10 @@ watch(
   },
 );
 
+let offEsc: (() => void) | null = null;
 function close(): void {
+  offEsc?.();
+  offEsc = null;
   open.value = false;
   removeEventListener('mousedown', outside, true);
   removeEventListener('scroll', onScroll, true);
@@ -66,6 +71,7 @@ async function toggle(): Promise<void> {
   const h = pop.value?.offsetHeight ?? 300;
   pos.value = { left: Math.max(8, Math.min(r.left, innerWidth - 392)), top: r.bottom + 6 + h > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6 };
   addEventListener('mousedown', outside, true);
+  offEsc ??= pushEsc(close);
   addEventListener('scroll', onScroll, true);
 }
 function pick(e: EffectDto): void {
@@ -79,6 +85,8 @@ async function onFile(): Promise<void> {
   if (file.value) file.value.value = '';
   if (!f) return;
   close();
+  const bad = checkFile(f, 'anim');
+  if (bad) return toast(bad, 'err', 6000);
   try {
     toast(`正在上传 ${f.name}…`, 'info');
     const r = await upload<{ asset: AssetDto; effect: EffectDto | null }>('/api/assets', f);

@@ -14,6 +14,7 @@ import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
 import PreviewStage from './PreviewStage.vue';
 import QrBox from './QrBox.vue';
+import { useEsc } from '../lib/esc.ts';
 
 const emit = defineEmits<{ close: [] }>();
 const N = 4;
@@ -111,6 +112,8 @@ async function finish(skip: boolean): Promise<void> {
   }
   toast(skip ? '随时可以在「设置」里重新打开新手引导' : '设置完成，开播时特效会自动播放', skip ? 'info' : 'ok');
 }
+// 按 Esc 关闭
+useEsc(() => void finish(true));
 </script>
 
 <template>

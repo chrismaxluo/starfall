@@ -10,6 +10,7 @@ import ConfirmButton from './ConfirmButton.vue';
 import EffThumb from './EffThumb.vue';
 import HonorMedal from './HonorMedal.vue';
 import IdTag from './IdTag.vue';
+import { useEsc } from '../lib/esc.ts';
 
 const emit = defineEmits<{ close: [] }>();
 const q = ui.quick!;
@@ -34,6 +35,8 @@ async function remove(): Promise<void> {
   await refreshRules();
   emit('close');
 }
+// 按 Esc 关闭
+useEsc(() => emit('close'));
 </script>
 
 <template>

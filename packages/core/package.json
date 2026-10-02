@@ -6,10 +6,13 @@
   "license": "GPL-3.0-only",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./danmu": "./src/danmu.ts"
   },
   "scripts": {
     "typecheck": "tsc -p ."
   },
-  "dependencies": { "@starfall/shared": "workspace:*" }
+  "dependencies": {
+    "@starfall/shared": "workspace:*"
+  }
 }

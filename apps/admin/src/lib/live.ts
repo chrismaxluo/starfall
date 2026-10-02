@@ -2,7 +2,7 @@
 import { setTimeZone } from './format.ts';
 import { CHAT_MAX_LIMIT, OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
 import type { ChatItem } from '@starfall/shared/overlay';
-import { FEED_KEEP, refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
+import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
@@ -102,7 +102,7 @@ function handle(m: Msg): void {
       break;
     case 'overlays':
       state.overlays = m.overlays;
-      if (state.status) state.status.overlays = m.overlays.filter((x) => x.role !== 'chat').length;
+      if (state.status) state.status.overlays = m.overlays.filter(isFxLive).length;
       break;
     case 'chat':
       state.chat = [...state.chat, m.item].slice(-CHAT_MAX_LIMIT);

@@ -79,7 +79,7 @@ function onTierEffect(t: Tier, r: TierRule, label: string): void {
   void save(`${label}进场改为播放「${effectById(r.effectId)?.name ?? ''}」`);
 }
 /** 冷却改了之后的提示 */
-const cdMsg = (label: string, v: number) => (v === 0 ? `${label}：每次进场都播放` : `${label}：同一个人 ${v >= 60 && v % 60 === 0 ? `${v / 60} 小时` : `${v} 分钟`}内不重复`);
+const cdMsg = (label: string, v: number) => (v === 0 ? `${label}：每次进场都播放` : `${label}：同一个人 ${v >= 60 && v % 60 === 0 ? `${v / 60} 小时` : `${v} 分钟`}内只播一次`);
 const TIER_OFF: Record<string, string> = {
   guard: '已关闭：TA 们会按房管、粉丝牌或其他观众处理',
   mod: '已关闭：房管会按粉丝牌或其他观众处理',
@@ -292,7 +292,7 @@ onMounted(() => void refreshRules());
       <div class="rl-bar">
         <Icon name="i-bolt" /><span>不重复播放的方式</span>
         <Seg :model-value="rules.cooldownMode" label="不重复播放的方式" :options="[{ value: 'minutes', label: '按时间' }, { value: 'oncePerLive', label: '每场直播只播一次' }]" @change="setMode" />
-        <span class="hint">{{ once ? '同一个人这一场直播里只播一次，下一场重新算' : '每条规则可以单独设置多久内不重复' }}</span>
+        <span class="hint">{{ once ? '同一个人这一场直播里只播一次，下一场重新算' : '每条规则可以单独设置多久内只播一次' }}</span>
       </div>
 
       <div class="rl-sec"><h3>专属用户</h3><span>给某几位观众单独指定特效，永远最先用；只对进场有效</span></div>
@@ -335,7 +335,7 @@ onMounted(() => void refreshRules());
         </div>
         <div class="table-wrap">
           <table class="extable">
-            <thead><tr><th>观众</th><th>身份</th><th>专属特效</th><th>多久内不重复</th><th>有效期</th><th>开关</th><th /></tr></thead>
+            <thead><tr><th>观众</th><th>身份</th><th>专属特效</th><th>多久内只播一次</th><th>有效期</th><th>开关</th><th /></tr></thead>
             <tbody>
               <tr v-for="x in exList" :key="x.uid" :style="flashUid === x.uid ? 'outline: 2px solid var(--accent-ring)' : ''">
                 <td><span class="who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" :guard="x.guard" /><span><div>{{ x.name ?? '（昵称未知）' }}</div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">UID {{ x.uid }}</div></span></span></td>
@@ -364,7 +364,7 @@ onMounted(() => void refreshRules());
           <span class="who"><IdTag :identity="g.tier" /></span>
           <span class="say">
             <b>{{ g.cond }}</b>进场时，播放 <EffectPicker v-model="rules.tiers[g.tier].effectId" @change="onTierEffect(g.tier, rules.tiers[g.tier], g.cond)" />
-            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers[g.tier].cooldownMin" @change="(v) => save(cdMsg(g.cond, v))" /> 内不重复</template>
+            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers[g.tier].cooldownMin" after="内只播一次" @change="(v) => save(cdMsg(g.cond, v))" /></template>
             <span v-if="!rules.tiers[g.tier].enabled" class="offnote">{{ TIER_OFF.guard }}</span>
           </span>
           <span class="acts">
@@ -380,7 +380,7 @@ onMounted(() => void refreshRules());
           <span class="who"><IdTag identity="mod" /></span>
           <span class="say">
             <b>房管</b>进场时，播放 <EffectPicker v-model="rules.tiers.mod.effectId" @change="onTierEffect('mod', rules.tiers.mod, '房管')" />
-            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers.mod.cooldownMin" @change="(v) => save(cdMsg('房管', v))" /> 内不重复</template>
+            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers.mod.cooldownMin" after="内只播一次" @change="(v) => save(cdMsg('房管', v))" /></template>
             <span v-if="!rules.tiers.mod.enabled" class="offnote">{{ TIER_OFF.mod }}</span>
           </span>
           <span class="acts">
@@ -409,7 +409,7 @@ onMounted(() => void refreshRules());
           <span class="who"><Medal :level="b.fromLevel" /></span>
           <span class="say">
             粉丝牌 <b>{{ bandLabel(i) }}</b> 进场时，播放 <EffectPicker v-model="b.effectId" @change="(flash(`band${b.fromLevel}`), save(`粉丝牌 ${bandLabel(i)}改为播放「${effectById(b.effectId)?.name ?? ''}」`))" />
-            <template v-if="!once">，同一个人 <CdPick v-model="b.cooldownMin" @change="(v) => save(cdMsg(`粉丝牌 ${bandLabel(i)}`, v))" /> 内不重复</template>
+            <template v-if="!once">，同一个人 <CdPick v-model="b.cooldownMin" after="内只播一次" @change="(v) => save(cdMsg(`粉丝牌 ${bandLabel(i)}`, v))" /></template>
             <span v-if="!b.enabled" class="offnote">已关闭：这些观众按其他观众处理</span>
           </span>
           <span class="acts">
@@ -426,7 +426,7 @@ onMounted(() => void refreshRules());
           <span class="who"><IdTag identity="nor" /></span>
           <span class="say">
             <b>其他观众</b>进场时，播放 <EffectPicker v-model="rules.tiers.nor.effectId" @change="onTierEffect('nor', rules.tiers.nor, '其他观众')" />
-            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers.nor.cooldownMin" @change="(v) => save(cdMsg('其他观众', v))" /> 内不重复</template>
+            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers.nor.cooldownMin" after="内只播一次" @change="(v) => save(cdMsg('其他观众', v))" /></template>
             <span v-if="!rules.tiers.nor.enabled" class="offnote">{{ TIER_OFF.nor }}</span>
           </span>
           <span class="acts">

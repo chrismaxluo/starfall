@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 弹幕规则（F-DM-01 ~ 04）：关键词、匹配方式、发送人条件、素材、全局 / 每人冷却；从上到下匹配，可调整顺序
+// 弹幕规则（F-DM-01 ~ 04）：关键词、匹配方式、发送人条件、素材、所有人 / 每人多久内只播一次；从上到下匹配，可调整顺序
 import { computed, nextTick, ref } from 'vue';
 import { DANMU_WHO_ALL } from '@starfall/shared';
 import { del, post, put } from '../lib/api.ts';
@@ -35,17 +35,32 @@ const TEMPLATES = [
 ];
 const unusedTemplates = computed(() => TEMPLATES.filter((t) => !state.danmu.some((r) => r.keywords.includes(t.keywords[0]!))));
 const defaultEffect = () => state.effects.find((e) => e.name === '晶语')?.id ?? state.effects[0]?.id ?? null;
-async function add(keywords: string[] = ['关键词']): Promise<void> {
+/** 一条规则最多几个关键词（和服务端一致） */
+const KEYWORD_MAX = 20;
+/** 一次输入或粘贴多个词：逗号、顿号、分号、空格都当分隔 */
+const splitWords = (v: string) => [...new Set(v.split(/[,，、;；\s]+/).map((x) => x.trim().slice(0, 30)).filter(Boolean))];
+async function add(keywords: string[]): Promise<boolean> {
   const r = await attempt(() => post<DanmuRuleDto>('/api/rules/danmu', { keywords, mode: 'contains', who: DANMU_WHO_ALL, effectId: defaultEffect(), globalCdSec: 10, userCdMin: 10, enabled: true }));
-  if (!r) return;
+  if (!r) return false;
   state.danmu.push(r);
   flash.value = r.id;
   void refreshEffects();
-  if (keywords[0] !== '关键词') return toast(`已添加：弹幕里有「${keywords.join('」或「')}」时播放`, 'ok');
-  toast('已添加弹幕规则，先把「关键词」换成你想要的词', 'info');
+  toast(`已添加：弹幕里有「${keywords.join('」或「')}」时播放`, 'ok');
+  return true;
+}
+// 新建规则先是一张草稿卡：填了关键词才真正保存，免得没填完的规则在直播里起作用
+const draft = ref(false);
+const draftIn = ref<HTMLInputElement | null>(null);
+async function startDraft(): Promise<void> {
+  draft.value = true;
   await nextTick();
-  const inputs = list.value?.querySelectorAll<HTMLInputElement>('.kwin');
-  inputs?.[inputs.length - 1]?.focus();
+  draftIn.value?.focus();
+}
+async function saveDraft(): Promise<void> {
+  const words = splitWords(draftIn.value?.value ?? '');
+  if (!words.length) return toast('先填一个关键词，例如「晚安」', 'info');
+  if (words.length > KEYWORD_MAX) return toast(`一条规则最多 ${KEYWORD_MAX} 个关键词`, 'info');
+  if (await add(words)) draft.value = false;
 }
 async function remove(r: DanmuRuleDto): Promise<void> {
   if (await attempt(() => del(`/api/rules/danmu/${r.id}`), '已删除弹幕规则')) {
@@ -59,18 +74,27 @@ async function move(i: number, d: -1 | 1): Promise<void> {
   const res = await attempt(() => put<{ rules: DanmuRuleDto[] }>('/api/rules/danmu/order', { ids }));
   if (res) state.danmu = res.rules;
 }
-/** 添加关键词；同一关键词在别的规则里也有时提示（F-DM-04） */
-async function addKeyword(r: DanmuRuleDto, e: KeyboardEvent): Promise<void> {
+/** 添加关键词（回车或点别处都算）；同一关键词在别的规则里也有时提示（F-DM-04） */
+async function addKeyword(r: DanmuRuleDto, e: Event): Promise<void> {
   const el = e.target as HTMLInputElement;
-  const v = el.value.trim();
-  if (!v) return;
+  const words = splitWords(el.value);
+  if (!words.length) return;
   el.value = '';
-  // 新规则的占位词"关键词"在输入第一个真正的词时替换掉
+  // 旧版本新建规则时的占位词"关键词"，在输入第一个真正的词时替换掉
   const base = r.keywords.length === 1 && r.keywords[0] === '关键词' ? [] : r.keywords;
-  if (base.includes(v)) return;
-  await patch(r, { keywords: [...base, v] });
-  const other = state.danmu.findIndex((x) => x.id !== r.id && x.keywords.includes(v));
-  if (other >= 0) toast(`「${v}」也在第 ${other + 1} 条规则里，排在前面的那条优先`, 'info', 4000);
+  const fresh = words.filter((w) => !base.includes(w));
+  if (!fresh.length) return;
+  if (base.length + fresh.length > KEYWORD_MAX) {
+    el.value = fresh.join('，');
+    return toast(`一条规则最多 ${KEYWORD_MAX} 个关键词，可以再新建一条规则`, 'info');
+  }
+  await patch(r, { keywords: [...base, ...fresh] }, `已添加关键词「${fresh.join('」「')}」`);
+  const dup = fresh.find((w) => state.danmu.some((x) => x.id !== r.id && x.keywords.includes(w)));
+  if (dup) {
+    const other = state.danmu.findIndex((x) => x.id !== r.id && x.keywords.includes(dup));
+    toast(`「${dup}」也在第 ${other + 1} 条规则里，排在前面的那条优先`, 'info', 4000);
+  }
+  if (e.type !== 'keydown') return;
   await nextTick();
   (list.value?.querySelectorAll<HTMLInputElement>('.kwin')[state.danmu.indexOf(r)])?.focus();
 }
@@ -79,7 +103,7 @@ function removeKeyword(r: DanmuRuleDto, k: string): void {
   void patch(r, { keywords: r.keywords.filter((x) => x !== k) });
 }
 function setCd(r: DanmuRuleDto, key: 'globalCdSec' | 'userCdMin', v: number): void {
-  void patch(r, { [key]: v }, key === 'globalCdSec' ? (v ? `全场 ${v} 秒内不重复` : '全场不限次数') : v ? `同一个人 ${v} 分钟内不重复` : '同一个人不限次数');
+  void patch(r, { [key]: v }, key === 'globalCdSec' ? (v ? `所有人合计 ${v} 秒内只播一次` : '所有人合计：每次都播') : v ? `同一个人 ${v} 分钟内只播一次` : '同一个人：每次都播');
 }
 function preview(r: DanmuRuleDto): void {
   emit('preview', { effectId: r.effectId, viewer: sampleFor(r.who), label: `弹幕「${r.keywords[0]}」`, kind: 'danmu', vars: { text: r.keywords[0] } });
@@ -102,11 +126,11 @@ const clashes = computed(() => {
 
 <template>
   <div>
-    <div class="rl-flow"><span>弹幕里有关键词就播放。多条规则都符合时，用排在最上面的一条，可以用箭头调整顺序。</span></div>
-    <div class="rl-sec"><h3>关键词</h3><span v-if="state.danmu.length">{{ state.danmu.length }} 条</span><span class="r"><button class="btn primary" @click="add()"><Icon name="i-plus" />新建弹幕规则</button></span></div>
+    <div class="rl-flow"><span>弹幕里有关键词就播放。多条规则都符合时，用编号最小（排在最上面）的一条，可以用箭头调整顺序。</span></div>
+    <div class="rl-sec"><h3>关键词</h3><span v-if="state.danmu.length">{{ state.danmu.length }} 条</span><span class="r"><button class="btn primary" :disabled="draft" @click="startDraft"><Icon name="i-plus" />新建弹幕规则</button></span></div>
     <div ref="list" class="rl-list">
       <div v-for="(r, i) in state.danmu" :key="r.id" class="rl" :class="{ off: !r.enabled, flash: flash === r.id }">
-        <span class="who"><span class="tag dm">弹幕</span></span>
+        <span class="who"><span class="rl-no" :title="i === 0 ? '排在最上面，最先匹配' : `第 ${i + 1} 条：上面的规则都没对上时才看这条`">#{{ i + 1 }}</span></span>
         <span class="say">
           弹幕
           <select class="sel sm" :value="r.mode" aria-label="匹配方式" @change="(e) => patch(r, { mode: (e.target as HTMLSelectElement).value as DanmuRule['mode'] }, '已修改匹配方式')">
@@ -116,12 +140,12 @@ const clashes = computed(() => {
             <span v-for="(k, ki) in r.keywords" :key="k" class="kwwrap"><i v-if="ki" class="or">或</i><span class="kw" :title="clashes.has(k) ? '这个关键词也在别的规则里，排在前面的优先' : ''" :style="clashes.has(k) ? 'box-shadow: inset 0 0 0 1px var(--gov)' : ''">
               {{ k }}<button :aria-label="`删除关键词 ${k}`" @click="removeKeyword(r, k)"><Icon name="i-x" style="width: 11px; height: 11px" /></button>
             </span></span>
-            <input class="kwin" placeholder="+ 关键词，回车" aria-label="添加关键词" maxlength="30" @keydown.enter.prevent="(e) => addKeyword(r, e)" />
+            <input class="kwin" placeholder="+ 加关键词" title="输入后按回车或点别处就会添加；多个词用逗号或空格隔开" aria-label="添加关键词" maxlength="200" @keydown.enter.prevent="(e) => addKeyword(r, e)" @blur="(e) => addKeyword(r, e)" />
           </span>
           时，播放 <EffectPicker v-model="r.effectId" @change="(id) => ((flash = r.id), patch(r, { effectId: id }, `改为播放「${effectById(id)?.name}」`))" />
           <span class="line2">
             <WhoPick :model-value="r.who" :people="r.people" :block-anchor="state.settings?.blockAnchor" @change="(w) => setWho(r, w)" />
-            发的才算；全场 <CdPick :model-value="r.globalCdSec" unit="sec" hint="不管谁发，这段时间里只播一次" @change="(v) => setCd(r, 'globalCdSec', v)" /> 内、同一个人 <CdPick :model-value="r.userCdMin" hint="同一个人这段时间里再发，不重复播放" @change="(v) => setCd(r, 'userCdMin', v)" /> 内不重复
+            发的才算；所有人合计 <CdPick :model-value="r.globalCdSec" unit="sec" hint="不管谁发，这段时间里只播一次" after="内只播一次" @change="(v) => setCd(r, 'globalCdSec', v)" />，同一个人 <CdPick :model-value="r.userCdMin" hint="同一个人这段时间里再发，不重复播放" after="内只播一次" @change="(v) => setCd(r, 'userCdMin', v)" />
           </span>
           <span v-if="!r.enabled" class="offnote">已关闭：这条规则不起作用</span>
         </span>
@@ -133,14 +157,24 @@ const clashes = computed(() => {
           <Switch v-model="r.enabled" :label="`弹幕规则 ${i + 1}`" @change="(v) => patch(r, { enabled: v }, v ? '已打开这条弹幕规则' : '已关闭这条弹幕规则')" />
         </span>
       </div>
+      <div v-if="draft" class="rl draft">
+        <span class="who"><span class="rl-no">新</span></span>
+        <span class="say">
+          弹幕里有
+          <input ref="draftIn" class="inp kwdraft" placeholder="输入关键词，多个用逗号隔开，例如：晚安，好梦" aria-label="新规则的关键词" maxlength="400" @keydown.enter.prevent="saveDraft" @keydown.esc="draft = false" />
+          时播放特效
+          <span class="line2 inline-hint">填好关键词才会保存；保存后可以再改特效、谁发的才算、多久内只播一次</span>
+        </span>
+        <span class="acts"><button class="btn" @click="draft = false">取消</button><button class="btn primary" @click="saveDraft">添加</button></span>
+      </div>
     </div>
-    <div v-if="!state.danmu.length" class="rl-empty">
+    <div v-if="!state.danmu.length && !draft" class="rl-empty">
       <h4>还没有弹幕规则</h4>
       <p>观众发的弹幕里有某个词时播放特效。点一个常用的直接添加，之后可以改：</p>
       <div class="tpls">
         <button v-for="t in TEMPLATES" :key="t.name" type="button" @click="add([...t.keywords])"><b>{{ t.name }}</b><span>{{ t.keywords.join('、') }}</span></button>
       </div>
     </div>
-    <div v-else-if="unusedTemplates.length" class="rl-more">常用：<button v-for="t in unusedTemplates" :key="t.name" class="btn" @click="add([...t.keywords])">+ {{ t.name }}</button></div>
+    <div v-else-if="unusedTemplates.length && !draft" class="rl-more">常用：<button v-for="t in unusedTemplates" :key="t.name" class="btn" @click="add([...t.keywords])">+ {{ t.name }}</button></div>
   </div>
 </template>

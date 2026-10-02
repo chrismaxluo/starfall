@@ -6,7 +6,7 @@ import { post, put } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { useQrLogin } from '../lib/qr.ts';
-import { output, refreshSettings, refreshStatus, state } from '../lib/store.ts';
+import { isFxLive, output, refreshSettings, refreshStatus, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { OutputDto, RoomRecord } from '../lib/types.ts';
 import Avatar from './Avatar.vue';
@@ -60,7 +60,7 @@ async function saveRoom(): Promise<void> {
 const out = computed(() => output());
 const url = computed(() => (out.value ? `${location.origin}${out.value.path}` : ''));
 // 只算直播软件里的特效页，不算「在浏览器里查看」打开的
-const online = computed(() => state.overlays.some((x) => x.outputId === out.value?.id && x.role !== 'chat' && !x.env?.view));
+const online = computed(() => state.overlays.some((x) => x.outputId === out.value?.id && isFxLive(x)));
 async function setApp(app: OutputDto['app']): Promise<void> {
   const o = out.value;
   if (!o || o.app === app) return;

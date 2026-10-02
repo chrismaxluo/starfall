@@ -204,7 +204,7 @@ function insertVar(v: string): void {
   });
 }
 
-async function save(): Promise<void> {
+async function save(then: 'close' | 'copy' = 'close'): Promise<void> {
   if (!eff.value || !d.value || ro.value) return;
   const name = d.value.name.trim();
   if (!name) return toast('请填写素材名称', 'info');
@@ -214,15 +214,17 @@ async function save(): Promise<void> {
   if (!r) return;
   await refreshEffects();
   toast(`已保存：${name}${r.usedBy.length ? `，${r.usedBy.map((u) => u.label).join('、')} 已同步` : ''}`);
+  ask.value = null;
+  if (then === 'copy') return copy(true);
   emit('close');
 }
 
-async function copy(): Promise<void> {
+async function copy(force = false): Promise<void> {
   if (!eff.value) return;
-  // 复制的是已保存的版本，会切到副本：没保存的修改先提醒一次
-  if (dirty.value && !confirmCopy.value) {
-    confirmCopy.value = true;
-    return toast('有修改还没保存，复制出的副本不包含这些修改；再点一次「复制」会放弃修改', 'info', 4000);
+  // 复制的是已保存的版本，会切到副本：有没保存的修改先问
+  if (dirty.value && !force) {
+    ask.value = 'copy';
+    return;
   }
   const used = eff.value.usedBy.length > 0;
   const r = await attempt(() => post<EffectDto>(`/api/effects/${eff.value!.id}/copy`, { replaceRefs: eff.value!.builtin && used && replaceRefs.value }));
@@ -325,16 +327,31 @@ watch(featherNow, (p) => {
   if (offTimer) clearTimeout(offTimer);
   offTimer = setTimeout(replay, 600);
 });
-function close(): void {
+/** 有没保存的修改时要关闭 / 复制：底部换成询问条（保存 / 不保存 / 继续编辑） */
+const ask = ref<'close' | 'copy' | null>(null);
+function close(force = false): void {
   audio?.pause();
-  if (dirty.value && !confirmLeave.value) {
-    confirmLeave.value = true;
-    return toast('有修改还没保存，再点一次关闭会放弃修改', 'info');
+  if (dirty.value && !force && !ro.value) {
+    ask.value = 'close';
+    return;
   }
   emit('close');
 }
-const confirmLeave = ref(false);
-const confirmCopy = ref(false);
+// 改了东西以后，之前的询问作废（再关闭时重新问）
+watch(dirty, (v) => !v && (ask.value = null));
+function onKey(e: KeyboardEvent): void {
+  // 上面还开着预览小窗、命令面板时，按键交给它们
+  if (ui.preview || ui.palette) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if (ask.value) ask.value = null;
+    else close();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (!ro.value && dirty.value && !busy.value) void save(ask.value === 'copy' ? 'copy' : 'close');
+  }
+}
+addEventListener('keydown', onKey);
 // 有没保存的修改时，刷新或关闭浏览器标签页前提醒
 const beforeUnload = (e: BeforeUnloadEvent) => {
   if (dirty.value) e.preventDefault();
@@ -342,6 +359,7 @@ const beforeUnload = (e: BeforeUnloadEvent) => {
 addEventListener('beforeunload', beforeUnload);
 onBeforeUnmount(() => {
   removeEventListener('beforeunload', beforeUnload);
+  removeEventListener('keydown', onKey);
   // 不管怎么关掉的（保存、切换、复制），试听的音效都停掉
   audio?.pause();
   audio = null;
@@ -350,7 +368,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div class="ed-scrim" @click="close" />
+    <div class="ed-scrim" @click="close()" />
     <div v-if="eff && d" class="editor" role="dialog" aria-label="素材设置">
       <div class="ed-h">
         <label class="ed-name" :title="ro ? '' : '点击改名，保存后生效'">
@@ -358,7 +376,7 @@ onBeforeUnmount(() => {
           <Icon v-if="!ro" name="i-pen" />
         </label>
         <span v-if="ro" class="badge">内置</span>
-        <button class="icon-btn" aria-label="关闭" @click="close"><Icon name="i-x" /></button>
+        <button class="icon-btn" aria-label="关闭（Esc）" title="关闭（Esc）" @click="close()"><Icon name="i-x" /></button>
       </div>
       <div class="ed-b">
         <div class="ed-prev">
@@ -385,7 +403,8 @@ onBeforeUnmount(() => {
                   <span v-else class="thumb-icon" style="position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.6); font-size: 11px">{{ a.ext.toUpperCase() }}</span>
                 </span>
                 <span><b>{{ a.filename }}</b><span>{{ meta }}</span></span>
-                <button class="btn" :disabled="busy" @click="repIn?.click()"><Icon name="i-replay" />替换文件</button>
+                <ConfirmButton v-if="eff.usedBy.length" label="替换文件" confirm-label="确认替换？马上生效、旧文件删除" cls="btn" armed-cls="btn live-send" :disabled="busy" :title="`正在用于 ${eff.usedBy.map((u) => u.label).join('、')}：替换后马上生效，不用点保存，也撤不回`" @confirm="repIn?.click()"><Icon name="i-replay" />替换文件</ConfirmButton>
+                <button v-else class="btn" :disabled="busy" title="替换后马上生效，不用点保存" @click="repIn?.click()"><Icon name="i-replay" />替换文件</button>
               </div>
               <input ref="repIn" type="file" hidden accept=".webm,.mp4,.svga,.json,.gif,.png,.apng,.webp,.jpg,.jpeg" @change="replaceFile" />
               <div class="toggle-line fe-line">上下羽化 <Seg v-model="d.feather" label="上下羽化" :options="featherOptions" /></div>
@@ -471,7 +490,13 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <div class="ed-f">
+      <div v-if="ask" class="ed-f ask" role="alertdialog" aria-label="有修改还没保存">
+        <span class="use"><Icon name="i-info" /><b>有修改还没保存</b>{{ ask === 'copy' ? '：复制出的副本只包含已保存的内容' : '' }}</span>
+        <button class="btn" @click="ask = null">继续编辑</button>
+        <button class="btn" @click="ask === 'copy' ? copy(true) : close(true)">{{ ask === 'copy' ? '不保存，直接复制' : '不保存，关闭' }}</button>
+        <button class="btn primary" :disabled="busy" @click="save(ask)">{{ ask === 'copy' ? '保存后复制' : '保存并关闭' }}</button>
+      </div>
+      <div v-else class="ed-f">
         <span class="use">
           <label v-if="ro && eff.usedBy.length" style="display: inline-flex; align-items: center; gap: 8px; color: var(--t1); cursor: pointer">
             <input v-model="replaceRefs" type="checkbox" style="accent-color: var(--accent); width: 15px; height: 15px" />复制后，把 <b>{{ eff.usedBy.map((u) => u.label).join('、') }}</b> 用的「{{ eff.name }}」换成副本
@@ -481,11 +506,11 @@ onBeforeUnmount(() => {
         </span>
         <template v-if="!ro">
           <ConfirmButton label="删除" cls="btn" style="color: #d64545" @confirm="remove" />
-          <button class="btn" @click="copy"><Icon name="i-dup" />复制</button>
-          <button class="btn" @click="close">取消</button>
-          <button class="btn primary" :disabled="busy" @click="save">保存</button>
+          <button class="btn" @click="copy()"><Icon name="i-dup" />复制</button>
+          <button class="btn" @click="close()">取消</button>
+          <button class="btn primary" :disabled="busy" title="Ctrl + S" @click="save()">保存</button>
         </template>
-        <button v-else class="btn primary" @click="copy">复制并编辑</button>
+        <button v-else class="btn primary" @click="copy()">复制并编辑</button>
       </div>
     </div>
   </Teleport>

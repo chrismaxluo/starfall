@@ -110,7 +110,7 @@ async function addUid(): Promise<void> {
   if (w.value.uids.includes(uid)) return toast('已经在名单里了', 'info');
   if (w.value.uids.length >= DANMU_UIDS_MAX) return toast(`一条规则最多指定 ${DANMU_UIDS_MAX} 位观众`, 'info');
   busy.value = true;
-  // 先查一下是谁，免得填错；查不到（B 站暂时连不上）也能加
+  // 先查一下是谁，免得填错；查不到（B站暂时连不上）也能加
   const p = await get<{ uid: number; name: string; face: string; guard?: number }>(`/api/viewers/${uid}`).catch((e: Error) => (/没有 UID/.test(e.message) ? (toast(e.message, 'err'), undefined) : null));
   busy.value = false;
   if (p === undefined) return;

@@ -534,7 +534,7 @@ onBeforeUnmount(() => {
                 <span class="hint">也可以在左边预览里按住素材直接拖。在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算；大小 100% 是自动算出的大小</span>
                 <button class="btn" type="button" style="margin-left: auto; flex: none" :disabled="!adjusted" @click="resetOffset">回到原位</button>
               </div>
-              <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B 站的信息、弹幕，或者被挡住。</div>
+              <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B站的信息、弹幕，或者被挡住。</div>
               <div v-if="adjusted && outOfStage" class="warnbox">素材有一部分超出了画面，超出的部分直播时看不到。</div>
             </template>
             <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
@@ -543,8 +543,8 @@ onBeforeUnmount(() => {
           <div class="ed-sec">
             <h3><span class="n">3</span>头像和欢迎语</h3>
             <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">{{ svgaHasPerson ? 'SVGA 里已经放了头像或昵称，一般不用再叠加' : '素材里已经画好文字的话可以关掉' }}</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
-            <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B 站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
-            <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前面放上 B 站的荣耀等级勋章（和弹幕里的一样），没有荣耀等级的观众不显示</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
+            <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
+            <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前面放上 B站的荣耀等级勋章（和弹幕里的一样），没有荣耀等级的观众不显示</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
             <template v-if="!a || d.showText">
               <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />

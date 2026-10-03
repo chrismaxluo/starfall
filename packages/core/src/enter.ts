@@ -22,7 +22,7 @@ export interface EnterMatch {
 }
 
 const GUARD_TIER = { 1: 'gov', 2: 'adm', 3: 'cap' } as const;
-const TIER_LABEL: Record<Tier, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '普通观众' };
+const TIER_LABEL: Record<Tier, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '其他观众' };
 
 /** 专属规则在 today（YYYY-MM-DD）是否有效 */
 export function isExclusiveActive(x: Exclusive, today: string): boolean {

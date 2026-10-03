@@ -25,7 +25,7 @@ const days = computed(() => {
 async function logoutBili(): Promise<void> {
   const r = await attempt(() => del<{ remote: boolean }>('/api/bili/account'));
   if (!r) return;
-  toast(r.remote ? '已退出 B 站登录，登录信息已在 B 站失效' : '已删除本地的登录信息（没能通知 B 站，登录信息可能要过期后才失效）', r.remote ? 'ok' : 'info');
+  toast(r.remote ? '已退出 B站登录，登录信息已在 B站失效' : '已删除本地的登录信息（没能通知 B站，登录信息可能要过期后才失效）', r.remote ? 'ok' : 'info');
   await refreshStatus();
 }
 
@@ -117,7 +117,7 @@ onMounted(() => {
           </div>
         </template>
         <template v-else>
-          <p style="margin: 0 0 12px; font-size: 13px; color: var(--t2)">还没有登录。不登录的话 B 站会隐藏观众昵称和 UID，特效无法按身份播放。建议用 <b>小号</b> 扫码。</p>
+          <p style="margin: 0 0 12px; font-size: 13px; color: var(--t2)">还没有登录。不登录的话 B站会隐藏观众昵称和 UID，特效无法按身份播放。建议用 <b>小号</b> 扫码。</p>
           <button class="btn primary" @click="qr = true"><Icon name="i-qr" />扫码登录</button>
         </template>
       </div>
@@ -136,12 +136,12 @@ onMounted(() => {
         <div class="field">
           <span class="flabel">未开播时</span>
           <Seg :model-value="state.settings.offlinePolicy" label="未开播时" :options="[{ value: 'mute', label: '不播放' }, { value: 'play', label: '照常播放（排练用）' }]" @change="(v) => saveSetting({ offlinePolicy: v }, v === 'play' ? '未开播时也会播放（排练模式）' : '未开播时不播放')" />
-          <span class="hint" style="font-size: 12px; color: var(--t3)">默认只在开播时播放。下播后有人进直播间，不会播特效，但会记录。</span>
+          <span class="hint" style="font-size: 12px; color: var(--t3)">默认只在开播时播放。打开「照常播放」后，没开播也会连接直播间、播放特效，用来排练。</span>
         </div>
         <div class="field" style="margin-top: 14px">
           <span class="flabel">连接直播间</span>
           <Seg :model-value="state.settings.connectMode" label="连接时机" :options="[{ value: 'live_only', label: '只在开播时（推荐）' }, { value: 'always', label: '一直连接' }]" @change="(v) => saveSetting({ connectMode: v }, v === 'always' ? '会一直连接直播间' : '只在开播时连接直播间')" />
-          <span class="hint" style="font-size: 12px; color: var(--t3)">只在开播时连接：没开播时账号不在线，更安全。排练模式下会一直连接。</span>
+          <span class="hint" style="font-size: 12px; color: var(--t3)">{{ state.settings.offlinePolicy === 'play' ? '现在开着排练模式：会一直连接，这里的选择暂时不起作用。' : state.settings.connectMode === 'live_only' ? '开播后 1 分钟内自动连上；没开播时不连接、也不记录，账号不在线，更安全。' : '没开播时也一直连着直播间，进场、弹幕照常记录（但不播放特效）。' }}</span>
         </div>
       </div>
 
@@ -149,7 +149,7 @@ onMounted(() => {
         <div class="card-h"><h2>黑名单</h2><span class="aside">这些人不会触发任何特效，事件照常记录</span></div>
         <template v-if="state.settings">
           <div class="toggle-line">主播本人不触发 <Switch v-model="state.settings.blockAnchor" label="主播本人不触发" @change="(v) => saveSetting({ blockAnchor: v }, v ? '主播本人不会触发特效' : '主播本人也会触发特效')" /></div>
-          <div class="toggle-line" style="margin-top: 8px">登录的 B 站账号不触发 <span class="hint">通常是小号</span><Switch v-model="state.settings.blockAccount" label="登录的账号不触发" @change="(v) => saveSetting({ blockAccount: v }, v ? '登录的账号不会触发特效' : '登录的账号也会触发特效')" /></div>
+          <div class="toggle-line" style="margin-top: 8px">登录的 B站账号不触发 <span class="hint">通常是小号</span><Switch v-model="state.settings.blockAccount" label="登录的账号不触发" @change="(v) => saveSetting({ blockAccount: v }, v ? '登录的账号不会触发特效' : '登录的账号也会触发特效')" /></div>
         </template>
         <div class="add-user" style="margin-top: 12px"><input v-model="blIn" class="inp num" placeholder="输入 UID，回车添加" inputmode="numeric" aria-label="黑名单 UID" @keydown.enter="addBl" /><button class="btn" @click="addBl">添加</button></div>
         <div class="bl-list">

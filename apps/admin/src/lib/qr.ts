@@ -1,4 +1,4 @@
-// B 站扫码登录：申请二维码 → 每 2 秒查询一次状态 → 成功后保存（加密）。扫码弹窗和新手引导共用
+// B站扫码登录：申请二维码 → 每 2 秒查询一次状态 → 成功后保存（加密）。扫码弹窗和新手引导共用
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { get, post } from './api.ts';
 import { refreshStatus } from './store.ts';
@@ -39,7 +39,7 @@ export function useQrLogin(onSuccess: () => void, auto = true) {
       if (r.state === 'success' || r.state === 'expired') stop();
       if (r.state === 'success') {
         await refreshStatus();
-        toast(`已登录 B 站账号：${r.account?.name ?? ''}`);
+        toast(`已登录 B站账号：${r.account?.name ?? ''}`);
         onSuccess();
       }
     } catch {

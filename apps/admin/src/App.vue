@@ -237,15 +237,9 @@ function reloadPage(): void {
           </nav>
         </div>
         <div>
-          <div class="nav-label">即将推出</div>
-          <nav class="nav" aria-label="后续功能">
-            <a class="disabled" href="#overview"><Icon name="i-chart" />数据统计<span class="soon">第二期</span></a>
-          </nav>
-        </div>
-        <div>
           <div class="nav-label">其他</div>
           <nav class="nav" aria-label="其他">
-            <a href="/overlay/?demo=1" target="_blank" rel="noopener"><Icon name="i-demo" />特效页演示<Icon name="i-ext" /></a>
+            <a href="/overlay/?demo=1" target="_blank" rel="noopener" title="在新标签里轮流播放所有内置特效（示例）"><Icon name="i-demo" />内置特效演示<Icon name="i-ext" /></a>
             <a href="#settings" :aria-current="route.page === 'settings' ? 'page' : 'false'"><Icon name="i-gear" />设置</a>
           </nav>
         </div>
@@ -257,7 +251,7 @@ function reloadPage(): void {
             </template>
             <template v-else>
               <span class="avatar" style="background: var(--line-strong)"><Icon name="i-user" /></span>
-              <span class="acct-meta"><b>未登录 B 站</b><span>点这里扫码登录</span></span>
+              <span class="acct-meta"><b>未登录 B站</b><span>点这里扫码登录</span></span>
             </template>
           </a>
         </div>

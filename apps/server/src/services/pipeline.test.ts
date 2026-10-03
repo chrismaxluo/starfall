@@ -466,7 +466,7 @@ describe('礼物', () => {
     }
     expect(t.events()).toHaveLength(0);
     vi.advanceTimersByTime(3200);
-    expect(t.events()).toMatchObject([{ kind: 'gift', status: 'played', rule: '礼物 · 单次 ≥ 1 元', payload: { giftName: '小花花', count: 10 } }]);
+    expect(t.events()).toMatchObject([{ kind: 'gift', status: 'played', rule: '礼物 · 单次 ≥ 10电池', payload: { giftName: '小花花', count: 10 } }]);
     expect(t.plays()[0]).toMatchObject({ text: '小星 送出 小花花', gift: { name: '小花花', count: 10 } });
   });
 
@@ -479,7 +479,7 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 0, paid: false, giftName: '辣条' }, { uid: 4 }));
     expect(t.events().map((e) => [e.uid, e.rule, e.status])).toEqual([
       [1, '礼物 · 「小电视飞船」', 'played'],
-      [2, '礼物 · 单次 10 – 100 元', 'queued'],
+      [2, '礼物 · 单次 100 – 1000电池', 'queued'],
       [3, null, 'no_rule'],
       [4, null, 'no_rule'],
     ]);

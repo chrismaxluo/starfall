@@ -16,7 +16,7 @@ import { bigNum, clock, duration, hms, when } from '../lib/format.ts';
 import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
-import { effectById, state } from '../lib/store.ts';
+import { effectById, state, ui } from '../lib/store.ts';
 import type { EventDto, StatsDto, TriggerKind, Viewer } from '../lib/types.ts';
 
 const stats = ref<StatsDto | null>(null);
@@ -52,10 +52,11 @@ onBeforeUnmount(() => {
   if (tick) clearInterval(tick);
 });
 
+// 第 3 步按「连上过一次」算：配好以后先打开星临、还没开直播软件时，不会又冒出来
 const setupSteps = computed(() => [
-  { name: '扫码登录 B 站', done: Boolean(s.value?.account.loggedIn), href: '#settings' },
-  { name: '填写直播间号', done: Boolean(s.value?.room), href: '#settings' },
-  { name: '把特效页加到直播软件', done: (s.value?.overlays ?? 0) > 0, href: '#obs' },
+  { name: '扫码登录 B站', done: Boolean(s.value?.account.loggedIn), href: '#settings', qr: true },
+  { name: '填写直播间号', done: Boolean(s.value?.room), href: '#settings', qr: false },
+  { name: '把特效页加到直播软件', done: (s.value?.overlays ?? 0) > 0 || Boolean(state.settings?.overlaySeen), href: '#obs', qr: false },
 ]);
 const needSetup = computed(() => setupSteps.value.some((x) => !x.done));
 
@@ -76,7 +77,7 @@ const connText = computed(() => {
   if (!l) return '—';
   if (l.connection === 'connected') return '已连接';
   if (l.reason === 'offline') return '未开播，未连接';
-  if (l.reason === 'not_logged_in') return '未登录 B 站';
+  if (l.reason === 'not_logged_in') return '未登录 B站';
   if (l.reason === 'no_room') return '未设置直播间';
   return l.connectionDetail ?? '连接中';
 });
@@ -135,7 +136,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
     <div v-if="needSetup" class="guide">
       <b>开始使用：</b>
       <ol>
-        <li v-for="(x, i) in setupSteps" :key="x.name" :class="{ done: x.done }"><Icon :name="x.done ? 'i-check' : 'i-todo'" />{{ i + 1 }}. <a :href="x.href">{{ x.name }}</a></li>
+        <li v-for="(x, i) in setupSteps" :key="x.name" :class="{ done: x.done }"><Icon :name="x.done ? 'i-check' : 'i-todo'" />{{ i + 1 }}. <a :href="x.href" @click="(e) => x.qr && !x.done && (e.preventDefault(), (ui.qr = true))">{{ x.name }}</a></li>
       </ol>
     </div>
 
@@ -173,8 +174,8 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
     </div>
 
     <div class="card kstrip">
-      <div><small>进场人数 · 去重</small><span class="v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardUnique ?? 0 }}</b> 人</div></div>
-      <div><small>触发特效</small><span class="v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardPlayed ?? 0 }}</b> 次</div></div>
+      <div><small>进场观众 · 每人算一次</small><span class="v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardUnique ?? 0 }}</b> 人</div></div>
+      <div><small>播放了特效</small><span class="v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardPlayed ?? 0 }}</b> 次</div></div>
       <div><small>看过<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.watched) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
       <div><small>高能榜<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.rankCount) : '—' }}</span><div class="d">{{ live ? '现在在线、登录了的观众' : '开播后显示' }}</div></div>
       <div><small>点赞<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.likes) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>

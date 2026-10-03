@@ -97,11 +97,11 @@ function addBand(): void {
   const v = Number(addBattery.value);
   if (!(v >= 1)) return void (bandMsg.value = { text: '请输入至少 1 电池', err: true });
   const gold = Math.round(v) * 100;
-  if (rules.value.bands.some((b) => b.fromGold === gold)) return void (bandMsg.value = { text: `已经有 ${batteryYuan(gold)}这一档了`, err: true });
+  if (rules.value.bands.some((b) => b.fromGold === gold)) return void (bandMsg.value = { text: `已经有 ${batteryYuan(gold)}这一段了`, err: true });
   const parent = bands.value.find((b) => b.fromGold < gold) ?? bands.value[bands.value.length - 1]!;
   rules.value.bands.push({ fromGold: gold, effectId: parent.effectId, enabled: parent.enabled });
   addBattery.value = null;
-  bandMsg.value = { text: '低于最低一档的礼物不播特效', err: false };
+  bandMsg.value = { text: '低于最低一段的礼物不播特效', err: false };
   void save(`已在 ${batteryYuan(gold)}处分出一段`);
 }
 function removeBand(b: GiftBand): void {
@@ -135,7 +135,7 @@ onMounted(async () => {
 
 <template>
   <div v-if="rules">
-    <div class="rl-flow"><span>有人送礼时，先看是不是下面的<b>指定礼物</b>；不是的话，再按这次送的<b>总价值</b>（单价 × 数量）找对应的一段。价值按 B 站礼物面板的电池计算（1 电池 = 0.1 元）。免费礼物不播放。</span></div>
+    <div class="rl-flow"><span>有人送礼时，先看是不是下面的<b>指定礼物</b>；不是的话，再按这次送的<b>总价值</b>（单价 × 数量）找对应的一段。价值按 B站礼物面板的电池计算（1 电池 = 0.1 元）。免费礼物不播放。</span></div>
 
     <div class="rl-sec"><h3>指定礼物</h3><span>送这些礼物时，用这里的特效（优先）</span></div>
     <div class="rl-gifts">
@@ -200,7 +200,7 @@ onMounted(async () => {
       <div class="rl" :class="{ off: !rules.comboEnabled }">
         <span class="who"><span class="tag">连击</span></span>
         <span class="say">
-          同一个人 <CdPick v-model="rules.comboSec" unit="sec" :options="[1, 2, 3, 5, 8, 10, 15]" :max="15" :allow-zero="false" hint="这段时间里连续送同一种礼物，合成一次特效" @change="(v) => save(`连击合并时间：${v} 秒`)" /> 内连续送同一种礼物，合成一次特效，显示总数量
+          同一个人 <CdPick v-model="rules.comboSec" unit="sec" :options="[1, 2, 3, 5, 8, 10, 15]" :max="15" :allow-zero="false" hint="这段时间里连续送同一种礼物，合成一次特效" @change="(v) => save(`连击合并时间：${v} 秒`)" /> 内连续送同一种礼物，合成一次特效，显示总数量<span class="hint">（连击停下后才播放，会晚几秒；按合起来的总价值选特效）</span>
           <span v-if="!rules.comboEnabled" class="offnote">已关闭：每次送礼都单独处理</span>
         </span>
         <span class="acts"><Switch v-model="rules.comboEnabled" label="连击合并" @change="(v) => save(v ? '已开启连击合并' : '已关闭连击合并，每次送礼都单独处理')" /></span>

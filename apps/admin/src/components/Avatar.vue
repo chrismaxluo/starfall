@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { GUARD_FRAMES } from '@starfall/shared/overlay';
 
-/** guard：大航海等级（1 总督、2 提督、3 舰长），有的话套上 B 站的头像框 */
+/** guard：大航海等级（1 总督、2 提督、3 舰长），有的话套上 B站的头像框 */
 const props = defineProps<{ name: string; face?: string | null | undefined; size?: number; guard?: number | null | undefined }>();
 const GRADS = ['#6E6BF2', '#E0689B', '#2FA6A0', '#E58B3A', '#5B8DEF', '#9A6BE0'];
 const failed = ref(false);
@@ -11,7 +11,7 @@ watch(() => props.face, () => (failed.value = false));
 watch(() => props.guard, () => (frameFailed.value = false));
 const bg = computed(() => GRADS[[...(props.name || '?')].reduce((s, c) => s + c.charCodeAt(0), 0) % GRADS.length]);
 const style = computed(() => ({ background: bg.value, ...(props.size ? { width: `${props.size}px`, height: `${props.size}px`, fontSize: `${Math.round(props.size * 0.42)}px` } : {}) }));
-/** 后台里的头像都不大：用 B 站的缩略图，省流量 */
+/** 后台里的头像都不大：用 B站的缩略图，省流量 */
 const frame = computed(() => {
   const url = props.guard ? GUARD_FRAMES[props.guard as 1 | 2 | 3] : undefined;
   return url && !frameFailed.value ? `${url}@120w_120h.webp` : null;

@@ -41,7 +41,7 @@ const cmds = computed<Cmd[]>(() => {
     { g: '直播中', icon: 'i-x', label: '清空播放队列', kw: '排队', run: () => void clearQueue() },
     { g: '跳转', icon: 'i-grid', label: '总览', kw: '首页 实时动态', run: () => go('overview') },
     { g: '跳转', icon: 'i-wand', label: '进场规则', kw: '触发规则 身份 大航海 粉丝牌', run: () => go('rules', 'enter') },
-    { g: '跳转', icon: 'i-user', label: '专属用户', kw: '触发规则 专属素材', run: () => go('rules', 'exclusive') },
+    { g: '跳转', icon: 'i-user', label: '专属用户', kw: '触发规则 专属特效 专属素材', run: () => go('rules', 'exclusive') },
     { g: '跳转', icon: 'i-chat', label: '弹幕规则', kw: '触发规则 关键词', run: () => go('rules', 'danmu') },
     { g: '跳转', icon: 'i-gift', label: '礼物规则', kw: '触发规则 价值 连击', run: () => go('rules', 'gift') },
     { g: '跳转', icon: 'i-anchor', label: '上舰规则', kw: '触发规则 开通 续费 舰长 提督 总督', run: () => go('rules', 'guard') },

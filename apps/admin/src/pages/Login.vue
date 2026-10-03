@@ -115,7 +115,7 @@ const RIBBONS = [
 
     <main class="lg-main">
       <section class="lg-pitch">
-        <span class="lg-eyebrow"><i />B 站直播间进场特效</span>
+        <span class="lg-eyebrow"><i />B站直播间进场特效</span>
         <h1>让每一次进场，<br /><span class="l2">都成为一场驾临。</span></h1>
         <p>舰长登船、粉丝进场、专属用户驾到——星临认出每一位观众，自动播放为 TA 准备的特效。</p>
         <div class="lg-chips">

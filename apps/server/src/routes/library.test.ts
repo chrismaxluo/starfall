@@ -28,14 +28,14 @@ describe('素材列表', () => {
       { page: 'guard', label: '上舰 · 开通总督' },
       { page: 'guard', label: '上舰 · 续费总督' },
     ]);
-    expect((await byName('晶耀')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 100 元' }]);
-    expect((await byName('晶礼')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 10 – 100 元' }]);
+    expect((await byName('晶耀')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 1000电池' }]);
+    expect((await byName('晶礼')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 100 – 1000电池' }]);
     expect((await byName('晶巡')).usedBy).toEqual([{ page: 'enter', label: '进场 · 房管' }]);
     expect((await byName('霜玻')).usedBy.map((u) => u.label)).toEqual(['进场 · 粉丝牌 21 级及以上', '进场 · 粉丝牌 1 – 20 级']);
     // 普通观众档默认关闭，但仍然引用了"一行字"
-    expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['礼物 · 单次 1 – 10 元']);
+    expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['礼物 · 单次 10 – 100电池']);
     // 普通观众默认用霜玻的简短版（默认关闭）
-    expect((await byName('霜玻·简'))).toMatchObject({ durationMs: 2400, visual: { type: 'builtin_style', style: 'frost' }, usedBy: [{ page: 'enter', label: '进场 · 普通观众' }] });
+    expect((await byName('霜玻·简'))).toMatchObject({ durationMs: 2400, visual: { type: 'builtin_style', style: 'frost' }, usedBy: [{ page: 'enter', label: '进场 · 其他观众' }] });
   });
 
   it('未登录不能访问', async () => {
@@ -291,7 +291,7 @@ describe('复制与删除', () => {
     expect(a).toMatchObject({ name: '晶耀 副本', builtin: false, visual: { type: 'builtin_style', style: 'glass-big' }, usedBy: [] });
     const b = (await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { replaceRefs: true } })).json();
     expect(b).toMatchObject({ name: '晶耀 副本 2' });
-    expect(b.usedBy.map((u: { label: string }) => u.label)).toEqual(['礼物 · 单次 ≥ 100 元']);
+    expect(b.usedBy.map((u: { label: string }) => u.label)).toEqual(['礼物 · 单次 ≥ 1000电池']);
     expect((await req({ method: 'PUT', url: `/api/effects/${b.id}`, payload: { volume: 20 } })).statusCode).toBe(200);
     expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '亭阁' } })).statusCode).toBe(409);
   });

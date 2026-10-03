@@ -88,7 +88,7 @@ export interface LiveStatus {
   connection: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopped';
   connectionDetail: string | null;
   reason: 'ok' | 'no_room' | 'not_logged_in' | 'offline';
-  /** B 站说登录已失效，要重新扫码 */
+  /** B站说登录已失效，要重新扫码 */
   loginInvalid?: boolean;
   adminCount: number;
 }
@@ -118,6 +118,8 @@ export interface Settings {
   giftComboSec: number;
   autoBackup: boolean;
   onboarded: boolean;
+  /** 直播软件里的特效页连上过 */
+  overlaySeen?: boolean;
   /** 素材上下羽化（全局） */
   featherOn: boolean;
   featherPct: number;
@@ -241,7 +243,7 @@ export interface StatsDto {
   honor: Record<'l1' | 'l21' | 'l41' | 'l61' | 'none', number>;
 }
 
-/** B 站名单里的一位观众（高能榜、舰队名单） */
+/** B站名单里的一位观众（高能榜、舰队名单） */
 export interface ListViewer {
   uid: number;
   name: string;

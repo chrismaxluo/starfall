@@ -61,7 +61,7 @@ useEsc(() => void cancel());
           <ul><li v-for="w in plan.warnings" :key="w">{{ w }}</li></ul>
           <span v-if="plan.files.missing">缺少的文件可以之后在素材库里重新上传；想一起恢复，请用「导出（含素材文件）」得到的 zip 导入。</span>
         </div>
-        <p class="imp-note">规则会整体替换成{{ restoring ? '备份' : '文件' }}里的；本机的素材、黑名单、输出只增加和更新，不会删除；B 站账号和后台密码不受影响。确认后会先自动备份一份现在的配置，{{ restoring ? '恢复' : '导入' }}错了还能再恢复回来。</p>
+        <p class="imp-note">规则会整体替换成{{ restoring ? '备份' : '文件' }}里的；本机的素材、黑名单、输出只增加和更新，不会删除；B站账号和后台密码不受影响。确认后会先自动备份一份现在的配置，{{ restoring ? '恢复' : '导入' }}错了还能再恢复回来。</p>
       </div>
       <div class="imp-f">
         <button class="btn" :disabled="busy" @click="cancel">{{ changed.length ? '取消' : '关闭' }}</button>

@@ -97,8 +97,8 @@ describe('礼物匹配', () => {
     expect(matchGift(gift({ giftId: 25, unitPrice: 1_245_000 }), gifts({ specific: [{ giftId: 25, giftName: '', effectId: 1, enabled: false }] }))?.key).toBe('gift:band:100000');
   });
   it('按单次价值（数量 × 单价）分档，高档优先；低于最低档、落在停用档都不播', () => {
-    expect(matchGift(gift({ unitPrice: 1000, count: 99 }), gifts())).toMatchObject({ key: 'gift:band:10000', label: '礼物 · 单次 10 – 100 元', valueGold: 99_000 });
-    expect(matchGift(gift({ unitPrice: 100_000, count: 1 }), gifts())).toMatchObject({ key: 'gift:band:100000', label: '礼物 · 单次 ≥ 100 元' });
+    expect(matchGift(gift({ unitPrice: 1000, count: 99 }), gifts())).toMatchObject({ key: 'gift:band:10000', label: '礼物 · 单次 100 – 1000电池', valueGold: 99_000 });
+    expect(matchGift(gift({ unitPrice: 100_000, count: 1 }), gifts())).toMatchObject({ key: 'gift:band:100000', label: '礼物 · 单次 ≥ 1000电池' });
     expect(matchGift(gift({ unitPrice: 1000, count: 3 }), gifts())).toBeNull();
     expect(matchGift(gift({ unitPrice: 100, count: 3 }), gifts())).toBeNull();
     expect(matchGift(gift({ unitPrice: 100_000 }), gifts({ bands: [{ fromGold: 100_000, effectId: null, enabled: true }] }))).toBeNull();
@@ -108,7 +108,7 @@ describe('礼物匹配', () => {
     expect(yuanText(22_000)).toBe('22 元');
     expect(yuanText(1_245_000)).toBe('1245 元');
     expect(sortedGiftBands(gifts().bands).map((b) => [b.fromGold, b.toGold])).toEqual([[100_000, null], [10_000, 100_000], [1000, 10_000]]);
-    expect(giftBandLabel(1000, 10_000)).toBe('1 – 10 元');
+    expect(giftBandLabel(1000, 10_000)).toBe('10 – 100电池');
   });
 });
 

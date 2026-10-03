@@ -49,7 +49,7 @@ export const STATUS_WHY: Partial<Record<PlayStatus, string>> = {
   no_overlay: '当时直播软件里的特效页没连上，观众看不到特效',
   dropped: '排队的特效太多，超过了上限，这条被挤掉了（可以在总览的「排队设置」里调）',
   cleared: '暂停或清空排队时，这条还没轮到',
-  duplicate: 'B 站把同一件事发了好几条消息，只算一次',
+  duplicate: 'B站把同一件事发了好几条消息，只算一次',
 };
 
 /** 筛选「为什么没播」的选项 */

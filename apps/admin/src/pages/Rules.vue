@@ -200,7 +200,7 @@ async function lookup(): Promise<void> {
     const card = await get<{ uid: number; name: string; face: string }>(`/api/viewers/${uid}`);
     Object.assign(d, { found: card, msg: `找到用户：${card.name}`, ok: true });
   } catch (e) {
-    // 查不到昵称也可以添加（例如 B 站接口暂时不可用）
+    // 查不到昵称也可以添加（例如 B站接口暂时不可用）
     Object.assign(d, { found: e instanceof ApiError && e.status === 404 ? null : { uid, name: `UID ${uid}`, face: '' }, msg: e instanceof Error ? e.message : String(e), ok: false });
   } finally {
     d.busy = false;
@@ -333,7 +333,7 @@ onMounted(() => void refreshRules());
         </div>
         <div v-if="draft" class="addbar">
           <div class="r1">
-            <input id="exUid" v-model="draft.uid" class="inp num" inputmode="numeric" placeholder="输入 B 站 UID，回车查询" aria-label="B站 UID" @keydown.enter="lookup" />
+            <input id="exUid" v-model="draft.uid" class="inp num" inputmode="numeric" placeholder="输入 B站 UID，回车查询" aria-label="B站 UID" @keydown.enter="lookup" />
             <button class="btn" :disabled="draft.busy" @click="lookup"><span v-if="draft.busy" class="spin" />{{ draft.busy ? '查询中' : '查询' }}</button>
             <span style="color: var(--t3); font-size: 12.5px">或</span>
             <button class="linkish" @click="showRecent = !showRecent">从最近进场的观众里选</button>
@@ -362,12 +362,12 @@ onMounted(() => void refreshRules());
               <tr v-for="x in exList" :key="x.uid" :style="flashUid === x.uid ? 'outline: 2px solid var(--accent-ring)' : ''">
                 <td><span class="who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" :guard="x.guard" /><span><div>{{ x.name ?? '（昵称未知）' }}</div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">UID {{ x.uid }}</div></span></span></td>
                 <td><span v-if="viewerOf(x.uid) || x.honor" class="ids"><HonorMedal :level="viewerOf(x.uid)?.honor || x.honor" /><IdTag v-if="viewerOf(x.uid)" :viewer="viewerOf(x.uid)!" /></span><span v-else style="color: var(--t3)">—</span></td>
-                <td><EffectPicker v-model="x.effectId" @change="(id) => updateEx(x, { effectId: id }, `${x.name ?? x.uid} 的专属素材改为「${effectById(id)?.name}」`)" /></td>
+                <td><EffectPicker v-model="x.effectId" @change="(id) => updateEx(x, { effectId: id }, `${x.name ?? x.uid} 的专属特效改为「${effectById(id)?.name}」`)" /></td>
                 <td><CdPick v-if="!once" v-model="x.cooldownMin" @change="(v) => updateEx(x, { cooldownMin: v }, cdMsg(x.name ?? String(x.uid), v))" /><span v-else class="inline-hint">每场一次</span></td>
                 <td>
                   <button class="untilb" :class="x.until ? (x.until < todayStr ? 'expired' : 'set') : ''" @click.stop="(e) => openDate(e, x)">{{ x.until ? `${x.until < todayStr ? '已过期 ' : '至 '}${x.until.slice(5)}` : '长期' }}</button>
                 </td>
-                <td><Switch v-model="x.enabled" :label="`启用 ${x.name ?? x.uid}`" @change="(v) => updateEx(x, { enabled: v }, v ? '已启用' : '已停用，TA 会按身份档位播放')" /></td>
+                <td><Switch v-model="x.enabled" :label="`启用 ${x.name ?? x.uid}`" @change="(v) => updateEx(x, { enabled: v }, v ? '已启用' : '已停用，TA 会按身份的规则播放')" /></td>
                 <td style="white-space: nowrap">
                   <button class="playmini" aria-label="预览" title="预览" @click="preview(x.effectId, { name: x.name ?? '专属观众', guard: 0, isMod: false, medalLevel: null }, x.name ?? String(x.uid))"><svg><use href="#i-play" /></svg></button>
                   <ConfirmButton label="" confirm-label="确认移除" cls="moreb" :aria-label="`移除 ${x.name ?? x.uid}`" @confirm="removeEx(x)"><Icon name="i-x" /></ConfirmButton>
@@ -468,7 +468,7 @@ onMounted(() => void refreshRules());
       <template v-if="datePop">
         <div style="position: fixed; inset: 0; z-index: 45" @click="datePop = null" />
         <div class="datepop" :style="{ left: `${datePop.left}px`, top: `${datePop.top}px` }">
-          <b style="font-weight: 500">有效期</b><span style="color: var(--t3); font-size: 12px">到期后自动停用，改回按身份档位播放（含当天）</span>
+          <b style="font-weight: 500">有效期</b><span style="color: var(--t3); font-size: 12px">到期后自动停用，改回按身份的规则播放（含当天）</span>
           <input v-model="datePop.value" class="inp" type="date" aria-label="截止日期" />
           <div class="row"><button class="btn" @click="setUntil(null)">设为长期</button><button class="btn primary" @click="setUntil(datePop.value)">确定</button></div>
         </div>

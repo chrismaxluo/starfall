@@ -53,7 +53,7 @@ function preview(row: (typeof ROWS)[number], op: 'open' | 'renew'): void {
 
 <template>
   <div v-if="state.guard">
-    <div class="rl-flow"><span>有人开通或续费大航海时播放，会<b>插队优先</b>。同一次上舰 B 站会发好几条消息，星临只播一次。</span></div>
+    <div class="rl-flow"><span>有人开通或续费大航海时播放，{{ state.settings?.queueJump === false ? '按顺序排队（排队设置里关掉了插队）' : '会插队优先播放' }}。同一次上舰 B站会发好几条消息，星临只播一次。</span></div>
     <div class="rl-list">
       <div v-for="row in ROWS" :key="row.key" class="rl" :class="{ off: !state.guard[row.key].enabled }">
         <span class="who"><IdTag :identity="row.key" /></span>
@@ -69,7 +69,8 @@ function preview(row: (typeof ROWS)[number], op: 'open' | 'renew'): void {
           <span v-if="!state.guard[row.key].enabled" class="offnote">已关闭：{{ row.name }}上舰不播放特效</span>
         </span>
         <span class="acts">
-          <button class="playmini" :aria-label="`预览开通${row.name}`" :title="`预览开通${row.name}`" @click="preview(row, 'open')"><svg><use href="#i-play" /></svg></button>
+          <button class="playmini" :aria-label="separate(row.key) ? `预览开通${row.name}` : `预览${row.name}上舰`" :title="separate(row.key) ? `预览开通${row.name}` : `预览${row.name}上舰`" @click="preview(row, 'open')"><svg><use href="#i-play" /></svg></button>
+          <button v-if="separate(row.key)" class="playmini renew" :aria-label="`预览续费${row.name}`" :title="`预览续费${row.name}`" @click="preview(row, 'renew')"><svg><use href="#i-play" /></svg><i>续</i></button>
           <Switch v-model="state.guard[row.key].enabled" :label="`${row.name}上舰特效`" @change="(v) => save(v ? `已打开${row.name}上舰特效` : `已关闭${row.name}上舰特效`)" />
         </span>
       </div>

@@ -564,7 +564,7 @@ export class ConfigIO {
   }
 }
 
-const TIER_LABEL: Record<string, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '普通观众' };
+const TIER_LABEL: Record<string, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '其他观众' };
 const describeTier = (t: { effect: string | null; cooldownMin: number; enabled: boolean }) => `${t.effect ?? '未选素材'}，冷却 ${t.cooldownMin} 分钟${t.enabled ? '' : '（停用）'}`;
 const stripName = ({ name: _n, ...rest }: ConfigFile['effects'][number]) => rest;
 function fmt(v: unknown): string {

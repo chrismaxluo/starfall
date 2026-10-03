@@ -676,6 +676,8 @@ td .excl { font-size: 11px; color: var(--accent); background: var(--accent-soft)
 .playmini { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--l2); color: var(--t2); display: grid; place-items: center; }
 .playmini:hover { color: var(--accent); border-color: var(--accent); }
 .playmini svg { width: 12px; height: 12px; fill: currentColor; stroke: none; }
+.playmini.renew { position: relative; }
+.playmini.renew i { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-size: 10px; line-height: 14px; padding: 0 3px; border-radius: 4px; background: var(--accent); color: var(--on-accent); }
 .live-send[data-armed="1"] { background: #D64545; border-color: transparent; color: #fff; }
 
 /* 特效选择按钮 + 弹出列表 */

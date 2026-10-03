@@ -26,7 +26,7 @@ export const yuan = (gold: number) => {
   return `${Math.round(y * 10) / 10} 元`;
 };
 
-/** B 站礼物面板上的价格写法：1 电池 = 100 金瓜子 = 0.1 元；超过 1 万写成「1.314万电池」 */
+/** B站礼物面板上的价格写法：1 电池 = 100 金瓜子 = 0.1 元；超过 1 万写成「1.314万电池」 */
 export const battery = (gold: number) => {
   const b = gold / 100;
   return b > 10_000 ? `${Math.round(b / 10) / 1000}万电池` : `${Math.round(b * 10) / 10}电池`;

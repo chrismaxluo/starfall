@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 总览右侧面板「在线观众」：在线人数和名单（B 站只给前 100 位，按贡献排，没贡献的也在），开着这一页时每 30 秒刷新
+// 总览右侧面板「在线观众」：在线人数和名单（B站只给前 100 位，按贡献排，没贡献的也在），开着这一页时每 30 秒刷新
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PersonRow from './PersonRow.vue';
 import Seg from './Seg.vue';
@@ -49,7 +49,7 @@ const rows = computed(() =>
 
 <template>
   <div v-if="!state.status?.room" class="ov-qempty"><b>还没设置直播间</b>在设置里填好直播间号后显示</div>
-  <div v-else-if="data && !data.live" class="ov-qempty"><b>开播后显示</b>在线观众来自 B 站直播间的在线名单，按贡献排序</div>
+  <div v-else-if="data && !data.live" class="ov-qempty"><b>开播后显示</b>在线观众来自 B站直播间的在线名单，按贡献排序</div>
   <template v-else>
     <div class="phead">
       <span v-if="data">在线 <b class="num">{{ data.count.toLocaleString('zh-CN') }}</b> 人<template v-if="data.items.length < data.count"> · 名单里 <b class="num">{{ data.items.length }}</b> 人</template> · 每 30 秒刷新</span>
@@ -62,7 +62,7 @@ const rows = computed(() =>
       <div v-if="data && !rows.length" class="pempty">{{ filter === 'all' ? '现在没有在线的观众' : '没有符合的观众' }}</div>
     </div>
     <div class="pfoot">
-      <span>{{ data && data.count > 100 ? 'B 站只给前 100 位（按贡献排）' : 'B 站的在线名单：隐身、没登录的观众看不到' }}</span>
+      <span>{{ data && data.count > 100 ? 'B站只给前 100 位（按贡献排）' : 'B站的在线名单：隐身、没登录的观众看不到' }}</span>
       <span class="sp" /><span>点一行可设置专属特效</span>
     </div>
   </template>

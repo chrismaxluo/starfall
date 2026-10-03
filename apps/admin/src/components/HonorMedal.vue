@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 荣耀等级勋章：用 B 站的图（每级一张，数字画在图上）；读不到图时显示文字
+// 荣耀等级勋章：用 B站的图（每级一张，数字画在图上）；读不到图时显示文字
 import { computed, ref, watch } from 'vue';
 import { state } from '../lib/store.ts';
 

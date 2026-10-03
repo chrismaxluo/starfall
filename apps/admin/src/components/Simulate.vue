@@ -145,7 +145,7 @@ onMounted(async () => {
           <li v-for="(t, ti) in trace" :key="ti" :class="{ hit: t.hit }">{{ t.text }}</li>
         </ol>
         <template v-if="res.rule">会用 <b>{{ res.rule }}</b> 这条规则，播放 <b>{{ res.effect?.name }}</b><br /></template>
-        <span v-else class="miss">没有符合的规则，不会播放{{ kind === 'gift' ? '（免费礼物、低于最低一档，或落在已关闭的一段）' : kind === 'danmu' ? '（没有规则包含这句弹幕，或者发的人不符合「谁发的才算」）' : '' }}<br /></span>
+        <span v-else class="miss">没有符合的规则，不会播放{{ kind === 'gift' ? '（免费礼物、低于最低一段，或落在已关闭的一段）' : kind === 'danmu' ? '（没有规则包含这句弹幕，或者发的人不符合「谁发的才算」）' : '' }}<br /></span>
         <template v-if="res.rule">{{ res.status === 'played' ? '会播放，已经在预览小窗里放给你看了' : `不会播放：${res.statusText}` }}</template>
         <span v-for="n in res.notes" :key="n" class="simnote"><br />提示：{{ n }}</span>
       </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 观众身份标签：主播 / 大航海 / 房管 / 本直播间粉丝牌 / 普通。
-// 传 viewer 时和 B 站弹幕里一样都显示：大航海又是房管，后面加一个「房」；大航海、房管戴着本直播间的粉丝牌，粉丝牌也显示
+// 传 viewer 时和 B站弹幕里一样都显示：大航海又是房管，后面加一个「房」；大航海、房管戴着本直播间的粉丝牌，粉丝牌也显示
 import { computed, ref } from 'vue';
 import { isOwnMedal } from '@starfall/shared';
 import { IDENTITY, identityOf, isAnchor } from '../lib/identity.ts';
@@ -24,7 +24,7 @@ const alsoMedal = computed(() => {
   if (!v || (!guard.value && id.value !== 'mod')) return false;
   return anchorUid.value === undefined ? Boolean(v.medal && v.medal.level > 0) : isOwnMedal(v, anchorUid.value);
 });
-// 官方图标加载失败（断网、B 站改了地址）时换回自绘图标
+// 官方图标加载失败（断网、B站改了地址）时换回自绘图标
 const broken = ref(new Set<string>());
 </script>
 

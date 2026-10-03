@@ -3,8 +3,8 @@ import type { Tier, Viewer } from './types.ts';
 
 export type Identity = Tier | 'fan';
 
-// B 站官方大航海图标（200×200，直播间「大航海」页的静态资源）。版权归哔哩哔哩：只在运行时引用，不放进项目；
-// 地址带构建哈希，B 站改版后可能失效，加载失败时退回自绘的 g-xxx 图标。见 docs/bili-protocol.md §5.6.2
+// B站官方大航海图标（200×200，直播间「大航海」页的静态资源）。版权归哔哩哔哩：只在运行时引用，不放进项目；
+// 地址带构建哈希，B站改版后可能失效，加载失败时退回自绘的 g-xxx 图标。见 docs/bili-protocol.md §5.6.2
 const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
 
 export const IDENTITY: Record<Identity, { name: string; icon: string | null; badge?: string; color: string; grad: string }> = {
@@ -50,7 +50,7 @@ export const SAMPLES: Record<Identity, SampleViewer> = {
   nor: { name: '路过的猫', guard: 0, isMod: false, medalLevel: null },
 };
 
-/** B 站粉丝牌配色（消息里没有颜色时使用） */
+/** B站粉丝牌配色（消息里没有颜色时使用） */
 export function medalColors(level: number, guard = false): { bg: string; level: string; border: string; text: string } {
   const t = level <= 10 ? ['#5762A7', null] : level <= 20 ? ['#C770A4', null] : level <= 30 ? ['#3FB4F6', '#5FC7F4'] : level <= 40 ? ['#4C7DFF', '#58A1F8'] : level <= 50 ? ['#A773F1', '#D47AFF'] : ['#EC4F6E', '#F18087'];
   return { bg: `${t[0]}99`, level: `${t[0]}E6`, border: guard && t[1] ? t[1] : `${t[0]}99`, text: '#FFFFFF' };

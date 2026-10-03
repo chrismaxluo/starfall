@@ -24,8 +24,15 @@ export function sortedGiftBands(bands: readonly GiftBand[]): Array<GiftBand & { 
   return s.map((b, i) => ({ ...b, toGold: i === 0 ? null : s[i - 1]!.fromGold }));
 }
 
+/** 电池数（B 站礼物面板上的写法：1 电池 = 100 金瓜子 = 0.1 元；超过 1 万写成「1.314万电池」），和后台显示的一样 */
+export function batteryText(gold: number): string {
+  const b = gold / 100;
+  return b > 10_000 ? `${Math.round(b / 10) / 1000}万电池` : `${Math.round(b * 10) / 10}电池`;
+}
+
+/** 礼物分段的说法：≥ 1000电池、100 – 1000电池（界面上礼物价值都用电池） */
 export function giftBandLabel(fromGold: number, toGold: number | null): string {
-  return toGold === null ? `≥ ${yuanText(fromGold)}` : `${yuanText(fromGold).replace(' 元', '')} – ${yuanText(toGold)}`;
+  return toGold === null ? `≥ ${batteryText(fromGold)}` : `${batteryText(fromGold).replace('电池', '')} – ${batteryText(toGold)}`;
 }
 
 export function matchGift(ev: Pick<GiftEvent, 'giftId' | 'giftName' | 'unitPrice' | 'count' | 'paid'>, rules: GiftRules): GiftMatch | null {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import ChatPreview from '../components/ChatPreview.vue';
+import AddSteps from '../components/AddSteps.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
@@ -311,19 +312,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
 
           <details class="howto" :open="howtoOpen" @toggle="(e) => (howtoOpen = (e.target as HTMLDetailsElement).open)">
             <summary><Icon name="i-chev" /><span>{{ o.app === 'obs' ? '在 OBS 中添加' : '在 B站直播姬中添加' }}</span><span class="aside">特效页没连上时自动展开{{ o.app === 'livehime' ? ' · 菜单名称以实际版本为准' : '' }}</span></summary>
-            <ol v-if="o.app === 'obs'" class="steps">
-              <li v-if="o.orient === 'portrait'"><span>竖屏推流时，OBS 的 <b>设置 → 视频 → 基础分辨率</b> 也要设成 <code>{{ o.width }}x{{ o.height }}</code>。</span></li>
-              <li><span><em class="tagsrc fx">特效页</em>在 <b>来源</b> 里点 <b>+</b> → <b>浏览器</b>，命名为「星临特效」，URL 粘贴特效页地址，宽 <code>{{ o.width }}</code> 高 <code>{{ o.height }}</code>，勾选 <b>通过 OBS 控制音频</b>（特效的音效才会进入直播）。</span></li>
-              <li><span><em class="tagsrc fx">特效页</em>取消勾选 <b>不可见时关闭源</b> 和 <b>场景变为活动状态时刷新浏览器</b>，避免切场景时漏播；把它拖到来源列表 <b>最上方</b>。</span></li>
-              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再加一个 <b>浏览器</b> 来源，命名为「星临弹幕」，URL 粘贴弹幕列表地址，宽 <code>{{ chatWh.w }}</code> 高 <code>{{ chatWh.h }}</code>，拖到画面左边或右边。</span></li>
-              <li><span>第一次用可以先检查直播软件支不支持：<button type="button" class="linkish" @click="copyCheck">复制兼容性自检地址</button>，在直播软件里临时加一个浏览器源打开它，看完删掉。加好特效页后，也可以点上面的「发一个测试特效到直播画面」。</span></li>
-            </ol>
-            <ol v-else class="steps">
-              <li v-if="o.orient === 'portrait'"><span>在直播姬里切换到 <b>竖屏直播</b> 模式。</span></li>
-              <li><span><em class="tagsrc fx">特效页</em>点 <b>添加素材 → 浏览器</b>，粘贴特效页地址，宽高填 <code>{{ o.width }}</code> × <code>{{ o.height }}</code>，拖动 <b>铺满画面</b>，放到 <b>图层最上方</b>。</span></li>
-              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再添加一个 <b>浏览器</b> 素材，粘贴弹幕列表地址，宽高填 <code>{{ chatWh.w }}</code> × <code>{{ chatWh.h }}</code>，拖到画面左边或右边。想改大小就改宽高数字或下面的「字号」，不要拉伸变形。</span></li>
-              <li><span>第一次用可以先检查直播软件支不支持：<button type="button" class="linkish" @click="copyCheck">复制兼容性自检地址</button>，在直播软件里临时加一个浏览器源打开它，看完删掉。加好特效页后，也可以点上面的「发一个测试特效到直播画面」。</span></li>
-            </ol>
+            <AddSteps :output="o" @copy-check="copyCheck" />
           </details>
         </div>
 
@@ -416,7 +405,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                     <button :aria-pressed="o.chatMedal === 'all'" @click="save({ chatMedal: 'all' })">戴什么显示什么</button>
                   </span>
                 </div>
-                <span class="hint">{{ o.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B 站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
+                <span class="hint">{{ o.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
               </div>
             </div>
             <div class="srow">

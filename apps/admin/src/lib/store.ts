@@ -32,7 +32,7 @@ export const state = reactive({
   feed: [] as EventDto[],
   /** 实时连接是否在线 */
   wsOnline: false,
-  /** 荣耀等级勋章：等级 → B 站的图（读不到时是空的，界面上改成显示文字） */
+  /** 荣耀等级勋章：等级 → B站的图（读不到时是空的，界面上改成显示文字） */
   honorMedals: {} as Record<number, string>,
   /** 从别的页面跳到"添加专属用户"时预填的 UID */
   pendingExclusive: null as number | null,

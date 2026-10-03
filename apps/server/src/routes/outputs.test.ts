@@ -27,6 +27,11 @@ describe('直播软件输出', () => {
     expect(u).toMatchObject({ chatEnabled: false, chatSide: 'right', chatSize: 'large', chatMedal: 'all', chatMax: 15 });
     expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatSide: 'middle' } })).statusCode).toBe(400);
     for (const chatMax of [0, 21, 2.5]) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatMax } })).statusCode).toBe(400);
+    // 自动消失：默认 0（一直显示），可以设 3 – 600 秒
+    expect(o.chatFadeSec).toBe(0);
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatFadeSec: 10 } })).json()).toMatchObject({ chatFadeSec: 10 });
+    for (const chatFadeSec of [1, 601, -1, 2.5]) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatFadeSec } })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatFadeSec: 0 } })).json()).toMatchObject({ chatFadeSec: 0 });
   });
 
   it('新建（未填的用默认值）、修改、参数校验', async () => {

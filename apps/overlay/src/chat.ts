@@ -1,6 +1,6 @@
 // 弹幕列表：直播间里所有人的弹幕排成一列，新的从下面进来，旧的往上顶，最多显示设置的条数（放不下时少显示几条）。
 // 地址形如 /overlay/?output=1&key=...&chat=1，在直播软件里单独加一个浏览器源（建议 600×900），拖到画面左边或右边。
-// 设计见 design/preview/chat-list.html。毛玻璃在带透明度动画的父元素里会失效：透明度只加在气泡、头像本身，外层只做位移
+// 可以设成每条显示多少秒后自动淡出（chatFadeSec，0 为一直显示）。设计见 design/preview/chat-list.html。毛玻璃在带透明度动画的父元素里会失效：透明度只加在气泡、头像本身，外层只做位移
 import './chat.css';
 import { CHAT_MAX_LIMIT, GUARD_BADGES } from '@starfall/shared/overlay';
 import type { ChatItem, OverlayConfig, ServerToOverlay } from '@starfall/shared/overlay';
@@ -109,11 +109,42 @@ function enter(el: HTMLElement, item: ChatItem): void {
   }
 }
 
+// ---------- 自动消失 ----------
+/** 这条弹幕从什么时候开始算（本机时间）：刚收到的按收到的时间；打开页面时补上的旧弹幕按它发出的时间，不晚于现在 */
+const shownAt = new WeakMap<Element, number>();
+const fadeMs = () => (config.chatFadeSec > 0 ? config.chatFadeSec * 1000 : 0);
+/** 还没到消失时间的（打开页面、改设置重画时，过了时间的就不画了） */
+const fresh = (it: ChatItem) => !fadeMs() || Date.now() - Math.min(it.ts, Date.now()) < fadeMs();
+function expire(el: HTMLElement): void {
+  if (el.dataset.out) return;
+  el.dataset.out = '1';
+  if (reduced()) return void el.remove();
+  // 列表从底部往上排，最上面的最先到时间：原地淡出、往上飘一点，下面的不会跳
+  const parts = el.querySelectorAll<HTMLElement>(':scope > .g, :scope > .avw');
+  let done = 0;
+  for (const p of parts) {
+    anim(p, [{ opacity: Number(p.style.opacity || 1), transform: 'none' }, { opacity: 0, transform: 'translateY(-14px)' }], { duration: 520, easing: 'cubic-bezier(.4,0,.2,1)' }).finished.then(
+      () => ++done === parts.length && el.remove(),
+      () => el.remove(),
+    );
+  }
+}
+setInterval(() => {
+  const ms = fadeMs();
+  if (!ms) return;
+  const now = Date.now();
+  for (const r of list.children) {
+    const at = shownAt.get(r);
+    if (at !== undefined && now - at >= ms) expire(r as HTMLElement);
+  }
+}, 400);
+
 /** 加一条：旧的往上挪（FLIP：先记下位置，插入后从旧位置滑过去）；超过条数或放不下时，最上面的淡出 */
 function add(item: ChatItem, quiet = false, remember = true): void {
   if (remember) items = [...items, item].slice(-CHAT_MAX_LIMIT);
   const before = new Map([...list.children].map((r) => [r, r.getBoundingClientRect().top]));
   const el = build(item);
+  shownAt.set(el, quiet ? Math.min(item.ts, Date.now()) : Date.now());
   list.append(el);
   const leaving: HTMLElement[] = [];
   const live = [...list.children].filter((r) => !(r as HTMLElement).dataset.out) as HTMLElement[];
@@ -154,11 +185,11 @@ function add(item: ChatItem, quiet = false, remember = true): void {
 /** 按现在的设置重新画一遍（不要动画） */
 function redraw(): void {
   list.replaceChildren();
-  for (const it of items.slice(-config.chatMax)) add(it, true, false);
+  for (const it of items.slice(-config.chatMax)) if (fresh(it)) add(it, true, false);
 }
 
 function applyConfig(next: OverlayConfig): void {
-  const redrawNeeded = next.chatMedal !== config.chatMedal || next.chatSize !== config.chatSize || next.chatMax !== config.chatMax;
+  const redrawNeeded = next.chatMedal !== config.chatMedal || next.chatSize !== config.chatSize || next.chatMax !== config.chatMax || next.chatFadeSec !== config.chatFadeSec;
   config = next;
   const lite = q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
   root.className = `chat-root side-${config.chatSide}${config.chatSize === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${config.chatEnabled ? '' : ' off'}`;

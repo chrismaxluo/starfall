@@ -1,0 +1,1 @@
+ALTER TABLE `outputs` ADD `chat_fade_sec` integer DEFAULT 0 NOT NULL;

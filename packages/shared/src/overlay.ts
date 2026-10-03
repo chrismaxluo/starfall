@@ -41,11 +41,17 @@ export interface OverlayConfig {
   chatMedal: 'own' | 'all';
   /** 弹幕列表最多显示几条 */
   chatMax: number;
+  /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示（只被新弹幕顶走） */
+  chatFadeSec: number;
 }
 
 /** 弹幕列表条数：默认 8 条，最多能设 CHAT_MAX_LIMIT 条（服务端也最多记住这么多条） */
 export const CHAT_MAX_DEFAULT = 8;
 export const CHAT_MAX_LIMIT = 20;
+/** 弹幕自动消失的时间：3 – 600 秒（0 为一直显示）；后台的常用选项 */
+export const CHAT_FADE_MIN = 3;
+export const CHAT_FADE_MAX = 600;
+export const CHAT_FADE_OPTIONS = [5, 10, 15, 30, 60];
 /** 弹幕列表浏览器源的建议宽度 */
 export const CHAT_WIDTH = 600;
 

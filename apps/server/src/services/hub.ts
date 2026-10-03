@@ -54,6 +54,7 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   chatSize: o.chatSize,
   chatMedal: o.chatMedal,
   chatMax: o.chatMax,
+  chatFadeSec: o.chatFadeSec,
 });
 
 export class Hub {

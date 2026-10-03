@@ -66,6 +66,8 @@ export interface OutputDto {
   chatSize: 'normal' | 'large';
   chatMedal: 'own' | 'all';
   chatMax: number;
+  /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示 */
+  chatFadeSec: number;
   key: string;
   path: string;
   /** 弹幕列表地址 */

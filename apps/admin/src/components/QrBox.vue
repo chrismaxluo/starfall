@@ -12,7 +12,8 @@ defineProps<{ qr: ReturnType<typeof useQrLogin> }>();
     <div v-if="qr.st.value === 'expired'" class="scanned" style="color: var(--gov)">二维码已过期</div>
   </div>
   <span v-if="qr.st.value === 'loading'"><span class="spin" /> 正在获取二维码…</span>
+  <span v-else-if="qr.st.value === 'waiting' && qr.offline.value" class="err">和星临的连接断了，扫码结果收不到，正在重试…</span>
   <span v-else-if="qr.st.value === 'waiting'">用 <b>B站手机客户端</b> 扫一扫（首页左上角）</span>
   <span v-else-if="qr.st.value === 'error'" class="err">{{ qr.err.value }}</span>
-  <button v-if="qr.st.value === 'expired' || qr.st.value === 'error'" class="btn primary" @click="qr.start">重新获取二维码</button>
+  <button v-if="qr.st.value === 'expired' || qr.st.value === 'error' || qr.offline.value" class="btn primary" @click="qr.start">重新获取二维码</button>
 </template>

@@ -501,6 +501,7 @@
   background: radial-gradient(60% 40% at 25% 60%, rgba(255,170,90,.55), transparent 70%), radial-gradient(60% 40% at 85% 70%, rgba(90,160,255,.5), transparent 70%), radial-gradient(70% 45% at 60% 18%, rgba(210,120,255,.35), transparent 70%), linear-gradient(175deg, #2A2436, #151823 60%, #0E1017); }
 .chatpv.alpha { background: repeating-conic-gradient(#2A2A31 0% 25%, #1F1F25 0% 50%) 0 0 / 14px 14px; }
 .chatpv iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: transparent; color-scheme: normal; }
+.chatpv-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: rgba(255,255,255,.55); font-size: 12.5px; line-height: 1.8; pointer-events: none; }
 .chatpv-off { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 10, 16, .6); color: rgba(255,255,255,.7); font-size: 13px; }
 .prev-note { margin: 10px 0 0; font-size: 12px; color: var(--t3); }
 
@@ -578,3 +579,21 @@ body:has(.editor) .toasts { bottom: 92px; }
 
 /* 事件记录：没播的原因后面的处理按钮 */
 .st-fix { display: block; margin-top: 3px; font-size: 12px; }
+
+/* 输出页预览：背景切换；测试按钮多时换行 */
+.prev-tools { flex-wrap: wrap; }
+.prev-bg { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t3); }
+.prev-bg .seg button { height: 28px; padding: 0 10px; font-size: 12px; }
+/* 和星临的连接断了：页面上的状态可能不是最新的，变灰 */
+.app.stale .top .live, .app.stale .top .livestate, .app.stale .ov-side, .app.stale .kstrip, .app.stale .ptabs .dot { filter: grayscale(1); opacity: .55; }
+
+/* 弹幕规则：拖动排序 */
+.rl-no.grab { cursor: grab; gap: 4px; }
+.rl-no.grab:active { cursor: grabbing; }
+.rl-no .grip { width: 10px; height: 10px; color: var(--t3); }
+.rl.dragging { opacity: .45; }
+.rl.dropto { box-shadow: 0 -2px 0 0 var(--accent); }
+
+/* SVGA 动态图层：每个图层的缩略图 */
+.svga-slot .sthumb { width: 30px; height: 30px; flex: none; border-radius: 6px; overflow: hidden; background: repeating-conic-gradient(#2A2A31 0% 25%, #1F1F25 0% 50%) 0 0 / 8px 8px; display: grid; place-items: center; }
+.svga-slot .sthumb img { max-width: 100%; max-height: 100%; object-fit: contain; }

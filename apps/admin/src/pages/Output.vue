@@ -5,6 +5,7 @@ import AddSteps from '../components/AddSteps.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
+import Seg from '../components/Seg.vue';
 import { del, post, put } from '../lib/api.ts';
 import { CHAT_MAX_LIMIT, CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
@@ -440,13 +441,13 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           </div>
           <div class="prev-tools">
             <template v-if="ptab === 'fx'">
-              <button v-for="id in (['gov', 'cap', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', cap: '舰长', fan: '粉丝牌', nor: '普通' }[id as 'gov'] }}</button>
+              <button v-for="id in (['gov', 'adm', 'cap', 'mod', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" :title="tierEffect(id) ? '' : '这个身份还没选特效'" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', fan: '粉丝牌', nor: '其他' }[id as 'gov'] }}</button>
             </template>
             <template v-else>
               <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('normal')"><i style="background: var(--nor)" />测试弹幕</button>
               <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('guard')"><i style="background: var(--gov)" />大航海发言</button>
             </template>
-            <button class="btn" style="margin-left: auto" @click="alphaBg = !alphaBg">{{ alphaBg ? '游戏画面背景' : '透明背景' }}</button>
+            <span class="prev-bg"><span>背景</span><Seg :model-value="alphaBg ? 'alpha' : 'game'" label="预览背景" :options="[{ value: 'game', label: '游戏画面' }, { value: 'alpha', label: '透明' }]" @change="(v) => (alphaBg = v === 'alpha')" /></span>
           </div>
           <p v-if="ptab === 'fx' && overlays.length" class="prev-note">特效页已连上 {{ clock(overlays[0]!.since) }} 起</p>
         </div>

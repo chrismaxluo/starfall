@@ -80,10 +80,30 @@ async function remove(r: DanmuRuleDto): Promise<void> {
   });
 }
 async function move(i: number, d: -1 | 1): Promise<void> {
+  await moveTo(i, i + d);
+}
+/** 把第 from 条挪到第 to 条的位置（上下箭头、拖动共用） */
+async function moveTo(from: number, to: number): Promise<void> {
+  if (from === to || to < 0 || to >= state.danmu.length) return;
   const ids = state.danmu.map((r) => r.id);
-  [ids[i], ids[i + d]] = [ids[i + d]!, ids[i]!];
-  const res = await attempt(() => put<{ rules: DanmuRuleDto[] }>('/api/rules/danmu/order', { ids }));
+  const [id] = ids.splice(from, 1);
+  ids.splice(to, 0, id!);
+  const res = await attempt(() => put<{ rules: DanmuRuleDto[] }>('/api/rules/danmu/order', { ids }), `已把这条挪到第 ${to + 1} 条`);
   if (res) state.danmu = res.rules;
+}
+// 按住左边的编号拖动排序
+const dragFrom = ref<number | null>(null);
+const dragOver = ref<number | null>(null);
+function onDragStart(e: DragEvent, i: number): void {
+  dragFrom.value = i;
+  e.dataTransfer?.setData('text/plain', String(i));
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+}
+function onDrop(i: number): void {
+  const from = dragFrom.value;
+  dragFrom.value = null;
+  dragOver.value = null;
+  if (from !== null) void moveTo(from, i);
 }
 /** 添加关键词（回车或点别处都算）；同一关键词在别的规则里也有时提示（F-DM-04） */
 async function addKeyword(r: DanmuRuleDto, e: Event): Promise<void> {
@@ -140,11 +160,11 @@ const clashes = computed(() => {
 
 <template>
   <div>
-    <div class="rl-flow"><span>弹幕里有关键词就播放。多条规则都符合时，用编号最小（排在最上面）的一条，可以用箭头调整顺序。</span></div>
+    <div class="rl-flow"><span>弹幕里有关键词就播放。多条规则都符合时，用编号最小（排在最上面）的一条；按住左边的编号拖动，或者用右边的箭头调整顺序。</span></div>
     <div class="rl-sec"><h3>关键词</h3><span v-if="state.danmu.length">{{ state.danmu.length }} 条</span><span class="r"><button class="btn primary" :disabled="draft" @click="startDraft"><Icon name="i-plus" />新建弹幕规则</button></span></div>
     <div ref="list" class="rl-list">
-      <div v-for="(r, i) in state.danmu" :key="r.id" class="rl" :class="{ off: !r.enabled, flash: flash === r.id }">
-        <span class="who"><span class="rl-no" :title="i === 0 ? '排在最上面，最先匹配' : `第 ${i + 1} 条：上面的规则都没对上时才看这条`">#{{ i + 1 }}</span></span>
+      <div v-for="(r, i) in state.danmu" :key="r.id" class="rl" :class="{ off: !r.enabled, flash: flash === r.id, dragging: dragFrom === i, dropto: dragOver === i && dragFrom !== i }" @dragover.prevent="dragFrom !== null && (dragOver = i)" @dragleave="dragOver === i && (dragOver = null)" @drop.prevent="onDrop(i)">
+        <span class="who"><span class="rl-no grab" draggable="true" :title="`${i === 0 ? '排在最上面，最先匹配' : `第 ${i + 1} 条：上面的规则都没对上时才看这条`}；按住拖动可以调整顺序`" @dragstart="(e) => onDragStart(e, i)" @dragend="(dragFrom = null), (dragOver = null)"><Icon name="i-grip" class="grip" />#{{ i + 1 }}</span></span>
         <span class="say">
           弹幕
           <select class="sel sm" :value="r.mode" aria-label="匹配方式" title="包含：弹幕里有这个词就算；整条就是：整条弹幕只能是这个词" @change="(e) => patch(r, { mode: (e.target as HTMLSelectElement).value as DanmuRule['mode'] }, '已修改匹配方式')">

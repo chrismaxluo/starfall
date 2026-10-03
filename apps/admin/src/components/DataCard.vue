@@ -36,6 +36,12 @@ function when(stamp: string): string {
   return m ? `${Number(m[2])}月${Number(m[3])}日 ${m[4]}:${m[5]}${m[6] ? ' · 手动' : ''}` : stamp;
 }
 
+/** 恢复到某一份备份：先显示会有哪些变化，确认后才生效（恢复前会自动再备份一份现在的） */
+async function restore(b: BackupItem): Promise<void> {
+  if (!b.config) return;
+  const r = await attempt(() => post<ImportPreview>(`/api/backup/restore/${b.config}`));
+  if (r) preview.value = r;
+}
 async function pick(e: Event): Promise<void> {
   const el = e.target as HTMLInputElement;
   const f = el.files?.[0];
@@ -64,6 +70,7 @@ onMounted(load);
       <div class="bk-list">
         <div v-for="b in showAll ? backups : backups.slice(0, 2)" :key="b.stamp" class="bk-item">
           <span class="num">{{ when(b.stamp) }}</span><span class="sz">{{ fileSize(b.dbSize + b.configSize) }}</span>
+          <button v-if="b.config" type="button" class="linkish" @click="restore(b)">恢复到这份</button>
           <a v-if="b.config" class="linkish" :href="`/api/backup/files/${b.config}`" download>下载配置</a>
         </div>
         <span v-if="!backups.length" class="inline-hint">还没有备份。</span>
@@ -91,8 +98,8 @@ onMounted(load);
         <button class="btn" :disabled="uploading !== null" @click="fileIn?.click()">{{ uploading !== null ? `正在上传 ${Math.round(uploading * 100)}%` : '导入配置' }}</button>
         <input ref="fileIn" type="file" accept=".json,.zip,application/json,application/zip" hidden @change="pick" />
       </div>
-      <span class="hint" style="font-size: 12px; color: var(--t3)">配置包括规则、素材设置、输出和播放设置，不含 B 站登录信息和后台密码。导出的文件可以直接导入以后的 Windows 版；换电脑时建议用「含素材文件」的 zip。</span>
+      <span class="hint" style="font-size: 12px; color: var(--t3)">配置包括规则、素材设置、输出和播放设置，不含 B 站登录信息和后台密码。导出的文件电脑版和服务器版都能导入；换电脑时建议用「含素材文件」的 zip。导入或恢复前会自动备份一份现在的配置，导错了可以在上面的备份列表里点「恢复到这份」。</span>
     </div>
-    <ImportDialog v-if="preview" :preview="preview" @close="preview = null" @done="preview = null" />
+    <ImportDialog v-if="preview" :preview="preview" @close="preview = null" @done="(preview = null), load()" />
   </div>
 </template>

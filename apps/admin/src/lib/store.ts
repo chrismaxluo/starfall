@@ -98,6 +98,8 @@ export const ui = reactive({
   editorId: null as number | null,
   wizard: false,
   palette: false,
+  /** 打开事件记录时先搜索这个（观众菜单「查看 TA 的记录」） */
+  logQuery: null as string | null,
   /** 扫码登录 B站（侧边栏、登录失效提醒条） */
   qr: false,
   /** 预览小窗：点规则的 ▶、命令面板里的「预览某身份进场特效」 */

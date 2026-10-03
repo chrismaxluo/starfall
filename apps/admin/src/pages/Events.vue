@@ -7,18 +7,25 @@ import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
 import Seg from '../components/Seg.vue';
-import { get } from '../lib/api.ts';
-import { describe, statusCls, statusText } from '../lib/events.ts';
+import { del, get } from '../lib/api.ts';
+import { go } from '../lib/route.ts';
+import { STATUS_WHY, WHY_FILTERS, describe, statusCls, statusText } from '../lib/events.ts';
 import { dateTime } from '../lib/format.ts';
 import { onLiveEvent, onLiveEventStatus, onResync } from '../lib/live.ts';
-import { effectById, state } from '../lib/store.ts';
-import { toast } from '../lib/toast.ts';
+import { effectById, state, ui } from '../lib/store.ts';
+import { attempt, toast } from '../lib/toast.ts';
 import type { EventDto, Viewer } from '../lib/types.ts';
 
 type Kind = 'all' | EventDto['kind'];
 const kind = ref<Kind>('all');
-const q = ref('');
-const st = ref<'all' | 'played' | 'skip'>('all');
+// 从观众菜单「查看 TA 的记录」跳过来时，带着 UID 搜索
+const q = ref(ui.logQuery ?? '');
+ui.logQuery = null;
+/** 状态筛选：全部 / 已播放 / 未播放（所有原因）/ 某一种没播的原因（逗号分隔的状态） */
+const st = ref<string>('all');
+/** 时间范围：全部 / 今天 / 本场 / 最近 7 天 */
+const range = ref<'all' | 'today' | 'live' | '7d'>('all');
+const failed = ref(false);
 const rows = ref<EventDto[]>([]);
 const cursor = ref<number | null>(null);
 const loading = ref(false);
@@ -30,7 +37,9 @@ function query(c?: number): string {
   if (kind.value !== 'all') p.set('kind', kind.value);
   if (q.value) p.set('q', q.value);
   if (st.value === 'played') p.set('status', 'played');
-  if (st.value === 'skip') p.set('status', NOT_PLAYED);
+  else if (st.value === 'skip') p.set('status', NOT_PLAYED);
+  else if (st.value !== 'all') p.set('status', st.value);
+  if (range.value !== 'all') p.set('range', range.value);
   if (c) p.set('cursor', String(c));
   return `/api/events?${p}`;
 }
@@ -44,14 +53,17 @@ async function load(more = false): Promise<void> {
     if (my !== seq) return;
     rows.value = more ? [...rows.value, ...r.events] : r.events;
     cursor.value = r.nextCursor;
+    failed.value = false;
   } catch (e) {
-    if (my === seq) toast(e instanceof Error ? e.message : String(e), 'err');
+    if (my !== seq) return;
+    if (!more) failed.value = true;
+    toast(e instanceof Error ? e.message : String(e), 'err');
   } finally {
     if (my === seq) loading.value = false;
   }
 }
 let t: ReturnType<typeof setTimeout> | null = null;
-watch([kind, st], () => void load());
+watch([kind, st, range], () => void load());
 watch(q, () => {
   if (t) clearTimeout(t);
   t = setTimeout(() => void load(), 300);
@@ -59,10 +71,11 @@ watch(q, () => {
 
 // 实时追加：没有搜索时，符合当前筛选的新事件直接插到最上面
 function matches(e: EventDto): boolean {
-  if (q.value) return false;
+  if (q.value || range.value === '7d' || (range.value === 'live' && !state.status?.live.live)) return false;
   if (kind.value !== 'all' && e.kind !== kind.value) return false;
   if (st.value === 'played') return e.status === 'played';
   if (st.value === 'skip') return NOT_PLAYED.split(',').includes(e.status);
+  if (st.value !== 'all') return st.value.split(',').includes(e.status);
   return true;
 }
 // 实时插入的最多保留这么多条（开几个小时也不会越积越多）；想看更早的点"加载更多"
@@ -103,6 +116,36 @@ onMounted(() => void load());
 onBeforeUnmount(() => (off1(), off2(), off3()));
 
 const isExcl = (uid: number) => state.exclusives.some((x) => x.uid === uid && x.enabled);
+/** 每种没播的原因，一键去处理 */
+function fixOf(e: EventDto): { label: string; run: () => void } | null {
+  switch (e.status) {
+    case 'no_rule':
+      return e.kind === 'sc' ? null : { label: '去看规则', run: () => go('rules', e.kind === 'enter' ? undefined : e.kind) };
+    case 'no_overlay':
+      return { label: '去检查特效页', run: () => go('obs') };
+    case 'cooldown':
+    case 'once':
+      return { label: '去改', run: () => go('rules', e.kind === 'enter' ? undefined : e.kind) };
+    case 'offline':
+      return { label: '去设置', run: () => go('settings') };
+    case 'dropped':
+      return { label: '排队设置', run: () => go('overview') };
+    case 'blacklist':
+      return {
+        label: '移出黑名单',
+        run: () => void attempt(() => del(`/api/blacklist/${e.uid}`), `已把 ${e.uname} 移出黑名单，之后照常触发`),
+      };
+    default:
+      return null;
+  }
+}
+const hasFilter = () => Boolean(q.value || kind.value !== 'all' || st.value !== 'all' || range.value !== 'all');
+function clearFilters(): void {
+  q.value = '';
+  kind.value = 'all';
+  st.value = 'all';
+  range.value = 'all';
+}
 function setExclusive(e: EventDto): void {
   state.pendingExclusive = e.uid;
   location.hash = 'rules/exclusive';
@@ -120,9 +163,14 @@ function setExclusive(e: EventDto): void {
     <div class="toolbar">
       <Seg v-model="kind" label="事件类型" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物' }, { value: 'guard', label: '上舰' }, { value: 'sc', label: '醒目留言' }]" />
       <div class="s"><Icon name="i-search" /><input v-model.trim="q" class="inp" maxlength="40" placeholder="搜索昵称或 UID" aria-label="搜索昵称或 UID" /></div>
-      <select v-model="st" class="sel" style="width: 140px" aria-label="播放状态">
-        <option value="all">全部状态</option><option value="played">已播放</option><option value="skip">未播放</option>
+      <select v-model="st" class="sel" style="width: 170px" aria-label="播放状态">
+        <option value="all">全部状态</option><option value="played">已播放</option><option value="skip">未播放（所有原因）</option>
+        <optgroup label="没播的原因"><option v-for="w in WHY_FILTERS" :key="w.value" :value="w.value">{{ w.label }}</option></optgroup>
       </select>
+      <select v-model="range" class="sel" style="width: 130px" aria-label="时间范围">
+        <option value="all">全部时间</option><option value="today">今天</option><option value="live">{{ state.status?.live.live ? '本场' : '上一场' }}</option><option value="7d">最近 7 天</option>
+      </select>
+      <button v-if="hasFilter()" class="linkish" type="button" @click="clearFilters">清除筛选</button>
     </div>
     <div class="table-wrap">
       <table class="logtable">
@@ -139,11 +187,26 @@ function setExclusive(e: EventDto): void {
             </td>
             <td><span class="evchip"><EvIcon :kind="e.kind" :img="e.payload?.icon" />{{ describe(e) }}</span></td>
             <td><template v-if="e.rule">{{ e.rule }}<template v-if="e.effectId"> → {{ effectById(e.effectId)?.name ?? '（素材已删除）' }}</template></template><span v-else style="color: var(--t3)">—</span></td>
-            <td><span v-if="e.kind === 'sc'" class="st skip">只记录</span><span v-else class="st" :class="statusCls(e.status)">{{ statusText(e.status) }}</span></td>
+            <td>
+              <span v-if="e.kind === 'sc'" class="st skip" title="醒目留言现在只记录，不触发特效">只记录</span>
+              <template v-else>
+                <span class="st" :class="statusCls(e.status)" :title="STATUS_WHY[e.status]">{{ statusText(e.status) }}</span>
+                <button v-if="fixOf(e)" type="button" class="linkish st-fix" :title="STATUS_WHY[e.status]" @click="fixOf(e)!.run()">{{ fixOf(e)!.label }}</button>
+              </template>
+            </td>
             <td class="row-act" style="white-space: nowrap"><button v-if="e.kind === 'enter' && e.uid > 0" class="btn" @click="setExclusive(e)">{{ isExcl(e.uid) ? '修改专属' : '设为专属' }}</button></td>
           </tr>
-          <tr v-if="!rows.length && !loading">
-            <td colspan="6" style="text-align: center; padding: 40px; color: var(--t3)">{{ q || kind !== 'all' || st !== 'all' ? '没有符合条件的记录' : '还没有记录，开播后观众的进场、弹幕、礼物都会记在这里' }}</td>
+          <tr v-if="loading && !rows.length">
+            <td colspan="6" style="text-align: center; padding: 40px; color: var(--t3)">正在读取…</td>
+          </tr>
+          <tr v-else-if="failed && !rows.length">
+            <td colspan="6" style="text-align: center; padding: 40px; color: var(--t3)">没读到事件记录（可能是和星临的连接断了）。<button class="linkish" type="button" @click="load()">重试</button></td>
+          </tr>
+          <tr v-else-if="!rows.length">
+            <td colspan="6" style="text-align: center; padding: 40px; color: var(--t3)">
+              <template v-if="hasFilter()">没有符合条件的记录。<button class="linkish" type="button" @click="clearFilters">清除筛选</button></template>
+              <template v-else>还没有记录，开播后观众的进场、弹幕、礼物都会记在这里</template>
+            </td>
           </tr>
         </tbody>
       </table>

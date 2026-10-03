@@ -1,5 +1,5 @@
 // 事件记录（需求 F-DA-01 ~ 02、F-UI-04）：每个事件一行，带命中规则和播放状态。
-import { and, desc, eq, inArray, isNotNull, like, lt, or } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, like, lt, or } from 'drizzle-orm';
 import type { EventKind, PlayStatus, StdEvent } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
 import { events } from '../db/schema.ts';
@@ -109,13 +109,15 @@ export class EventLog {
   }
 
   /** 按时间倒序分页查询；cursor 是上一页最后一条的 id；roomId 只看这个直播间的 */
-  query(f: { roomId?: number; kind?: EventKind; status?: PlayStatus[]; q?: string; cursor?: number; limit?: number }): { events: EventDto[]; nextCursor: number | null } {
+  query(f: { roomId?: number; kind?: EventKind; status?: PlayStatus[]; q?: string; cursor?: number; limit?: number; from?: number; to?: number }): { events: EventDto[]; nextCursor: number | null } {
     const limit = Math.min(200, Math.max(1, f.limit ?? 50));
     const conds = [];
     if (f.roomId !== undefined) conds.push(eq(events.roomId, f.roomId));
     if (f.kind) conds.push(eq(events.kind, f.kind));
     if (f.status?.length) conds.push(inArray(events.status, f.status));
     if (f.cursor) conds.push(lt(events.id, f.cursor));
+    if (f.from !== undefined) conds.push(gte(events.ts, f.from));
+    if (f.to !== undefined) conds.push(lt(events.ts, f.to));
     const q = f.q?.trim();
     if (q) {
       const esc = q.replace(/[\\%_]/g, (c) => `\\${c}`);

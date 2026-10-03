@@ -146,7 +146,7 @@ const lastFade = ref(10);
 watch(() => o.value?.chatFadeSec, (v) => v && (lastFade.value = v), { immediate: true });
 function setChatFade(v: number): void {
   if (!o.value || v === o.value.chatFadeSec) return;
-  void save({ chatFadeSec: v }, v ? `弹幕显示 ${v} 秒后自动淡出` : '弹幕一直显示，只被新弹幕顶走');
+  void save({ chatFadeSec: v }, v ? `没人发弹幕 ${v} 秒后，从最旧的开始一条一条消失` : '弹幕一直显示，只被新弹幕顶走');
 }
 async function copy(which: 'fx' | 'chat'): Promise<void> {
   try {
@@ -438,11 +438,11 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                 <div class="line">
                   <Switch :model-value="o.chatFadeSec > 0" label="弹幕自动消失" @change="(v) => setChatFade(v ? lastFade : 0)" />
                   <template v-if="o.chatFadeSec > 0">
-                    <span class="hint">每条显示</span>
-                    <CdPick :model-value="o.chatFadeSec" unit="sec" :options="CHAT_FADE_OPTIONS" :max="CHAT_FADE_MAX" :allow-zero="false" hint="每条弹幕显示多久后淡出" after="后淡出" @change="setChatFade" />
+                    <span class="hint">没人发弹幕</span>
+                    <CdPick :model-value="o.chatFadeSec" unit="sec" :options="CHAT_FADE_OPTIONS" :max="CHAT_FADE_MAX" :allow-zero="false" hint="最后一条弹幕之后过多久开始消失" after="后开始消失" @change="setChatFade" />
                   </template>
                 </div>
-                <span class="hint">{{ o.chatFadeSec > 0 ? `每条弹幕显示 ${o.chatFadeSec} 秒后自动淡出；弹幕多的时候，没到时间也会被新弹幕顶走。` : '关着时弹幕一直显示，只被新弹幕顶走（没人说话时最后几条一直留在画面上）。' }}</span>
+                <span class="hint">{{ o.chatFadeSec > 0 ? `没人发弹幕 ${o.chatFadeSec} 秒后，从最上面最旧的那条开始，每 2 秒淡出一条；有新弹幕来就重新计时。满 ${o.chatMax} 条时，新弹幕照样会把最旧的顶走。` : '关着时弹幕一直显示，只被新弹幕顶走（没人说话时最后几条一直留在画面上）。' }}</span>
               </div>
             </div>
           </div>

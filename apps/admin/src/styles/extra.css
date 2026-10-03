@@ -526,3 +526,50 @@
 .ed-f.ask .use { display: inline-flex; align-items: center; gap: 6px; color: var(--t2); }
 .ed-f.ask .use b { color: var(--t1); }
 .ed-f.ask .use svg { width: 15px; height: 15px; color: var(--accent); }
+
+/* 素材设置：预览按哪类事件、示例观众；欢迎语的中文变量按钮和效果示例 */
+.pv-opts { display: grid; gap: 8px; }
+.pv-opt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--t3); }
+.pv-opt .seg button { padding: 0 9px; height: 26px; font-size: 12px; }
+.vars .vars-l { font-size: 12px; color: var(--t3); margin-right: 2px; align-self: center; }
+.tx-ex { font-size: 12.5px; color: var(--t1); padding: 8px 10px; border-radius: 8px; background: var(--hover); }
+.tx-ex span { color: var(--t3); margin-right: 8px; font-size: 12px; }
+/* 素材设置：不常用的设置收起来 */
+.ed-more { border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; }
+.ed-more[open] { padding-bottom: 12px; display: grid; gap: 10px; }
+.ed-more summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; height: 40px; font-size: 13px; color: var(--t2); }
+.ed-more summary::-webkit-details-marker { display: none; }
+.ed-more summary svg { width: 13px; height: 13px; transform: rotate(-90deg); transition: transform .15s; color: var(--t3); }
+.ed-more[open] summary svg { transform: none; }
+.ed-more summary .hint { margin-left: auto; font-size: 12px; color: var(--t3); }
+
+/* 弹幕规则：被前面规则抢先的关键词 */
+.shadownote { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gov); }
+.shadownote svg { width: 13px; height: 13px; flex: none; }
+.kw.dim { opacity: .6; text-decoration: line-through; text-decoration-color: var(--gov); }
+
+/* 素材库：没传上去的文件 */
+.ecard.failed { border-color: rgba(214, 69, 69, .45); }
+.ecard .up-err { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 16px; text-align: center; font-size: 12.5px; line-height: 1.6; color: #FF9A9A; background: rgba(214, 69, 69, .08); }
+.ecard .up-err svg { width: 22px; height: 22px; }
+.ecard .meta .bad { color: #D64545; }
+
+/* 模拟一下：进场一步步找规则的过程 */
+.simtrace { margin: 0 0 8px; padding-left: 1.3em; display: grid; gap: 3px; font-size: 12.5px; color: var(--t3); }
+.simtrace li.hit { color: var(--ok); font-weight: 500; }
+
+/* 总览右侧：看别的标签时，正在播放的特效显示在最上面 */
+.ov-nowbar { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; padding: 8px 12px; border-radius: 9px; background: var(--ok-soft); font-size: 12.5px; color: var(--t2); }
+.ov-nowbar .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-nowbar b { color: var(--t1); font-weight: 600; }
+.ov-nowbar .dotp { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; animation: ping 1.6s ease-out infinite; }
+
+/* 谁发的才算：最近发弹幕的人 */
+.whopop .recent { display: flex; flex-wrap: wrap; gap: 6px; }
+.whopop .recent .lbl { width: 100%; padding: 0; }
+.whopop .rchip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px 0 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; font-size: 12px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.whopop .rchip:hover { border-color: var(--accent-ring); }
+/* 弹出框内容变多（例如打开「指定观众」）时不超出屏幕 */
+.whopop { max-height: calc(100vh - 16px); overflow: auto; }
+/* 素材设置开着时，提示条往上挪，不挡住底部的按钮 */
+body:has(.editor) .toasts { bottom: 92px; }

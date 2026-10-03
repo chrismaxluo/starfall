@@ -3,9 +3,12 @@
 import { useQrLogin } from '../lib/qr.ts';
 import Icon from './Icon.vue';
 import QrBox from './QrBox.vue';
+import { useEsc } from '../lib/esc.ts';
 
 const emit = defineEmits<{ close: [] }>();
 const qr = useQrLogin(() => emit('close'));
+// 按 Esc 关闭
+useEsc(() => emit('close'));
 </script>
 
 <template>

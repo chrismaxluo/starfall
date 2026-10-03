@@ -6,6 +6,7 @@ import { refreshEffects, refreshOutputs, refreshRules, refreshSettings } from '.
 import { attempt, toast } from '../lib/toast.ts';
 import type { ImportPreview } from '../lib/types.ts';
 import Icon from './Icon.vue';
+import { useEsc } from '../lib/esc.ts';
 
 const props = defineProps<{ preview: ImportPreview }>();
 const emit = defineEmits<{ close: []; done: [] }>();
@@ -33,6 +34,8 @@ async function confirm(): Promise<void> {
   toast(r.savedFiles ? `导入完成，恢复了 ${r.savedFiles} 个素材文件` : '导入完成');
   emit('done');
 }
+// 按 Esc 关闭
+useEsc(() => void cancel());
 </script>
 
 <template>

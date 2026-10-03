@@ -25,7 +25,7 @@ import { go, route } from './lib/route.ts';
 import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
 import { toggleTheme } from './lib/theme.ts';
-import { attempt, toasts } from './lib/toast.ts';
+import { attempt, runAction, toast, toasts } from './lib/toast.ts';
 
 const NAV: Array<{ page: Page; name: string; icon: string }> = [
   { page: 'overview', name: '总览', icon: 'i-grid' },
@@ -181,8 +181,23 @@ watch(
 );
 document.documentElement.dataset.safe = 'on';
 
+// 文件拖到不接收的地方：不让浏览器直接打开文件、离开后台
+function onWinDragOver(e: DragEvent): void {
+  if (e.dataTransfer?.types.includes('Files') && !e.defaultPrevented) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'none';
+  }
+}
+function onWinDrop(e: DragEvent): void {
+  if (!e.dataTransfer?.types.includes('Files') || e.defaultPrevented) return;
+  e.preventDefault();
+  toast('要上传素材的话，请把文件拖到「素材库」页面', 'info', 3500, { label: '去素材库', run: () => go('assets') });
+}
+
 onMounted(() => {
   void boot();
+  addEventListener('dragover', onWinDragOver);
+  addEventListener('drop', onWinDrop);
   addEventListener('keydown', onKey);
   clock = setInterval(() => (now.value = Date.now()), 30_000);
   // 账号有效期、开播状态等每分钟校对一次（实时连接断开时也能恢复）
@@ -190,6 +205,8 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   removeEventListener('keydown', onKey);
+  removeEventListener('dragover', onWinDragOver);
+  removeEventListener('drop', onWinDrop);
   if (clock) clearInterval(clock);
   if (poll) clearInterval(poll);
   if (wsTimer) clearTimeout(wsTimer);
@@ -304,7 +321,7 @@ function reloadPage(): void {
 
   <div class="toasts" aria-live="polite">
     <div v-for="t in toasts" :key="t.id" class="toast" :class="{ out: t.out }">
-      <Icon :name="t.kind === 'err' ? 'i-ban' : t.kind === 'info' ? 'i-info' : 'i-check'" :style="t.kind === 'err' ? 'color:#D64545' : t.kind === 'info' ? 'color:var(--accent)' : ''" />{{ t.text }}
+      <Icon :name="t.kind === 'err' ? 'i-ban' : t.kind === 'info' ? 'i-info' : 'i-check'" :style="t.kind === 'err' ? 'color:#D64545' : t.kind === 'info' ? 'color:var(--accent)' : ''" />{{ t.text }}<button v-if="t.action" type="button" class="toast-act" @click="runAction(t)">{{ t.action.label }}</button>
     </div>
   </div>
 </template>

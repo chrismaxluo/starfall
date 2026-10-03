@@ -7,7 +7,7 @@ import { SAMPLES } from '../lib/identity.ts';
 import { battery, batteryYuan, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
 import { effectById, refreshEffects, state } from '../lib/store.ts';
-import { attempt } from '../lib/toast.ts';
+import { attempt, undoable } from '../lib/toast.ts';
 import type { GiftBand, GiftConfig, GiftRules } from '../lib/types.ts';
 import CdPick from './CdPick.vue';
 import ConfirmButton from './ConfirmButton.vue';
@@ -65,9 +65,10 @@ const valueBar = computed(() => {
 });
 const ticks = computed(() => [...bands.value].reverse().map((b, i, arr) => ({ key: b.fromGold, text: battery(b.fromGold), note: yuan(b.fromGold), left: ((i + 1) / (arr.length + 1)) * 100 })));
 
-async function save(msg?: string): Promise<void> {
+async function save(msg?: string, undo?: () => Promise<unknown>): Promise<void> {
   if (!rules.value) return;
-  const r = await attempt(() => put<GiftRules>('/api/rules/gift', rules.value), msg);
+  const r = await attempt(() => put<GiftRules>('/api/rules/gift', rules.value), undo ? undefined : msg);
+  if (r && undo && msg) undoable(msg, undo);
   if (r) state.gift = r;
   else state.gift = await get<GiftRules>('/api/rules/gift');
   void refreshEffects();
@@ -77,14 +78,19 @@ function addSpecific(g: GiftConfig): void {
   if (!rules.value) return;
   const eff = state.effects.find((e) => e.name === '晶礼')?.id ?? null;
   rules.value.specific.push({ giftId: g.id, giftName: g.name, effectId: eff, enabled: true });
-  picking.value = false;
-  giftQ.value = '';
+  // 选完不收起，可以接着选别的礼物；选过的会从列表里消失
   void save(`已添加指定礼物：${g.name}`);
 }
 function removeSpecific(id: number): void {
   if (!rules.value) return;
+  const before = rules.value.specific.map((s) => ({ ...s }));
+  const name = before.find((s) => s.giftId === id)?.giftName ?? '';
   rules.value.specific = rules.value.specific.filter((s) => s.giftId !== id);
-  void save('已删除指定礼物');
+  void save(`已删除指定礼物：${name}`, async () => {
+    if (!rules.value) return;
+    rules.value.specific = before;
+    await save(`已恢复指定礼物：${name}`);
+  });
 }
 function addBand(): void {
   if (!rules.value) return;
@@ -100,8 +106,13 @@ function addBand(): void {
 }
 function removeBand(b: GiftBand): void {
   if (!rules.value || rules.value.bands.length <= 1) return;
+  const before = rules.value.bands.map((x) => ({ ...x }));
   rules.value.bands = rules.value.bands.filter((x) => x.fromGold !== b.fromGold);
-  void save('已删除这一段，这段价值并入相邻的一段');
+  void save('已删除这一段，这段价值并入相邻的一段', async () => {
+    if (!rules.value) return;
+    rules.value.bands = before;
+    await save('已恢复这一段');
+  });
 }
 const jumps = (gold: number) => gold >= JUMP_GOLD && state.settings?.queueJump;
 function previewSpec(giftId: number, name: string, effectId: number | null): void {
@@ -133,20 +144,20 @@ onMounted(async () => {
         <span v-else class="gico">{{ [...s.giftName][0] ?? '礼' }}</span>
         <div class="body">
           <div class="nm">{{ s.giftName || `礼物 ${s.giftId}` }}<span v-if="giftOf(s.giftId)" class="pr">{{ battery(giftOf(s.giftId)!.price) }} / 个（{{ yuan(giftOf(s.giftId)!.price) }}）</span></div>
-          <EffectPicker v-model="s.effectId" @change="(id) => save(`「${s.giftName}」改为播放「${effectById(id)?.name}」`)" />
+          <EffectPicker v-model="s.effectId" kind="gift" @change="(id) => save(`「${s.giftName}」改为播放「${effectById(id)?.name}」`)" />
         </div>
         <div class="side">
           <Switch v-model="s.enabled" :label="`指定礼物 ${s.giftName}`" @change="(v) => save(v ? `已打开「${s.giftName}」` : `已关闭「${s.giftName}」，按价值分段处理`)" />
           <span>
-            <button class="playmini" :aria-label="`预览送出 ${s.giftName}`" @click="previewSpec(s.giftId, s.giftName, s.effectId)"><svg><use href="#i-play" /></svg></button>
-            <ConfirmButton label="" confirm-label="删除" cls="playmini" armed-cls="delb" :aria-label="`删除指定礼物 ${s.giftName}`" @confirm="removeSpecific(s.giftId)"><Icon name="i-x" /></ConfirmButton>
+            <button class="playmini" :aria-label="`预览送出 ${s.giftName}`" :title="`预览送出 ${s.giftName}`" @click="previewSpec(s.giftId, s.giftName, s.effectId)"><svg><use href="#i-play" /></svg></button>
+            <ConfirmButton label="" confirm-label="删除" cls="playmini" armed-cls="delb" :aria-label="`删除指定礼物 ${s.giftName}`" :title="`删除指定礼物 ${s.giftName}`" @confirm="removeSpecific(s.giftId)"><Icon name="i-x" /></ConfirmButton>
           </span>
         </div>
       </div>
       <button class="rl-gift add" :disabled="!!catalogErr" @click="picking = !picking"><span><Icon name="i-plus" />{{ catalogErr ? '读取礼物面板失败' : '从礼物列表里选' }}</span></button>
     </div>
     <div v-if="picking" class="rl-gpick">
-      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
+      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致；点一下就加上，可以连着选几个</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
       <div class="grid">
         <template v-for="grp in groups" :key="grp.title">
           <div class="sep">{{ grp.title }}</div>
@@ -172,13 +183,13 @@ onMounted(async () => {
       <div v-for="(b, i) in bands" :key="b.fromGold" class="rl" :class="{ off: !b.enabled }">
         <span class="who"><span class="tag">{{ battery(b.fromGold) }}+</span></span>
         <span class="say">
-          一次送出 <b>{{ bandLabel(i) }}</b><span class="hint">（{{ bandYuan(i) }}）</span> 时，播放 <EffectPicker v-model="b.effectId" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" />
+          一次送出 <b>{{ bandLabel(i) }}</b><span class="hint">（{{ bandYuan(i) }}）</span> 时，播放 <EffectPicker v-model="b.effectId" kind="gift" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" />
           <span v-if="jumps(b.fromGold)" class="hint">· 会插队优先播放</span>
           <span v-if="!b.enabled" class="offnote">已关闭：{{ bandLabel(i) }}的礼物不播放特效</span>
         </span>
         <span class="acts">
+          <button class="playmini" :aria-label="`预览 ${bandLabel(i)}的礼物`" :title="`预览 ${bandLabel(i)}的礼物`" @click="previewBand(i)"><svg><use href="#i-play" /></svg></button>
           <ConfirmButton v-if="bands.length > 1" label="" confirm-label="删除" cls="playmini" armed-cls="delb" :aria-label="`删除 ${bandLabel(i)}这一段`" @confirm="removeBand(b)"><Icon name="i-x" /></ConfirmButton>
-          <button class="playmini" :aria-label="`预览 ${bandLabel(i)}的礼物`" @click="previewBand(i)"><svg><use href="#i-play" /></svg></button>
           <Switch v-model="b.enabled" :label="`${bandLabel(i)}的礼物特效`" @change="(v) => save(v ? `已打开 ${bandLabel(i)}` : `已关闭 ${bandLabel(i)}，这段价值的礼物不播放特效`)" />
         </span>
       </div>

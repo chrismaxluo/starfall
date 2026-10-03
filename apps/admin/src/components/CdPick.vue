@@ -2,6 +2,7 @@
 // 多久内只播一次：点一下弹出常用选项（每次都播 / 1 / 5 / 10 / 30 分钟 / 1 小时），也可以自己填。unit 为 sec 时单位是秒
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import Icon from './Icon.vue';
+import { pushEsc } from '../lib/esc.ts';
 
 const props = withDefaults(defineProps<{ unit?: 'min' | 'sec'; hint?: string; options?: number[]; max?: number; allowZero?: boolean; after?: string }>(), {
   unit: 'min',
@@ -26,7 +27,10 @@ function text(v: number): string {
   if (props.unit === 'sec') return `${v} 秒`;
   return v >= 60 && v % 60 === 0 ? `${v / 60} 小时` : `${v} 分钟`;
 }
+let offEsc: (() => void) | null = null;
 function close(): void {
+  offEsc?.();
+  offEsc = null;
   open.value = false;
   removeEventListener('mousedown', outside, true);
   removeEventListener('scroll', onScroll, true);
@@ -45,6 +49,7 @@ async function toggle(): Promise<void> {
   const h = pop.value?.offsetHeight ?? 150;
   pos.value = { left: Math.max(8, Math.min(r.left, innerWidth - 276)), top: r.bottom + 6 + h > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6 };
   addEventListener('mousedown', outside, true);
+  offEsc ??= pushEsc(close);
   addEventListener('scroll', onScroll, true);
 }
 function set(v: number): void {

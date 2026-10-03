@@ -1,6 +1,7 @@
 // 规则页里各个标签共用的"在右侧预览"请求
+import { SAMPLES } from './identity.ts';
 import type { SampleViewer } from './identity.ts';
-import type { TriggerKind } from './types.ts';
+import type { EffectDto, TriggerKind } from './types.ts';
 
 export interface PreviewRequest {
   effectId: number | null;
@@ -9,6 +10,16 @@ export interface PreviewRequest {
   kind?: TriggerKind;
   vars?: { text?: string; gift?: string; count?: number; valueGold?: number; months?: number; guardLevel?: 1 | 2 | 3; op?: 'open' | 'renew' };
 }
+
+/** 按事件类型预览时用的示例观众和内容（礼物带礼物图和数量、弹幕带弹幕内容） */
+export const PREVIEW_BY_KIND: Record<TriggerKind, Omit<PreviewRequest, 'effectId' | 'label'>> = {
+  enter: { viewer: SAMPLES.cap, kind: 'enter' },
+  danmu: { viewer: SAMPLES.nor, kind: 'danmu', vars: { text: '主播晚上好！' } },
+  gift: { viewer: SAMPLES.fan, kind: 'gift', vars: { gift: '小花花', count: 66, valueGold: 6600 } },
+  guard: { viewer: SAMPLES.cap, kind: 'guard', vars: { guardLevel: 3, op: 'open', months: 1 } },
+};
+/** 特效平时用在哪类事件上（没在用的按进场） */
+export const usualKind = (e: EffectDto | undefined): TriggerKind => e?.usedBy[0]?.page ?? 'enter';
 
 export const yuan = (gold: number) => {
   const y = gold / 1000;

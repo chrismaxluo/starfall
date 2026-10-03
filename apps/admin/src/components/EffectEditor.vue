@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 素材设置（F-AS-06 ~ 12）：左边预览，右边 ① 画面 ② 头像和欢迎语 ③ 音效 ④ 位置与时长
+// 素材设置（F-AS-06 ~ 12）：左边预览，右边 ① 画面 ② 位置和大小 ③ 头像和欢迎语 ④ 音效 ⑤ 时长和渐入渐出
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
 import { FADE_MAX_MS, FADE_MIN_MS, FEATHER_MAX, OFFSET_MAX, SIZE_MAX, SIZE_MIN } from '@starfall/shared';
@@ -8,10 +8,13 @@ import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { placeWarnings } from '../lib/place.ts';
 import { SAMPLES, STYLES } from '../lib/identity.ts';
-import type { Identity } from '../lib/identity.ts';
+import type { Identity, SampleViewer } from '../lib/identity.ts';
+import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
+import { builtinThumb } from '../lib/thumbs.ts';
 import { effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
-import type { AssetDto, EffectDto, SoundDto } from '../lib/types.ts';
+import { checkFile } from '../lib/upload-check.ts';
+import type { AssetDto, EffectDto, SoundDto, TriggerKind } from '../lib/types.ts';
 import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
 import PreviewStage from './PreviewStage.vue';
@@ -33,7 +36,20 @@ const TEXT_TABS: Array<{ value: TextKey; label: string }> = [
   { value: 'guard', label: '上舰时' },
   { value: 'danmu', label: '弹幕时' },
 ];
-const VARS = ['{name}', '{guard}', '{medal}', '{level}', '{honor}', '{text}', '{gift}', '{count}', '{value}', '{months}', '{op}', '{act}'];
+/** 欢迎语里能用的变量：按钮写中文，点了插入 {变量}；只显示当前这类欢迎语能用的 */
+const VAR_COMMON = [
+  { key: 'name', label: '昵称' },
+  { key: 'guard', label: '大航海身份' },
+  { key: 'medal', label: '粉丝牌名' },
+  { key: 'level', label: '粉丝牌等级' },
+  { key: 'honor', label: '荣耀等级' },
+];
+const VARS_OF: Record<TextKey, Array<{ key: string; label: string }>> = {
+  enter: VAR_COMMON,
+  danmu: [...VAR_COMMON, { key: 'text', label: '弹幕内容' }],
+  gift: [...VAR_COMMON, { key: 'gift', label: '礼物名' }, { key: 'count', label: '数量' }, { key: 'value', label: '价值（元）' }],
+  guard: [...VAR_COMMON, { key: 'act', label: '上舰 / 续费' }, { key: 'op', label: '开通 / 续费' }, { key: 'months', label: '月数' }],
+};
 // 宫廷特效铺满画面，位置只分偏上 / 居中 / 偏下
 const ROYAL_POSITIONS: Array<{ value: Position; label: string }> = [
   { value: 'top', label: '偏上' },
@@ -98,17 +114,76 @@ function patch() {
   return timed.value ? { ...base, durationCustom: true, durationMs } : { ...base, durationMs };
 }
 
-/** 示例观众：按这个素材用在哪条规则选（总督规则用总督观众） */
-const sample = computed(() => {
+/** 示例观众：默认按这个素材用在哪条规则选（总督规则用总督观众），也可以手动换 */
+type Who = 'auto' | 'gov' | 'cap' | 'nor' | 'long';
+const who = ref<Who>('auto');
+const WHO_OPTIONS: Array<{ value: Who; label: string }> = [
+  { value: 'auto', label: '按规则' },
+  { value: 'gov', label: '总督' },
+  { value: 'cap', label: '舰长' },
+  { value: 'nor', label: '普通' },
+  { value: 'long', label: '长昵称' },
+];
+const LONG_NAME: SampleViewer = { name: '一只特别特别能熬夜的小猫咪', guard: 0, isMod: false, medalLevel: 12 };
+const sample = computed((): SampleViewer => {
+  if (who.value === 'long') return LONG_NAME;
+  if (who.value !== 'auto') return SAMPLES[who.value];
   const u = (eff.value?.usedBy ?? []).map((x) => x.label).join(' ');
   const id: Identity = /总督/.test(u) ? 'gov' : /提督/.test(u) ? 'adm' : /舰长/.test(u) ? 'cap' : /房管/.test(u) ? 'mod' : /粉丝牌/.test(u) ? 'fan' : 'cap';
   return SAMPLES[id];
 });
-const KIND_OF_TAB: Record<TextKey, 'enter' | 'gift' | 'guard' | 'danmu'> = { enter: 'enter', gift: 'gift', guard: 'guard', danmu: 'danmu' };
+/** 按哪类事件预览：默认按素材平时的用途（礼物特效带礼物图、弹幕特效带弹幕内容），和欢迎语的标签联动 */
+const KIND_OPTIONS: Array<{ value: TriggerKind; label: string }> = [
+  { value: 'enter', label: '进场' },
+  { value: 'danmu', label: '弹幕' },
+  { value: 'gift', label: '礼物' },
+  { value: 'guard', label: '上舰' },
+];
+const pvKind = ref<TriggerKind>(usualKind(eff.value));
+txTab.value = pvKind.value;
+watch(txTab, (t) => (pvKind.value = t));
+watch(pvKind, (k) => {
+  txTab.value = k;
+  replay();
+});
+watch(who, () => replay());
+/** 发到直播画面测试：和预览里一样（还没保存的修改、按哪类事件、示例观众） */
+async function sendLive(): Promise<void> {
+  if (!eff.value || !d.value) return;
+  const k = pvKind.value;
+  const vars = k === 'guard' ? { ...PREVIEW_BY_KIND.guard.vars, guardLevel: (sample.value.guard || 3) as 1 | 2 | 3 } : PREVIEW_BY_KIND[k].vars;
+  await attempt(() => post('/api/playback/test', { effectId: eff.value!.id, kind: k, viewer: sample.value, ...(dirty.value && !ro.value ? { draft: patch() } : {}), ...(vars ? { vars } : {}) }), dirty.value ? '已发送到直播画面（包括还没保存的修改）' : '已发送到直播画面');
+}
 function replay(): void {
   if (!eff.value || !d.value) return;
-  void stage.value?.play(eff.value.id, sample.value, patch(), KIND_OF_TAB[txTab.value]).then(() => setTimeout(checkSafe, 300));
+  const k = pvKind.value;
+  // 上舰示例按示例观众的身份（普通观众按舰长）
+  const vars = k === 'guard' ? { ...PREVIEW_BY_KIND.guard.vars, guardLevel: (sample.value.guard || 3) as 1 | 2 | 3 } : PREVIEW_BY_KIND[k].vars;
+  void stage.value?.play(eff.value.id, sample.value, patch(), k, vars).then(() => setTimeout(checkSafe, 300));
 }
+/** 欢迎语示例：用示例观众把第一句填好（和特效页里显示的一样） */
+const textExample = computed(() => {
+  if (!d.value) return '';
+  const tpl = lines(d.value.texts[txTab.value])[0] ?? lines(d.value.texts.enter)[0] ?? '{name} 来了';
+  const v = sample.value;
+  const vars = PREVIEW_BY_KIND[txTab.value].vars ?? {};
+  const guard = txTab.value === 'guard' ? v.guard || 3 : v.guard;
+  const map: Record<string, string> = {
+    name: v.name,
+    guard: guard ? (['', '总督', '提督', '舰长'] as const)[guard] : '',
+    medal: v.medalLevel ? '星临' : '',
+    level: v.medalLevel ? String(v.medalLevel) : '',
+    honor: String(v.honor ?? 30),
+    text: vars.text ?? '',
+    gift: vars.gift ?? '',
+    count: vars.count !== undefined ? String(vars.count) : '',
+    value: vars.valueGold !== undefined ? `${vars.valueGold / 1000} 元` : '',
+    months: vars.months !== undefined ? String(vars.months) : '',
+    op: vars.op === 'renew' ? '续费' : vars.op ? '开通' : '',
+    act: vars.op === 'renew' ? '续费' : vars.op ? '上舰' : '',
+  };
+  return tpl.replace(/\{(\w+)\}/g, (m, k: string) => (k in map ? map[k]! : m)).replace(/ {2,}/g, ' ').trim();
+});
 let replayTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
   () => d.value && [d.value.position, d.value.showText, d.value.soundAssetId, d.value.fadeIn, d.value.fadeOut, d.value.durationCustom, d.value.guardFrame, d.value.honorBadge, JSON.stringify(d.value.svgaMap)],
@@ -204,7 +279,7 @@ function insertVar(v: string): void {
   });
 }
 
-async function save(then: 'close' | 'copy' = 'close'): Promise<void> {
+async function save(then: 'stay' | 'close' | 'copy' = 'stay'): Promise<void> {
   if (!eff.value || !d.value || ro.value) return;
   const name = d.value.name.trim();
   if (!name) return toast('请填写素材名称', 'info');
@@ -216,7 +291,12 @@ async function save(then: 'close' | 'copy' = 'close'): Promise<void> {
   toast(`已保存：${name}${r.usedBy.length ? `，${r.usedBy.map((u) => u.label).join('、')} 已同步` : ''}`);
   ask.value = null;
   if (then === 'copy') return copy(true);
-  emit('close');
+  if (then === 'close') return emit('close');
+  // 点「保存」后留在这里接着调（以前保存就关窗，想再改得重新打开）
+  if (eff.value) {
+    d.value = snapshot(eff.value);
+    saved.value = JSON.stringify(d.value);
+  }
 }
 
 async function copy(force = false): Promise<void> {
@@ -246,7 +326,10 @@ async function replaceFile(): Promise<void> {
   const f = repIn.value?.files?.[0];
   if (repIn.value) repIn.value.value = '';
   if (!f || !eff.value) return;
+  const bad = checkFile(f, 'anim');
+  if (bad) return toast(bad, 'err', 6000);
   busy.value = true;
+  toast(`正在上传 ${f.name}…`, 'info');
   const r = await attempt(() => upload<EffectDto>(`/api/effects/${eff.value!.id}/file`, f, undefined, 'PUT'), '已替换文件，所有用到它的规则自动换成新文件');
   busy.value = false;
   if (r) {
@@ -267,6 +350,8 @@ async function uploadSound(): Promise<void> {
   const f = sndIn.value?.files?.[0];
   if (sndIn.value) sndIn.value.value = '';
   if (!f) return;
+  const bad = checkFile(f, 'audio');
+  if (bad) return toast(bad, 'err', 6000);
   const r = await attempt(() => upload<{ sound: SoundDto }>('/api/sounds', f), `已添加音效：${f.name}`);
   if (!r) return;
   await refreshEffects();
@@ -348,7 +433,7 @@ function onKey(e: KeyboardEvent): void {
     else close();
   } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
-    if (!ro.value && dirty.value && !busy.value) void save(ask.value === 'copy' ? 'copy' : 'close');
+    if (!ro.value && dirty.value && !busy.value) void save(ask.value ?? 'stay');
   }
 }
 addEventListener('keydown', onKey);
@@ -385,9 +470,13 @@ onBeforeUnmount(() => {
           </PreviewStage>
           <div class="tools">
             <button class="btn" @click="replay"><Icon name="i-replay" />重播（带声音）</button>
-            <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :disabled="dirty" :title="dirty ? '先保存再发送到直播' : ''" @confirm="attempt(() => post('/api/playback/test', { effectId: eff!.id }), '已发送到直播画面')" />
+            <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :title="dirty ? '发送的是现在预览里的样子（包括还没保存的修改）' : ''" @confirm="sendLive" />
           </div>
           <span v-if="a && !ro" class="hint" style="font-size: 12px; color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>
+          <div class="pv-opts">
+            <div class="pv-opt"><span>按</span><Seg v-model="pvKind" label="按哪类事件预览" :options="KIND_OPTIONS" /><span>预览</span></div>
+            <div class="pv-opt"><span>示例观众</span><Seg v-model="who" label="示例观众" :options="WHO_OPTIONS" /></div>
+          </div>
           <span class="hint" style="font-size: 12px; color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
         </div>
         <div class="ed-set" :class="{ readonly: ro }">
@@ -407,9 +496,6 @@ onBeforeUnmount(() => {
                 <button v-else class="btn" :disabled="busy" title="替换后马上生效，不用点保存" @click="repIn?.click()"><Icon name="i-replay" />替换文件</button>
               </div>
               <input ref="repIn" type="file" hidden accept=".webm,.mp4,.svga,.json,.gif,.png,.apng,.webp,.jpg,.jpeg" @change="replaceFile" />
-              <div class="toggle-line fe-line">上下羽化 <Seg v-model="d.feather" label="上下羽化" :options="featherOptions" /></div>
-              <div v-if="d.feather === 'custom'" class="slider-row off"><label for="edFe">羽化宽度</label><input id="edFe" v-model.number="d.featherPct" type="range" min="0" :max="FEATHER_MAX" step="1" /><output>{{ d.featherPct }}%</output></div>
-              <span class="hint" style="font-size: 12px; color: var(--t3)">{{ featherHint }}</span>
               <template v-if="slots.length">
                 <div class="toggle-line">动态图层 <span class="hint">SVGA 里预留的图层，播放时换成这位观众的头像、昵称等</span></div>
                 <div class="svga-slots">
@@ -422,17 +508,40 @@ onBeforeUnmount(() => {
                 </div>
                 <span class="hint" style="font-size: 12px; color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来；荣耀等级勋章按观众的等级换图，没有等级时藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
               </template>
+              <details class="ed-more">
+                <summary><Icon name="i-chev" />边缘慢慢变透明（上下羽化）<span class="hint">{{ featherOptions.find((x) => x.value === d!.feather)?.label }}</span></summary>
+                <div class="toggle-line fe-line">上下羽化 <Seg v-model="d.feather" label="上下羽化" :options="featherOptions" /></div>
+                <div v-if="d.feather === 'custom'" class="slider-row off"><label for="edFe">羽化宽度</label><input id="edFe" v-model.number="d.featherPct" type="range" min="0" :max="FEATHER_MAX" step="1" /><output>{{ d.featherPct }}%</output></div>
+                <span class="hint" style="font-size: 12px; color: var(--t3)">{{ featherHint }}</span>
+              </details>
               <div v-if="a.warnings.includes('no_alpha')" class="warnbox">这个文件没有透明通道，在直播软件里会带背景色，挡住直播画面。建议导出成带透明通道的 WebM（VP9）。</div>
               <div v-if="a.warnings.includes('large')" class="warnbox">文件超过 10 MB，首次加载可能会慢一点，建议压缩。</div>
             </template>
             <div v-else class="filecard">
-              <span class="vt" :style="{ background: STYLES[eff.visual.type === 'builtin_style' ? eff.visual.style : 'line']?.grad }" />
+              <span class="vt" :style="{ background: STYLES[eff.visual.type === 'builtin_style' ? eff.visual.style : 'line']?.grad }"><img v-if="eff.visual.type === 'builtin_style'" :src="builtinThumb(eff.visual.style, true)" alt="" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit" /></span>
               <span><b>内置样式 · {{ STYLES[eff.visual.type === 'builtin_style' ? eff.visual.style : 'line']?.name }}</b><span>由特效页绘制，自带头像和欢迎语</span></span>
             </div>
           </div>
 
           <div class="ed-sec">
-            <h3><span class="n">2</span>头像和欢迎语</h3>
+            <h3><span class="n">2</span>位置和大小</h3>
+            <Seg v-model="d.position" label="位置" :options="positionOptions" />
+            <template v-if="a">
+              <div class="slider-row off"><label for="edOffY">上下挪动</label><input id="edOffY" v-model.number="d.offsetY" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetY, '往上', '往下') }}</output></div>
+              <div class="slider-row off"><label for="edOffX">左右挪动</label><input id="edOffX" v-model.number="d.offsetX" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetX, '往左', '往右') }}</output></div>
+              <div class="slider-row off"><label for="edSize">大小</label><input id="edSize" v-model.number="d.sizePct" type="range" :min="SIZE_MIN" :max="SIZE_MAX" step="1" /><output>{{ clampSize(d.sizePct) }}%</output></div>
+              <div class="toggle-line">
+                <span class="hint">也可以在左边预览里按住素材直接拖。在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算；大小 100% 是自动算出的大小</span>
+                <button class="btn" type="button" style="margin-left: auto; flex: none" :disabled="!adjusted" @click="resetOffset">回到原位</button>
+              </div>
+              <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B 站的信息、弹幕，或者被挡住。</div>
+              <div v-if="adjusted && outOfStage" class="warnbox">素材有一部分超出了画面，超出的部分直播时看不到。</div>
+            </template>
+            <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
+          </div>
+
+          <div class="ed-sec">
+            <h3><span class="n">3</span>头像和欢迎语</h3>
             <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">{{ svgaHasPerson ? 'SVGA 里已经放了头像或昵称，一般不用再叠加' : '素材里已经画好文字的话可以关掉' }}</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
             <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B 站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
             <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前面放上 B 站的荣耀等级勋章（和弹幕里的一样），没有荣耀等级的观众不显示</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
@@ -440,13 +549,13 @@ onBeforeUnmount(() => {
               <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
-              <div class="vars"><button v-for="v in VARS" :key="v" type="button" @click="insertVar(v)">{{ v }}</button></div>
-              <span class="hint" style="font-size: 12px; color: var(--t3)">通用：昵称 {name}、大航海 {guard}、牌子 {medal}、等级 {level}、荣耀等级 {honor}　弹幕：{text}　礼物：{gift} {count} {value}　上舰：月数 {months}、开通 / 续费 {op}、上舰 / 续费 {act}</span>
+              <div class="vars"><span class="vars-l">插入</span><button v-for="v in VARS_OF[txTab]" :key="v.key" type="button" :title="`插入 {${v.key}}`" @click="insertVar(`{${v.key}}`)">{{ v.label }}</button></div>
+              <div class="tx-ex"><span>效果</span>{{ textExample }}</div>
             </template>
           </div>
 
           <div class="ed-sec">
-            <h3><span class="n">3</span>音效 <span class="hint">音效在素材库的「音效」里管理，可以被多个素材共用</span></h3>
+            <h3><span class="n">4</span>音效 <span class="hint">音效在素材库的「音效」里管理，可以被多个素材共用</span></h3>
             <div class="snd">
               <select class="sel" :value="d.soundAssetId ?? ''" aria-label="音效" @change="onSound">
                 <option value="">无音效</option>
@@ -459,23 +568,12 @@ onBeforeUnmount(() => {
             <div class="slider-row"><label for="edVol">音量</label><input id="edVol" v-model.number="d.volume" type="range" min="0" max="100" /><output>{{ d.volume }}%</output></div>
           </div>
 
+
           <div class="ed-sec">
-            <h3><span class="n">4</span>位置与时长</h3>
-            <div class="row2">
-              <Seg v-model="d.position" label="位置" :options="positionOptions" />
-              <span v-if="timed && !d.durationCustom" class="hint" style="font-size: 13px; color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
-              <div v-else class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div>
-            </div>
+            <h3><span class="n">5</span>时长和渐入渐出</h3>
+            <span v-if="timed && !d.durationCustom" class="hint" style="font-size: 13px; color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
+            <div v-else class="row2"><span class="hint" style="font-size: 13px; color: var(--t2)">显示多久</span><div class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div></div>
             <template v-if="a">
-              <div class="slider-row off"><label for="edOffY">上下挪动</label><input id="edOffY" v-model.number="d.offsetY" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetY, '往上', '往下') }}</output></div>
-              <div class="slider-row off"><label for="edOffX">左右挪动</label><input id="edOffX" v-model.number="d.offsetX" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetX, '往左', '往右') }}</output></div>
-              <div class="slider-row off"><label for="edSize">大小</label><input id="edSize" v-model.number="d.sizePct" type="range" :min="SIZE_MIN" :max="SIZE_MAX" step="1" /><output>{{ clampSize(d.sizePct) }}%</output></div>
-              <div class="toggle-line">
-                <span class="hint">在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算；大小 100% 是自动算出的大小</span>
-                <button class="btn" type="button" style="margin-left: auto; flex: none" :disabled="!adjusted" @click="resetOffset">回到原位</button>
-              </div>
-              <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B 站的信息、弹幕，或者被挡住。</div>
-              <div v-if="adjusted && outOfStage" class="warnbox">素材有一部分超出了画面，超出的部分直播时看不到。</div>
               <div v-if="timed" class="toggle-line">手动设置时长 <span class="hint">{{ d.durationCustom ? `最长 ${maxSeconds} 秒，到时间就结束` : '关着时按素材完整播放' }}</span><Switch v-model="d.durationCustom" label="手动设置时长" /></div>
               <div class="toggle-line">
                 开头渐入 <span class="hint">{{ d.fadeIn ? '用多少秒慢慢出现' : '关掉后第一帧直接出现' }}</span>
@@ -486,7 +584,6 @@ onBeforeUnmount(() => {
                 <span class="ctl"><span v-if="d.fadeOut" class="suffix"><input v-model.number="d.fadeOutS" class="inp num" type="number" min="0.1" max="5" step="0.1" aria-label="渐出秒数" /><span>秒</span></span><Switch v-model="d.fadeOut" label="结尾渐出" /></span>
               </div>
             </template>
-            <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>
         </div>
       </div>
@@ -507,8 +604,8 @@ onBeforeUnmount(() => {
         <template v-if="!ro">
           <ConfirmButton label="删除" cls="btn" style="color: #d64545" @confirm="remove" />
           <button class="btn" @click="copy()"><Icon name="i-dup" />复制</button>
-          <button class="btn" @click="close()">取消</button>
-          <button class="btn primary" :disabled="busy" title="Ctrl + S" @click="save()">保存</button>
+          <button class="btn" @click="close()">{{ dirty ? '取消' : '关闭' }}</button>
+          <button class="btn primary" :disabled="busy || !dirty" :title="dirty ? '保存后留在这里，可以接着调（Ctrl + S）' : '没有要保存的修改'" @click="save()">{{ dirty ? '保存' : '已保存' }}</button>
         </template>
         <button v-else class="btn primary" @click="copy()">复制并编辑</button>
       </div>

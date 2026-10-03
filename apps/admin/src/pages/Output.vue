@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import CdPick from '../components/CdPick.vue';
 import ChatPreview from '../components/ChatPreview.vue';
 import AddSteps from '../components/AddSteps.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
+import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_MAX_LIMIT, CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay';
+import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
@@ -138,6 +140,13 @@ function setChatMax(v: number): void {
   if (!(n >= 1 && n <= CHAT_MAX_LIMIT)) return toast(`条数要在 1 – ${CHAT_MAX_LIMIT} 之间`, 'err');
   if (n === o.value.chatMax) return;
   void save({ chatMax: n }, `最多显示 ${n} 条；浏览器源的高度建议改成 ${chatHeight(n, o.value.chatSize)}`);
+}
+/** 弹幕自动消失：0 为一直显示；打开时用上次选的秒数（默认 10 秒） */
+const lastFade = ref(10);
+watch(() => o.value?.chatFadeSec, (v) => v && (lastFade.value = v), { immediate: true });
+function setChatFade(v: number): void {
+  if (!o.value || v === o.value.chatFadeSec) return;
+  void save({ chatFadeSec: v }, v ? `弹幕显示 ${v} 秒后自动淡出` : '弹幕一直显示，只被新弹幕顶走');
 }
 async function copy(which: 'fx' | 'chat'): Promise<void> {
   try {
@@ -421,6 +430,19 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                   <span class="hint">最多显示几条（1 – {{ CHAT_MAX_LIMIT }}）</span>
                 </div>
                 <span class="hint">条数改了，浏览器源的高度也要跟着改（上面「宽高填」已经算好）。放不下时从最上面开始少显示几条。</span>
+              </div>
+            </div>
+            <div class="srow">
+              <span class="lb">自动消失</span>
+              <div class="ctl">
+                <div class="line">
+                  <Switch :model-value="o.chatFadeSec > 0" label="弹幕自动消失" @change="(v) => setChatFade(v ? lastFade : 0)" />
+                  <template v-if="o.chatFadeSec > 0">
+                    <span class="hint">每条显示</span>
+                    <CdPick :model-value="o.chatFadeSec" unit="sec" :options="CHAT_FADE_OPTIONS" :max="CHAT_FADE_MAX" :allow-zero="false" hint="每条弹幕显示多久后淡出" after="后淡出" @change="setChatFade" />
+                  </template>
+                </div>
+                <span class="hint">{{ o.chatFadeSec > 0 ? `每条弹幕显示 ${o.chatFadeSec} 秒后自动淡出；弹幕多的时候，没到时间也会被新弹幕顶走。` : '关着时弹幕一直显示，只被新弹幕顶走（没人说话时最后几条一直留在画面上）。' }}</span>
               </div>
             </div>
           </div>

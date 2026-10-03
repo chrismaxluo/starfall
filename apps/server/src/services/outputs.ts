@@ -1,7 +1,7 @@
 // 输出（需求 F-OU-01 ~ 06）：每个输出是一个特效页地址 + 一套画布设置。密钥只用于特效页，无法登录后台。
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { CHAT_MAX_DEFAULT, CHAT_MAX_LIMIT } from '@starfall/shared';
+import { CHAT_FADE_MAX, CHAT_FADE_MIN, CHAT_MAX_DEFAULT, CHAT_MAX_LIMIT } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
 import { outputs } from '../db/schema.ts';
@@ -26,13 +26,14 @@ export const OutputInputSchema = z
     chatSize: z.enum(['normal', 'large']),
     chatMedal: z.enum(['own', 'all']),
     chatMax: z.number().int().min(1).max(CHAT_MAX_LIMIT),
+    chatFadeSec: z.number().int().min(0).max(CHAT_FADE_MAX).refine((v) => v === 0 || v >= CHAT_FADE_MIN, `弹幕自动消失的时间至少 ${CHAT_FADE_MIN} 秒`),
   })
   .strict();
 export type OutputInput = z.infer<typeof OutputInputSchema>;
 export const OutputPatchSchema = OutputInputSchema.partial().strict();
 
 /** 新建输出的默认值：竖屏 1080×1920，安全区按手机竖屏实测（P0 报告） */
-const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT };
+const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT, chatFadeSec: 0 };
 
 const newKey = () => crypto.randomBytes(16).toString('base64url');
 

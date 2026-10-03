@@ -224,7 +224,7 @@ function reloadPage(): void {
   <div v-if="state.authed === null" class="login"><span class="spin" /></div>
   <Login v-else-if="!state.authed" @done="boot" />
   <template v-else>
-    <div class="app">
+    <div class="app" :class="{ stale: wsDownLong }">
       <aside class="side">
         <div class="brand">
           <Logo :size="32" />

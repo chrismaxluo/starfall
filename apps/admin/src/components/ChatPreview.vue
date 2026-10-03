@@ -35,6 +35,8 @@ onBeforeUnmount(() => {
 });
 
 let n = 0;
+/** 预览里有没有弹幕（真实的或者测试的）：一条都没有时提示怎么看效果 */
+const tested = ref(false);
 const honor = (lv: number) => ({ level: lv, ...(state.honorMedals[lv] ? { url: state.honorMedals[lv] } : {}) });
 /** 测试弹幕：编的观众，只在预览里显示 */
 function test(kind: 'normal' | 'guard'): void {
@@ -45,6 +47,7 @@ function test(kind: 'normal' | 'guard'): void {
       ? { id: `t${++n}`, ts: Date.now(), viewer: { uid: 0, name: '长夜未央', guard: 1, isMod: true, anchor: false, medal: { name: mn, level: 44, own: true }, honor: honor(68) }, text: '晚上好，来陪主播了' }
       : { id: `t${++n}`, ts: Date.now(), viewer: { uid: 0, name: '测试观众', guard: 0, isMod: false, anchor: false, medal: { name: mn, level: 12, own: true }, honor: honor(21) }, text: '这是一条测试弹幕，只在这里显示' };
   send({ type: 'chat', item });
+  tested.value = true;
 }
 defineExpose({ test });
 </script>
@@ -53,5 +56,6 @@ defineExpose({ test });
   <div class="chatpv" :class="{ alpha }" :style="{ width: `${CHAT_WIDTH * K}px`, height: `${H * K}px` }">
     <iframe ref="frame" src="/overlay/?preview=1&chat=1" title="弹幕列表预览" :style="{ width: `${CHAT_WIDTH}px`, height: `${H}px`, transform: `scale(${K})` }" />
     <div v-if="!config.chatEnabled" class="chatpv-off">弹幕列表已关闭</div>
+    <div v-else-if="!state.chat.length && !tested" class="chatpv-empty">还没有弹幕<br />点下面的「测试弹幕」看看效果</div>
   </div>
 </template>

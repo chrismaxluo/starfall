@@ -4,7 +4,7 @@ import { onMounted, ref } from 'vue';
 import { get, post, put, upload } from '../lib/api.ts';
 import { fileSize } from '../lib/format.ts';
 import { refreshSettings, state } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { BackupItem, ImportPreview, Settings } from '../lib/types.ts';
 import Icon from './Icon.vue';
 import ImportDialog from './ImportDialog.vue';
@@ -24,6 +24,19 @@ async function save(patch: Partial<Settings>, msg: string): Promise<void> {
   // 成功失败都重新读取：失败时开关要回到原来的状态
   await attempt(() => put('/api/settings', patch), msg);
   await refreshSettings().catch(() => undefined);
+}
+/** 保留期改短：更早的记录几小时内会被删掉，删了不能恢复，提示条上可以撤销 */
+async function setRetention(v: Settings['retentionDays']): Promise<void> {
+  const old = state.settings?.retentionDays ?? 90;
+  const shorter = v !== 0 && (old === 0 || v < old);
+  if (!shorter) return save({ retentionDays: v }, '保留期已修改');
+  if (!(await attempt(() => put('/api/settings', { retentionDays: v })))) return void refreshSettings().catch(() => undefined);
+  await refreshSettings().catch(() => undefined);
+  undoable(`已改成保留 ${v} 天：超过 ${v} 天的事件记录会在几小时内删除，删了不能恢复`, async () => {
+    await put('/api/settings', { retentionDays: old });
+    await refreshSettings();
+    toast('已改回原来的保留期');
+  });
 }
 async function runNow(): Promise<void> {
   running.value = true;
@@ -83,7 +96,7 @@ onMounted(load);
     <div class="field" style="margin-top: 14px">
       <div class="slider-row">
         <label for="keep">事件记录保留</label>
-        <select id="keep" class="sel" :value="state.settings.retentionDays" @change="(e) => save({ retentionDays: Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'] }, '保留期已修改')">
+        <select id="keep" class="sel" :value="state.settings.retentionDays" @change="(e) => setRetention(Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'])">
           <option :value="30">30 天</option><option :value="90">90 天</option><option :value="180">180 天</option><option :value="0">永久</option>
         </select>
         <span />

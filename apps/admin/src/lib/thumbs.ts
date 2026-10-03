@@ -75,13 +75,33 @@ function offscreen(w: number, h: number): HTMLDivElement {
 }
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function svgaFrame(url: string): Promise<string | null> {
+async function svgaLib(): Promise<typeof SvgaLib> {
   const mod = (await import('svgaplayerweb')) as unknown as { default?: typeof SvgaLib } & typeof SvgaLib;
-  const S = mod.default ?? mod;
-  const item = await new Promise<SvgaLib.VideoEntity>((resolve, reject) => {
+  return mod.default ?? mod;
+}
+function parseSvga(S: typeof SvgaLib, url: string): Promise<SvgaLib.VideoEntity> {
+  return new Promise<SvgaLib.VideoEntity>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('timeout')), 10_000);
     new S.Parser().load(new URL(url, location.href).href, (x) => (clearTimeout(t), resolve(x)), (e) => (clearTimeout(t), reject(e)));
   });
+}
+
+/** SVGA 里每个图层的图片（素材设置的「动态图层」列表显示缩略图，认得出哪个是头像位、哪个是名字位） */
+export async function svgaLayerImages(url: string): Promise<Record<string, string>> {
+  const S = await svgaLib();
+  const item = await parseSvga(S, url);
+  const imgs = (item as unknown as { images?: Record<string, string> }).images ?? {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(imgs)) {
+    if (typeof v !== 'string') continue;
+    out[k] = v.startsWith('iVBO') ? `data:image/png;base64,${v}` : v.startsWith('/9j/') ? `data:image/jpeg;base64,${v}` : v;
+  }
+  return out;
+}
+
+async function svgaFrame(url: string): Promise<string | null> {
+  const S = await svgaLib();
+  const item = await parseSvga(S, url);
   const vb = (item as unknown as { videoSize?: { width: number; height: number } }).videoSize ?? { width: 400, height: 400 };
   const k = Math.min(1, MAX_W / vb.width);
   const el = offscreen(Math.round(vb.width * k), Math.round(vb.height * k));

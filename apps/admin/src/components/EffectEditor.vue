@@ -10,7 +10,7 @@ import { placeWarnings } from '../lib/place.ts';
 import { SAMPLES, STYLES } from '../lib/identity.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
-import { builtinThumb } from '../lib/thumbs.ts';
+import { builtinThumb, svgaLayerImages } from '../lib/thumbs.ts';
 import { effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import { checkFile } from '../lib/upload-check.ts';
@@ -383,6 +383,16 @@ const o = computed(() => output());
 
 // SVGA 的动态图层：每个图层选播放时换成什么
 const slots = computed(() => (a.value?.ext === 'svga' ? (a.value.slots ?? []) : []));
+/** 每个图层的图片（缩略图），认得出哪个是头像位、哪个是名字位 */
+const slotImgs = ref<Record<string, string>>({});
+watch(
+  () => (a.value?.ext === 'svga' ? a.value.url : null),
+  (u) => {
+    slotImgs.value = {};
+    if (u) void svgaLayerImages(u).then((m) => (slotImgs.value = m)).catch(() => undefined);
+  },
+  { immediate: true },
+);
 const SVGA_ROLE_NAMES: Array<[SvgaRole | '', string]> = [['', '不替换'], ['avatar', '头像（圆形）'], ['avatarSquare', '头像（方形）'], ['frame', '头像框（大航海）'], ['badge', '身份图标（船锚）'], ['honor', '荣耀等级勋章'], ['name', '昵称'], ['welcome', '欢迎语']];
 /** SVGA 里已经放了头像或昵称：一般不用再叠加头像和欢迎语 */
 const svgaHasPerson = computed(() => Object.values(d.value?.svgaMap ?? {}).some((r) => r === 'avatar' || r === 'avatarSquare' || r === 'name' || r === 'welcome'));
@@ -500,6 +510,7 @@ onBeforeUnmount(() => {
                 <div class="toggle-line">动态图层 <span class="hint">SVGA 里预留的图层，播放时换成这位观众的头像、昵称等</span></div>
                 <div class="svga-slots">
                   <label v-for="s in slots" :key="s.key" class="svga-slot">
+                    <span class="sthumb"><img v-if="slotImgs[s.key]" :src="slotImgs[s.key]" alt="" /></span>
                     <span class="k num" :title="s.key">{{ s.key }}</span><span class="sz num">{{ s.w }}×{{ s.h }}</span>
                     <select v-model="d.svgaMap[s.key]" class="sel sm" :aria-label="`图层 ${s.key} 换成`">
                       <option v-for="[r, label] in SVGA_ROLE_NAMES" :key="r" :value="r">{{ label }}</option>

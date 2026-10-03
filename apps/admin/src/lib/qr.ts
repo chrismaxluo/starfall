@@ -11,6 +11,9 @@ export function useQrLogin(onSuccess: () => void, auto = true) {
   const img = ref('');
   const st = ref<QrState>('loading');
   const err = ref('');
+  /** 连着查询失败（断网、星临没在运行）：页面上提示，不要一直写「请扫一扫」 */
+  const offline = ref(false);
+  let fails = 0;
   let key = '';
   let timer: ReturnType<typeof setInterval> | null = null;
   const stop = () => {
@@ -25,6 +28,8 @@ export function useQrLogin(onSuccess: () => void, auto = true) {
       key = r.key;
       img.value = r.image;
       st.value = 'waiting';
+      fails = 0;
+      offline.value = false;
       stop();
       timer = setInterval(poll, 2000);
     } catch (e) {
@@ -35,6 +40,8 @@ export function useQrLogin(onSuccess: () => void, auto = true) {
   async function poll(): Promise<void> {
     try {
       const r = await get<{ state: QrState; account?: { name: string } }>(`/api/bili/qrcode/${encodeURIComponent(key)}`);
+      fails = 0;
+      offline.value = false;
       st.value = r.state;
       if (r.state === 'success' || r.state === 'expired') stop();
       if (r.state === 'success') {
@@ -43,10 +50,11 @@ export function useQrLogin(onSuccess: () => void, auto = true) {
         onSuccess();
       }
     } catch {
-      /* 网络抖动时下次再查 */
+      // 网络抖动时下次再查；连着 3 次失败才提示
+      if (++fails >= 3) offline.value = true;
     }
   }
   onMounted(() => auto && void start());
   onBeforeUnmount(stop);
-  return { img, st, err, start, stop };
+  return { img, st, err, offline, start, stop };
 }

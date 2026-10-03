@@ -37,3 +37,28 @@ export function statusCls(s: PlayStatus): 'ok' | 'skip' | 'warn' | 'bad' {
   if (s === 'paused' || s === 'no_overlay' || s === 'dropped') return 'warn';
   return 'skip';
 }
+
+/** 为什么没播：鼠标停在状态上时显示的大白话说明 */
+export const STATUS_WHY: Partial<Record<PlayStatus, string>> = {
+  no_rule: '没有符合的规则，或者对应的规则关着',
+  blacklist: '这位观众在黑名单里，不会触发任何特效',
+  paused: '当时点了「暂停所有特效」',
+  offline: '当时没开播；想在没开播时也播放，到「设置 → 播放」打开「照常播放（排练用）」',
+  cooldown: '同一个人在「多久内只播一次」的时间里又来了，这次没播',
+  once: '开着「每场直播只播一次」，这场已经给 TA 播过了',
+  no_overlay: '当时直播软件里的特效页没连上，观众看不到特效',
+  dropped: '排队的特效太多，超过了上限，这条被挤掉了（可以在总览的「排队设置」里调）',
+  cleared: '暂停或清空排队时，这条还没轮到',
+  duplicate: 'B 站把同一件事发了好几条消息，只算一次',
+};
+
+/** 筛选「为什么没播」的选项 */
+export const WHY_FILTERS: Array<{ value: string; label: string }> = [
+  { value: 'no_rule', label: '未命中规则' },
+  { value: 'cooldown,once', label: '冷却中 / 本场已播过' },
+  { value: 'no_overlay', label: '特效页不在线' },
+  { value: 'blacklist', label: '黑名单' },
+  { value: 'offline', label: '未开播' },
+  { value: 'paused,cleared', label: '已暂停 / 已清空' },
+  { value: 'dropped', label: '队列已满，丢弃' },
+];

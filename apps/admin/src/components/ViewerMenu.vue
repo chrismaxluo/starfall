@@ -46,6 +46,13 @@ async function copy(): Promise<void> {
     toast(`UID：${props.viewer.uid}`, 'info');
   }
 }
+function showLogs(): void {
+  emit('close');
+  ui.logQuery = String(props.viewer.uid);
+  // 已经在事件记录页时，换个地址再回来，让它重新读
+  if (location.hash.startsWith('#logs')) location.hash = 'overview';
+  setTimeout(() => (location.hash = 'logs'));
+}
 async function block(): Promise<void> {
   emit('close');
   const v = props.viewer;
@@ -68,7 +75,7 @@ async function block(): Promise<void> {
       <button :disabled="viewer.uid <= 0" @click="exclusive"><Icon name="i-spark" />{{ isExcl ? '修改 TA 的专属特效' : '为 TA 设置专属特效' }}</button>
       <button :disabled="viewer.uid <= 0" @click="copy"><Icon name="i-copy" />复制 UID</button>
       <button :disabled="viewer.uid <= 0" @click="block"><Icon name="i-ban" />加入黑名单</button>
-      <button disabled><Icon name="i-user" />查看观众档案<span class="soon">第二期</span></button>
+      <button :disabled="viewer.uid <= 0" @click="showLogs"><Icon name="i-list" />查看 TA 的事件记录</button>
     </div>
   </Teleport>
 </template>

@@ -183,9 +183,39 @@ const stageStyle = computed(() => {
   const portrait = o.value.orient === 'portrait';
   return portrait ? { width: '300px', height: `${Math.round((300 * o.value.height) / o.value.width)}px` } : { width: '100%', aspectRatio: `${o.value.width} / ${o.value.height}` };
 });
-function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
+/** 特效页环境检测：只列出有问题的项目，每项写清楚影响和怎么办；全都正常时只说一句 */
+const CAP_HINT: Record<string, { name: string; tip: string }> = {
+  webmVp9: { name: '透明视频', tip: '透明 WebM 放不了：请更新直播软件；在这之前上传的视频会带背景' },
+  blur: { name: '毛玻璃', tip: '不影响使用：玻璃质感的特效会简化成半透明' },
+  dynamicBorder: { name: '玻璃描边', tip: '不影响使用：玻璃边缘的光效会简化' },
+  audio: { name: '声音', tip: '声音可能出不来：OBS 里勾选「通过 OBS 控制音频」；直播姬里检查这个浏览器源的音量' },
+};
+function capIssues(env: Record<string, unknown> | null): Array<{ name: string; tip: string }> {
   if (!env) return [];
-  return [['透明视频', Boolean(env.webmVp9)], ['毛玻璃', Boolean(env.blur)], ['玻璃描边', Boolean(env.dynamicBorder)], ['声音', Boolean(env.audio)]];
+  return Object.keys(CAP_HINT).filter((k) => !env[k]).map((k) => CAP_HINT[k]!);
+}
+/** 特效页报的错误翻成大白话，写上怎么办 */
+function plainError(msg: string): string {
+  if (/play\(\) failed|user didn't interact|NotAllowedError|autoplay/i.test(msg)) return '声音被直播软件拦住了：OBS 里勾选「通过 OBS 控制音频」后，右键这个浏览器源点「刷新」；直播姬里检查这个素材的音量';
+  if (/404|Failed to load|NotSupportedError|no supported source|MEDIA_ERR|加载失败/i.test(msg)) return `素材文件读不出来，可能被删了或者格式不支持：到素材库重新上传，或者换一个特效（${msg}）`;
+  if (/超时|timeout/i.test(msg)) return `素材加载太慢：文件可能太大，或者网络不好（${msg}）`;
+  return msg;
+}
+// 发一个测试特效到直播画面（直播软件里真的会出现），直播中要再点一次确认
+async function sendTest(): Promise<void> {
+  const e = state.enter?.tiers.cap.effectId ?? state.effects.find((x) => x.builtin)?.id;
+  if (!e) return toast('还没有可以测试的特效', 'info');
+  await attempt(() => post('/api/playback/test', { effectId: e }), '已发送：去直播软件里看看画面上有没有出现');
+}
+async function copyCheck(): Promise<void> {
+  if (!o.value) return;
+  const url = `${location.origin}/overlay/?check=1&w=${o.value.width}&h=${o.value.height}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('已复制自检地址：在直播软件里临时加一个浏览器源打开它，看完删掉');
+  } catch {
+    toast(url, 'info', 8000);
+  }
 }
 /** 特效页运行环境（取直播软件里的那个，不取浏览器查看的） */
 const fxEnv = computed(() => overlays.value[0]?.env ?? null);
@@ -238,14 +268,24 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
             <div class="src-f">
               <span class="wh2">宽高填 <code>{{ o.width }} × {{ o.height }}</code></span>
-              <span v-if="fxEnv" class="caps"><span v-for="[name, ok] in caps(fxEnv)" :key="name" :class="ok ? 'ok' : 'mid'">{{ ok ? '✓' : '!' }} {{ name }}</span><span v-if="fxEnv.lite" class="mid">兼容模式</span></span>
+              <span v-if="fxEnv" class="caps">
+                <span v-if="!capIssues(fxEnv).length" class="ok" title="透明视频、毛玻璃、玻璃描边、声音都支持">✓ 环境正常</span>
+                <span v-for="c in capIssues(fxEnv)" :key="c.name" class="mid" :title="c.tip">! {{ c.name }}</span>
+                <span v-if="fxEnv.lite" class="mid" title="电脑性能不够时自动简化特效，保证不卡">兼容模式</span>
+              </span>
               <span class="links">
                 <a class="linkish" :href="`${o.path}&view=1`" target="_blank" rel="noopener" title="深色背景、显示安全区和连接状态；只用来查看，直播软件里请用上面的地址">在浏览器里查看</a>
                 <ConfirmButton label="重置密钥" confirm-label="确认重置？两个地址都会失效" cls="linkish dim" armed-cls="delb" @confirm="resetKey" />
               </span>
             </div>
             <div v-if="viewing.length && !overlays.length" class="src-note">浏览器里正在查看特效页，但这不算加到了直播软件：直播画面里要另外添加上面的地址</div>
-            <div v-if="fxError" class="src-err">最近的问题：{{ fxError }}</div>
+            <div v-if="capIssues(fxEnv).length" class="src-note">{{ capIssues(fxEnv).map((c) => `${c.name}：${c.tip}`).join('；') }}</div>
+            <div v-if="fxError" class="src-err">最近的问题：{{ plainError(fxError) }}</div>
+            <div v-if="overlays.length" class="src-test">
+              <ConfirmButton v-if="state.status?.live.live" label="发一个测试特效到直播画面" confirm-label="确认？观众会看到" cls="btn" armed-cls="btn live-send" @confirm="sendTest" />
+              <button v-else class="btn" type="button" @click="sendTest">发一个测试特效到直播画面</button>
+              <span class="inline-hint">直播软件里真的会出现一次，用来确认加对了</span>
+            </div>
           </div>
 
           <div class="srcbox" :class="{ off: !o.chatEnabled }">
@@ -276,13 +316,13 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <li><span><em class="tagsrc fx">特效页</em>在 <b>来源</b> 里点 <b>+</b> → <b>浏览器</b>，命名为「星临特效」，URL 粘贴特效页地址，宽 <code>{{ o.width }}</code> 高 <code>{{ o.height }}</code>，勾选 <b>通过 OBS 控制音频</b>（特效的音效才会进入直播）。</span></li>
               <li><span><em class="tagsrc fx">特效页</em>取消勾选 <b>不可见时关闭源</b> 和 <b>场景变为活动状态时刷新浏览器</b>，避免切场景时漏播；把它拖到来源列表 <b>最上方</b>。</span></li>
               <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再加一个 <b>浏览器</b> 来源，命名为「星临弹幕」，URL 粘贴弹幕列表地址，宽 <code>{{ chatWh.w }}</code> 高 <code>{{ chatWh.h }}</code>，拖到画面左边或右边。</span></li>
-              <li><span>第一次用可以先打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
+              <li><span>第一次用可以先检查直播软件支不支持：<button type="button" class="linkish" @click="copyCheck">复制兼容性自检地址</button>，在直播软件里临时加一个浏览器源打开它，看完删掉。加好特效页后，也可以点上面的「发一个测试特效到直播画面」。</span></li>
             </ol>
             <ol v-else class="steps">
               <li v-if="o.orient === 'portrait'"><span>在直播姬里切换到 <b>竖屏直播</b> 模式。</span></li>
               <li><span><em class="tagsrc fx">特效页</em>点 <b>添加素材 → 浏览器</b>，粘贴特效页地址，宽高填 <code>{{ o.width }}</code> × <code>{{ o.height }}</code>，拖动 <b>铺满画面</b>，放到 <b>图层最上方</b>。</span></li>
               <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再添加一个 <b>浏览器</b> 素材，粘贴弹幕列表地址，宽高填 <code>{{ chatWh.w }}</code> × <code>{{ chatWh.h }}</code>，拖到画面左边或右边。想改大小就改宽高数字或下面的「字号」，不要拉伸变形。</span></li>
-              <li><span>第一次用可以先用浏览器素材打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
+              <li><span>第一次用可以先检查直播软件支不支持：<button type="button" class="linkish" @click="copyCheck">复制兼容性自检地址</button>，在直播软件里临时加一个浏览器源打开它，看完删掉。加好特效页后，也可以点上面的「发一个测试特效到直播画面」。</span></li>
             </ol>
           </details>
         </div>

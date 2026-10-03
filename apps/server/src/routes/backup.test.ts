@@ -92,7 +92,7 @@ describe('导入配置', () => {
     expect(await dst.effectId('生日')).toBeUndefined();
 
     const ok = await dst.req({ method: 'POST', url: `/api/backup/import/${token}` });
-    expect(ok.json()).toEqual({ ok: true, savedFiles: 2 });
+    expect(ok.json()).toMatchObject({ ok: true, savedFiles: 2 });
     const bday = await dst.effectId('生日');
     expect(bday).toBeDefined();
     const eff = (await dst.req({ method: 'GET', url: `/api/effects/${bday}` })).json();
@@ -249,5 +249,35 @@ describe('自动备份', () => {
     expect(list.filter((x) => x.manual)[0]!.stamp).toBe('20260903-120007-m');
     await b.run(at(4, 2), true);
     expect(await b.tick(at(4, 5))).toBe(true);
+  });
+});
+
+describe('从备份恢复', () => {
+  it('选一份备份先预览，确认后恢复；恢复前自动再备份一份现在的配置', async () => {
+    const t = await setup();
+    await populate(t);
+    const item = (await t.req({ method: 'POST', url: '/api/backup/run' })).json();
+    // 备份之后又删掉了弹幕规则
+    const rules = (await t.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules as Array<{ id: number }>;
+    for (const r of rules) await t.req({ method: 'DELETE', url: `/api/rules/danmu/${r.id}` });
+    expect((await t.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules).toHaveLength(0);
+    const pre = await t.req({ method: 'POST', url: `/api/backup/restore/${item.config}` });
+    expect(pre.statusCode).toBe(200);
+    const { token, filename } = pre.json();
+    expect(filename).toBe(item.config);
+    const before = (await t.req({ method: 'GET', url: '/api/backup/list' })).json().items.length;
+    // 备份名字精确到秒：隔开一秒，免得和上面那份同名
+    await new Promise((r) => setTimeout(r, 1100));
+    const ok = (await t.req({ method: 'POST', url: `/api/backup/import/${token}` })).json();
+    expect(ok.backup).toMatch(/-m$/);
+    expect((await t.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules).toHaveLength(1);
+    // 恢复前多了一份手动备份；原来那份备份文件还在
+    expect((await t.req({ method: 'GET', url: '/api/backup/list' })).json().items.length).toBe(before + 1);
+    expect((await t.req({ method: 'GET', url: `/api/backup/files/${item.config}` })).statusCode).toBe(200);
+  });
+  it('不存在的备份、乱写的名字', async () => {
+    const t = await setup();
+    expect((await t.req({ method: 'POST', url: '/api/backup/restore/starfall-20200101-0400.json' })).statusCode).toBe(404);
+    expect((await t.req({ method: 'POST', url: '/api/backup/restore/..%2Fsecret.json' })).statusCode).toBe(400);
   });
 });

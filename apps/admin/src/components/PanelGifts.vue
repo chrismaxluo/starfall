@@ -11,11 +11,18 @@ import type { GiftRankDto, Viewer } from '../lib/types.ts';
 const props = defineProps<{ scope: 'live' | 'today' }>();
 const emit = defineEmits<{ pick: [viewer: Viewer, x: number, y: number] }>();
 const data = ref<GiftRankDto | null>(null);
+/** 读取失败（还没读到过数据时显示，可以重试） */
+const failed = ref(false);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
 
 async function load(): Promise<void> {
-  data.value = await get<GiftRankDto>(`/api/stats/gifts?scope=${props.scope}`).catch(() => data.value);
+  try {
+    data.value = await get<GiftRankDto>(`/api/stats/gifts?scope=${props.scope}`);
+    failed.value = false;
+  } catch {
+    failed.value = true;
+  }
 }
 watch(() => [props.scope, state.status?.room?.roomId, state.status?.live.liveSince], () => void load());
 // 有人送礼时稍后刷新（连击合并完才记录，不用每条都请求）
@@ -52,6 +59,7 @@ function sub(r: GiftRankDto['rows'][number]): string {
   <template v-else>
     <div class="phead">
       <span v-if="data">{{ scope === 'live' ? '本场' : '今天' }}送礼 <b class="num">{{ data.people }}</b> 人 · 合计 <b class="num">{{ battery(data.gold) }}</b>（{{ yuan(data.gold) }}）</span>
+      <span v-else-if="failed">没读到礼物榜。<button type="button" class="linkish" @click="load">重试</button></span>
       <span v-else>正在读取……</span>
     </div>
     <div class="plist">

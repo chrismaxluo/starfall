@@ -106,7 +106,10 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   live.onStatus(() => hub.toAdmins({ type: 'status', status: { live: live.status(), paused: settings.get('paused'), overlays: hub.overlayCount() } }));
   log.onChange((m) => hub.toAdmins(m));
   pipeline.onQueueChange((queue) => hub.toAdmins({ type: 'queue', queue, paused: settings.get('paused') }));
-  hub.onOverlaysChange(() => hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() }));
+  hub.onOverlaysChange(() => {
+    if (hub.overlayCount() > 0 && !settings.get('overlaySeen')) settings.set('overlaySeen', true);
+    hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() });
+  });
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
   return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };

@@ -84,10 +84,12 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       return;
     }
     // 弹幕列表和特效页用同一个连接地址，多一个 view=chat
+    // 浏览器查看页多一个 view=1：照样收特效，但不算在线
     const role = req.query.view === 'chat' ? 'chat' : 'fx';
-    const what = role === 'chat' ? '弹幕列表' : '特效页';
-    const client = ctx.hub.addOverlay(socket, output, role === 'chat' ? [] : preloadUrls(ctx), Date.now(), role);
-    const log = req.log.child({ output: output.id, ip: req.ip, ...(role === 'chat' ? { view: 'chat' } : {}) });
+    const view = role === 'fx' && req.query.view === '1';
+    const what = role === 'chat' ? '弹幕列表' : view ? '特效页（浏览器查看）' : '特效页';
+    const client = ctx.hub.addOverlay(socket, output, role === 'chat' ? [] : preloadUrls(ctx), Date.now(), role, view);
+    const log = req.log.child({ output: output.id, ip: req.ip, ...(role === 'chat' ? { view: 'chat' } : view ? { view: 'browser' } : {}) });
     log.info(`${what}已连接`);
     // 记录断开原因，方便排查"特效页不显示"
     let reason: string | null = null;

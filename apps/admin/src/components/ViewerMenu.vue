@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // 观众菜单：设置专属、复制 UID、加入黑名单（总览实时动态、事件记录）
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { post } from '../lib/api.ts';
+import { del, post } from '../lib/api.ts';
 import { state, ui } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { Viewer } from '../lib/types.ts';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
@@ -46,9 +46,21 @@ async function copy(): Promise<void> {
     toast(`UID：${props.viewer.uid}`, 'info');
   }
 }
+function showLogs(): void {
+  emit('close');
+  ui.logQuery = String(props.viewer.uid);
+  // 已经在事件记录页时，换个地址再回来，让它重新读
+  if (location.hash.startsWith('#logs')) location.hash = 'overview';
+  setTimeout(() => (location.hash = 'logs'));
+}
 async function block(): Promise<void> {
   emit('close');
-  await attempt(() => post('/api/blacklist', { uid: props.viewer.uid, name: props.viewer.name }), `已把 ${props.viewer.name} 加入黑名单，TA 不会再触发特效`);
+  const v = props.viewer;
+  if (!(await attempt(() => post('/api/blacklist', { uid: v.uid, name: v.name })))) return;
+  undoable(`已把 ${v.name} 加入黑名单，TA 不会再触发特效`, async () => {
+    await del(`/api/blacklist/${v.uid}`);
+    toast(`已把 ${v.name} 移出黑名单`);
+  });
 }
 </script>
 
@@ -63,7 +75,7 @@ async function block(): Promise<void> {
       <button :disabled="viewer.uid <= 0" @click="exclusive"><Icon name="i-spark" />{{ isExcl ? '修改 TA 的专属特效' : '为 TA 设置专属特效' }}</button>
       <button :disabled="viewer.uid <= 0" @click="copy"><Icon name="i-copy" />复制 UID</button>
       <button :disabled="viewer.uid <= 0" @click="block"><Icon name="i-ban" />加入黑名单</button>
-      <button disabled><Icon name="i-user" />查看观众档案<span class="soon">第二期</span></button>
+      <button :disabled="viewer.uid <= 0" @click="showLogs"><Icon name="i-list" />查看 TA 的事件记录</button>
     </div>
   </Teleport>
 </template>

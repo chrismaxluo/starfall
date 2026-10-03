@@ -8,7 +8,7 @@
 
 识别每一位进场的观众，在弹幕、礼物、上舰的时刻，于直播画面上播放专属的动画、欢迎语与音效。
 
-[![Version](https://img.shields.io/badge/version-1.3.0-5451D6?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-5451D6?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-2F6FEB?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24-3C873A?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -181,7 +181,7 @@ pnpm build        # 构建管理后台与特效页
 
 ### 质量保障
 
-- **测试**：350 余个单元与集成测试，覆盖消息解析、规则匹配、冷却与合并、播放队列、接口，以及基于模拟 B 站服务器的端到端流程。
+- **测试**：360 余个单元与集成测试，覆盖消息解析、规则匹配、冷却与合并、播放队列、接口，以及基于模拟 B 站服务器的端到端流程。
 - **检查**：TypeScript 严格模式、ESLint、Vue 模板类型检查，`pnpm check` 一次完成。
 - **分支**：`main` 仅承载里程碑版本并打标签，日常开发在 `dev`；详见[开发约定](docs/development.md)。
 
@@ -224,6 +224,7 @@ pnpm --filter @starfall/server start
 - [x] **v1.1.0**：素材位置、大小、上下羽化、渐入渐出可调；素材库卡片操作；特效页自动更新、后台新版本提示
 - [x] **v1.2.0**：大航海头像框、荣耀等级；弹幕规则按身份多选；SVGA 动态图层；总览切换面板（在线观众、礼物榜、大航海）；记录醒目留言
 - [x] **v1.3.0**：弹幕列表（所有人的弹幕排成一列显示在直播画面上）；直播软件输出页改版
+- [x] **v1.4.0**：管理后台体验全面改进（运行状态提醒、真实画面预览、撤销、事件原因与处理入口、备份恢复）；弹幕列表条数设置与自动消失
 - [ ] Windows 客户端：在主播电脑上直接运行，界面与服务器版一致
 - [ ] 第二期：醒目留言、关注、点赞触发；直播数据统计；观众档案
 

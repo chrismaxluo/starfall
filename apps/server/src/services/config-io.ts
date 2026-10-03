@@ -15,6 +15,7 @@ import type { Db } from '../db/index.ts';
 import { assets, effects, ruleDanmu, ruleExclusive } from '../db/schema.ts';
 import type { Settings } from '../db/seed.ts';
 import { HttpError } from '../http.ts';
+import { issueText } from '../zod-text.ts';
 import type { AssetRow, AssetStore } from './assets.ts';
 import type { BlacklistStore } from './blacklist.ts';
 import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rules.ts';
@@ -145,6 +146,8 @@ const OutputPart = OutputInputSchema.extend({
   chatSide: OutputInputSchema.shape.chatSide.default('left'),
   chatSize: OutputInputSchema.shape.chatSize.default('normal'),
   chatMedal: OutputInputSchema.shape.chatMedal.default('own'),
+  chatMax: OutputInputSchema.shape.chatMax.default(8),
+  chatFadeSec: OutputInputSchema.shape.chatFadeSec.default(0),
 });
 
 export const ConfigFileSchema = z.object({
@@ -193,7 +196,7 @@ export function parseConfigFile(text: string): ConfigFile {
   const r = ConfigFileSchema.safeParse(json);
   if (!r.success) {
     const i = r.error.issues[0]!;
-    throw new HttpError(400, 'invalid_config', `配置文件内容有误：${i.path.join('.') || '（根）'} ${i.message}`);
+    throw new HttpError(400, 'invalid_config', `配置文件内容有误：${issueText(i)}（位置 ${i.path.join('.') || '最外层'}）`);
   }
   return r.data;
 }
@@ -290,7 +293,7 @@ export class ConfigIO {
         guard: Object.fromEntries((['gov', 'adm', 'cap'] as const).map((t) => [t, { open: ref(guard[t].openEffectId), renew: ref(guard[t].renewEffectId), enabled: guard[t].enabled }])) as ConfigFile['rules']['guard'],
       },
       blacklist: this.d.blacklist.list().map((b) => ({ uid: b.uid, name: b.name, note: b.note })),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec })),
     };
   }
 
@@ -562,7 +565,7 @@ export class ConfigIO {
   }
 }
 
-const TIER_LABEL: Record<string, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '普通观众' };
+const TIER_LABEL: Record<string, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '其他观众' };
 const describeTier = (t: { effect: string | null; cooldownMin: number; enabled: boolean }) => `${t.effect ?? '未选素材'}，冷却 ${t.cooldownMin} 分钟${t.enabled ? '' : '（停用）'}`;
 const stripName = ({ name: _n, ...rest }: ConfigFile['effects'][number]) => rest;
 function fmt(v: unknown): string {

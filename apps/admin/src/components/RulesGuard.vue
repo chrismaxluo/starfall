@@ -5,7 +5,7 @@ import { get, put } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
 import { effectById, refreshEffects, state } from '../lib/store.ts';
-import { attempt } from '../lib/toast.ts';
+import { attempt, undoable } from '../lib/toast.ts';
 import type { GuardRules } from '../lib/types.ts';
 import EffectPicker from './EffectPicker.vue';
 import IdTag from './IdTag.vue';
@@ -22,9 +22,10 @@ type Key = (typeof ROWS)[number]['key'];
 const split = reactive<Record<Key, boolean>>({ gov: false, adm: false, cap: false });
 const separate = (k: Key) => split[k] || state.guard![k].openEffectId !== state.guard![k].renewEffectId;
 
-async function save(msg?: string): Promise<void> {
+async function save(msg?: string, undo?: () => Promise<unknown>): Promise<void> {
   if (!state.guard) return;
-  const r = await attempt(() => put<GuardRules>('/api/rules/guard', state.guard), msg);
+  const r = await attempt(() => put<GuardRules>('/api/rules/guard', state.guard), undo ? undefined : msg);
+  if (r && undo && msg) undoable(msg, undo);
   state.guard = r ?? (await get<GuardRules>('/api/rules/guard'));
   void refreshEffects();
 }
@@ -34,9 +35,15 @@ function setBoth(row: (typeof ROWS)[number], id: number): void {
 }
 function merge(row: (typeof ROWS)[number]): void {
   const g = state.guard![row.key];
+  const old = g.renewEffectId;
   split[row.key] = false;
   g.renewEffectId = g.openEffectId;
-  void save(`${row.name}续费改回和开通用同一个特效`);
+  void save(`${row.name}续费改回和开通用同一个特效`, async () => {
+    if (!state.guard) return;
+    state.guard[row.key].renewEffectId = old;
+    split[row.key] = true;
+    await save(`${row.name}续费恢复成「${effectById(old)?.name ?? ''}」`);
+  });
 }
 function preview(row: (typeof ROWS)[number], op: 'open' | 'renew'): void {
   const g = state.guard![row.key];
@@ -46,23 +53,24 @@ function preview(row: (typeof ROWS)[number], op: 'open' | 'renew'): void {
 
 <template>
   <div v-if="state.guard">
-    <div class="rl-flow"><span>有人开通或续费大航海时播放，会<b>插队优先</b>。同一次上舰 B 站会发好几条消息，星临只播一次。</span></div>
+    <div class="rl-flow"><span>有人开通或续费大航海时播放，{{ state.settings?.queueJump === false ? '按顺序排队（排队设置里关掉了插队）' : '会插队优先播放' }}。同一次上舰 B站会发好几条消息，星临只播一次。</span></div>
     <div class="rl-list">
       <div v-for="row in ROWS" :key="row.key" class="rl" :class="{ off: !state.guard[row.key].enabled }">
         <span class="who"><IdTag :identity="row.key" /></span>
         <span v-if="!separate(row.key)" class="say">
-          有人<b>开通或续费{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" @change="(id) => setBoth(row, id)" />
+          有人<b>开通或续费{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" kind="guard" @change="(id) => setBoth(row, id)" />
           <button class="linkish sm" @click="split[row.key] = true">续费用别的特效</button>
           <span v-if="!state.guard[row.key].enabled" class="offnote">已关闭：{{ row.name }}上舰不播放特效</span>
         </span>
         <span v-else class="say">
-          有人<b>开通{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" @change="(id) => save(`开通${row.name}：${effectById(id)?.name}`)" />；
-          <b>续费</b>时，播放 <EffectPicker v-model="state.guard[row.key].renewEffectId" @change="(id) => save(`续费${row.name}：${effectById(id)?.name}`)" />
+          有人<b>开通{{ row.name }}</b>时，播放 <EffectPicker v-model="state.guard[row.key].openEffectId" kind="guard" @change="(id) => save(`开通${row.name}：${effectById(id)?.name}`)" />；
+          <b>续费</b>时，播放 <EffectPicker v-model="state.guard[row.key].renewEffectId" kind="guard" @change="(id) => save(`续费${row.name}：${effectById(id)?.name}`)" />
           <button class="linkish sm" @click="merge(row)">改回同一个</button>
           <span v-if="!state.guard[row.key].enabled" class="offnote">已关闭：{{ row.name }}上舰不播放特效</span>
         </span>
         <span class="acts">
-          <button class="playmini" :aria-label="`预览开通${row.name}`" @click="preview(row, 'open')"><svg><use href="#i-play" /></svg></button>
+          <button class="playmini" :aria-label="separate(row.key) ? `预览开通${row.name}` : `预览${row.name}上舰`" :title="separate(row.key) ? `预览开通${row.name}` : `预览${row.name}上舰`" @click="preview(row, 'open')"><svg><use href="#i-play" /></svg></button>
+          <button v-if="separate(row.key)" class="playmini renew" :aria-label="`预览续费${row.name}`" :title="`预览续费${row.name}`" @click="preview(row, 'renew')"><svg><use href="#i-play" /></svg><i>续</i></button>
           <Switch v-model="state.guard[row.key].enabled" :label="`${row.name}上舰特效`" @change="(v) => save(v ? `已打开${row.name}上舰特效` : `已关闭${row.name}上舰特效`)" />
         </span>
       </div>

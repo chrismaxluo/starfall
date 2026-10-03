@@ -39,12 +39,27 @@ export interface OverlayConfig {
   chatSide: 'left' | 'right';
   chatSize: 'normal' | 'large';
   chatMedal: 'own' | 'all';
+  /** 弹幕列表最多显示几条 */
+  chatMax: number;
+  /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示（只被新弹幕顶走） */
+  chatFadeSec: number;
 }
 
-/** 弹幕列表最多显示几条 */
-export const CHAT_MAX = 8;
-/** 弹幕列表浏览器源的建议宽高 */
-export const CHAT_SIZE = { width: 600, height: 900 } as const;
+/** 弹幕列表条数：默认 8 条，最多能设 CHAT_MAX_LIMIT 条（服务端也最多记住这么多条） */
+export const CHAT_MAX_DEFAULT = 8;
+export const CHAT_MAX_LIMIT = 20;
+/** 弹幕自动消失的时间：3 – 600 秒（0 为一直显示）；后台的常用选项 */
+export const CHAT_FADE_MIN = 3;
+export const CHAT_FADE_MAX = 600;
+export const CHAT_FADE_OPTIONS = [5, 10, 15, 30, 60];
+/** 弹幕列表浏览器源的建议宽度 */
+export const CHAT_WIDTH = 600;
+
+/** 弹幕列表浏览器源的建议高度：普通长度的弹幕每条约 110（字号大时 1.2 倍），上下留边，按 50 取整，至少 300 */
+export function chatHeight(max: number, size: 'normal' | 'large'): number {
+  const row = size === 'large' ? 132 : 110;
+  return Math.max(300, Math.ceil((32 + max * row - 14) / 50) * 50);
+}
 
 /** 弹幕列表里的一条弹幕 */
 export interface ChatItem {

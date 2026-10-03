@@ -182,6 +182,8 @@ export const outputs = sqliteTable('outputs', {
   chatSide: text('chat_side', { enum: ['left', 'right'] }).notNull().default('left'),
   chatSize: text('chat_size', { enum: ['normal', 'large'] }).notNull().default('normal'),
   chatMedal: text('chat_medal', { enum: ['own', 'all'] }).notNull().default('own'),
+  chatMax: integer('chat_max').notNull().default(8),
+  chatFadeSec: integer('chat_fade_sec').notNull().default(0),
   key: text('key').notNull().unique(),
   createdAt: integer('created_at').notNull().default(now),
 });

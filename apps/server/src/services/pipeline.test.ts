@@ -15,7 +15,7 @@ function fakeLive() {
   return {
     state,
     onEvent: (fn: (ev: StdEvent, raw: unknown) => void) => (listeners.add(fn), () => listeners.delete(fn)),
-    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, adminCount: 0 }),
+    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, loginInvalid: false, adminCount: 0 }),
     emit: (ev: StdEvent, raw?: unknown) => { for (const fn of listeners) fn(ev, raw); },
   };
 }
@@ -466,7 +466,7 @@ describe('礼物', () => {
     }
     expect(t.events()).toHaveLength(0);
     vi.advanceTimersByTime(3200);
-    expect(t.events()).toMatchObject([{ kind: 'gift', status: 'played', rule: '礼物 · 单次 ≥ 1 元', payload: { giftName: '小花花', count: 10 } }]);
+    expect(t.events()).toMatchObject([{ kind: 'gift', status: 'played', rule: '礼物 · 单次 ≥ 10电池', payload: { giftName: '小花花', count: 10 } }]);
     expect(t.plays()[0]).toMatchObject({ text: '小星 送出 小花花', gift: { name: '小花花', count: 10 } });
   });
 
@@ -479,7 +479,7 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 0, paid: false, giftName: '辣条' }, { uid: 4 }));
     expect(t.events().map((e) => [e.uid, e.rule, e.status])).toEqual([
       [1, '礼物 · 「小电视飞船」', 'played'],
-      [2, '礼物 · 单次 10 – 100 元', 'queued'],
+      [2, '礼物 · 单次 100 – 1000电池', 'queued'],
       [3, null, 'no_rule'],
       [4, null, 'no_rule'],
     ]);
@@ -592,13 +592,14 @@ describe('弹幕列表', () => {
     expect(b).toMatchObject({ sticker: { width: 162 }, viewer: { anchor: false, guard: 3, face: 'https://i0.hdslb.com/face/3.jpg', medal: { level: 21, own: true }, honor: { level: 30 } } });
   });
 
-  it('只记住最近 8 条；新打开的弹幕列表先收到这些；换直播间清空', async () => {
+  it('记住最近 20 条（能设的最多条数）；新打开的弹幕列表先收到这些；换直播间清空', async () => {
     const t = await setup();
-    for (let i = 1; i <= 10; i++) t.live.emit(dm(`第 ${i} 条`));
+    for (let i = 1; i <= 22; i++) t.live.emit(dm(`第 ${i} 条`));
     const chat = fakeSock();
     t.hub.addOverlay(chat, t.ctx.outputs.list()[0]!, [], Date.now(), 'chat');
     const hello = chat.sent[0] as Extract<ServerToOverlay, { type: 'hello' }>;
-    expect(hello.chat?.map((c) => c.text)).toEqual(['第 3 条', '第 4 条', '第 5 条', '第 6 条', '第 7 条', '第 8 条', '第 9 条', '第 10 条']);
+    expect(hello.chat?.map((c) => c.text)).toEqual(Array.from({ length: 20 }, (_, i) => `第 ${i + 3} 条`));
+    expect(hello.config.chatMax).toBe(8);
     t.ctx.room.save({ roomId: 40000, shortId: 0, anchorUid: 1, anchorName: '别人' });
     expect(chat.sent.at(-1)).toEqual({ type: 'chat_clear' });
     expect(t.hub.recentChat()).toEqual([]);

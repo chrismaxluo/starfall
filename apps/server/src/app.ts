@@ -108,6 +108,16 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
       cacheControl: false,
       setHeaders: (reply) => reply.header('Cache-Control', 'public, max-age=31536000, immutable'),
     });
+    // 内置特效的效果截图（素材库卡片、选特效时显示）：重新生成后要能马上换上，只缓存一小时
+    if (fs.existsSync(path.join(dist, 'thumbs'))) {
+      await app.register(fastifyStatic, {
+        root: path.join(dist, 'thumbs'),
+        prefix: '/thumbs/',
+        decorateReply: false,
+        cacheControl: false,
+        setHeaders: (reply) => reply.header('Cache-Control', 'public, max-age=3600'),
+      });
+    }
     // 入口页和根目录下的图标：不缓存
     const sendTop = async (reply: FastifyReply, name: string) => {
       const ext = path.extname(name).slice(1);

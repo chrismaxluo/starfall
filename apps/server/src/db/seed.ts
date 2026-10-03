@@ -71,6 +71,8 @@ export const DEFAULT_SETTINGS = {
   featherPct: 10,
   /** 新手引导已完成或跳过（F-UI-06） */
   onboarded: false,
+  /** 直播软件里的特效页连上过（首页「开始使用」的第 3 步按这个算，不按此刻在不在线） */
+  overlaySeen: false,
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

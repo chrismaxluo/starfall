@@ -1,6 +1,6 @@
 // 播放控制、测试、模拟（需求 F-PL-05 ~ 06、F-RU-05）
 import type { FastifyInstance } from 'fastify';
-import { HONOR_LEVEL_MAX, PLAY_STATUS } from '@starfall/shared';
+import { HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, PLAY_STATUS } from '@starfall/shared';
 import type { Viewer } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
@@ -16,7 +16,7 @@ const SimViewerSchema = z
     guard: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).default(0),
     isMod: z.boolean().default(false),
     /** 粉丝牌等级；own 为假表示戴的是别的主播的牌子 */
-    medal: z.object({ level: z.number().int().min(1).max(60), own: z.boolean().default(true) }).nullable().default(null),
+    medal: z.object({ level: z.number().int().min(1).max(MEDAL_LEVEL_MAX), own: z.boolean().default(true) }).nullable().default(null),
     /** 荣耀等级（0 没有） */
     honor: z.number().int().min(0).max(HONOR_LEVEL_MAX).default(0),
   })
@@ -55,33 +55,26 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { removed: true };
   });
 
-  app.post('/api/playback/test', async (req) => {
-    const { effectId } = parseBody(z.object({ effectId: z.number().int().positive() }).strict(), req.body);
-    return ctx.pipeline.test(effectId);
-  });
-
-  // 预览：返回播放内容（后台用真实的特效页在本地播放），不入队、不上直播
-  app.post('/api/preview', async (req) => {
-    const b = parseBody(
-      z.object({
-        effectId: z.number().int().positive(),
-        kind: z.enum(['enter', 'danmu', 'gift', 'guard']).default('enter'),
-        viewer: z
-          .object({ name: z.string().max(40), guard: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), isMod: z.boolean(), medalLevel: z.number().int().min(1).max(60).nullable(), honor: z.number().int().min(0).max(HONOR_LEVEL_MAX) })
-          .partial()
-          .strict()
-          .optional(),
-        /** 还没保存的修改（素材设置里预览用） */
-        draft: EffectPatchSchema.omit({ name: true }).optional(),
-        /** 欢迎语变量（弹幕内容、礼物和数量、上舰月数）；不填用示例 */
-        vars: z
-          .object({ text: z.string().max(100), gift: z.string().max(40), count: z.number().int().min(1), valueGold: z.number().int().min(0), months: z.number().int().min(1).max(120), guardLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]), op: z.enum(['open', 'renew']) })
-          .partial()
-          .strict()
-          .optional(),
-      }).strict(),
-      req.body,
-    );
+  /** 预览、发到直播测试共用：特效编号 + 还没保存的修改 + 示例观众 + 欢迎语变量 */
+  const PreviewBody = z.object({
+    effectId: z.number().int().positive(),
+    kind: z.enum(['enter', 'danmu', 'gift', 'guard']).default('enter'),
+    viewer: z
+      .object({ name: z.string().max(40), guard: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), isMod: z.boolean(), medalLevel: z.number().int().min(1).max(MEDAL_LEVEL_MAX).nullable(), honor: z.number().int().min(0).max(HONOR_LEVEL_MAX) })
+      .partial()
+      .strict()
+      .optional(),
+    /** 还没保存的修改（素材设置里预览用） */
+    draft: EffectPatchSchema.omit({ name: true }).optional(),
+    /** 欢迎语变量（弹幕内容、礼物和数量、上舰月数）；不填用示例 */
+    vars: z
+      .object({ text: z.string().max(100), gift: z.string().max(40), count: z.number().int().min(1), valueGold: z.number().int().min(0), months: z.number().int().min(1).max(120), guardLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]), op: z.enum(['open', 'renew']) })
+      .partial()
+      .strict()
+      .optional(),
+  }).strict();
+  /** 把还没保存的修改套到已保存的特效上，示例观众换成播放用的样子 */
+  const previewInput = (b: z.infer<typeof PreviewBody>) => {
     const saved = ctx.effects.get(b.effectId);
     const d = b.draft ?? {};
     let sound = saved.sound;
@@ -94,7 +87,22 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     const v = b.viewer ?? {};
     const medal = v.medalLevel === null ? { medal: undefined } : v.medalLevel ? { medal: { name: '星临', level: v.medalLevel, anchorUid: 0 } } : {};
     const { medalLevel: _m, ...rest } = v;
-    return ctx.pipeline.preview(effect, { ...rest, ...medal }, b.kind, b.vars);
+    return { effect, viewer: { ...rest, ...medal } };
+  };
+
+  app.post('/api/playback/test', async (req) => {
+    const b = parseBody(PreviewBody, req.body);
+    // 只给了特效编号：和以前一样按已保存的样子、示例观众进场
+    if (!b.draft && !b.viewer && !b.vars && b.kind === 'enter') return ctx.pipeline.test(b.effectId);
+    const { effect, viewer } = previewInput(b);
+    return ctx.pipeline.test(effect, viewer, b.kind, b.vars);
+  });
+
+  // 预览：返回播放内容（后台用真实的特效页在本地播放），不入队、不上直播
+  app.post('/api/preview', async (req) => {
+    const b = parseBody(PreviewBody, req.body);
+    const { effect, viewer } = previewInput(b);
+    return ctx.pipeline.preview(effect, viewer, b.kind, b.vars);
   });
 
   // 今天（按主播时区）的统计

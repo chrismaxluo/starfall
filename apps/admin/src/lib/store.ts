@@ -32,7 +32,7 @@ export const state = reactive({
   feed: [] as EventDto[],
   /** 实时连接是否在线 */
   wsOnline: false,
-  /** 荣耀等级勋章：等级 → B 站的图（读不到时是空的，界面上改成显示文字） */
+  /** 荣耀等级勋章：等级 → B站的图（读不到时是空的，界面上改成显示文字） */
   honorMedals: {} as Record<number, string>,
   /** 从别的页面跳到"添加专属用户"时预填的 UID */
   pendingExclusive: null as number | null,
@@ -40,10 +40,14 @@ export const state = reactive({
 
 export const effectById = (id: number | null | undefined) => (id ? state.effects.find((e) => e.id === id) : undefined);
 export const output = () => state.outputs[0];
+/** 加到直播软件里的特效页（不算弹幕列表，也不算「在浏览器里查看」打开的页面） */
+export const isFxLive = (x: OverlayInfo) => x.role !== 'chat' && !x.view && !x.env?.view;
+/** 「在浏览器里查看」打开的特效页 */
+export const isFxView = (x: OverlayInfo) => x.role !== 'chat' && Boolean(x.view || x.env?.view);
 
 /** 输出的设置换成特效页、弹幕列表收到的格式（预览用） */
 export function overlayConfigOf(o: OutputDto): OverlayConfig {
-  return { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal };
+  return { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec };
 }
 
 export async function refreshStatus(): Promise<void> {
@@ -94,6 +98,10 @@ export const ui = reactive({
   editorId: null as number | null,
   wizard: false,
   palette: false,
+  /** 打开事件记录时先搜索这个（观众菜单「查看 TA 的记录」） */
+  logQuery: null as string | null,
+  /** 扫码登录 B站（侧边栏、登录失效提醒条） */
+  qr: false,
   /** 预览小窗：点规则的 ▶、命令面板里的「预览某身份进场特效」 */
   preview: null as PreviewRequest | null,
   quick: null as { uid: number; name: string; face?: string | undefined; viewer?: Viewer } | null,

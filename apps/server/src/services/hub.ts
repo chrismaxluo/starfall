@@ -1,5 +1,5 @@
 // 在线的特效页和管理后台（方案设计 9.3）。这里不关心 WebSocket 细节，只管"发给谁"。
-import { CHAT_MAX, OVERLAY_CLOSE } from '@starfall/shared';
+import { CHAT_MAX_LIMIT, OVERLAY_CLOSE } from '@starfall/shared';
 import type { ChatItem, OverlayConfig, ServerToOverlay } from '@starfall/shared';
 import type { OutputRow } from './outputs.ts';
 
@@ -15,6 +15,8 @@ export interface OverlayClient {
   sock: Sock;
   outputId: number;
   role: OverlayRole;
+  /** 浏览器查看页（&view=1）：能看特效，但不算"加到了直播软件" */
+  view: boolean;
   since: number;
   /** 特效页上报的运行环境（直播软件、内核版本、能力检测） */
   env: Record<string, unknown> | null;
@@ -29,6 +31,7 @@ export const PLAY_ACK_MS = 5000;
 export interface OverlayInfo {
   outputId: number;
   role: OverlayRole;
+  view: boolean;
   since: number;
   env: Record<string, unknown> | null;
   lastError: string | null;
@@ -50,6 +53,8 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   chatSide: o.chatSide,
   chatSize: o.chatSize,
   chatMedal: o.chatMedal,
+  chatMax: o.chatMax,
+  chatFadeSec: o.chatFadeSec,
 });
 
 export class Hub {
@@ -58,7 +63,7 @@ export class Hub {
   private readonly overlays = new Set<OverlayClient>();
   private readonly admins = new Set<Sock>();
   private readonly overlayListeners = new Set<() => void>();
-  /** 最近的几条弹幕：弹幕列表刚打开（或刷新）时先显示这些 */
+  /** 最近的几条弹幕（按能设的最多条数记）：弹幕列表刚打开（或刷新）时先显示这些，页面按自己的条数取最后几条 */
   private chatRecent: ChatItem[] = [];
 
   constructor(opts: { build?: () => string | null } = {}) {
@@ -75,8 +80,8 @@ export class Hub {
     for (const fn of this.overlayListeners) fn();
   }
 
-  addOverlay(sock: Sock, output: OutputRow, preload: string[], now = Date.now(), role: OverlayRole = 'fx'): OverlayClient {
-    const c: OverlayClient = { sock, outputId: output.id, role, since: now, env: null, lastError: null, pending: new Map() };
+  addOverlay(sock: Sock, output: OutputRow, preload: string[], now = Date.now(), role: OverlayRole = 'fx', view = false): OverlayClient {
+    const c: OverlayClient = { sock, outputId: output.id, role, view, since: now, env: null, lastError: null, pending: new Map() };
     this.overlays.add(c);
     if (role === 'chat') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), chat: this.chatRecent });
     else send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
@@ -90,16 +95,18 @@ export class Hub {
 
   report(c: OverlayClient, patch: Partial<Pick<OverlayClient, 'env' | 'lastError'>>): void {
     Object.assign(c, patch);
+    // 旧版特效页不在地址里带 view=1，只在上报的环境里写 view
+    if (patch.env?.view === true) c.view = true;
     this.overlaysChanged();
   }
 
-  /** 在线的特效页数量（不算弹幕列表） */
+  /** 加到直播软件里的特效页数量（不算弹幕列表，也不算浏览器查看页） */
   overlayCount(): number {
-    return [...this.overlays].filter((c) => c.role === 'fx').length;
+    return [...this.overlays].filter((c) => c.role === 'fx' && !c.view).length;
   }
 
   overlayList(): OverlayInfo[] {
-    return [...this.overlays].map((c) => ({ outputId: c.outputId, role: c.role, since: c.since, env: c.env, lastError: c.lastError }));
+    return [...this.overlays].map((c) => ({ outputId: c.outputId, role: c.role, view: c.view, since: c.since, env: c.env, lastError: c.lastError }));
   }
 
   /** 发给所有特效页（所有输出同步播放）；版本更新也发给弹幕列表 */
@@ -113,7 +120,7 @@ export class Hub {
 
   /** 新的一条弹幕：发给所有弹幕列表和管理后台（后台的预览用），记住最近的几条 */
   toChat(item: ChatItem): void {
-    this.chatRecent = [...this.chatRecent, item].slice(-CHAT_MAX);
+    this.chatRecent = [...this.chatRecent, item].slice(-CHAT_MAX_LIMIT);
     for (const c of this.overlays) if (c.role === 'chat') send(c.sock, { type: 'chat', item });
     this.toAdmins({ type: 'chat', item });
   }

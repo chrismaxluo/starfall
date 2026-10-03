@@ -105,8 +105,10 @@ export type TierRule = z.infer<typeof TierRuleSchema>;
 
 
 /** 粉丝牌分档：只存起始等级，区间由相邻两档推出，所以不会重叠 */
+/** 粉丝牌等级上限（B 站现在最高 120 级）：进场分段、弹幕「谁发的才算」、模拟都用这个 */
+export const MEDAL_LEVEL_MAX = 120;
 export const MedalBandSchema = z.object({
-  fromLevel: z.number().int().min(1).max(60),
+  fromLevel: z.number().int().min(1).max(MEDAL_LEVEL_MAX),
   effectId: z.number().int().positive().nullable(),
   cooldownMin,
   enabled: z.boolean(),
@@ -148,7 +150,6 @@ export type EnterRules = z.infer<typeof EnterRulesSchema>;
 export const DANMU_WHO_OLD = ['all', 'fan', 'fan10', 'guard', 'mod'] as const;
 
 /** 粉丝牌等级上限 */
-export const MEDAL_LEVEL_MAX = 120;
 /** 荣耀等级上限（B 站目前到 80 级） */
 export const HONOR_LEVEL_MAX = 80;
 /** 一条规则最多指定多少位观众 */

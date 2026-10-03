@@ -37,6 +37,8 @@ export interface LiveStatus {
   connectionDetail: string | null;
   /** 为什么没有连接 */
   reason: LiveReason;
+  /** B 站说登录已失效（在别处退出或过期）：要重新扫码，不然收不到直播间消息 */
+  loginInvalid: boolean;
   adminCount: number;
 }
 
@@ -70,6 +72,7 @@ export class LiveService {
   private session: { id: number; roomId: number | null; startedAt: number } | null = null;
   private connection: ClientState = 'idle';
   private connectionDetail: string | null = null;
+  private loginInvalid = false;
   private reason: LiveReason = 'no_room';
   /** 解析失败的消息数（协议可能变了） */
   parseErrors = 0;
@@ -110,6 +113,7 @@ export class LiveService {
       connection: this.connection,
       connectionDetail: this.connectionDetail,
       reason: this.reason,
+      loginInvalid: this.loginInvalid,
       adminCount: this.admins.size,
     };
   }
@@ -238,6 +242,7 @@ export class LiveService {
     if (gen !== this.gen || this.stopped) return;
     const wbi = new WbiSigner(http);
     this.connectedRoom = roomId;
+    this.loginInvalid = false;
     this.client = this.deps.createClient({
       roomId,
       uid: http.uid,
@@ -245,10 +250,17 @@ export class LiveService {
       getDanmuInfo: () =>
         this.deps.getDanmuInfo(http, wbi, roomId).catch((e: unknown) => {
           // -101：账号未登录（登录已过期或在别处退出）
-          if (e instanceof BiliApiError && e.code === -101) throw new Error('B 站登录已失效，请在「设置」里重新扫码登录');
+          if (e instanceof BiliApiError && e.code === -101) {
+            if (!this.loginInvalid) {
+              this.loginInvalid = true;
+              this.emitStatus();
+            }
+            throw new Error('B 站登录已失效');
+          }
           throw e;
         }),
       onState: (s, detail) => {
+        if (s === 'connected') this.loginInvalid = false;
         this.connection = s;
         this.connectionDetail = detail ?? null;
         this.emitStatus();
@@ -269,6 +281,7 @@ export class LiveService {
     this.connectedRoom = null;
     this.connection = 'idle';
     this.connectionDetail = null;
+    this.loginInvalid = false;
   }
 
   private async refreshAdmins(roomId: number): Promise<void> {

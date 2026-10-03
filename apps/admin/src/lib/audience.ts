@@ -1,4 +1,4 @@
-// 总览右侧面板共用：B 站名单里的人换成后台的观众格式、身份说明
+// 总览右侧面板共用：B站名单里的人换成后台的观众格式、身份说明
 import { isAnchor } from './identity.ts';
 import type { ListViewer, Viewer } from './types.ts';
 

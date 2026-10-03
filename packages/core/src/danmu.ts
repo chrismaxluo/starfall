@@ -24,9 +24,44 @@ export function whoOk(who: DanmuWho, v: Viewer, anchorUid: number): boolean {
   return who.fanMin !== null && isOwnMedal(v, anchorUid) && v.medal!.level >= who.fanMin;
 }
 
+/** 英文不分大小写、全角半角字母数字当成一样（观众发「ＡＷＳＬ」「awsl」都算） */
+export function normText(s: string): string {
+  return s.normalize('NFKC').toLowerCase();
+}
+
 export function keywordHit(rule: Pick<DanmuRule, 'keywords' | 'mode'>, text: string): boolean {
-  const t = text.trim();
-  return rule.keywords.some((k) => k && (rule.mode === 'exact' ? t === k : t.includes(k)));
+  const t = normText(text.trim());
+  return rule.keywords.some((k) => {
+    const kk = normText(k.trim());
+    return kk !== '' && (rule.mode === 'exact' ? t === kk : t.includes(kk));
+  });
+}
+
+/**
+ * 被前面的规则抢先、永远轮不到的关键词：前面有一条打开的「包含」规则，它的某个词就在这个词里面
+ * （弹幕里有「晚安啦」就一定有「晚安」）。只看关键词，不管"谁发的才算"。
+ * 返回 { 规则序号（从 0 起）: [{ word, by: 抢先的规则序号, byWord }] }
+ */
+export function shadowedKeywords(rules: ReadonlyArray<Pick<DanmuRule, 'keywords' | 'mode' | 'enabled'>>): Record<number, Array<{ word: string; by: number; byWord: string }>> {
+  const out: Record<number, Array<{ word: string; by: number; byWord: string }>> = {};
+  rules.forEach((r, i) => {
+    for (const word of r.keywords) {
+      const w = normText(word.trim());
+      for (let j = 0; j < i; j++) {
+        const p = rules[j]!;
+        if (!p.enabled) continue;
+        const byWord = p.keywords.find((k) => {
+          const kk = normText(k.trim());
+          return kk !== '' && (p.mode === 'exact' ? r.mode === 'exact' && kk === w : w.includes(kk));
+        });
+        if (byWord !== undefined) {
+          (out[i] ??= []).push({ word, by: j, byWord });
+          break;
+        }
+      }
+    }
+  });
+  return out;
 }
 
 export function danmuLabel(rule: Pick<DanmuRule, 'keywords'>): string {

@@ -211,6 +211,7 @@ pnpm --filter @starfall/server start
 |---|---|
 | [部署指南](docs/deployment.md) | 安装、系统服务、更新、HTTPS、备份与恢复、常见问题 |
 | [使用手册](docs/user-guide.md) | 首次设置、接入直播软件、配置规则、直播中的操作 |
+| [功能验收清单](docs/acceptance.md) | 每次发版前，服务器版和电脑版都按它检查 |
 | [需求文档](docs/requirements.md) | 功能需求与验收场景 |
 | [方案设计](docs/architecture.md) | 技术选型、架构、数据模型、接口 |
 | [B 站协议笔记](docs/bili-protocol.md) | 直播消息格式与字段说明 |

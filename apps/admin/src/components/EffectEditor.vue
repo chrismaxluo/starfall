@@ -154,12 +154,14 @@ async function sendLive(): Promise<void> {
   const vars = k === 'guard' ? { ...PREVIEW_BY_KIND.guard.vars, guardLevel: (sample.value.guard || 3) as 1 | 2 | 3 } : PREVIEW_BY_KIND[k].vars;
   await attempt(() => post('/api/playback/test', { effectId: eff.value!.id, kind: k, viewer: sample.value, ...(dirty.value && !ro.value ? { draft: patch() } : {}), ...(vars ? { vars } : {}) }), dirty.value ? '已发送到直播画面（包括还没保存的修改）' : '已发送到直播画面');
 }
-function replay(): void {
+/** 预览重播。打开窗口、改设置时自动重播不出声，只有点「重播（带声音）」才有声音 */
+function replay(withSound = false): void {
   if (!eff.value || !d.value) return;
   const k = pvKind.value;
   // 上舰示例按示例观众的身份（普通观众按舰长）
   const vars = k === 'guard' ? { ...PREVIEW_BY_KIND.guard.vars, guardLevel: (sample.value.guard || 3) as 1 | 2 | 3 } : PREVIEW_BY_KIND[k].vars;
-  void stage.value?.play(eff.value.id, sample.value, patch(), k, vars).then(() => setTimeout(checkSafe, 300));
+  const draft = withSound ? patch() : { ...patch(), volume: 0 };
+  void stage.value?.play(eff.value.id, sample.value, draft, k, vars).then(() => setTimeout(checkSafe, 300));
 }
 /** 欢迎语示例：用示例观众把第一句填好（和特效页里显示的一样） */
 const textExample = computed(() => {
@@ -479,7 +481,7 @@ onBeforeUnmount(() => {
             <div v-if="a && !ro" class="drag-layer" :class="{ grab: overMedia, grabbing: dragging }" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp" @pointerleave="overMedia = false" />
           </PreviewStage>
           <div class="tools">
-            <button class="btn" @click="replay"><Icon name="i-replay" />重播（带声音）</button>
+            <button class="btn" @click="replay(true)"><Icon name="i-replay" />重播（带声音）</button>
             <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :title="dirty ? '发送的是现在预览里的样子（包括还没保存的修改）' : ''" @confirm="sendLive" />
           </div>
           <span v-if="a && !ro" class="hint" style="font-size: 12px; color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>

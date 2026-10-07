@@ -15,6 +15,11 @@ describe('关于', () => {
   it('版本号比较', () => {
     expect(compareVersions('1.5.0', '1.4.0')).toBeGreaterThan(0);
     expect(compareVersions('v1.4.0', '1.4.0')).toBe(0);
+    // 测试版：数字一样时正式版更新；测试版之间按序号比
+    expect(compareVersions('1.5.0', '1.5.0-beta.2')).toBeGreaterThan(0);
+    expect(compareVersions('1.5.0-beta.1', '1.5.0')).toBeLessThan(0);
+    expect(compareVersions('1.5.0-beta.10', '1.5.0-beta.2')).toBeGreaterThan(0);
+    expect(compareVersions('1.5.0-beta.1', '1.4.0')).toBeGreaterThan(0);
     expect(compareVersions('1.4.10', '1.4.9')).toBeGreaterThan(0);
     expect(compareVersions('1.4.0', '1.5.0-beta.1')).toBeLessThan(0);
   });

@@ -706,6 +706,24 @@ describe('送礼名单', () => {
     expect(t.hub.recentGifts()).toHaveLength(3);
   });
 
+  it('直播中重启服务：启动时还不知道场次，接上本场后把本场的送礼名单装回来（不会清空）', async () => {
+    const t = await setup();
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(gf({ unitPrice: 1000, count: 2 }));
+    // 新的进程：刚启动时直播状态还没读到（sessionId 为空）
+    const live2 = { ...t.live, status: () => ({ ...t.live.status(), sessionId: s2 }) };
+    let s2: number | null = null;
+    const hub2 = new Hub();
+    const p2 = new Pipeline({ ...t.ctx, live: live2, hub: hub2, gifts: { find: (id: number) => GIFTS[id] }, timeZone: 'Asia/Shanghai' });
+    p2.start();
+    cleanup.push(() => p2.stop());
+    expect(hub2.recentGifts()).toEqual([]);
+    // 接上了还没结束的本场
+    s2 = 1;
+    vi.advanceTimersByTime(500);
+    expect(hub2.recentGifts()).toMatchObject([{ kind: 'gift', value: 2000 }]);
+  });
+
   it('新开一场直播时清空（没开播时保留上一场的）；服务重启后从事件记录恢复本场的', async () => {
     const t = await setup();
     const gifts = fakeSock();

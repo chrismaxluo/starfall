@@ -16,6 +16,8 @@ const LATEST_TTL_MS = 3600_000;
 const SERVER_DIR = path.resolve(import.meta.dirname, '../..');
 
 function readVersion(): string {
+  // 电脑版打包后找不到 apps/server/package.json，由电脑版启动服务时告诉版本号
+  if (process.env.STARFALL_VERSION) return process.env.STARFALL_VERSION;
   try {
     return (JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'package.json'), 'utf8')) as { version?: string }).version ?? '未知';
   } catch {
@@ -35,12 +37,15 @@ function gitDescribe(): Promise<string | null> {
   });
 }
 
-/** 比较两个 x.y.z 版本号：a 比 b 新返回正数 */
+/** 比较两个 x.y.z 版本号：a 比 b 新返回正数；数字一样时正式版比测试版（带 -beta.1 之类的后缀）新 */
 export function compareVersions(a: string, b: string): number {
-  const pa = a.replace(/^v/, '').split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
-  const pb = b.replace(/^v/, '').split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
+  const [ma = '', ra] = a.replace(/^v/, '').split('-', 2);
+  const [mb = '', rb] = b.replace(/^v/, '').split('-', 2);
+  const pa = ma.split('.').map((x) => Number.parseInt(x, 10) || 0);
+  const pb = mb.split('.').map((x) => Number.parseInt(x, 10) || 0);
   for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
-  return 0;
+  if (!ra !== !rb) return ra ? -1 : 1;
+  return ra && rb ? ra.localeCompare(rb, 'en', { numeric: true }) : 0;
 }
 
 /** 目录里所有文件的大小（字节），读不到的跳过 */
@@ -103,6 +108,13 @@ export function aboutRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { value, error, checkedAt: latest.at };
   }
 
+  /** 素材、备份占多大：要把文件夹走一遍，记 1 分钟（文件多时会卡一下，别每次打开都算） */
+  let sized: { at: number; assetBytes: number; backupBytes: number } | null = null;
+  const sizes = (p: { assets: string; backups: string }) => {
+    if (!sized || Date.now() - sized.at > 60_000) sized = { at: Date.now(), assetBytes: dirSize(p.assets), backupBytes: dirSize(p.backups) };
+    return { assetBytes: sized.assetBytes, backupBytes: sized.backupBytes };
+  };
+
   app.get('/api/about', async (req) => {
     const { check } = parseBody(z.object({ check: z.enum(['0', '1']).optional() }).passthrough(), req.query);
     const p = paths(ctx.config.dataDir);
@@ -121,8 +133,7 @@ export function aboutRoutes(app: FastifyInstance, ctx: AppContext): void {
         memoryMb: Math.round(mem.rss / 1048576),
         dataDir: ctx.config.dataDir,
         dbBytes: fileSize(p.db) + fileSize(`${p.db}-wal`),
-        assetBytes: dirSize(p.assets),
-        backupBytes: dirSize(p.backups),
+        ...sizes(p),
         port: ctx.config.port,
         timeZone: ctx.config.timeZone,
       },

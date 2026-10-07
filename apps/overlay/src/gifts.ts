@@ -46,7 +46,8 @@ const say = (pre: string, b: string) => h('span', { class: 'say' }, pre, h('b', 
 
 function build(it: GiftListItem): HTMLElement {
   const v = it.viewer;
-  let tier = tierOf(it.value);
+  // 大航海成员送的按身份配色（舰长蓝、提督紫、总督红金），其他人按价值
+  let tier = v.guard ? guardTier(v.guard) : tierOf(it.value);
   let line: HTMLElement;
   let pic: HTMLElement | null = null;
   let num: HTMLElement;

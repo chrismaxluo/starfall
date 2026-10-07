@@ -5,10 +5,11 @@ import './giftcard.css';
 import { h } from './dom.ts';
 import { count, countSec, giftImg, restWithGift } from './glass.ts';
 import { avatar, withGuardFrame } from './parts.ts';
-import { tierOf, tierVars } from './tiers.ts';
+import { guardTier, tierOf, tierVars } from './tiers.ts';
 
 
-const colors = (item: PlayItem) => ({ ...tierVars(tierOf(item.gift?.value ?? 0)), '--dur': `${item.effect.durationMs}ms` });
+/** 大航海成员送的按身份配色（舰长蓝、提督紫、总督红金），其他人按价值 */
+const colors = (item: PlayItem) => ({ ...tierVars(item.viewer.guard ? guardTier(item.viewer.guard) : tierOf(item.gift?.value ?? 0)), '--dur': `${item.effect.durationMs}ms` });
 
 /** 迸出去的碎片：n 个，方向均匀分布再加一点随机，距离、大小、形状、延迟各不相同 */
 function burst(cls: string, n: number, dist: [number, number], delay: number): HTMLElement {

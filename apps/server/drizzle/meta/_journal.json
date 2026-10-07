@@ -134,6 +134,13 @@
       "when": 1791392144898,
       "tag": "0018_honor_bands",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1791405853073,
+      "tag": "0019_gift_list",
+      "breakpoints": true
     }
   ]
 }

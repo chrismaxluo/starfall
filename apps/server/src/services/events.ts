@@ -237,6 +237,18 @@ export class EventLog {
       .map((r) => r.uid);
   }
 
+  /** 某一场的礼物、上舰、醒目留言（服务重启后恢复送礼名单用）：按时间先后，只取最近 limit 条 */
+  giftListEvents(sessionId: number, limit: number): Array<{ id: number; ts: number; kind: string; viewer: unknown; payload: unknown }> {
+    return this.db
+      .select({ id: events.id, ts: events.ts, kind: events.kind, viewer: events.viewer, payload: events.payload })
+      .from(events)
+      .where(and(eq(events.sessionId, sessionId), inArray(events.kind, ['gift', 'guard', 'sc'])))
+      .orderBy(desc(events.id))
+      .limit(limit)
+      .all()
+      .reverse();
+  }
+
   /** 服务启动时：上次退出（包括崩溃）时还在排队的事件没有播出来，改为"已清空" */
   clearStaleQueued(): number {
     return this.db.update(events).set({ status: 'cleared' }).where(eq(events.status, 'queued')).run().changes;

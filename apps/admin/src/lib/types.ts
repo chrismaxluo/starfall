@@ -1,5 +1,5 @@
 // 接口返回的数据格式（与服务端 apps/server 的返回值一致）
-import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GiftsFilter, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
 
 export type { Tier, TierRule, HonorBand, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules, QuickButton };
 
@@ -68,10 +68,18 @@ export interface OutputDto {
   chatMax: number;
   /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示 */
   chatFadeSec: number;
+  giftsEnabled: boolean;
+  giftsSide: 'left' | 'right';
+  giftsSize: 'normal' | 'large';
+  giftsMax: number;
+  giftsSpeed: 'off' | 'slow' | 'normal' | 'fast';
+  giftsFilter: GiftsFilter;
   key: string;
   path: string;
   /** 弹幕列表地址 */
   chatPath: string;
+  /** 送礼名单地址 */
+  giftsPath: string;
 }
 
 export type AccountStatus = { loggedIn: false } | { loggedIn: true; uid: number; name: string; face: string; expiresAt: number | null };
@@ -223,7 +231,7 @@ export interface RoomInfo {
 export interface OverlayInfo {
   outputId: number;
   /** fx：特效页；chat：弹幕列表 */
-  role: 'fx' | 'chat';
+  role: 'fx' | 'chat' | 'gifts';
   /** 浏览器查看页：不算加到了直播软件 */
   view?: boolean;
   since: number;

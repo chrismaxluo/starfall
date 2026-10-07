@@ -1,6 +1,6 @@
 // 在线的特效页和管理后台（方案设计 9.3）。这里不关心 WebSocket 细节，只管"发给谁"。
-import { CHAT_MAX_LIMIT, OVERLAY_CLOSE } from '@starfall/shared';
-import type { ChatItem, OverlayConfig, ServerToOverlay } from '@starfall/shared';
+import { CHAT_MAX_LIMIT, GIFTS_KEEP, OVERLAY_CLOSE } from '@starfall/shared';
+import type { ChatItem, GiftListItem, OverlayConfig, ServerToOverlay } from '@starfall/shared';
 import type { OutputRow } from './outputs.ts';
 
 export interface Sock {
@@ -8,8 +8,8 @@ export interface Sock {
   close(code?: number, reason?: string): void;
 }
 
-/** fx：特效页；chat：弹幕列表 */
-export type OverlayRole = 'fx' | 'chat';
+/** fx：特效页；chat：弹幕列表；gifts：送礼名单 */
+export type OverlayRole = 'fx' | 'chat' | 'gifts';
 
 export interface OverlayClient {
   sock: Sock;
@@ -55,6 +55,12 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   chatMedal: o.chatMedal,
   chatMax: o.chatMax,
   chatFadeSec: o.chatFadeSec,
+  giftsEnabled: o.giftsEnabled,
+  giftsSide: o.giftsSide,
+  giftsSize: o.giftsSize,
+  giftsMax: o.giftsMax,
+  giftsSpeed: o.giftsSpeed,
+  giftsFilter: o.giftsFilter,
 });
 
 export class Hub {
@@ -65,6 +71,8 @@ export class Hub {
   private readonly overlayListeners = new Set<() => void>();
   /** 最近的几条弹幕（按能设的最多条数记）：弹幕列表刚打开（或刷新）时先显示这些，页面按自己的条数取最后几条 */
   private chatRecent: ChatItem[] = [];
+  /** 本场（没开播时是上一场）的送礼名单，最多记 GIFTS_KEEP 条：送礼名单打开时先显示这些，页面按自己的筛选和条数取 */
+  private giftsRecent: GiftListItem[] = [];
 
   constructor(opts: { build?: () => string | null } = {}) {
     this.build = opts.build ?? (() => null);
@@ -84,6 +92,7 @@ export class Hub {
     const c: OverlayClient = { sock, outputId: output.id, role, view, since: now, env: null, lastError: null, pending: new Map() };
     this.overlays.add(c);
     if (role === 'chat') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), chat: this.chatRecent });
+    else if (role === 'gifts') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), gifts: this.giftsRecent });
     else send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
     this.overlaysChanged();
     return c;
@@ -109,10 +118,10 @@ export class Hub {
     return [...this.overlays].map((c) => ({ outputId: c.outputId, role: c.role, view: c.view, since: c.since, env: c.env, lastError: c.lastError }));
   }
 
-  /** 发给所有特效页（所有输出同步播放）；版本更新也发给弹幕列表 */
+  /** 发给所有特效页（所有输出同步播放）；版本更新也发给弹幕列表、送礼名单 */
   toOverlays(msg: ServerToOverlay, now = Date.now()): void {
     for (const c of this.overlays) {
-      if (c.role === 'chat' && msg.type !== 'version') continue;
+      if (c.role !== 'fx' && msg.type !== 'version') continue;
       send(c.sock, msg);
       if (msg.type === 'play') c.pending.set(msg.item.id, { at: now, label: `${msg.item.effect.name} · ${msg.item.viewer.name}` });
     }
@@ -135,6 +144,25 @@ export class Hub {
   /** 最近的几条弹幕（管理后台打开时用） */
   recentChat(): ChatItem[] {
     return this.chatRecent;
+  }
+
+  /** 送礼名单新的一条：发给所有送礼名单和管理后台 */
+  toGifts(item: GiftListItem): void {
+    this.giftsRecent = [...this.giftsRecent, item].slice(-GIFTS_KEEP);
+    for (const c of this.overlays) if (c.role === 'gifts') send(c.sock, { type: 'gift_item', item });
+    this.toAdmins({ type: 'gift_item', item });
+  }
+
+  /** 新开了一场直播、换了直播间：清空送礼名单；items 是重新装进来的记录（服务启动时从事件记录恢复，那时还没有页面连着） */
+  resetGifts(items: GiftListItem[] = []): void {
+    this.giftsRecent = items.slice(-GIFTS_KEEP);
+    for (const c of this.overlays) if (c.role === 'gifts') send(c.sock, { type: 'gifts_clear' });
+    this.toAdmins({ type: 'gifts_clear' });
+  }
+
+  /** 本场的送礼名单（管理后台打开时用） */
+  recentGifts(): GiftListItem[] {
+    return this.giftsRecent;
   }
 
   /** 特效页回了"开始播放"：返回这次播放的说明和延迟；不是等待中的播放时返回 null */

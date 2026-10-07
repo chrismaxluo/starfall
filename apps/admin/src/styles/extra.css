@@ -363,6 +363,7 @@
 .src-ic svg.i { width: 19px; height: 19px; }
 .src-ic.fx { background: linear-gradient(135deg, #8D8BFF, #5451D6); }
 .src-ic.dm { background: linear-gradient(135deg, #3FB4F6, #2F6FEB); }
+.src-ic.gf { background: linear-gradient(135deg, #FFB347, #FF6A88); }
 .src-t { min-width: 0; }
 .src-t b { display: block; font-size: 14.5px; font-weight: 600; color: var(--t1); }
 .src-t > span { display: block; font-size: 12.5px; color: var(--t3); margin-top: 2px; }

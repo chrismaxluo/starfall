@@ -34,6 +34,19 @@ describe('直播软件输出', () => {
     expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatFadeSec: 0 } })).json()).toMatchObject({ chatFadeSec: 0 });
   });
 
+  it('送礼名单：默认打开、靠右、6 条、所有付费礼物和上舰、醒目留言；可以改成只显示选中的礼物', async () => {
+    const { req } = await setup();
+    const [o] = (await req({ method: 'GET', url: '/api/outputs' })).json().outputs;
+    expect(o).toMatchObject({ giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: 6, giftsSpeed: 'normal', giftsFilter: { mode: 'all', gifts: [], guard: true, sc: true }, giftsPath: `/overlay/?output=${o.id}&key=${o.key}&gifts=1` });
+    const giftsFilter = { mode: 'only', gifts: [{ id: 32251, name: '心动盲盒' }], guard: true, sc: false };
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsFilter, giftsMax: 10, giftsSide: 'left' } })).json()).toMatchObject({ giftsFilter, giftsMax: 10, giftsSide: 'left' });
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsFilter: { ...giftsFilter, mode: 'some' } } })).statusCode).toBe(400);
+    for (const giftsMax of [0, 21]) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsMax } })).statusCode).toBe(400);
+    // 滚动：不滚动 / 慢 / 中 / 快
+    for (const giftsSpeed of ['off', 'slow', 'fast']) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsSpeed } })).json()).toMatchObject({ giftsSpeed });
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsSpeed: 'turbo' } })).statusCode).toBe(400);
+  });
+
   it('新建（未填的用默认值）、修改、参数校验', async () => {
     const { req } = await setup();
     const o = (await req({ method: 'POST', url: '/api/outputs', payload: { name: '横屏录播', app: 'obs', orient: 'landscape', width: 1920, height: 1080 } })).json();

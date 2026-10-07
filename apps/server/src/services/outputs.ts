@@ -1,13 +1,23 @@
 // 输出（需求 F-OU-01 ~ 06）：每个输出是一个特效页地址 + 一套画布设置。密钥只用于特效页，无法登录后台。
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { CHAT_FADE_MAX, CHAT_FADE_MIN, CHAT_MAX_DEFAULT, CHAT_MAX_LIMIT } from '@starfall/shared';
+import { CHAT_FADE_MAX, CHAT_FADE_MIN, CHAT_MAX_DEFAULT, CHAT_MAX_LIMIT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, GIFTS_MAX_LIMIT } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
 import { outputs } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 
 export type OutputRow = typeof outputs.$inferSelect;
+
+/** 送礼名单显示哪些：所有付费礼物 / 只显示勾选的礼物；上舰、醒目留言单独勾 */
+export const GiftsFilterSchema = z
+  .object({
+    mode: z.enum(['all', 'only']),
+    gifts: z.array(z.object({ id: z.number().int().positive(), name: z.string().max(40) }).strict()).max(200),
+    guard: z.boolean(),
+    sc: z.boolean(),
+  })
+  .strict();
 
 export const OutputInputSchema = z
   .object({
@@ -27,13 +37,19 @@ export const OutputInputSchema = z
     chatMedal: z.enum(['own', 'all']),
     chatMax: z.number().int().min(1).max(CHAT_MAX_LIMIT),
     chatFadeSec: z.number().int().min(0).max(CHAT_FADE_MAX).refine((v) => v === 0 || v >= CHAT_FADE_MIN, `弹幕自动消失的时间至少 ${CHAT_FADE_MIN} 秒`),
+    giftsEnabled: z.boolean(),
+    giftsSide: z.enum(['left', 'right']),
+    giftsSize: z.enum(['normal', 'large']),
+    giftsMax: z.number().int().min(1).max(GIFTS_MAX_LIMIT),
+    giftsSpeed: z.enum(['off', 'slow', 'normal', 'fast']),
+    giftsFilter: GiftsFilterSchema,
   })
   .strict();
 export type OutputInput = z.infer<typeof OutputInputSchema>;
 export const OutputPatchSchema = OutputInputSchema.partial().strict();
 
 /** 新建输出的默认值：竖屏 1080×1920，安全区按手机竖屏实测（P0 报告） */
-const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT, chatFadeSec: 0 };
+const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT, chatFadeSec: 0, giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: GIFTS_MAX_DEFAULT, giftsSpeed: 'normal', giftsFilter: GIFTS_FILTER_DEFAULT };
 
 const newKey = () => crypto.randomBytes(16).toString('base64url');
 
@@ -41,6 +57,8 @@ const newKey = () => crypto.randomBytes(16).toString('base64url');
 export const overlayPath = (o: Pick<OutputRow, 'id' | 'key'>) => `/overlay/?output=${o.id}&key=${o.key}`;
 /** 弹幕列表地址：同一个特效页程序，多一个 chat=1 */
 export const chatPath = (o: Pick<OutputRow, 'id' | 'key'>) => `${overlayPath(o)}&chat=1`;
+/** 送礼名单地址：多一个 gifts=1 */
+export const giftsPath = (o: Pick<OutputRow, 'id' | 'key'>) => `${overlayPath(o)}&gifts=1`;
 
 export class OutputStore {
   private readonly db: Db;

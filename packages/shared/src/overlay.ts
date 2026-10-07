@@ -43,6 +43,64 @@ export interface OverlayConfig {
   chatMax: number;
   /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示（只被新弹幕顶走） */
   chatFadeSec: number;
+  /** 送礼名单：开关、对齐（靠左 / 靠右）、字号、最多显示几条、显示哪些 */
+  giftsEnabled: boolean;
+  giftsSide: 'left' | 'right';
+  giftsSize: 'normal' | 'large';
+  giftsMax: number;
+  /** 循环滚动的速度 */
+  giftsSpeed: GiftsSpeed;
+  giftsFilter: GiftsFilter;
+}
+
+/**
+ * 送礼名单滚动速度：每秒多少像素（按 1080 宽设计的尺寸）；慢约 5 秒一条、中约 3 秒、快约 2 秒。
+ * off 为不滚动：固定挂着，放不下时只留最新的几条（配合「只显示选中的礼物」把特定礼物挂在画面上）
+ */
+export type GiftsSpeed = 'off' | 'slow' | 'normal' | 'fast';
+export const GIFTS_SPEED_PX: Record<GiftsSpeed, number> = { off: 0, slow: 20, normal: 32, fast: 50 };
+
+/**
+ * 送礼名单显示哪些：all 为所有付费礼物；only 为只显示 gifts 里勾选的礼物（按礼物编号，名字只用来在后台显示）。
+ * 上舰、醒目留言单独勾选，两种方式都看这两项
+ */
+export interface GiftsFilter {
+  mode: 'all' | 'only';
+  gifts: Array<{ id: number; name: string }>;
+  guard: boolean;
+  sc: boolean;
+}
+export const GIFTS_FILTER_DEFAULT: GiftsFilter = { mode: 'all', gifts: [], guard: true, sc: true };
+/** 送礼名单一屏显示几条：默认 6 条，最多 GIFTS_MAX_LIMIT 条；本场最近 GIFTS_KEEP 条都在循环滚动里（服务端也记这么多） */
+export const GIFTS_MAX_DEFAULT = 6;
+export const GIFTS_MAX_LIMIT = 20;
+export const GIFTS_KEEP = 200;
+/** 送礼名单浏览器源的建议宽度、高度（每条约 96，字号大时 1.25 倍） */
+export const GIFTS_WIDTH = 640;
+export function giftsHeight(max: number, size: 'normal' | 'large'): number {
+  const row = size === 'large' ? 120 : 96;
+  return Math.max(300, Math.ceil((40 + max * row) / 50) * 50);
+}
+
+/** 送礼名单里的一条：礼物（连击合成一条）、上舰、醒目留言 */
+export interface GiftListItem {
+  id: string;
+  ts: number;
+  kind: 'gift' | 'guard' | 'sc';
+  viewer: { name: string; face?: string; guard: GuardLevel };
+  /** 总价值（金瓜子），决定颜色 */
+  value: number;
+  gift?: { id: number; name: string; count: number; img?: string };
+  guard?: { level: 1 | 2 | 3; months: number; op: 'open' | 'renew' };
+  /** 醒目留言：内容、金额（元） */
+  sc?: { text: string; price: number };
+}
+
+/** 这一条在不在送礼名单里显示 */
+export function giftListShows(f: GiftsFilter, it: GiftListItem): boolean {
+  if (it.kind === 'guard') return f.guard;
+  if (it.kind === 'sc') return f.sc;
+  return f.mode === 'all' || f.gifts.some((g) => g.id === it.gift?.id);
 }
 
 /** 弹幕列表条数：默认 8 条，最多能设 CHAT_MAX_LIMIT 条（服务端也最多记住这么多条） */
@@ -153,7 +211,7 @@ export const OVERLAY_BUILD_RE = /index-[\w-]+\.js/;
 
 export type ServerToOverlay =
   /** build：服务端现在的特效页版本；和页面自己的不一样时，页面会在空闲时自动刷新 */
-  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null; chat?: ChatItem[] }
+  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null; chat?: ChatItem[]; gifts?: GiftListItem[] }
   /** 特效页重新构建了（不用重启服务） */
   | { type: 'version'; build: string }
   | { type: 'config'; config: OverlayConfig }
@@ -164,6 +222,10 @@ export type ServerToOverlay =
   | { type: 'chat'; item: ChatItem }
   /** 弹幕列表：换了直播间，清空 */
   | { type: 'chat_clear' }
+  /** 送礼名单：新的一条 */
+  | { type: 'gift_item'; item: GiftListItem }
+  /** 送礼名单：新开了一场直播或换了直播间，清空 */
+  | { type: 'gifts_clear' }
   /** 心跳：特效页据此判断连接是否还活着（浏览器里收不到协议层的 ping） */
   | { type: 'ping' };
 

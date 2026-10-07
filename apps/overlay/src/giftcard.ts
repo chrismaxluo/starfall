@@ -5,20 +5,11 @@ import './giftcard.css';
 import { h } from './dom.ts';
 import { count, countSec, giftImg, restWithGift } from './glass.ts';
 import { avatar, withGuardFrame } from './parts.ts';
+import { guardTier, tierOf, tierVars } from './tiers.ts';
 
 
-/** 价值分档的颜色（金瓜子）：B站连击条的四种颜色 */
-const TIERS: Array<{ from: number; c1: string; c2: string; c3: string }> = [
-  { from: 100_000, c1: '#FF9D00', c2: '#FFD400', c3: '#FFF1B8' },
-  { from: 50_000, c1: '#FF49A1', c2: '#FF7AB6', c3: '#FFD3E8' },
-  { from: 10_000, c1: '#9F66FF', c2: '#6FACFE', c3: '#E2D4FF' },
-  { from: 0, c1: '#3D8BFF', c2: '#62C6FF', c3: '#D3ECFF' },
-];
-const tier = (value: number) => TIERS.find((t) => value >= t.from)!;
-const colors = (item: PlayItem) => {
-  const t = tier(item.gift?.value ?? 0);
-  return { '--c1': t.c1, '--c2': t.c2, '--c3': t.c3, '--dur': `${item.effect.durationMs}ms` };
-};
+/** 大航海成员送的按身份配色（舰长蓝、提督紫、总督红金），其他人按价值 */
+const colors = (item: PlayItem) => ({ ...tierVars(item.viewer.guard ? guardTier(item.viewer.guard) : tierOf(item.gift?.value ?? 0)), '--dur': `${item.effect.durationMs}ms` });
 
 /** 迸出去的碎片：n 个，方向均匀分布再加一点随机，距离、大小、形状、延迟各不相同 */
 function burst(cls: string, n: number, dist: [number, number], delay: number): HTMLElement {

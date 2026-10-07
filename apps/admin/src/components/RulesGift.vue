@@ -6,7 +6,7 @@ import { get, put } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import { battery, batteryYuan, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
-import { effectById, refreshEffects, state, ui } from '../lib/store.ts';
+import { effectById, refreshEffects, refreshSettings, state, ui } from '../lib/store.ts';
 import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { GiftBand, GiftConfig, GiftRules } from '../lib/types.ts';
 import CdPick from './CdPick.vue';
@@ -76,6 +76,11 @@ const valueBar = computed(() => {
 });
 const ticks = computed(() => [...bands.value].reverse().map((b, i, arr) => ({ key: b.fromGold, text: battery(b.fromGold), note: yuan(b.fromGold), left: ((i + 1) / (arr.length + 1)) * 100 })));
 
+/** 礼物图用动图还是静态图（全局设置，所有礼物特效都按它） */
+async function setAnim(v: boolean): Promise<void> {
+  await attempt(() => put('/api/settings', { giftAnimImg: v }), v ? '礼物图改用动图' : '礼物图改用静态图');
+  await refreshSettings().catch(() => undefined);
+}
 async function save(msg?: string, undo?: () => Promise<unknown>): Promise<void> {
   if (!rules.value) return;
   const r = await attempt(() => put<GiftRules>('/api/rules/gift', rules.value), undo ? undefined : msg);
@@ -172,11 +177,14 @@ onMounted(async () => {
     <div class="rtool">
       <span class="say">先看是不是指定礼物，不是的话按这次送的总价值找对应的一段。<button class="linkish" :aria-expanded="help" @click="help = !help"><Icon name="i-info" />怎么判断</button></span>
       <span class="sp" />
+      <span v-if="state.settings" class="set" title="礼物特效里的礼物图用 B站的动图；关掉用静态图（直播电脑比较卡时可以关掉）">礼物图用动图<Switch v-model="state.settings.giftAnimImg" label="礼物图用动图" @change="setAnim" /></span>
       <span class="set">连击合并<Switch v-model="rules.comboEnabled" label="连击合并" @change="(v) => save(v ? '已开启连击合并' : '已关闭连击合并，每次送礼都单独处理')" /><template v-if="rules.comboEnabled">同一个人 <CdPick v-model="rules.comboSec" unit="sec" :options="[1, 2, 3, 5, 8, 10, 15]" :max="15" :allow-zero="false" hint="这段时间里连续送同一种礼物，合成一次特效" @change="(v) => save(`连击合并时间：${v} 秒`)" /> 内连续送，合成一次</template></span>
     </div>
     <div v-if="help" class="rhelp">
       <b>总价值</b> = 单价 × 数量，按 B站礼物面板的电池计算（1 电池 = 0.1 元）。免费礼物不播放。<br />
       <b>{{ battery(JUMP_GOLD) }}（{{ yuan(JUMP_GOLD) }}）以上</b>的礼物{{ state.settings?.queueJump === false ? '按顺序排队（排队设置里关掉了插队）' : '会插队优先播放（可在总览「排队设置」里关掉）' }}。<br />
+      <b>B站动画</b>：有 B站全屏动画的礼物（大多是 5 元以上的）播 B站官方的动画，下方显示是谁送的；没有动画的礼物 100 元以上显示晶耀、以下显示晶礼。观众在 B站 App 里也会看到 App 自己播的动画，不想重复可以给这一段换成别的特效。<br />
+      <b>礼物图用动图</b>：礼物特效里的礼物图用 B站的动图，关掉用静态图，对所有礼物特效都有效。<br />
       <b>连击合并</b>：同一个人在设定的几秒内连续送同一种礼物，合成一次特效，显示总数量，按合起来的总价值选特效；连击停下后才播放，会晚几秒。关掉后每次送礼都单独处理。
     </div>
 

@@ -1,3 +1,4 @@
+import type { GiftConfig } from '@starfall/bili';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DANMU_WHO_ALL } from '@starfall/shared';
 import type { EnterEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
@@ -33,6 +34,12 @@ const medal = (level: number, anchorUid = ANCHOR) => ({ name: '星临', level, a
 let cleanup: Array<() => Promise<unknown> | void> = [];
 afterEach(async () => { for (const c of cleanup) await c(); cleanup = []; vi.useRealTimers(); });
 
+const CAR_FX = { src: 'https://i0.hdslb.com/car.mp4', w: 720, h: 1280, videoW: 1088, videoH: 1280, rgb: [0, 0, 720, 1280] as [number, number, number, number], alpha: [724, 0, 360, 640] as [number, number, number, number] };
+const GIFTS: Record<number, GiftConfig> = {
+  31036: { id: 31036, name: '小花花', price: 100, paid: true, icon: 'https://i0.hdslb.com/gift/flower.png', webp: 'https://i0.hdslb.com/gift/flower.webp' },
+  32089: { id: 32089, name: '极速超跑', price: 100_000, paid: true, icon: 'https://i0.hdslb.com/gift/car.png', webp: 'https://i0.hdslb.com/gift/car.webp', effectId: 699 },
+};
+
 async function setup(opts: { overlay?: boolean } = {}) {
   const t = await testApp();
   cleanup.push(() => t.app.close());
@@ -40,7 +47,7 @@ async function setup(opts: { overlay?: boolean } = {}) {
   t.ctx.db.insert(room).values({ id: 1, roomId: 30000, anchorUid: ANCHOR, anchorName: '主播' }).run();
   const live = fakeLive();
   const hub = new Hub();
-  const p = new Pipeline({ ...t.ctx, live, hub, gifts: { iconFor: (id: number) => (id === 31036 ? 'https://i0.hdslb.com/gift/flower.png' : undefined) }, timeZone: 'Asia/Shanghai', rng: () => 0 });
+  const p = new Pipeline({ ...t.ctx, live, hub, gifts: { find: (id: number) => GIFTS[id] }, giftFx: { forGift: (g) => (g?.effectId === 699 ? { fx: CAR_FX, durationMs: 5700 } : undefined) }, timeZone: 'Asia/Shanghai', rng: () => 0 });
   p.start();
   cleanup.push(() => p.stop());
   const sock = fakeSock();
@@ -524,17 +531,41 @@ describe('礼物', () => {
     const t = await setup();
     t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
     t.live.emit(gf({ unitPrice: 5000, count: 3 }));
-    expect(t.plays()[0]).toMatchObject({ kind: 'gift', effect: { name: '晶礼', visual: { style: 'glass-gift' } }, text: '小星 送出 小花花', gift: { name: '小花花', count: 3, img: 'https://i0.hdslb.com/gift/flower.png' } });
+    expect(t.plays()[0]).toMatchObject({ kind: 'gift', effect: { name: 'B站动画', visual: { style: 'glass-gift' } }, text: '小星 送出 小花花', gift: { name: '小花花', count: 3, img: 'https://i0.hdslb.com/gift/flower.webp', value: 15_000 } });
     vi.advanceTimersByTime(10_000);
     t.live.emit(gf({ giftId: 1, giftName: '别的礼物', unitPrice: 20_000 }, { uid: 5 }));
     vi.advanceTimersByTime(10);
     const last = t.plays().at(-1)!;
-    expect(last.gift).toEqual({ name: '别的礼物', count: 1 });
-    // 消息自带官方图标时优先用它（礼物面板里没有这个礼物也有图）
+    expect(last.gift).toEqual({ name: '别的礼物', count: 1, value: 20_000 });
+    // 礼物面板里没有这个礼物时用消息自带的图
     vi.advanceTimersByTime(10_000);
     t.live.emit(gf({ giftId: 2, giftName: '盲盒礼物', unitPrice: 20_000, icon: 'https://s1.hdslb.com/bfs/live/box.png' }, { uid: 6 }));
     vi.advanceTimersByTime(10);
-    expect(t.plays().at(-1)!.gift).toEqual({ name: '盲盒礼物', count: 1, img: 'https://s1.hdslb.com/bfs/live/box.png' });
+    expect(t.plays().at(-1)!.gift).toEqual({ name: '盲盒礼物', count: 1, img: 'https://s1.hdslb.com/bfs/live/box.png', value: 20_000 });
+    // 设置里关掉动图：用静态图
+    t.ctx.settings.set('giftAnimImg', false);
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ unitPrice: 5000, count: 3 }, { uid: 7 }));
+    vi.advanceTimersByTime(10);
+    expect(t.plays().at(-1)!.gift?.img).toBe('https://i0.hdslb.com/gift/flower.png');
+  });
+
+  it('「B站动画」：有官方全屏动画的礼物按动画长度播；没有动画时 100 元以上显示晶耀、以下显示晶礼', async () => {
+    const t = await setup();
+    const bili = t.ctx.effects.list().find((e) => e.name === 'B站动画')!.id;
+    const g = t.ctx.giftRules.get();
+    t.ctx.giftRules.set({ ...g, comboEnabled: false, bands: g.bands.map((b) => ({ ...b, effectId: bili, enabled: true })) });
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
+    expect(t.plays().at(-1)).toMatchObject({ effect: { visual: { style: 'bili-gift' }, durationMs: 5700 }, gift: { name: '极速超跑', img: 'https://i0.hdslb.com/gift/car.webp', fx: CAR_FX, value: 100_000 } });
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ giftId: 1, giftName: '没有动画的大礼物', unitPrice: 200_000 }, { uid: 2 }));
+    vi.advanceTimersByTime(10);
+    expect(t.plays().at(-1)).toMatchObject({ effect: { visual: { style: 'glass-big' } } });
+    expect(t.plays().at(-1)!.gift?.fx).toBeUndefined();
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ unitPrice: 20_000 }, { uid: 3 }));
+    vi.advanceTimersByTime(10);
+    expect(t.plays().at(-1)).toMatchObject({ effect: { visual: { style: 'glass-gift' } } });
   });
 
   it('≥ 100 元的礼物插队；关闭插队后按优先级排（礼物仍然排在进场前面）', async () => {
@@ -545,7 +576,7 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 20_000 }, { uid: 3 }));
     t.live.emit(gf({ unitPrice: 200_000 }, { uid: 4 }));
     expect(t.p.snapshot().items.map((i) => [i.kind, i.viewerName])).toEqual([['gift', '小星'], ['gift', '小星'], ['enter', '小星']]);
-    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['晶耀', '晶礼', '门楼']);
+    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['B站动画', 'B站动画', '门楼']);
   });
 });
 

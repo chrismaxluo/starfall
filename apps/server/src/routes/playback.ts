@@ -1,7 +1,7 @@
 // 播放控制、测试、模拟（需求 F-PL-05 ~ 06、F-RU-05）
 import type { FastifyInstance } from 'fastify';
-import { HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, PLAY_STATUS } from '@starfall/shared';
-import type { Viewer } from '@starfall/shared';
+import { BIG_GIFT_GOLD, BILI_GIFT_STYLE, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, PLAY_STATUS } from '@starfall/shared';
+import type { TriggerKind, Viewer } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { HttpError, parseBody } from '../http.ts';
@@ -89,28 +89,45 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     const { medalLevel: _m, ...rest } = v;
     return { effect, viewer: { ...rest, ...medal } };
   };
-  /** 礼物图：按礼物编号（没给时按名字）查礼物面板；查不到就不放图，不能拿示例里小花花的图顶替 */
-  const previewVars = (v: z.infer<typeof PreviewBody>['vars']): Vars | undefined => {
-    if (!v) return undefined;
-    const { giftId, ...rest } = v;
-    if (rest.gift === undefined) return rest;
-    const img = (giftId ? ctx.gifts.iconFor(giftId) : undefined) ?? ctx.gifts.iconByName(rest.gift);
-    return img ? { ...rest, giftImg: img } : rest;
+  /**
+   * 预览用的事件内容：礼物按编号（没给时按名字）找礼物面板里的礼物，查礼物图和 B站全屏动画（最多等 3 秒读好动画）。
+   * 「B站动画」没指定礼物时，用礼物面板上有动画的一个大礼物演示
+   */
+  const previewVars = async (b: z.infer<typeof PreviewBody>, effect: { visual: { type: string; style?: string } }): Promise<{ kind: TriggerKind; vars: Vars | undefined }> => {
+    let kind: TriggerKind = b.kind;
+    const { giftId, ...rest } = b.vars ?? {};
+    let vars: Vars | undefined = b.vars ? rest : undefined;
+    const bili = effect.visual.type === 'builtin_style' && effect.visual.style === BILI_GIFT_STYLE;
+    if (bili && (kind !== 'gift' || rest.gift === undefined)) {
+      const withFx = ctx.gifts.cached().filter((g) => g.effectId && g.paid && g.tab).sort((x, y) => x.price - y.price);
+      const show = withFx.find((g) => g.price >= BIG_GIFT_GOLD) ?? withFx[withFx.length - 1];
+      kind = 'gift';
+      vars = show ? { gift: show.name, giftId: show.id, count: 1, valueGold: show.price } : { gift: '礼物', count: 1, valueGold: BIG_GIFT_GOLD };
+    } else if (kind === 'gift' && rest.gift !== undefined) {
+      const id = giftId ?? ctx.gifts.byName(rest.gift)?.id;
+      vars = { ...rest, ...(id ? { giftId: id } : {}) };
+    }
+    if (kind === 'gift' && vars?.giftId) await ctx.giftFx.ready(ctx.gifts.find(vars.giftId));
+    return { kind, vars };
   };
 
   app.post('/api/playback/test', async (req) => {
     const b = parseBody(PreviewBody, req.body);
     // 只给了特效编号：和以前一样按已保存的样子、示例观众进场
-    if (!b.draft && !b.viewer && !b.vars && b.kind === 'enter') return ctx.pipeline.test(b.effectId);
+    const saved = ctx.effects.get(b.effectId, { uses: false });
+    const bili = saved.visual.type === 'builtin_style' && saved.visual.style === BILI_GIFT_STYLE;
+    if (!b.draft && !b.viewer && !b.vars && b.kind === 'enter' && !bili) return ctx.pipeline.test(b.effectId);
     const { effect, viewer } = previewInput(b);
-    return ctx.pipeline.test(effect, viewer, b.kind, previewVars(b.vars));
+    const { kind, vars } = await previewVars(b, effect);
+    return ctx.pipeline.test(effect, viewer, kind, vars);
   });
 
   // 预览：返回播放内容（后台用真实的特效页在本地播放），不入队、不上直播
   app.post('/api/preview', async (req) => {
     const b = parseBody(PreviewBody, req.body);
     const { effect, viewer } = previewInput(b);
-    return ctx.pipeline.preview(effect, viewer, b.kind, previewVars(b.vars));
+    const { kind, vars } = await previewVars(b, effect);
+    return ctx.pipeline.preview(effect, viewer, kind, vars);
   });
 
   // 今天（按主播时区）的统计

@@ -113,6 +113,8 @@ export interface Settings {
   cooldownMode: 'minutes' | 'oncePerLive';
   queueMax: number;
   queueJump: boolean;
+  /** 礼物特效里的礼物图用动图 */
+  giftAnimImg: boolean;
   blockAnchor: boolean;
   blockAccount: boolean;
   retentionDays: 0 | 30 | 90 | 180;

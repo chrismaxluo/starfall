@@ -63,6 +63,7 @@ export const STYLES: Record<string, { name: string; grad: string; edge: string }
   'royal-cap': { name: '门楼', grad: 'linear-gradient(135deg,#A9DDF0,#1F4F86)', edge: 'rgba(169,221,240,.7)' },
   'glass-gift': { name: '晶礼', grad: 'linear-gradient(135deg,#FFD2B8,#6B5A7E)', edge: 'rgba(255,179,138,.7)' },
   'glass-big': { name: '晶耀', grad: 'linear-gradient(135deg,#FFE0A8,#7A5A40)', edge: 'rgba(255,195,122,.75)' },
+  'bili-gift': { name: 'B站动画', grad: 'linear-gradient(135deg,#FF9DC4,#3D5BD9)', edge: 'rgba(255,157,196,.7)' },
   'glass-mod': { name: '晶巡', grad: 'linear-gradient(135deg,#B8F2E8,#2F5A62)', edge: 'rgba(61,214,193,.6)' },
   'glass-dm': { name: '晶语', grad: 'linear-gradient(135deg,#CFE9FF,#3E5C8A)', edge: 'rgba(124,199,255,.6)' },
   frost: { name: '霜玻', grad: 'linear-gradient(135deg,#3FB4F6,#2B2F5E)', edge: 'rgba(255,255,255,.2)' },

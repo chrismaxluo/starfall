@@ -31,8 +31,11 @@ function giftImg(item: PlayItem, cls: string): HTMLElement | null {
 }
 
 /** 数量从 1 数到实际数量（不支持 @property 的内核直接显示最终数字） */
+/** 从 1 数到 n 用多久（秒） */
+const countSec = (n: number) => (n > 1 ? Math.min(1.2, 0.4 + n / 400) : 0.01);
+
 function count(n: number, delaySec: number): HTMLElement {
-  const el = h('span', { class: 'cnt', style: { '--to': String(n), '--d': `${delaySec}s`, '--t': `${n > 1 ? Math.min(1.2, 0.4 + n / 400) : 0.01}s` } });
+  const el = h('span', { class: 'cnt', style: { '--to': String(n), '--d': `${delaySec}s`, '--t': `${countSec(n)}s` } });
   el.dataset.n = String(n);
   return el;
 }
@@ -48,17 +51,21 @@ function restWithGift(item: PlayItem): Array<string | HTMLElement> {
   return i < 0 ? [r] : [r.slice(0, i), h('b', {}, g!), r.slice(i + g!.length)];
 }
 
+/** 礼物横条：送得多（50 元以上）时更亮 */
+const HOT_GOLD = 50_000;
+
 function gift(item: PlayItem): HTMLElement {
   const n = item.gift?.count ?? 1;
   const img = giftImg(item, 'gimg');
+  const hot = (item.gift?.value ?? 0) >= HOT_GOLD;
   return glass(
-    `gx-gift life${img ? '' : ' no-img'}`,
+    `gx-gift life${img ? '' : ' no-img'}${hot ? ' hot' : ''}`,
     ACC.gift,
     item.effect.durationMs,
     avatar(item.viewer),
     h('div', { class: 'tx' }, h('span', { class: 'nm' }, item.viewer.name), h('span', { class: 'say' }, ...restWithGift(item))),
     img,
-    item.gift ? h('div', { class: 'num' }, h('small', {}, '×'), count(n, 0.7)) : null,
+    item.gift ? h('div', { class: 'num', style: { '--pd': `${0.7 + countSec(n)}s` } }, h('small', {}, '×'), count(n, 0.7)) : null,
   );
 }
 

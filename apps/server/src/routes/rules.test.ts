@@ -36,10 +36,10 @@ describe('进场规则', () => {
     expect(ctx.enterRules.full()).toMatchObject({ cooldownMode: 'oncePerLive', exclusives: [] });
   });
 
-  it('荣耀等级分档：默认 30 / 40 / 50 三档都关着、没选特效；可以保存、删光；起始等级不能重复', async () => {
+  it('荣耀等级分档：默认只有 50 级及以上一段，关着、没选特效；可以保存、删光；起始等级不能重复', async () => {
     const { req, ctx, effectId } = await setup();
     const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();
-    expect(r.honorBands).toEqual([50, 40, 30].map((fromLevel) => ({ fromLevel, effectId: null, cooldownMin: 10, enabled: false })));
+    expect(r.honorBands).toEqual([{ fromLevel: 50, effectId: null, cooldownMin: 10, enabled: false }]);
     r.honorBands = [{ fromLevel: 35, effectId: await effectId('霜玻'), cooldownMin: 0, enabled: true }, { fromLevel: 60, effectId: await effectId('门楼'), cooldownMin: 5, enabled: true }];
     const saved = (await req({ method: 'PUT', url: '/api/rules/enter', payload: r })).json();
     expect(saved.honorBands.map((b: { fromLevel: number }) => b.fromLevel)).toEqual([60, 35]);

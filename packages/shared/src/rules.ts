@@ -125,12 +125,6 @@ export const HonorBandSchema = z.object({
   enabled: z.boolean(),
 });
 export type HonorBand = z.infer<typeof HonorBandSchema>;
-/** 新装的和升级上来的默认分档（都先关着、没选特效） */
-export const HONOR_BANDS_DEFAULT: readonly HonorBand[] = [
-  { fromLevel: 50, effectId: null, cooldownMin: 10, enabled: false },
-  { fromLevel: 40, effectId: null, cooldownMin: 10, enabled: false },
-  { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false },
-];
 
 export const ExclusiveSchema = z.object({
   uid: z.number().int().positive(),

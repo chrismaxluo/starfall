@@ -33,13 +33,21 @@ let tick: ReturnType<typeof setInterval> | null = null;
 const s = computed(() => state.status);
 const info = computed(() => state.roomInfo);
 const live = computed(() => Boolean(s.value?.live.live));
-/** 数据范围：开播时默认看本场，没开播时默认看今天；手动选过就保持 */
+/** 数据范围：默认看本场，没开播时看上一场（凌晨下播后看到的是完整的一场，不会被 0 点切开）；从来没开播过才看今天；手动选过就保持 */
 const picked = ref<'live' | 'today' | null>(null);
-const scope = computed(() => picked.value ?? (live.value ? 'live' : 'today'));
+/** 这个直播间还没有过完整的一场 */
+const noSession = ref(false);
+const scope = computed(() => picked.value ?? (live.value || !noSession.value ? 'live' : 'today'));
 
 async function loadStats(): Promise<void> {
-  stats.value = await get<StatsDto>(`/api/stats?scope=${scope.value}`).catch(() => stats.value);
+  const r = await get<StatsDto>(`/api/stats?scope=${scope.value}`).catch(() => null);
+  if (!r) return;
+  stats.value = r;
+  // 没开播、也没有上一场：改看今天（会再读一次）
+  if (scope.value === 'live' && !r.live && !r.lastSession && !picked.value) noSession.value = true;
 }
+// 换了直播间：重新看有没有上一场
+watch(() => s.value?.room?.roomId, () => (noSession.value = false));
 watch([scope, live, () => s.value?.room?.roomId, () => s.value?.live.liveSince], () => void loadStats());
 // 有新事件时稍后刷新统计（避免每条都请求）
 const off = onLiveEvent(() => {

@@ -75,22 +75,20 @@ onMounted(load);
 
 <template>
   <div v-if="state.settings" class="card">
-    <div class="card-h"><h2>数据</h2></div>
+    <div class="card-h"><h2>数据</h2><span class="aside"><button class="btn" :disabled="running" title="马上备份一次数据库和配置（另外保留最近 5 份）" @click="runNow"><Icon name="i-check" />{{ running ? '正在备份…' : '立即备份' }}</button></span></div>
     <div class="field">
       <div class="toggle-line">每天自动备份 <span class="hint">凌晨备份数据库和配置，保留最近 7 份；手动备份另外保留最近 5 份</span>
         <Switch v-model="state.settings.autoBackup" label="每天自动备份" @change="(v) => save({ autoBackup: v }, v ? '已开启每天自动备份' : '已关闭自动备份')" />
       </div>
-      <div class="bk-list">
-        <div v-for="b in showAll ? backups : backups.slice(0, 2)" :key="b.stamp" class="bk-item">
-          <span class="num">{{ when(b.stamp) }}</span><span class="sz">{{ fileSize(b.dbSize + b.configSize) }}</span>
-          <button v-if="b.config" type="button" class="linkish" @click="restore(b)">恢复到这份</button>
-          <a v-if="b.config" class="linkish" :href="`/api/backup/files/${b.config}`" download>下载配置</a>
+      <div class="bk-t">
+        <div v-for="b in showAll ? backups : backups.slice(0, 2)" :key="b.stamp" class="r">
+          <span class="num">{{ when(b.stamp) }}<span v-if="b.manual" class="tag nor" style="margin-left: 6px; font-size: 11px">手动</span></span>
+          <span class="sz">{{ fileSize(b.dbSize + b.configSize) }}</span>
+          <button v-if="b.config" type="button" class="linkish" @click="restore(b)">恢复到这份</button><span v-else />
+          <a v-if="b.config" class="linkish" :href="`/api/backup/files/${b.config}`" download title="下载这份配置文件">下载</a><span v-else />
         </div>
-        <span v-if="!backups.length" class="inline-hint">还没有备份。</span>
-        <div class="bk-foot">
-          <button v-if="backups.length > 2" class="linkish" @click="showAll = !showAll">{{ showAll ? '收起' : `全部 ${backups.length} 份` }}</button>
-          <button class="linkish" :disabled="running" @click="runNow">{{ running ? '正在备份…' : '立即备份' }}</button>
-        </div>
+        <div v-if="!backups.length" class="r" style="grid-template-columns: 1fr"><span class="inline-hint">还没有备份。点右上角「立即备份」备份一份。</span></div>
+        <button v-if="backups.length > 2" type="button" class="more" @click="showAll = !showAll">{{ showAll ? '收起' : `全部 ${backups.length} 份` }}</button>
       </div>
     </div>
     <div class="field" style="margin-top: 14px">

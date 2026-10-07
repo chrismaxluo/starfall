@@ -255,3 +255,42 @@ export type GuardRule = z.infer<typeof GuardRuleSchema>;
 export const GuardRulesSchema = z.object({ gov: GuardRuleSchema, adm: GuardRuleSchema, cap: GuardRuleSchema });
 export type GuardRules = z.infer<typeof GuardRulesSchema>;
 
+
+// ---------- 素材快捷播放 ----------
+
+/** 最多多少个按钮 */
+export const QUICK_MAX = 40;
+/** 后台页面里的快捷键：单个数字或字母（不带 Ctrl 等，小键盘数字也算） */
+export const QUICK_KEY_RE = /^[0-9A-Z]$/;
+/** 电脑版的全局快捷键（在游戏、直播软件里也能按）：至少一个 Ctrl / Alt / Shift 加数字、字母或 F1–F12，例如 Ctrl+Alt+1 */
+export const QUICK_GLOBAL_RE = /^(?:(?:Ctrl|Alt|Shift)\+){1,3}(?:[0-9A-Z]|F[1-9]|F1[0-2])$/;
+
+export const QuickButtonSchema = z.object({
+  id: z.number().int().positive(),
+  effectId: z.number().int().positive(),
+  /** 按钮上显示的名字；空的时候显示素材名 */
+  label: z.string().trim().max(20),
+  hotkey: z.string().regex(QUICK_KEY_RE, '快捷键只能是一个数字或字母').nullable(),
+  globalHotkey: z.string().regex(QUICK_GLOBAL_RE, '全局快捷键要带 Ctrl、Alt 或 Shift，例如 Ctrl+Alt+1').nullable(),
+});
+export type QuickButton = z.infer<typeof QuickButtonSchema>;
+
+/** 保存整个按钮列表（按顺序）：快捷键不能重复 */
+export const QuickButtonsInputSchema = z
+  .array(QuickButtonSchema.omit({ id: true }))
+  .max(QUICK_MAX)
+  .superRefine((list, ctx) => {
+    const dup = (xs: Array<string | null>) => {
+      const seen = new Set<string>();
+      return xs.findIndex((x) => x !== null && (seen.has(x) || !seen.add(x)));
+    };
+    const k = dup(list.map((b) => b.hotkey));
+    if (k >= 0) ctx.addIssue({ code: 'custom', path: [k, 'hotkey'], message: `快捷键 ${list[k]!.hotkey} 被两个按钮用了` });
+    const g = dup(list.map((b) => b.globalHotkey));
+    if (g >= 0) ctx.addIssue({ code: 'custom', path: [g, 'globalHotkey'], message: `全局快捷键 ${list[g]!.globalHotkey} 被两个按钮用了` });
+    list.forEach((b, i) => {
+      const mods = b.globalHotkey?.split('+').slice(0, -1) ?? [];
+      if (new Set(mods).size !== mods.length) ctx.addIssue({ code: 'custom', path: [i, 'globalHotkey'], message: '全局快捷键里有重复的按键' });
+    });
+  });
+export type QuickButtonsInput = z.infer<typeof QuickButtonsInputSchema>;

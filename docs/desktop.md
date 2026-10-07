@@ -24,11 +24,11 @@
 
 | 内容 | 位置 |
 |---|---|
-| 程序 | `%LOCALAPPDATA%\Programs\Starfall\Starfall.exe`（安装时可以改） |
+| 程序 | `C:\Program Files\Starfall\Starfall.exe`（安装时可以改到别的盘；v1.5.0-beta.1 及以前装在 `%LOCALAPPDATA%\Programs\Starfall`，装新版时会自动移过来） |
 | 数据（数据库、素材、备份） | `%APPDATA%\Starfall\data` |
 | 日志 | `%APPDATA%\Starfall\logs`（`main.log` 窗口和托盘，`server.log` 本机服务） |
 
-卸载不会删除数据；重装或升级后素材、规则、设置都还在。
+安装和自动更新时 Windows 会弹一次「是否允许此应用对你的设备进行更改」，点「是」。卸载不会删除数据；重装或升级后素材、规则、设置都还在。
 
 从服务器版搬数据：服务器版后台「设置 → 数据 → 导出」，电脑版里「导入」。
 

@@ -32,7 +32,10 @@ win:
   requestedExecutionLevel: asInvoker
 nsis:
   oneClick: false
-  perMachine: false
+  # 装到 C:\Program Files\Starfall（安装时可以改成别的盘），不放在用户目录（AppData）里。
+  # 安装和自动更新时 Windows 会问一次管理员权限；数据仍在 %APPDATA%\Starfall，和安装位置无关。
+  # 以前装在用户目录的旧版本，安装新版时会自动卸掉（数据保留）
+  perMachine: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true

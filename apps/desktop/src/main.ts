@@ -85,6 +85,7 @@ const base = () => `http://127.0.0.1:${port}`;
 async function start(): Promise<void> {
   app.setAppUserModelId('io.github.chrismaxluo.starfall');
   log(`启动 ${NAME} ${app.getVersion()}`);
+  fixAutoStart();
   setupIpc();
   createTray();
   try {
@@ -401,6 +402,19 @@ const autoStart = () => app.getLoginItemSettings({ args: [HIDDEN_ARG] }).openAtL
 function setAutoStart(on: boolean): void {
   app.setLoginItemSettings({ openAtLogin: on, args: [HIDDEN_ARG] });
   log(`开机自动启动：${on ? '开' : '关'}`);
+}
+
+/** 换了安装位置（例如从用户目录换到 Program Files）后，开机启动项还指向旧位置的程序：改成现在这个 */
+function fixAutoStart(): void {
+  if (!app.isPackaged || process.platform !== 'win32') return;
+  const exe = process.execPath.toLowerCase();
+  const stale = app
+    .getLoginItemSettings({ args: [HIDDEN_ARG] })
+    .launchItems.some((i) => path.basename(i.path).toLowerCase() === 'starfall.exe' && path.resolve(i.path).toLowerCase() !== exe);
+  if (stale) {
+    log('开机启动项指向旧的安装位置，改成现在的');
+    setAutoStart(true);
+  }
 }
 
 // ---------- 检查更新（GitHub 发布页） ----------

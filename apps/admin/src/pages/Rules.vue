@@ -1,15 +1,16 @@
 <script setup lang="ts">
-// 触发规则：四类事件（进场 / 弹幕 / 礼物 / 上舰）分开设置，每条规则写成一句话：谁、做了什么时，播放哪个特效
+// 触发规则：进场 / 专属用户 / 弹幕 / 礼物 / 上舰分标签设置；每条规则一行，开关、条件、特效、冷却各占一列对齐
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MEDAL_LEVEL_MAX } from '@starfall/shared';
 import Avatar from '../components/Avatar.vue';
 import CdPick from '../components/CdPick.vue';
-import ConfirmButton from '../components/ConfirmButton.vue';
 import EffectPicker from '../components/EffectPicker.vue';
 import Icon from '../components/Icon.vue';
 import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import Medal from '../components/Medal.vue';
+import RowMenu from '../components/RowMenu.vue';
+import type { MenuItem } from '../components/RowMenu.vue';
 import Seg from '../components/Seg.vue';
 import SimDrawer from '../components/SimDrawer.vue';
 import Switch from '../components/Switch.vue';
@@ -19,19 +20,20 @@ import RulesGuard from '../components/RulesGuard.vue';
 import type { PreviewRequest } from '../lib/preview.ts';
 import { ApiError, del, get, post, put } from '../lib/api.ts';
 import { today } from '../lib/format.ts';
-import { SAMPLES, medalColors } from '../lib/identity.ts';
+import { SAMPLES } from '../lib/identity.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
-import { route } from '../lib/route.ts';
+import { go, route } from '../lib/route.ts';
 import { effectById, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { EnterBase, ExclusiveDto, MedalBand, Tier, TierRule, Viewer } from '../lib/types.ts';
 import { pushEsc } from '../lib/esc.ts';
 
-type Ev = 'enter' | 'danmu' | 'gift' | 'guard';
-const EVS: Ev[] = ['enter', 'danmu', 'gift', 'guard'];
+type Ev = 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard';
+const EVS: Ev[] = ['enter', 'exclusive', 'danmu', 'gift', 'guard'];
 const ev = ref<Ev>(EVS.includes(route.value.sub as Ev) ? (route.value.sub as Ev) : 'enter');
-/** 专属用户列表展开（从别的页面跳过来添加时自动展开） */
-const showEx = ref(route.value.sub === 'exclusive');
+/** 每个标签的「怎么判断」展开了没有 */
+const help = ref(false);
+watch(ev, () => (help.value = false));
 const simOpen = ref(false);
 const flashKey = ref<string | null>(null);
 
@@ -63,6 +65,9 @@ function flash(key: string): void {
   setTimeout(() => flashKey.value === key && (flashKey.value = null), 1800);
 }
 
+/** 各表的列宽：开关 | 条件 | 特效 | 冷却 | 操作 */
+const ENTER_COLS = '44px minmax(140px, 200px) minmax(190px, 300px) minmax(0, 1fr) 68px';
+const EX_COLS = '44px minmax(150px, 1.2fr) minmax(110px, 1fr) minmax(180px, 260px) 120px 96px 68px';
 const GUARDS: Array<{ tier: Tier; cond: string }> = [
   { tier: 'gov', cond: '总督' },
   { tier: 'adm', cond: '提督' },
@@ -76,6 +81,13 @@ function preview(effectId: number | null, viewer: SampleViewer, label: string, k
   ui.preview = { effectId, viewer, label, ...(kind ? { kind } : {}), ...(vars ? { vars } : {}) };
 }
 const onPreview = (p: PreviewRequest) => preview(p.effectId, p.viewer, p.label, p.kind, p.vars);
+/** 打开素材设置调整这条规则用的特效 */
+function editEffect(effectId: number | null): void {
+  if (!effectId) return toast('这条规则还没有选特效', 'info');
+  ui.editorId = effectId;
+}
+/** 进场每一行的「⋯」 */
+const tierMenu = (effectId: number | null): MenuItem[] => [{ icon: 'i-pen', label: '调整这个特效（素材设置）', run: () => editEffect(effectId) }];
 
 function onTierEffect(t: Tier, r: TierRule, label: string): void {
   flash(t);
@@ -84,13 +96,15 @@ function onTierEffect(t: Tier, r: TierRule, label: string): void {
 /** 冷却改了之后的提示 */
 const cdMsg = (label: string, v: number) => (v === 0 ? `${label}：每次进场都播放` : `${label}：同一个人 ${v >= 60 && v % 60 === 0 ? `${v / 60} 小时` : `${v} 分钟`}内只播一次`);
 const TIER_OFF: Record<string, string> = {
-  guard: '已关闭：TA 们会按房管、粉丝牌或其他观众处理',
+  gov: '已关闭：总督会按房管、粉丝牌或其他观众处理',
+  adm: '已关闭：提督会按房管、粉丝牌或其他观众处理',
+  cap: '已关闭：舰长会按房管、粉丝牌或其他观众处理',
   mod: '已关闭：房管会按粉丝牌或其他观众处理',
   nor: '已关闭：普通观众进场不播放特效。直播间人多时建议保持关闭，免得刷屏',
 };
 
-// ---------- 标签上的数量 ----------
-const counts = computed(() => {
+// ---------- 标签上的数量：开着几条 / 一共几条 ----------
+const counts = computed<Record<Ev, string>>(() => {
   const r = rules.value;
   const tiers = r ? Object.values(r.tiers) : [];
   const enterAll = tiers.length + (r?.bands.length ?? 0);
@@ -100,35 +114,30 @@ const counts = computed(() => {
   const giftOn = (g?.specific.filter((x) => x.enabled).length ?? 0) + (g?.bands.filter((x) => x.enabled).length ?? 0);
   const guardOn = state.guard ? (['gov', 'adm', 'cap'] as const).filter((k) => state.guard![k].enabled).length : 0;
   return {
-    enter: `${enterAll} 条 · ${enterOn} 条开着${state.exclusives.length ? ` · 专属 ${state.exclusives.length} 人` : ''}`,
-    danmu: state.danmu.length ? `${state.danmu.length} 条 · ${state.danmu.filter((d) => d.enabled).length} 条开着` : '还没有',
-    gift: `${giftAll} 条 · ${giftOn} 条开着`,
-    guard: `3 个等级 · ${guardOn} 个开着`,
+    enter: `${enterOn}/${enterAll}`,
+    exclusive: String(state.exclusives.length),
+    danmu: state.danmu.length ? `${state.danmu.filter((d) => d.enabled).length}/${state.danmu.length}` : '0',
+    gift: `${giftOn}/${giftAll}`,
+    guard: `${guardOn}/3`,
   };
 });
 const TABS: Array<{ v: Ev; icon: string; name: string }> = [
   { v: 'enter', icon: 'i-users', name: '进场' },
+  { v: 'exclusive', icon: 'i-user', name: '专属用户' },
   { v: 'danmu', icon: 'i-chat', name: '弹幕' },
   { v: 'gift', icon: 'i-gift', name: '礼物' },
   { v: 'guard', icon: 'i-anchor', name: '上舰' },
 ];
-
-// ---------- 粉丝牌等级条 ----------
-const levelBar = computed(() => {
-  const asc = [...bands.value].reverse();
-  return asc.map((b, i) => {
-    const to = asc[i + 1] ? asc[i + 1]!.fromLevel - 1 : MEDAL_LEVEL_MAX;
-    const last = !asc[i + 1];
-    return { b, from: b.fromLevel, to, label: last ? `${b.fromLevel} 级以上` : to === b.fromLevel ? `${b.fromLevel} 级` : `${b.fromLevel} – ${to} 级`, color: medalColors(b.fromLevel).level };
-  });
-});
-function locateBand(level: number): void {
-  flash(`band${level}`);
-  document.getElementById(`band${level}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+/** 换标签时地址跟着变（刷新后停在同一个标签） */
+function pick(t: Ev): void {
+  ev.value = t;
+  go('rules', t);
 }
 
 // ---------- 粉丝牌分档 ----------
 const addLevel = ref<number | null>(null);
+/** 「＋ 加一段」展开输入框 */
+const adding = ref(false);
 const addMsg = ref<{ text: string; err: boolean }>({ text: '分出来的新一段先沿用原来的特效', err: false });
 function addBand(): void {
   const v = Number(addLevel.value);
@@ -138,6 +147,7 @@ function addBand(): void {
   const parent = bands.value.find((b) => b.fromLevel < v) ?? bands.value[bands.value.length - 1]!;
   rules.value.bands.push({ fromLevel: v, effectId: parent.effectId, cooldownMin: parent.cooldownMin, enabled: parent.enabled });
   addLevel.value = null;
+  adding.value = false;
   addMsg.value = { text: '分出来的新一段先沿用原来的特效', err: false };
   flash(`band${v}`);
   void save(`已在 ${v} 级处分出一段`);
@@ -174,7 +184,7 @@ function viewerOf(uid: number): Viewer | undefined {
   return state.feed.find((e) => e.uid === uid)?.viewer;
 }
 function startAdd(uid?: number): void {
-  showEx.value = true;
+  ev.value = 'exclusive';
   draft.value = { uid: uid ? String(uid) : '', busy: false, msg: '', ok: false, found: null, effectId: rules.value?.tiers.gov.effectId ?? null, cooldownMin: 10 };
   showRecent.value = false;
   if (uid) void lookup();
@@ -222,6 +232,25 @@ async function updateEx(x: ExclusiveDto, patch: Partial<ExclusiveDto>, msg: stri
   else await refreshRules();
   void refreshEffects();
 }
+async function copyUid(uid: number): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(String(uid));
+    toast(`已复制 UID ${uid}`);
+  } catch {
+    toast(`UID：${uid}`, 'info');
+  }
+}
+function showLogs(uid: number): void {
+  ui.logQuery = String(uid);
+  go('logs');
+}
+const exMenu = (x: ExclusiveDto): Array<MenuItem | null> => [
+  { icon: 'i-list', label: '查看 TA 的事件记录', run: () => showLogs(x.uid) },
+  { icon: 'i-copy', label: '复制 UID', run: () => void copyUid(x.uid) },
+  { icon: 'i-pen', label: '调整这个特效（素材设置）', run: () => editEffect(x.effectId) },
+  null,
+  { icon: 'i-trash', label: '移除（可以撤销）', danger: true, run: () => void removeEx(x) },
+];
 async function removeEx(x: ExclusiveDto): Promise<void> {
   if (await attempt(() => del(`/api/rules/exclusive/${x.uid}`))) {
     state.exclusives = state.exclusives.filter((y) => y.uid !== x.uid);
@@ -262,11 +291,7 @@ onBeforeUnmount(() => clearInterval(todayTimer));
 watch(
   () => route.value.sub,
   (sub) => {
-    if (sub === 'exclusive') {
-      ev.value = 'enter';
-      showEx.value = true;
-    }
-    else if (EVS.includes(sub as Ev)) ev.value = sub as Ev;
+    if (EVS.includes(sub as Ev)) ev.value = sub as Ev;
   },
 );
 
@@ -300,169 +325,127 @@ onMounted(() => void refreshRules());
       <div class="actions"><button class="btn" @click="simOpen = true"><Icon name="i-bolt" />模拟一下</button></div>
     </div>
 
-    <div class="rl-tabs" role="tablist" aria-label="触发事件">
-      <button v-for="t in TABS" :key="t.v" class="rl-tab" role="tab" :aria-selected="ev === t.v" @click="ev = t.v">
-        <span class="ico"><Icon :name="t.icon" /></span><b>{{ t.name }}</b><span>{{ counts[t.v] }}</span>
-      </button>
+    <div class="rtabs" role="tablist" aria-label="触发事件">
+      <button v-for="t in TABS" :key="t.v" class="rtab" role="tab" :aria-selected="ev === t.v" @click="pick(t.v)"><Icon :name="t.icon" />{{ t.name }}<span class="cnt">{{ counts[t.v] }}</span></button>
     </div>
 
+    <!-- ================= 进场 ================= -->
     <template v-if="ev === 'enter' && rules">
-      <div class="rl-flow">
-        <span>有人进场时，按这个顺序找，用第一个符合的：</span>
-        <span class="st"><Icon name="i-user" />专属用户</span><i>→</i><span class="st">大航海</span><i>→</i><span class="st">房管</span><i>→</i><span class="st">粉丝牌</span><i>→</i><span class="st">其他观众</span>
-      </div>
-      <div class="rl-bar">
-        <Icon name="i-bolt" /><span>不重复播放的方式</span>
-        <Seg :model-value="rules.cooldownMode" label="不重复播放的方式" :options="[{ value: 'minutes', label: '按时间' }, { value: 'oncePerLive', label: '每场直播只播一次' }]" @change="setMode" />
-        <span class="hint">{{ once ? '同一个人这一场直播里只播一次，下一场重新算' : '每条规则可以单独设置多久内只播一次' }}</span>
-      </div>
-
-      <div class="rl-sec"><h3>专属用户</h3><span>给某几位观众单独指定特效，永远最先用；只对进场有效</span></div>
-      <div class="rl-bar">
-        <span><b>{{ state.exclusives.length }} 人</b>有专属特效</span>
-        <span class="hint">在总览的实时动态里点某个观众，也能直接设置</span>
+      <div class="rtool">
+        <span class="say">观众进场时，从上往下找第一条符合的，播放对应的特效。<button class="linkish" :aria-expanded="help" @click="help = !help"><Icon name="i-info" />怎么判断</button></span>
         <span class="sp" />
-        <button v-if="state.exclusives.length" class="btn" @click="showEx = !showEx">{{ showEx ? '收起列表' : '查看列表' }}</button>
-        <button class="btn primary" @click="startAdd()"><Icon name="i-plus" />添加专属用户</button>
+        <span class="set">不重复播放<Seg :model-value="rules.cooldownMode" label="不重复播放的方式" :options="[{ value: 'minutes', label: '按时间' }, { value: 'oncePerLive', label: '每场只播一次' }]" @change="setMode" /></span>
       </div>
-      <!-- 专属用户 -->
-      <div v-if="showEx || draft" class="rl-ex">
-        <div class="toolbar">
-          <div class="s"><Icon name="i-search" /><input v-model.trim="exQ" class="inp" placeholder="搜索昵称或 UID" aria-label="搜索专属用户" /></div>
-          <span class="subhint">专属只对<b style="color: var(--t1); font-weight: 500">进场</b>生效，礼物、弹幕、上舰按各自的规则播放。</span>
-        </div>
-        <div v-if="draft" class="addbar">
-          <div class="r1">
-            <input id="exUid" v-model="draft.uid" class="inp num" inputmode="numeric" placeholder="输入 B站 UID，回车查询" aria-label="B站 UID" @keydown.enter="lookup" />
-            <button class="btn" :disabled="draft.busy" @click="lookup"><span v-if="draft.busy" class="spin" />{{ draft.busy ? '查询中' : '查询' }}</button>
-            <span style="color: var(--t3); font-size: 12.5px">或</span>
-            <button class="linkish" @click="showRecent = !showRecent">从最近进场的观众里选</button>
-            <button class="icon-btn" style="margin-left: auto; box-shadow: none" aria-label="取消添加" @click="draft = null"><Icon name="i-x" /></button>
-          </div>
-          <div v-if="showRecent" class="picker">
-            <label v-for="v in recentViewers" :key="v.uid" :style="state.exclusives.some((x) => x.uid === v.uid) ? 'opacity:.5' : ''">
-              <input type="radio" name="expk" :disabled="state.exclusives.some((x) => x.uid === v.uid)" @change="((draft!.uid = String(v.uid)), (showRecent = false), lookup())" />
-              <Avatar :name="v.name" :face="v.face" :guard="v.guard" />{{ v.name }}<span class="ids"><HonorMedal :level="v.honor" /><IdTag :viewer="v" /></span><span class="uid num">{{ state.exclusives.some((x) => x.uid === v.uid) ? '已是专属' : v.uid }}</span>
-            </label>
-            <div v-if="!recentViewers.length" style="padding: 10px; color: var(--t3); font-size: 12.5px">还没有进场记录，开播后这里会列出最近进场的观众</div>
-          </div>
-          <div v-if="draft.msg" class="lookup" :class="{ ok: draft.ok }">{{ draft.msg }}</div>
-          <div v-if="draft.found" class="found">
-            <span class="who"><Avatar :name="draft.found.name" :face="draft.found.face" :guard="draft.found.guard" />{{ draft.found.name }}</span>
-            <span class="num" style="font-size: 12px; color: var(--t3)">UID {{ draft.found.uid }}</span>
-            <EffectPicker v-model="draft.effectId" />
-            <CdPick v-model="draft.cooldownMin" />
-            <button class="btn primary" style="margin-left: auto" @click="addExclusive">添加</button>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="extable">
-            <thead><tr><th>观众</th><th>身份</th><th>专属特效</th><th>多久内只播一次</th><th>有效期</th><th>开关</th><th /></tr></thead>
-            <tbody>
-              <tr v-for="x in exList" :key="x.uid" :style="flashUid === x.uid ? 'outline: 2px solid var(--accent-ring)' : ''">
-                <td><span class="who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" :guard="x.guard" /><span><div>{{ x.name ?? '（昵称未知）' }}</div><div class="num" style="font-size: 11.5px; color: var(--t3); font-weight: 400">UID {{ x.uid }}</div></span></span></td>
-                <td><span v-if="viewerOf(x.uid) || x.honor" class="ids"><HonorMedal :level="viewerOf(x.uid)?.honor || x.honor" /><IdTag v-if="viewerOf(x.uid)" :viewer="viewerOf(x.uid)!" /></span><span v-else style="color: var(--t3)">—</span></td>
-                <td><EffectPicker v-model="x.effectId" @change="(id) => updateEx(x, { effectId: id }, `${x.name ?? x.uid} 的专属特效改为「${effectById(id)?.name}」`)" /></td>
-                <td><CdPick v-if="!once" v-model="x.cooldownMin" @change="(v) => updateEx(x, { cooldownMin: v }, cdMsg(x.name ?? String(x.uid), v))" /><span v-else class="inline-hint">每场一次</span></td>
-                <td>
-                  <button class="untilb" :class="x.until ? (x.until < todayStr ? 'expired' : 'set') : ''" @click.stop="(e) => openDate(e, x)">{{ x.until ? `${x.until < todayStr ? '已过期 ' : '至 '}${x.until.slice(5)}` : '长期' }}</button>
-                </td>
-                <td><Switch v-model="x.enabled" :label="`启用 ${x.name ?? x.uid}`" @change="(v) => updateEx(x, { enabled: v }, v ? '已启用' : '已停用，TA 会按身份的规则播放')" /></td>
-                <td style="white-space: nowrap">
-                  <button class="playmini" aria-label="预览" title="预览" @click="preview(x.effectId, { name: x.name ?? '专属观众', guard: 0, isMod: false, medalLevel: null }, x.name ?? String(x.uid))"><svg><use href="#i-play" /></svg></button>
-                  <ConfirmButton label="" confirm-label="确认移除" cls="moreb" :aria-label="`移除 ${x.name ?? x.uid}`" @confirm="removeEx(x)"><Icon name="i-x" /></ConfirmButton>
-                </td>
-              </tr>
-              <tr v-if="!exList.length">
-                <td colspan="7" style="text-align: center; padding: 40px; color: var(--t3)">{{ state.exclusives.length ? '没有匹配的专属用户' : '还没有专属用户，点上面的「添加专属用户」' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="rl-sec"><h3>大航海</h3><span>只算本直播间的舰长、提督、总督</span></div>
-      <div class="rl-list">
-        <div v-for="g in GUARDS" :key="g.tier" class="rl" :class="{ off: !rules.tiers[g.tier].enabled, flash: flashKey === g.tier }">
-          <span class="who"><IdTag :identity="g.tier" /></span>
-          <span class="say">
-            <b>{{ g.cond }}</b>进场时，播放 <EffectPicker v-model="rules.tiers[g.tier].effectId" @change="onTierEffect(g.tier, rules.tiers[g.tier], g.cond)" />
-            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers[g.tier].cooldownMin" after="内只播一次" @change="(v) => save(cdMsg(g.cond, v))" /></template>
-            <span v-if="!rules.tiers[g.tier].enabled" class="offnote">{{ TIER_OFF.guard }}</span>
-          </span>
-          <span class="acts">
-            <button class="playmini" :aria-label="`预览${g.cond}进场`" :title="`预览${g.cond}进场`" @click="preview(rules.tiers[g.tier].effectId, tierSample(g.tier), `${g.cond}进场`)"><svg><use href="#i-play" /></svg></button>
-            <Switch v-model="rules.tiers[g.tier].enabled" :label="`${g.cond}进场特效`" @change="(v) => save(v ? `已打开${g.cond}进场特效` : `已关闭${g.cond}进场特效，TA 们会按房管、粉丝牌或其他观众处理`)" />
-          </span>
-        </div>
+      <div v-if="help" class="rhelp">
+        判断顺序：<span class="flow"><span>专属用户</span>→<span>大航海</span>→<span>房管</span>→<span>粉丝牌</span>→<span>其他观众</span></span>，用第一个符合的。<br />
+        一个人同时是舰长和房管，按<b>舰长</b>算；粉丝牌只算<b>本直播间</b>的牌子。关掉某一条，这些人会往下按后面的规则处理。<br />
+        <b>不重复播放</b>：「按时间」时每条规则自己设多久内只播一次；「每场只播一次」时同一个人一场直播只播一次，下一场重新算。
       </div>
 
-      <div class="rl-sec"><h3>房管</h3><span>本直播间的房管</span></div>
-      <div class="rl-list">
-        <div class="rl" :class="{ off: !rules.tiers.mod.enabled, flash: flashKey === 'mod' }">
-          <span class="who"><IdTag identity="mod" /></span>
-          <span class="say">
-            <b>房管</b>进场时，播放 <EffectPicker v-model="rules.tiers.mod.effectId" @change="onTierEffect('mod', rules.tiers.mod, '房管')" />
-            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers.mod.cooldownMin" after="内只播一次" @change="(v) => save(cdMsg('房管', v))" /></template>
-            <span v-if="!rules.tiers.mod.enabled" class="offnote">{{ TIER_OFF.mod }}</span>
-          </span>
-          <span class="acts">
-            <button class="playmini" aria-label="预览房管进场" title="预览房管进场" @click="preview(rules.tiers.mod.effectId, SAMPLES.mod, '房管进场')"><svg><use href="#i-play" /></svg></button>
-            <Switch v-model="rules.tiers.mod.enabled" label="房管进场特效" @change="(v) => save(v ? '已打开房管进场特效' : '已关闭房管进场特效')" />
-          </span>
-        </div>
-      </div>
+      <div class="rt">
+        <div class="excl-row"><Icon name="i-user" /><span v-if="state.exclusives.length"><b>专属用户 {{ state.exclusives.length }} 人</b>最优先，各自用自己的特效</span><span v-else>想给某几位观众单独指定特效？用<b>专属用户</b></span><button class="linkish" @click="pick('exclusive')">{{ state.exclusives.length ? '去设置 →' : '去添加 →' }}</button></div>
+        <div class="rt-h" :style="{ gridTemplateColumns: ENTER_COLS }"><span>开关</span><span>身份</span><span>播放的特效</span><span>{{ once ? '不重复播放' : '同一个人多久内只播一次' }}</span><span>操作</span></div>
 
-      <div class="rl-sec"><h3>粉丝牌</h3><span>只算本直播间的牌子，按等级分段，每一段放一种特效</span></div>
-      <div class="rl-lv">
-        <div class="lvbar">
-          <button v-for="x in levelBar" :key="x.from" type="button" :class="{ off: !x.b.enabled }" :style="{ flex: x.to - x.from + 1, background: x.b.enabled ? x.color : undefined }" :title="`${x.label}：${effectById(x.b.effectId)?.name ?? '未选择'}`" @click="locateBand(x.from)">
-            <span>{{ x.label }} · {{ x.b.enabled ? (effectById(x.b.effectId)?.name ?? '未选择') : '已关闭' }}</span>
-          </button>
+        <div class="rt-g"><b>大航海</b><span>本直播间的总督、提督、舰长</span></div>
+        <div v-for="g in GUARDS" :key="g.tier" class="rt-r" :class="{ off: !rules.tiers[g.tier].enabled, flash: flashKey === g.tier }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="rules.tiers[g.tier].enabled ? undefined : TIER_OFF[g.tier]">
+          <div class="c-sw"><Switch v-model="rules.tiers[g.tier].enabled" :label="`${g.cond}进场特效`" @change="(v) => save(v ? `已打开${g.cond}进场特效` : `已关闭${g.cond}进场特效，TA 们会按房管、粉丝牌或其他观众处理`)" /></div>
+          <div class="c-who"><IdTag :identity="g.tier" /></div>
+          <div class="c-eff"><EffectPicker v-model="rules.tiers[g.tier].effectId" @change="onTierEffect(g.tier, rules.tiers[g.tier], g.cond)" /></div>
+          <div class="c-cd"><CdPick v-if="!once" v-model="rules.tiers[g.tier].cooldownMin" @change="(v) => save(cdMsg(g.cond, v))" /><template v-else>每场只播一次</template></div>
+          <div class="c-act"><button class="icon-btn play" :aria-label="`预览${g.cond}进场`" :title="`预览${g.cond}进场`" @click="preview(rules.tiers[g.tier].effectId, tierSample(g.tier), `${g.cond}进场`)"><svg><use href="#i-play" /></svg></button><RowMenu :items="tierMenu(rules.tiers[g.tier].effectId)" :label="`${g.cond}进场：更多操作`" /></div>
         </div>
-        <div class="lvticks"><span v-for="x in levelBar" :key="x.from" :style="{ left: `${((x.from - 1) / (MEDAL_LEVEL_MAX - 1)) * 100}%` }">{{ x.from }}</span><span style="left: 100%">{{ MEDAL_LEVEL_MAX }}</span></div>
-        <div class="lvadd">
-          <Icon name="i-plus" />在 <input v-model.number="addLevel" class="inp num" type="number" min="2" :max="MEDAL_LEVEL_MAX" placeholder="31" aria-label="从几级开始分一段" @keydown.enter="addBand" /> 级处再分一段
-          <button class="btn" @click="addBand">分段</button>
-          <span class="hint" :style="{ color: addMsg.err ? '#D64545' : '' }">{{ addMsg.text }}</span>
-        </div>
-      </div>
-      <div class="rl-list" style="margin-top: 8px">
-        <div v-for="(b, i) in bands" :id="`band${b.fromLevel}`" :key="b.fromLevel" class="rl" :class="{ off: !b.enabled, flash: flashKey === `band${b.fromLevel}` }">
-          <span class="who"><Medal :level="b.fromLevel" /></span>
-          <span class="say">
-            粉丝牌 <b>{{ bandLabel(i) }}</b> 进场时，播放 <EffectPicker v-model="b.effectId" @change="(flash(`band${b.fromLevel}`), save(`粉丝牌 ${bandLabel(i)}改为播放「${effectById(b.effectId)?.name ?? ''}」`))" />
-            <template v-if="!once">，同一个人 <CdPick v-model="b.cooldownMin" after="内只播一次" @change="(v) => save(cdMsg(`粉丝牌 ${bandLabel(i)}`, v))" /></template>
-            <span v-if="!b.enabled" class="offnote">已关闭：这些观众按其他观众处理</span>
-          </span>
-          <span class="acts">
-            <button class="playmini" :aria-label="`预览粉丝牌 ${bandLabel(i)}进场`" :title="`预览粉丝牌 ${bandLabel(i)}进场`" @click="preview(b.effectId, { ...SAMPLES.fan, medalLevel: b.fromLevel }, `粉丝牌 ${bandLabel(i)}进场`)"><svg><use href="#i-play" /></svg></button>
-            <ConfirmButton v-if="bands.length > 1" label="删除" confirm-label="确认删除" cls="playmini" :aria-label="`删除粉丝牌 ${bandLabel(i)}这一段`" title="删除这一段（并入相邻的一段），再点一次确认" @confirm="removeBand(b, i)"><Icon name="i-x" /></ConfirmButton>
-            <Switch v-model="b.enabled" :label="`粉丝牌 ${bandLabel(i)}进场特效`" @change="(v) => save(v ? `已打开粉丝牌 ${bandLabel(i)}` : `已关闭粉丝牌 ${bandLabel(i)}，这些观众按其他观众处理`)" />
-          </span>
-        </div>
-      </div>
 
-      <div class="rl-sec"><h3>其他观众</h3><span>上面都不符合的人</span></div>
-      <div class="rl-list">
-        <div class="rl" :class="{ off: !rules.tiers.nor.enabled, flash: flashKey === 'nor' }">
-          <span class="who"><IdTag identity="nor" /></span>
-          <span class="say">
-            <b>其他观众</b>进场时，播放 <EffectPicker v-model="rules.tiers.nor.effectId" @change="onTierEffect('nor', rules.tiers.nor, '其他观众')" />
-            <template v-if="!once">，同一个人 <CdPick v-model="rules.tiers.nor.cooldownMin" after="内只播一次" @change="(v) => save(cdMsg('其他观众', v))" /></template>
-            <span v-if="!rules.tiers.nor.enabled" class="offnote">{{ TIER_OFF.nor }}</span>
+        <div class="rt-g"><b>房管</b><span>本直播间的房管</span></div>
+        <div class="rt-r" :class="{ off: !rules.tiers.mod.enabled, flash: flashKey === 'mod' }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="rules.tiers.mod.enabled ? undefined : TIER_OFF.mod">
+          <div class="c-sw"><Switch v-model="rules.tiers.mod.enabled" label="房管进场特效" @change="(v) => save(v ? '已打开房管进场特效' : '已关闭房管进场特效，房管会按粉丝牌或其他观众处理')" /></div>
+          <div class="c-who"><IdTag identity="mod" /></div>
+          <div class="c-eff"><EffectPicker v-model="rules.tiers.mod.effectId" @change="onTierEffect('mod', rules.tiers.mod, '房管')" /></div>
+          <div class="c-cd"><CdPick v-if="!once" v-model="rules.tiers.mod.cooldownMin" @change="(v) => save(cdMsg('房管', v))" /><template v-else>每场只播一次</template></div>
+          <div class="c-act"><button class="icon-btn play" aria-label="预览房管进场" title="预览房管进场" @click="preview(rules.tiers.mod.effectId, SAMPLES.mod, '房管进场')"><svg><use href="#i-play" /></svg></button><RowMenu :items="tierMenu(rules.tiers.mod.effectId)" label="房管进场：更多操作" /></div>
+        </div>
+
+        <div class="rt-g">
+          <b>粉丝牌</b><span>只算本直播间的牌子，按等级分段，每一段放一种特效</span>
+          <span class="r">
+            <span v-if="adding" class="lvadd">在 <input v-model.number="addLevel" class="inp num" type="number" min="2" :max="MEDAL_LEVEL_MAX" placeholder="31" aria-label="从几级开始分一段" @keydown.enter="addBand" @keydown.esc="adding = false" /> 级处再分一段 <button class="btn" @click="addBand">分段</button><button class="linkish" style="color: var(--t3)" @click="adding = false">取消</button><span class="hint" :style="{ color: addMsg.err ? '#D64545' : '' }">{{ addMsg.text }}</span></span>
+            <button v-else class="linkish" @click="adding = true"><Icon name="i-plus" style="width: 12px; height: 12px; vertical-align: -1px" /> 加一段</button>
           </span>
-          <span class="acts">
-            <button class="playmini" aria-label="预览其他观众进场" title="预览其他观众进场" @click="preview(rules.tiers.nor.effectId, SAMPLES.nor, '其他观众进场')"><svg><use href="#i-play" /></svg></button>
-            <Switch v-model="rules.tiers.nor.enabled" label="其他观众进场特效" @change="(v) => save(v ? '已打开其他观众进场特效' : '已关闭其他观众进场特效')" />
-          </span>
+        </div>
+        <div v-for="(b, i) in bands" :id="`band${b.fromLevel}`" :key="b.fromLevel" class="rt-r" :class="{ off: !b.enabled, flash: flashKey === `band${b.fromLevel}` }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="b.enabled ? undefined : '已关闭：这些观众按其他观众处理'">
+          <div class="c-sw"><Switch v-model="b.enabled" :label="`粉丝牌 ${bandLabel(i)}进场特效`" @change="(v) => save(v ? `已打开粉丝牌 ${bandLabel(i)}` : `已关闭粉丝牌 ${bandLabel(i)}，这些观众按其他观众处理`)" /></div>
+          <div class="c-who"><Medal :level="b.fromLevel" /><span class="sub">{{ bandLabel(i) }}</span></div>
+          <div class="c-eff"><EffectPicker v-model="b.effectId" @change="(flash(`band${b.fromLevel}`), save(`粉丝牌 ${bandLabel(i)}改为播放「${effectById(b.effectId)?.name ?? ''}」`))" /></div>
+          <div class="c-cd"><CdPick v-if="!once" v-model="b.cooldownMin" @change="(v) => save(cdMsg(`粉丝牌 ${bandLabel(i)}`, v))" /><template v-else>每场只播一次</template></div>
+          <div class="c-act">
+            <button class="icon-btn play" :aria-label="`预览粉丝牌 ${bandLabel(i)}进场`" :title="`预览粉丝牌 ${bandLabel(i)}进场`" @click="preview(b.effectId, { ...SAMPLES.fan, medalLevel: b.fromLevel }, `粉丝牌 ${bandLabel(i)}进场`)"><svg><use href="#i-play" /></svg></button>
+            <RowMenu :items="[...tierMenu(b.effectId), null, { icon: 'i-trash', label: '删掉这一段（并入相邻的一段）', danger: true, disabled: bands.length <= 1, run: () => removeBand(b, i) }]" :label="`粉丝牌 ${bandLabel(i)}：更多操作`" />
+          </div>
+        </div>
+
+        <div class="rt-g"><b>其他观众</b><span>上面都不符合的人。直播间人多时建议关着，免得刷屏</span></div>
+        <div class="rt-r" :class="{ off: !rules.tiers.nor.enabled, flash: flashKey === 'nor' }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="rules.tiers.nor.enabled ? undefined : TIER_OFF.nor">
+          <div class="c-sw"><Switch v-model="rules.tiers.nor.enabled" label="其他观众进场特效" @change="(v) => save(v ? '已打开其他观众进场特效' : '已关闭其他观众进场特效')" /></div>
+          <div class="c-who"><IdTag identity="nor" /></div>
+          <div class="c-eff"><EffectPicker v-model="rules.tiers.nor.effectId" @change="onTierEffect('nor', rules.tiers.nor, '其他观众')" /></div>
+          <div class="c-cd"><CdPick v-if="!once" v-model="rules.tiers.nor.cooldownMin" @change="(v) => save(cdMsg('其他观众', v))" /><template v-else>每场只播一次</template></div>
+          <div class="c-act"><button class="icon-btn play" aria-label="预览其他观众进场" title="预览其他观众进场" @click="preview(rules.tiers.nor.effectId, SAMPLES.nor, '其他观众进场')"><svg><use href="#i-play" /></svg></button><RowMenu :items="tierMenu(rules.tiers.nor.effectId)" label="其他观众进场：更多操作" /></div>
         </div>
       </div>
     </template>
-    <RulesDanmu v-else-if="ev === 'danmu'" @preview="onPreview" />
-    <RulesGift v-else-if="ev === 'gift'" @preview="onPreview" />
+
+    <!-- ================= 专属用户 ================= -->
+    <template v-else-if="ev === 'exclusive'">
+      <div class="rtool">
+        <span class="say"><span>给某几位观众单独指定进场特效，比按身份的规则优先。只对<b style="color: var(--t1); font-weight: 500">进场</b>有效，礼物、弹幕、上舰按各自的规则。</span></span>
+        <span class="sp" />
+        <span v-if="state.exclusives.length > 5" class="s"><Icon name="i-search" /><input v-model.trim="exQ" class="inp" placeholder="搜索昵称或 UID" aria-label="搜索专属用户" /></span>
+        <button class="btn primary" :disabled="!!draft" @click="startAdd()"><Icon name="i-plus" />添加专属用户</button>
+      </div>
+      <div v-if="draft" class="addbar">
+        <div class="r1">
+          <input id="exUid" v-model="draft.uid" class="inp num" inputmode="numeric" placeholder="输入 B站 UID，回车查询" aria-label="B站 UID" @keydown.enter="lookup" />
+          <button class="btn" :disabled="draft.busy" @click="lookup"><span v-if="draft.busy" class="spin" />{{ draft.busy ? '查询中' : '查询' }}</button>
+          <span style="color: var(--t3); font-size: 12.5px">或</span>
+          <button class="linkish" @click="showRecent = !showRecent">从最近进场的观众里选</button>
+          <button class="icon-btn" style="margin-left: auto; box-shadow: none" aria-label="取消添加" @click="draft = null"><Icon name="i-x" /></button>
+        </div>
+        <div v-if="showRecent" class="picker">
+          <label v-for="v in recentViewers" :key="v.uid" :style="state.exclusives.some((x) => x.uid === v.uid) ? 'opacity:.5' : ''">
+            <input type="radio" name="expk" :disabled="state.exclusives.some((x) => x.uid === v.uid)" @change="((draft!.uid = String(v.uid)), (showRecent = false), lookup())" />
+            <Avatar :name="v.name" :face="v.face" :guard="v.guard" />{{ v.name }}<span class="ids"><HonorMedal :level="v.honor" /><IdTag :viewer="v" /></span><span class="uid num">{{ state.exclusives.some((x) => x.uid === v.uid) ? '已是专属' : v.uid }}</span>
+          </label>
+          <div v-if="!recentViewers.length" style="padding: 10px; color: var(--t3); font-size: 12.5px">还没有进场记录，开播后这里会列出最近进场的观众</div>
+        </div>
+        <div v-if="draft.msg" class="lookup" :class="{ ok: draft.ok }">{{ draft.msg }}</div>
+        <div v-if="draft.found" class="found">
+          <span class="who"><Avatar :name="draft.found.name" :face="draft.found.face" :guard="draft.found.guard" />{{ draft.found.name }}</span>
+          <span class="num" style="font-size: 12px; color: var(--t3)">UID {{ draft.found.uid }}</span>
+          <EffectPicker v-model="draft.effectId" />
+          <CdPick v-model="draft.cooldownMin" />
+          <button class="btn primary" style="margin-left: auto" @click="addExclusive">添加</button>
+        </div>
+      </div>
+      <div class="rt">
+        <div class="rt-h" :style="{ gridTemplateColumns: EX_COLS }"><span>开关</span><span>观众</span><span>身份</span><span>专属特效</span><span>{{ once ? '不重复播放' : '多久内只播一次' }}</span><span>有效期</span><span>操作</span></div>
+        <div v-for="x in exList" :key="x.uid" class="rt-r" :class="{ off: !x.enabled, flash: flashUid === x.uid }" :style="{ gridTemplateColumns: EX_COLS }">
+          <div class="c-sw"><Switch v-model="x.enabled" :label="`启用 ${x.name ?? x.uid}`" @change="(v) => updateEx(x, { enabled: v }, v ? '已启用' : '已停用，TA 会按身份的规则播放')" /></div>
+          <div class="c-who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" :guard="x.guard" /><span class="nm"><b>{{ x.name ?? '（昵称未知）' }}</b><span class="uid">UID {{ x.uid }}</span></span></div>
+          <div class="c-who"><template v-if="viewerOf(x.uid) || x.honor"><HonorMedal :level="viewerOf(x.uid)?.honor || x.honor" /><IdTag v-if="viewerOf(x.uid)" :viewer="viewerOf(x.uid)!" /></template><span v-else class="sub">—</span></div>
+          <div class="c-eff"><EffectPicker v-model="x.effectId" @change="(id) => updateEx(x, { effectId: id }, `${x.name ?? x.uid} 的专属特效改为「${effectById(id)?.name}」`)" /></div>
+          <div class="c-cd"><CdPick v-if="!once" v-model="x.cooldownMin" @change="(v) => updateEx(x, { cooldownMin: v }, cdMsg(x.name ?? String(x.uid), v))" /><template v-else>每场只播一次</template></div>
+          <div class="c-cd"><button class="untilb" :class="x.until ? (x.until < todayStr ? 'expired' : 'set') : ''" :title="x.until ? '到期后自动停用' : '一直有效'" @click.stop="(e) => openDate(e, x)">{{ x.until ? `${x.until < todayStr ? '已过期 ' : '至 '}${x.until.slice(5)}` : '长期' }}</button></div>
+          <div class="c-act"><button class="icon-btn play" aria-label="预览" title="预览" @click="preview(x.effectId, { name: x.name ?? '专属观众', guard: 0, isMod: false, medalLevel: null }, x.name ?? String(x.uid))"><svg><use href="#i-play" /></svg></button><RowMenu :items="exMenu(x)" :label="`${x.name ?? x.uid}：更多操作`" /></div>
+        </div>
+        <div v-if="!exList.length" class="rt-empty">{{ state.exclusives.length ? '没有匹配的专属用户' : '还没有专属用户。点右上角「添加专属用户」，或者在总览的实时动态里点某个观众' }}</div>
+      </div>
+      <p v-if="state.exclusives.length" class="rt-note">在总览的实时动态里点某个观众，也能直接设置专属特效。</p>
+    </template>
+
+    <RulesDanmu v-else-if="ev === 'danmu'" v-model:help="help" @preview="onPreview" />
+    <RulesGift v-else-if="ev === 'gift'" v-model:help="help" @preview="onPreview" />
     <RulesGuard v-else-if="ev === 'guard'" @preview="onPreview" />
 
-    <SimDrawer v-if="simOpen" :kind="ev" @close="simOpen = false" />
+    <SimDrawer v-if="simOpen" :kind="ev === 'exclusive' ? 'enter' : ev" @close="simOpen = false" />
 
     <Teleport to="body">
       <template v-if="datePop">

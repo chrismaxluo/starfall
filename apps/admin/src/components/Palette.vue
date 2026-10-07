@@ -52,6 +52,7 @@ const cmds = computed<Cmd[]>(() => {
     { g: '跳转', icon: 'i-image', label: '音效', kw: '素材库 声音', run: () => go('assets', 'sound') },
     { g: '跳转', icon: 'i-list', label: '事件记录', kw: '日志 历史', run: () => go('logs') },
     { g: '跳转', icon: 'i-screen', label: '直播软件输出', kw: 'OBS 直播姬 浏览器源 地址 竖屏 横屏 分辨率 兼容', run: () => go('obs') },
+    { g: '跳转', icon: 'i-info', label: '关于', kw: '版本 更新 检查更新 作者 运行信息 更新记录', run: () => go('about') },
     { g: '跳转', icon: 'i-gear', label: '设置', kw: '账号 直播间 黑名单 密码', run: () => go('settings') },
     { g: '跳转', icon: 'i-ban', label: '黑名单', kw: '设置 屏蔽', run: () => go('settings') },
     { g: '其他', icon: 'i-star', label: '新手引导', kw: '帮助 开始', run: () => (ui.wizard = true) },

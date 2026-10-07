@@ -33,12 +33,6 @@ export class GiftCatalog {
     return this.find(giftId)?.icon || undefined;
   }
 
-  /** 会动的礼物图（没有时为 undefined）；规则同 iconFor */
-  animFor(giftId: number): string | undefined {
-    const g = this.find(giftId);
-    return g?.webp || g?.gif || undefined;
-  }
-
   /** 查礼物（只查缓存）：先查本直播间礼物面板，没有（别的直播间的礼物、下架的活动礼物等）再查全站礼物列表 */
   find(giftId: number): GiftConfig | undefined {
     const room = this.room.get();

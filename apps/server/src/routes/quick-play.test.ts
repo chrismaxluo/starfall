@@ -87,4 +87,15 @@ describe('素材快捷播放', () => {
     t.ctx.pipeline.pause();
     expect((await play(b!.id)).json().error.message).toContain('已暂停');
   });
+
+  it('电脑版全局快捷键按快捷键找按钮播放：重新保存按钮（编号变了）后照样能播', async () => {
+    const t = await setup();
+    t.ctx.hub.addOverlay({ send: () => undefined, close: () => undefined }, t.ctx.outputs.list()[0]!, []);
+    await t.save([{ ...btn(t.effectId('晶语')), globalHotkey: 'Ctrl+Alt+1' }]);
+    await t.save([{ ...btn(t.effectId('晶语')), globalHotkey: 'Ctrl+Alt+1' }]);
+    const play = (hotkey: string) => t.req({ method: 'POST', url: '/api/quickplay/play-global', payload: { hotkey } });
+    expect((await play('Ctrl+Alt+1')).statusCode).toBe(200);
+    expect((await play('Ctrl+Alt+2')).statusCode).toBe(404);
+    expect((await play('1')).statusCode).toBe(400);
+  });
 });

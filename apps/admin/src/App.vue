@@ -18,6 +18,7 @@ import Assets from './pages/Assets.vue';
 import Events from './pages/Events.vue';
 import Output from './pages/Output.vue';
 import SettingsPage from './pages/Settings.vue';
+import About from './pages/About.vue';
 import { pauseOnly, togglePause } from './lib/actions.ts';
 import { get, post, setUnauthorizedHandler } from './lib/api.ts';
 import { duration } from './lib/format.ts';
@@ -244,6 +245,7 @@ function reloadPage(): void {
           <div class="nav-label">其他</div>
           <nav class="nav" aria-label="其他">
             <a href="/overlay/?demo=1" target="_blank" rel="noopener" title="在新标签里轮流播放所有内置特效（示例）"><Icon name="i-demo" />内置特效演示<Icon name="i-ext" /></a>
+            <a href="#about" :aria-current="route.page === 'about' ? 'page' : 'false'"><Icon name="i-info" />关于</a>
             <a href="#settings" :aria-current="route.page === 'settings' ? 'page' : 'false'"><Icon name="i-gear" />设置</a>
           </nav>
         </div>
@@ -297,17 +299,19 @@ function reloadPage(): void {
         <Events v-else-if="route.page === 'logs'" />
         <Output v-else-if="route.page === 'obs'" />
         <SettingsPage v-else-if="route.page === 'settings'" />
+        <About v-else-if="route.page === 'about'" />
       </div>
     </div>
 
     <nav class="tabbar" aria-label="主导航（手机）">
       <a v-for="n in TABS" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ SHORT[n.page] }}</a>
-      <button :aria-current="['quickplay', 'obs', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
+      <button :aria-current="['quickplay', 'obs', 'about', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
     </nav>
     <div v-if="moreOpen" style="position: fixed; inset: 0; z-index: 44" @click="moreOpen = false" />
     <div v-if="moreOpen" class="sheet" @click="moreOpen = false">
       <a href="#quickplay"><Icon name="i-bolt" />素材快捷播放</a>
       <a href="#obs" @click="go('obs')"><Icon name="i-screen" />直播软件输出</a>
+      <a href="#about"><Icon name="i-info" />关于</a>
       <a href="#settings"><Icon name="i-gear" />设置</a>
     </div>
 

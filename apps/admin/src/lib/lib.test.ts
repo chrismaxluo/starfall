@@ -141,3 +141,15 @@ describe('素材快捷播放的快捷键', () => {
     expect(['F5', 'Space', 'Enter', 'NumpadAdd', 'Backquote'].map((code) => keyOf({ code }))).toEqual([null, null, null, null, null]);
   });
 });
+
+describe('更新记录', () => {
+  it('按「## 版本」分段，小标题、列表、粗体、代码；链接只留文字；HTML 会转义', async () => {
+    const { parseChangelog, CHANGELOG } = await import('./changelog.ts');
+    const s = parseChangelog('# 更新记录\n\n## 未发布\n\n### 素材\n- 新增 **快捷播放**，运行 `starfall update`\n- 见[使用手册](docs/user-guide.md) <b>\n\n## v1.4.0（2026-10-03）\n\n本版本说明。\n');
+    expect(s.map((x) => x.title)).toEqual(['未发布', 'v1.4.0（2026-10-03）']);
+    expect(s[0]!.html).toBe('<h4>素材</h4><ul><li>新增 <b>快捷播放</b>，运行 <code>starfall update</code></li><li>见使用手册 &lt;b&gt;</li></ul>');
+    expect(s[1]!.html).toBe('<p>本版本说明。</p>');
+    // 打包进来的真实更新记录
+    expect(CHANGELOG.some((x) => x.title.startsWith('v1.4.0'))).toBe(true);
+  });
+});

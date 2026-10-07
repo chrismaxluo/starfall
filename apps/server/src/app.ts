@@ -19,6 +19,7 @@ import { libraryRoutes } from './routes/library.ts';
 import { outputRoutes } from './routes/outputs.ts';
 import { playbackRoutes } from './routes/playback.ts';
 import { quickPlayRoutes } from './routes/quick-play.ts';
+import { aboutRoutes } from './routes/about.ts';
 import { ruleRoutes } from './routes/rules.ts';
 import { wsRoutes } from './routes/ws.ts';
 
@@ -142,6 +143,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   outputRoutes(app, ctx);
   playbackRoutes(app, ctx);
   quickPlayRoutes(app, ctx);
+  aboutRoutes(app, ctx);
   eventRoutes(app, ctx);
   backupRoutes(app, ctx);
   await app.register(async (scope) => wsRoutes(scope, ctx));

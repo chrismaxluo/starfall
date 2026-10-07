@@ -26,8 +26,8 @@ export const BUILTIN_EFFECTS: BuiltinEffect[] = [
   // 玻璃质感（大航海以外）：礼物 10 ~ 100 元、礼物 100 元以上、房管进场、弹幕回应。数量和礼物图由特效页单独显示，欢迎语里不用写
   { name: '晶礼', style: 'glass-gift', position: 'bl', durationMs: 4000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
   { name: '晶耀', style: 'glass-big', position: 'bl', durationMs: 6000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
-  // 礼物：有 B站全屏动画的播官方动画（时长跟动画走）；没有动画时按价值显示晶耀或晶礼，durationMs 是那时的时长
-  { name: 'B站动画', style: 'bili-gift', position: 'center', durationMs: 5000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
+  // 礼物：有 B站全屏动画的播官方动画（时长跟动画走）；没有动画时按价值显示晶耀或晶礼，position、durationMs 是那时的位置和时长
+  { name: 'B站动画', style: 'bili-gift', position: 'bl', durationMs: 5000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
   { name: '晶巡', style: 'glass-mod', position: 'bl', durationMs: 3200, texts: { enter: ['{name} 前来巡场'] } },
   { name: '晶语', style: 'glass-dm', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'], danmu: ['{name}：{text}'] } },
 ];

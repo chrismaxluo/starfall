@@ -64,7 +64,7 @@ const where = computed(() => (props.scope === 'live' ? '本场' : '今天'));
       <div>
         <b v-if="fleet">舰队 {{ fleet.total }} 人，{{ where }}来了 {{ came.length }} 人</b>
         <b v-else>{{ where }}来了 {{ came.length }} 位大航海</b>
-        <small v-if="fleet">{{ levels ? `${levels}（来自 B 站的大航海名单）` : '来自 B 站的大航海名单' }}</small>
+        <small v-if="fleet">{{ levels ? `${levels}（来自 B站的大航海名单）` : '来自 B站的大航海名单' }}</small>
         <small v-else-if="data?.fleetError">舰队名单暂时读不到：{{ data.fleetError }}</small>
         <small v-else>正在读取舰队名单……</small>
       </div>

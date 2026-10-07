@@ -7,7 +7,7 @@ import type { Effect, SvgaRole } from '@starfall/shared';
 import type { Readable } from 'node:stream';
 import type { z } from 'zod';
 import type { Db } from '../db/index.ts';
-import { effects, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, viewers } from '../db/schema.ts';
+import { effects, quickPlay, ruleDanmu, ruleEnterBands, ruleEnterHonorBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, viewers } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 import { assetDto } from './assets.ts';
 import type { AssetDto, AssetRow, AssetStore } from './assets.ts';
@@ -149,6 +149,7 @@ export class EffectStore {
     };
     for (const t of this.db.select().from(ruleEnterTiers).all()) add(t.effectId, { page: 'enter', label: `进场 · ${TIER_NAMES[t.tier]}` });
     for (const b of sortedBands(this.db.select().from(ruleEnterBands).all())) add(b.effectId, { page: 'enter', label: `进场 · 粉丝牌 ${bandLabel(b.fromLevel, b.toLevel)}` });
+    for (const b of sortedBands(this.db.select().from(ruleEnterHonorBands).all())) add(b.effectId, { page: 'enter', label: `进场 · 荣耀等级 ${bandLabel(b.fromLevel, b.toLevel)}` });
     // 只查专属用户的昵称（观众表会越来越大，不能每次整张读出来）
     const exclusives = this.db.select().from(ruleExclusive).all();
     const uids = exclusives.map((x) => x.uid);
@@ -223,7 +224,7 @@ export class EffectStore {
     return this.get(id);
   }
 
-  /** 复制素材；replaceRefs 为真时把原来用它的规则都换成副本（F-AS-13） */
+  /** 复制素材；replaceRefs 为真时把原来用它的规则（和快捷播放按钮）都换成副本（F-AS-13） */
   copy(id: number, opts: { name?: string; replaceRefs?: boolean }): EffectDto {
     const src = this.row(id);
     const name = opts.name ?? this.uniqueName(`${src.name} 副本`);
@@ -234,12 +235,14 @@ export class EffectStore {
       if (opts.replaceRefs) {
         tx.update(ruleEnterTiers).set({ effectId: n }).where(eq(ruleEnterTiers.effectId, id)).run();
         tx.update(ruleEnterBands).set({ effectId: n }).where(eq(ruleEnterBands.effectId, id)).run();
+        tx.update(ruleEnterHonorBands).set({ effectId: n }).where(eq(ruleEnterHonorBands.effectId, id)).run();
         tx.update(ruleExclusive).set({ effectId: n }).where(eq(ruleExclusive.effectId, id)).run();
         tx.update(ruleDanmu).set({ effectId: n }).where(eq(ruleDanmu.effectId, id)).run();
         tx.update(ruleGiftSpecific).set({ effectId: n }).where(eq(ruleGiftSpecific.effectId, id)).run();
         tx.update(ruleGiftBands).set({ effectId: n }).where(eq(ruleGiftBands.effectId, id)).run();
         tx.update(ruleGuard).set({ openEffectId: n }).where(eq(ruleGuard.openEffectId, id)).run();
         tx.update(ruleGuard).set({ renewEffectId: n }).where(eq(ruleGuard.renewEffectId, id)).run();
+        tx.update(quickPlay).set({ effectId: n }).where(eq(quickPlay.effectId, id)).run();
       }
       return n;
     });

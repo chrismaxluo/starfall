@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import CdPick from '../components/CdPick.vue';
 import ChatPreview from '../components/ChatPreview.vue';
+import AddSteps from '../components/AddSteps.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
+import Seg from '../components/Seg.vue';
+import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_MAX_LIMIT, CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay';
+import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
-import { overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
+import { isFxLive, isFxView, overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { OutputDto, OverlayConfig, OverlayInfo } from '../lib/types.ts';
 
@@ -31,7 +35,7 @@ watch(selId, (id) => {
   }
 });
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
-const online = (id: number) => state.overlays.some((x) => x.outputId === id && x.role !== 'chat');
+const online = (id: number) => state.overlays.some((x) => x.outputId === id && isFxLive(x));
 const cfg = computed<OverlayConfig | null>(() => {
   const x = o.value;
   return x ? overlayConfigOf(x) : null;
@@ -72,18 +76,20 @@ const chatPv = ref<InstanceType<typeof ChatPreview> | null>(null);
 const showSafe = ref(true);
 const showKey = ref(false);
 const showChatKey = ref(false);
+const showGiftsKey = ref(false);
 const alphaBg = ref(false);
 
-// 右侧预览：特效页 / 弹幕列表（记住上次看的）
+// 右侧预览：特效页 / 弹幕列表 / 送礼名单（记住上次看的）
 const TAB_KEY = 'sf-out-tab';
-const readTab = (): 'fx' | 'chat' => {
+type PTab = 'fx' | 'chat';
+const readTab = (): PTab => {
   try {
     return localStorage.getItem(TAB_KEY) === 'chat' ? 'chat' : 'fx';
   } catch {
     return 'fx';
   }
 };
-const ptab = ref<'fx' | 'chat'>(readTab());
+const ptab = ref<PTab>(readTab());
 watch(ptab, (t) => {
   try {
     localStorage.setItem(TAB_KEY, t);
@@ -128,6 +134,10 @@ const chatUrl = computed(() => (o.value ? `${location.origin}${o.value.chatPath}
 const mask = (u: string, show: boolean) => (show || !o.value ? u : u.replace(o.value.key, '••••••••••'));
 const shownUrl = computed(() => mask(url.value, showKey.value));
 const shownChatUrl = computed(() => mask(chatUrl.value, showChatKey.value));
+const giftsUrl = computed(() => (o.value ? `${location.origin}${o.value.giftsPath}` : ''));
+const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
+/** 送礼名单浏览器源的建议宽高 */
+const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize) } : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
 function setChatMax(v: number): void {
@@ -137,12 +147,20 @@ function setChatMax(v: number): void {
   if (n === o.value.chatMax) return;
   void save({ chatMax: n }, `最多显示 ${n} 条；浏览器源的高度建议改成 ${chatHeight(n, o.value.chatSize)}`);
 }
-async function copy(which: 'fx' | 'chat'): Promise<void> {
+/** 弹幕自动消失：0 为一直显示；打开时用上次选的秒数（默认 10 秒） */
+const lastFade = ref(10);
+watch(() => o.value?.chatFadeSec, (v) => v && (lastFade.value = v), { immediate: true });
+function setChatFade(v: number): void {
+  if (!o.value || v === o.value.chatFadeSec) return;
+  void save({ chatFadeSec: v }, v ? `没人发弹幕 ${v} 秒后，从最旧的开始一条一条消失` : '弹幕一直显示，只被新弹幕顶走');
+}
+async function copy(which: 'fx' | 'chat' | 'gifts'): Promise<void> {
   try {
-    await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : url.value);
-    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : '已复制特效页地址');
+    await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : which === 'gifts' ? giftsUrl.value : url.value);
+    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : which === 'gifts' ? `已复制送礼名单地址，宽高填 ${giftsWh.value.w} × ${giftsWh.value.h}` : '已复制特效页地址');
   } catch {
     if (which === 'chat') showChatKey.value = true;
+    else if (which === 'gifts') showGiftsKey.value = true;
     else showKey.value = true;
     toast('浏览器不允许自动复制，请手动选中地址复制', 'info');
   }
@@ -150,7 +168,7 @@ async function copy(which: 'fx' | 'chat'): Promise<void> {
 async function resetKey(): Promise<void> {
   const target = o.value;
   if (!target) return;
-  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：特效页、弹幕列表的旧地址立即失效，请把新地址重新填到直播软件');
+  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：特效页、弹幕列表、送礼名单的旧地址立即失效，请把新地址重新填到直播软件');
   if (r) Object.assign(target, r);
 }
 
@@ -163,14 +181,16 @@ function test(id: Identity): void {
   const e = tierEffect(id);
   if (e) void stage.value?.play(e, SAMPLES[id]);
 }
-const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role !== 'chat'));
+const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && isFxLive(x)));
+/** 「在浏览器里查看」打开的页面：能看特效，但不算加到了直播软件 */
+const viewing = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && isFxView(x)));
 const chats = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'chat'));
+const giftLists = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'gifts'));
 /** 在线状态：「在线 · 直播姬」，几个同时在线时写个数 */
 function liveText(list: OverlayInfo[]): string {
   if (!list.length) return '不在线';
   if (list.length > 1) return `${list.length} 个在线`;
   const env = list[0]!.env;
-  if (env?.view) return '在线 · 浏览器查看';
   const host = String(env?.host ?? '');
   return host.startsWith('OBS') ? '在线 · OBS' : host === 'B站直播姬' ? '在线 · 直播姬' : '在线';
 }
@@ -182,12 +202,42 @@ const stageStyle = computed(() => {
   const portrait = o.value.orient === 'portrait';
   return portrait ? { width: '300px', height: `${Math.round((300 * o.value.height) / o.value.width)}px` } : { width: '100%', aspectRatio: `${o.value.width} / ${o.value.height}` };
 });
-function caps(env: Record<string, unknown> | null): Array<[string, boolean]> {
+/** 特效页环境检测：只列出有问题的项目，每项写清楚影响和怎么办；全都正常时只说一句 */
+const CAP_HINT: Record<string, { name: string; tip: string }> = {
+  webmVp9: { name: '透明视频', tip: '透明 WebM 放不了：请更新直播软件；在这之前上传的视频会带背景' },
+  blur: { name: '毛玻璃', tip: '不影响使用：玻璃质感的特效会简化成半透明' },
+  dynamicBorder: { name: '玻璃描边', tip: '不影响使用：玻璃边缘的光效会简化' },
+  audio: { name: '声音', tip: '声音可能出不来：OBS 里勾选「通过 OBS 控制音频」；直播姬里检查这个浏览器源的音量' },
+};
+function capIssues(env: Record<string, unknown> | null): Array<{ name: string; tip: string }> {
   if (!env) return [];
-  return [['透明视频', Boolean(env.webmVp9)], ['毛玻璃', Boolean(env.blur)], ['玻璃描边', Boolean(env.dynamicBorder)], ['声音', Boolean(env.audio)]];
+  return Object.keys(CAP_HINT).filter((k) => !env[k]).map((k) => CAP_HINT[k]!);
+}
+/** 特效页报的错误翻成大白话，写上怎么办 */
+function plainError(msg: string): string {
+  if (/play\(\) failed|user didn't interact|NotAllowedError|autoplay/i.test(msg)) return '声音被直播软件拦住了：OBS 里勾选「通过 OBS 控制音频」后，右键这个浏览器源点「刷新」；直播姬里检查这个素材的音量';
+  if (/404|Failed to load|NotSupportedError|no supported source|MEDIA_ERR|加载失败/i.test(msg)) return `素材文件读不出来，可能被删了或者格式不支持：到素材库重新上传，或者换一个特效（${msg}）`;
+  if (/超时|timeout/i.test(msg)) return `素材加载太慢：文件可能太大，或者网络不好（${msg}）`;
+  return msg;
+}
+// 发一个测试特效到直播画面（直播软件里真的会出现），直播中要再点一次确认
+async function sendTest(): Promise<void> {
+  const e = state.enter?.tiers.cap.effectId ?? state.effects.find((x) => x.builtin)?.id;
+  if (!e) return toast('还没有可以测试的特效', 'info');
+  await attempt(() => post('/api/playback/test', { effectId: e }), '已发送：去直播软件里看看画面上有没有出现');
+}
+async function copyCheck(): Promise<void> {
+  if (!o.value) return;
+  const url = `${location.origin}/overlay/?check=1&w=${o.value.width}&h=${o.value.height}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('已复制自检地址：在直播软件里临时加一个浏览器源打开它，看完删掉');
+  } catch {
+    toast(url, 'info', 8000);
+  }
 }
 /** 特效页运行环境（取直播软件里的那个，不取浏览器查看的） */
-const fxEnv = computed(() => (overlays.value.find((x) => !x.env?.view) ?? overlays.value[0])?.env ?? null);
+const fxEnv = computed(() => overlays.value[0]?.env ?? null);
 const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastError ?? null);
 </script>
 
@@ -237,13 +287,24 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
             <div class="src-f">
               <span class="wh2">宽高填 <code>{{ o.width }} × {{ o.height }}</code></span>
-              <span v-if="fxEnv" class="caps"><span v-for="[name, ok] in caps(fxEnv)" :key="name" :class="ok ? 'ok' : 'mid'">{{ ok ? '✓' : '!' }} {{ name }}</span><span v-if="fxEnv.lite" class="mid">兼容模式</span></span>
+              <span v-if="fxEnv" class="caps">
+                <span v-if="!capIssues(fxEnv).length" class="ok" title="透明视频、毛玻璃、玻璃描边、声音都支持">✓ 环境正常</span>
+                <span v-for="c in capIssues(fxEnv)" :key="c.name" class="mid" :title="c.tip">! {{ c.name }}</span>
+                <span v-if="fxEnv.lite" class="mid" title="电脑性能不够时自动简化特效，保证不卡">兼容模式</span>
+              </span>
               <span class="links">
                 <a class="linkish" :href="`${o.path}&view=1`" target="_blank" rel="noopener" title="深色背景、显示安全区和连接状态；只用来查看，直播软件里请用上面的地址">在浏览器里查看</a>
                 <ConfirmButton label="重置密钥" confirm-label="确认重置？两个地址都会失效" cls="linkish dim" armed-cls="delb" @confirm="resetKey" />
               </span>
             </div>
-            <div v-if="fxError" class="src-err">最近的问题：{{ fxError }}</div>
+            <div v-if="viewing.length && !overlays.length" class="src-note">浏览器里正在查看特效页，但这不算加到了直播软件：直播画面里要另外添加上面的地址</div>
+            <div v-if="capIssues(fxEnv).length" class="src-note">{{ capIssues(fxEnv).map((c) => `${c.name}：${c.tip}`).join('；') }}</div>
+            <div v-if="fxError" class="src-err">最近的问题：{{ plainError(fxError) }}</div>
+            <div v-if="overlays.length" class="src-test">
+              <ConfirmButton v-if="state.status?.live.live" label="发一个测试特效到直播画面" confirm-label="确认？观众会看到" cls="btn" armed-cls="btn live-send" @confirm="sendTest" />
+              <button v-else class="btn" type="button" @click="sendTest">发一个测试特效到直播画面</button>
+              <span class="inline-hint">直播软件里真的会出现一次，用来确认加对了</span>
+            </div>
           </div>
 
           <div class="srcbox" :class="{ off: !o.chatEnabled }">
@@ -267,21 +328,30 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
           </div>
 
+          <div class="srcbox" :class="{ off: !o.giftsEnabled }">
+            <div class="src-h">
+              <span class="src-ic gf"><Icon name="i-gift" /></span>
+              <span class="src-t"><b>送礼名单</b><span>本场收到的礼物、上舰、醒目留言，一屏 {{ o.giftsMax }} 条，放不下时循环往上滚 · 拖到画面一侧</span></span>
+              <span class="right">
+                <span class="live" :class="o.giftsEnabled && giftLists.length ? '' : 'off'"><i />{{ o.giftsEnabled ? liveText(giftLists) : '已关闭' }}</span>
+                <button class="switch" role="switch" type="button" :aria-checked="o.giftsEnabled" aria-label="启用送礼名单" @click="save({ giftsEnabled: !o.giftsEnabled }, o.giftsEnabled ? '已关闭送礼名单：直播画面上不再显示' : '已打开送礼名单')" />
+              </span>
+            </div>
+            <div class="src-url">
+              <input class="inp" :value="shownGiftsUrl" readonly aria-label="送礼名单地址" @focus="(e) => showGiftsKey && (e.target as HTMLInputElement).select()" />
+              <button class="btn primary" @click="copy('gifts')"><Icon name="i-copy" />复制地址</button>
+              <button class="btn ic" :title="showGiftsKey ? '隐藏密钥' : '显示密钥'" :aria-label="showGiftsKey ? '隐藏密钥' : '显示密钥'" @click="showGiftsKey = !showGiftsKey"><Icon :name="showGiftsKey ? 'i-eye-off' : 'i-eye'" /></button>
+            </div>
+            <div class="src-f">
+              <span class="wh2">宽高填 <code>{{ giftsWh.w }} × {{ giftsWh.h }}</code></span>
+              <span>高度按一屏 {{ o.giftsMax }} 条算好了</span>
+              <span class="links"><a class="linkish" href="#giftlist">名单内容、外观 →</a><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
+            </div>
+          </div>
+
           <details class="howto" :open="howtoOpen" @toggle="(e) => (howtoOpen = (e.target as HTMLDetailsElement).open)">
             <summary><Icon name="i-chev" /><span>{{ o.app === 'obs' ? '在 OBS 中添加' : '在 B站直播姬中添加' }}</span><span class="aside">特效页没连上时自动展开{{ o.app === 'livehime' ? ' · 菜单名称以实际版本为准' : '' }}</span></summary>
-            <ol v-if="o.app === 'obs'" class="steps">
-              <li v-if="o.orient === 'portrait'"><span>竖屏推流时，OBS 的 <b>设置 → 视频 → 基础分辨率</b> 也要设成 <code>{{ o.width }}x{{ o.height }}</code>。</span></li>
-              <li><span><em class="tagsrc fx">特效页</em>在 <b>来源</b> 里点 <b>+</b> → <b>浏览器</b>，命名为「星临特效」，URL 粘贴特效页地址，宽 <code>{{ o.width }}</code> 高 <code>{{ o.height }}</code>，勾选 <b>通过 OBS 控制音频</b>（特效的音效才会进入直播）。</span></li>
-              <li><span><em class="tagsrc fx">特效页</em>取消勾选 <b>不可见时关闭源</b> 和 <b>场景变为活动状态时刷新浏览器</b>，避免切场景时漏播；把它拖到来源列表 <b>最上方</b>。</span></li>
-              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再加一个 <b>浏览器</b> 来源，命名为「星临弹幕」，URL 粘贴弹幕列表地址，宽 <code>{{ chatWh.w }}</code> 高 <code>{{ chatWh.h }}</code>，拖到画面左边或右边。</span></li>
-              <li><span>第一次用可以先打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
-            </ol>
-            <ol v-else class="steps">
-              <li v-if="o.orient === 'portrait'"><span>在直播姬里切换到 <b>竖屏直播</b> 模式。</span></li>
-              <li><span><em class="tagsrc fx">特效页</em>点 <b>添加素材 → 浏览器</b>，粘贴特效页地址，宽高填 <code>{{ o.width }}</code> × <code>{{ o.height }}</code>，拖动 <b>铺满画面</b>，放到 <b>图层最上方</b>。</span></li>
-              <li v-if="o.chatEnabled"><span><em class="tagsrc dm">弹幕列表</em>再添加一个 <b>浏览器</b> 素材，粘贴弹幕列表地址，宽高填 <code>{{ chatWh.w }}</code> × <code>{{ chatWh.h }}</code>，拖到画面左边或右边。想改大小就改宽高数字或下面的「字号」，不要拉伸变形。</span></li>
-              <li><span>第一次用可以先用浏览器素材打开 <a class="linkish" :href="`/overlay/?check=1&w=${o.width}&h=${o.height}`" target="_blank">兼容性自检页</a>，确认特效和声音都正常。</span></li>
-            </ol>
+            <AddSteps :output="o" @copy-check="copyCheck" />
           </details>
         </div>
 
@@ -374,7 +444,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                     <button :aria-pressed="o.chatMedal === 'all'" @click="save({ chatMedal: 'all' })">戴什么显示什么</button>
                   </span>
                 </div>
-                <span class="hint">{{ o.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B 站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
+                <span class="hint">{{ o.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
               </div>
             </div>
             <div class="srow">
@@ -391,8 +461,22 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                 <span class="hint">条数改了，浏览器源的高度也要跟着改（上面「宽高填」已经算好）。放不下时从最上面开始少显示几条。</span>
               </div>
             </div>
+            <div class="srow">
+              <span class="lb">自动消失</span>
+              <div class="ctl">
+                <div class="line">
+                  <Switch :model-value="o.chatFadeSec > 0" label="弹幕自动消失" @change="(v) => setChatFade(v ? lastFade : 0)" />
+                  <template v-if="o.chatFadeSec > 0">
+                    <span class="hint">没人发弹幕</span>
+                    <CdPick :model-value="o.chatFadeSec" unit="sec" :options="CHAT_FADE_OPTIONS" :max="CHAT_FADE_MAX" :allow-zero="false" hint="最后一条弹幕之后过多久开始消失" after="后开始消失" @change="setChatFade" />
+                  </template>
+                </div>
+                <span class="hint">{{ o.chatFadeSec > 0 ? `没人发弹幕 ${o.chatFadeSec} 秒后，从最上面最旧的那条开始，每 2 秒淡出一条；有新弹幕来就重新计时。满 ${o.chatMax} 条时，新弹幕照样会把最旧的顶走。` : '关着时弹幕一直显示，只被新弹幕顶走（没人说话时最后几条一直留在画面上）。' }}</span>
+              </div>
+            </div>
           </div>
         </div>
+
       </div>
 
       <!-- 右侧：实时预览 -->
@@ -409,13 +493,13 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           </div>
           <div class="prev-tools">
             <template v-if="ptab === 'fx'">
-              <button v-for="id in (['gov', 'cap', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', cap: '舰长', fan: '粉丝牌', nor: '普通' }[id as 'gov'] }}</button>
+              <button v-for="id in (['gov', 'adm', 'cap', 'mod', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" :title="tierEffect(id) ? '' : '这个身份还没选特效'" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', fan: '粉丝牌', nor: '其他' }[id as 'gov'] }}</button>
             </template>
             <template v-else>
               <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('normal')"><i style="background: var(--nor)" />测试弹幕</button>
               <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('guard')"><i style="background: var(--gov)" />大航海发言</button>
             </template>
-            <button class="btn" style="margin-left: auto" @click="alphaBg = !alphaBg">{{ alphaBg ? '游戏画面背景' : '透明背景' }}</button>
+            <span class="prev-bg"><span>背景</span><Seg :model-value="alphaBg ? 'alpha' : 'game'" label="预览背景" :options="[{ value: 'game', label: '游戏画面' }, { value: 'alpha', label: '透明' }]" @change="(v) => (alphaBg = v === 'alpha')" /></span>
           </div>
           <p v-if="ptab === 'fx' && overlays.length" class="prev-note">特效页已连上 {{ clock(overlays[0]!.since) }} 起</p>
         </div>

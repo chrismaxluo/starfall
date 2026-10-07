@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { MAX_UPLOAD_BYTES } from '@starfall/shared/labels';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
-import { route } from '../lib/route.ts';
-import { STYLES } from '../lib/identity.ts';
+import { go, route } from '../lib/route.ts';
+import { checkFile } from '../lib/upload-check.ts';
+import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
+import { builtinThumb, thumbOf } from '../lib/thumbs.ts';
 import { refreshEffects, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { AssetDto, EffectDto, SoundDto } from '../lib/types.ts';
@@ -21,7 +22,8 @@ const q = ref('');
 const sort = ref<'new' | 'name' | 'used'>('new');
 const over = ref(false);
 const fileIn = ref<HTMLInputElement | null>(null);
-const uploads = reactive<Array<{ id: number; name: string; pct: number }>>([]);
+/** 正在上传、排队和失败的文件（失败的留着，写明原因，可以重试或移除） */
+const uploads = reactive<Array<{ id: number; name: string; pct: number; file: File; err?: string; waiting?: boolean }>>([]);
 let upSeq = 0;
 const ACCEPT = '.webm,.mp4,.svga,.json,.gif,.png,.apng,.webp,.jpg,.jpeg,.mp3,.wav,.ogg';
 const AUDIO = /\.(mp3|wav|ogg)$/i;
@@ -42,42 +44,59 @@ const totalSize = computed(() => {
 });
 
 async function handleFiles(files: FileList | File[]): Promise<void> {
-  const list = [...files];
+  // 先全部列出来（排队中），再一个一个传；每传完一个就刷新列表
+  const list = [...files].map((file) => {
+    const err = checkFile(file);
+    const u = reactive({ id: ++upSeq, name: file.name, pct: 0, file, waiting: !err, ...(err ? { err } : {}) });
+    uploads.push(u);
+    return u;
+  });
   let anim = false;
   let snd = false;
-  for (const f of list) {
-    // 先在浏览器里检查大小：超过上限的文件上传到一半才被拒绝，看到的会是"连不上服务"
-    if (f.size > MAX_UPLOAD_BYTES) {
-      toast(`「${f.name}」太大了（${fileSize(f.size)}），单个文件不能超过 ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`, 'err', 5000);
-      continue;
-    }
-    const u = { id: ++upSeq, name: f.name, pct: 0 };
-    uploads.push(u);
-    const isAudio = AUDIO.test(f.name);
-    try {
-      if (isAudio) {
-        const r = await upload<{ sound: SoundDto; duplicate: boolean }>('/api/sounds', f, (p) => (u.pct = Math.round(p * 100)));
-        snd = true;
-        toast(r.duplicate ? `音效「${f.name}」已经有了` : `已添加音效：${f.name}`);
-      } else {
-        const r = await upload<{ asset: AssetDto; effect: EffectDto | null }>('/api/assets', f, (p) => (u.pct = Math.round(p * 100)));
-        anim = true;
-        const warn = r.asset.warnings.includes('no_alpha') ? '（没有透明通道，会挡住画面）' : r.asset.warnings.includes('large') ? '（文件较大，首次加载会慢）' : '';
-        toast(`已添加素材：${r.effect?.name ?? f.name}${warn}。去触发规则里选它，或点开调整`, warn ? 'info' : 'ok', warn ? 5000 : 3000);
-      }
-    } catch (e) {
-      toast(`${f.name}：${e instanceof Error ? e.message : String(e)}`, 'err');
-    } finally {
-      uploads.splice(uploads.indexOf(u), 1);
+  for (const u of list) {
+    if (u.err) continue;
+    if (await uploadOne(u)) {
+      if (AUDIO.test(u.name)) snd = true;
+      else anim = true;
     }
   }
-  await refreshEffects();
   if (snd && !anim) tab.value = 'sound';
   if (anim) tab.value = 'anim';
 }
+async function uploadOne(u: (typeof uploads)[number]): Promise<boolean> {
+  u.waiting = false;
+  delete u.err;
+  u.pct = 0;
+  try {
+    if (AUDIO.test(u.name)) {
+      const r = await upload<{ sound: SoundDto; duplicate: boolean }>('/api/sounds', u.file, (p) => (u.pct = Math.round(p * 100)));
+      toast(r.duplicate ? `音效「${u.name}」已经有了` : `已添加音效：${u.name}`);
+    } else {
+      const r = await upload<{ asset: AssetDto; effect: EffectDto | null; duplicate?: boolean }>('/api/assets', u.file, (p) => (u.pct = Math.round(p * 100)));
+      const warn = r.asset.warnings.includes('no_alpha') ? '（没有透明通道，会挡住画面）' : r.asset.warnings.includes('large') ? '（文件较大，首次加载会慢）' : '';
+      toast(`已添加素材：${r.effect?.name ?? u.name}${warn}`, warn ? 'info' : 'ok', 6000, { label: '去触发规则里用上它', run: () => go('rules') });
+    }
+    uploads.splice(uploads.indexOf(u), 1);
+    await refreshEffects();
+    return true;
+  } catch (e) {
+    u.err = e instanceof Error ? e.message : String(e);
+    return false;
+  }
+}
+const dropUpload = (u: (typeof uploads)[number]) => uploads.splice(uploads.indexOf(u), 1);
 function onPick(): void {
   if (fileIn.value?.files) void handleFiles(fileIn.value.files);
   if (fileIn.value) fileIn.value.value = '';
+}
+// 整个素材库页面都能把文件拖进来（不只上面的框）
+const hasFiles = (e: DragEvent) => Boolean(e.dataTransfer?.types.includes('Files'));
+function onDragOver(e: DragEvent): void {
+  if (hasFiles(e)) over.value = true;
+}
+function onDragLeave(e: DragEvent): void {
+  // 离开整个页面才算（在子元素之间移动也会触发 dragleave）
+  if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) over.value = false;
 }
 function onDrop(e: DragEvent): void {
   over.value = false;
@@ -89,12 +108,37 @@ function meta(e: EffectDto): string {
   const a = e.asset;
   return a ? `${a.ext.toUpperCase()}${a.width ? ` · ${a.width}×${a.height}` : ''} · ${seconds(a.durationMs)} · ${fileSize(a.size)}` : '文件已丢失';
 }
+// 卡片封面：视频取中间一帧（开头常是渐入、几乎全黑），SVGA / Lottie 渲染中间一帧
+const covers = reactive(new Map<number, string | null>());
+watch(
+  () => state.effects.map((e) => e.asset?.url ?? '').join(),
+  () => {
+    for (const e of state.effects) {
+      if (!e.asset || e.asset.kind === 'image' || covers.has(e.id)) continue;
+      covers.set(e.id, null);
+      void thumbOf(e).then((u) => covers.set(e.id, u));
+    }
+  },
+  { immediate: true },
+);
+/** 鼠标停在卡片上时从头播放，移开后回到中间那一帧 */
 function hoverVideo(ev: MouseEvent, play: boolean): void {
   const v = (ev.currentTarget as HTMLElement).querySelector('video');
   if (!v) return;
-  if (play) return void v.play().catch(() => undefined);
+  if (play) {
+    v.currentTime = 0;
+    return void v.play().catch(() => undefined);
+  }
   v.pause();
-  v.currentTime = 0;
+  if (Number.isFinite(v.duration)) v.currentTime = v.duration / 2;
+}
+const midFrame = (ev: Event) => {
+  const v = ev.target as HTMLVideoElement;
+  if (Number.isFinite(v.duration) && v.paused) v.currentTime = v.duration / 2;
+};
+/** 卡片右上角的 ▶：按它平时的用途预览 */
+function previewCard(e: EffectDto): void {
+  ui.preview = { effectId: e.id, label: e.usedBy.length ? `用于 ${e.usedBy.map((u) => u.label).join('、')}` : '还没有规则在用', ...PREVIEW_BY_KIND[usualKind(e)] };
 }
 
 // 音效试听
@@ -151,10 +195,15 @@ onBeforeUnmount(() => {
   audio?.pause();
   audio = null;
 });
+/** 支持的格式（拖放框里的说明） */
+const FORMATS = '动画：透明 WebM（推荐）· MP4（没有透明背景，会挡住画面）· SVGA · Lottie（.json）· GIF · PNG · APNG · WebP · JPG　音效：MP3 · WAV · OGG';
+const showFormats = ref(false);
+/** 自己的动画素材和音效都还没有：显示大的拖放框 */
+const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.sounds.length && !uploads.length);
 </script>
 
 <template>
-  <section class="page">
+  <section class="page" @dragenter.prevent="onDragOver" @dragover.prevent="onDragOver" @dragleave="onDragLeave" @drop.prevent="onDrop">
     <div class="page-head">
       <div>
         <h1>素材库</h1>
@@ -166,15 +215,23 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="drop" :class="{ over }" @dragenter.prevent="over = true" @dragover.prevent="over = true" @dragleave.prevent="over = false" @drop.prevent="onDrop">
+    <!-- 还没有素材时是一个大的拖放框；有了素材就收成一条提示（右上角和列表里都有「上传素材」） -->
+    <div v-if="empty" class="drop" :class="{ over }">
       <span class="ico"><Icon name="i-upload" /></span>
       <div>
         <b>把文件拖到这里，或点击选择</b>
-        <span>动画：透明 WebM（推荐）· MP4 · SVGA · Lottie（.json）· GIF · PNG · WebP　音效：MP3 · WAV · OGG　单个文件不超过 100 MB</span>
+        <span>{{ FORMATS }}　单个文件不超过 100 MB；拖到这个页面任何地方都可以</span>
       </div>
       <button class="btn" @click="fileIn?.click()">选择文件</button>
-      <input ref="fileIn" type="file" multiple hidden :accept="ACCEPT" @change="onPick" />
     </div>
+    <template v-else>
+      <div class="drop-slim" :class="{ over }">
+        <Icon name="i-upload" /><span><b>把文件拖到这个页面任何地方</b>就能上传，单个文件不超过 100 MB</span>
+        <button type="button" class="linkish" :aria-expanded="showFormats" @click="showFormats = !showFormats">支持哪些格式</button>
+      </div>
+      <div v-if="showFormats" class="fmts">{{ FORMATS }}</div>
+    </template>
+    <input ref="fileIn" type="file" multiple hidden :accept="ACCEPT" @change="onPick" />
 
     <div class="toolbar">
       <div class="seg" role="tablist" aria-label="素材类型">
@@ -191,23 +248,28 @@ onBeforeUnmount(() => {
       <div class="a-sec" style="margin-top: 4px"><h2>我的素材</h2><span>{{ mine.length }} 个</span></div>
       <div class="ecards">
         <button class="ecard new" @click="fileIn?.click()"><div><Icon name="i-upload" />上传素材</div></button>
-        <div v-for="u in uploads" :key="`u${u.id}`" class="ecard uploading">
-          <div class="ethumb"><div class="prog"><i :style="{ width: `${u.pct}%` }" /></div></div>
-          <div class="meta"><b>{{ u.name }}</b><span class="used">上传中 {{ u.pct }}%</span></div>
+        <div v-for="u in uploads" :key="`u${u.id}`" class="ecard uploading" :class="{ failed: u.err }">
+          <div class="ethumb">
+            <div v-if="u.err" class="up-err"><Icon name="i-ban" /><span>{{ u.err }}</span></div>
+            <div v-else class="prog"><i :style="{ width: `${u.pct}%` }" /></div>
+          </div>
+          <div class="meta"><b>{{ u.name }}</b><span :class="u.err ? 'bad' : 'used'">{{ u.err ? '没有传上去' : u.waiting ? '排队中' : `上传中 ${u.pct}%` }}</span></div>
+          <div v-if="u.err" class="card-acts">
+            <button type="button" @click="uploadOne(u)"><Icon name="i-replay" />重试</button>
+            <button type="button" @click="dropUpload(u)"><Icon name="i-x" />移除</button>
+          </div>
         </div>
         <div v-for="e in mine" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)" @mouseenter="(ev) => hoverVideo(ev, true)" @mouseleave="(ev) => hoverVideo(ev, false)">
           <div class="ethumb" :class="{ alpha: e.asset?.hasAlpha }">
             <template v-if="e.asset">
-              <video v-if="e.asset.kind === 'video'" class="thumb-media" :src="e.asset.url" muted loop playsinline preload="metadata" />
+              <video v-if="e.asset.kind === 'video'" class="thumb-media" :src="e.asset.url" :poster="covers.get(e.id) ?? undefined" muted loop playsinline preload="metadata" @loadedmetadata="midFrame" />
               <img v-else-if="e.asset.kind === 'image'" class="thumb-media" :src="e.asset.url" alt="" loading="lazy" />
+              <img v-else-if="covers.get(e.id)" class="thumb-media" :src="covers.get(e.id)!" alt="" />
               <span v-else class="thumb-icon"><Icon name="i-spark" /></span>
               <div class="fmt"><span>{{ e.asset.ext.toUpperCase() }}</span><span v-if="!e.asset.hasAlpha" class="warn">无透明</span></div>
             </template>
-            <div v-else class="mpos pos-center">
-              <div class="mini" :class="`tpl-${e.visual.type === 'builtin_style' ? e.visual.style : 'line'}`" :style="{ '--edge': STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.edge }">
-                <span class="avatar" :style="{ background: STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.grad }">星</span><span><b>{{ e.name }}</b></span>
-              </div>
-            </div>
+            <img v-else-if="e.visual.type === 'builtin_style'" class="thumb-media cover" :src="builtinThumb(e.visual.style)" alt="" loading="lazy" />
+            <button type="button" class="card-play" :aria-label="`预览 ${e.name}`" title="预览" @click.stop="previewCard(e)"><svg><use href="#i-play" /></svg></button>
           </div>
           <div class="meta">
             <input v-if="renameKey === `e:${e.id}`" v-model="renameText" v-focus class="inp rn" maxlength="40" aria-label="新名字" @click.stop @keydown.enter.prevent="commitRename" @keydown.esc.prevent="renameKey = ''" @blur="commitRename" />
@@ -227,11 +289,8 @@ onBeforeUnmount(() => {
       <div class="ecards">
         <div v-for="e in builtin" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)">
           <div class="ethumb">
-            <div class="mpos pos-center">
-              <div class="mini" :class="`tpl-${e.visual.type === 'builtin_style' ? e.visual.style : 'line'}`" :style="{ '--edge': STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.edge }">
-                <span class="avatar" :style="{ background: STYLES[e.visual.type === 'builtin_style' ? e.visual.style : 'line']?.grad }">星</span><span><b>{{ e.name }}</b></span>
-              </div>
-            </div>
+            <img v-if="e.visual.type === 'builtin_style'" class="thumb-media cover" :src="builtinThumb(e.visual.style)" alt="" loading="lazy" />
+            <button type="button" class="card-play" :aria-label="`预览 ${e.name}`" title="预览" @click.stop="previewCard(e)"><svg><use href="#i-play" /></svg></button>
           </div>
           <div class="meta">
             <b>{{ e.name }}<em>内置</em></b><span>{{ meta(e) }}</span>

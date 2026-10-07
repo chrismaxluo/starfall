@@ -1,7 +1,7 @@
 // WebSocket（方案设计 9.3）：/ws/overlay 给特效页，/ws/admin 给管理后台。
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from '@fastify/websocket';
-import { OVERLAY_CLOSE, OVERLAY_TIMING } from '@starfall/shared';
+import { BILI_GIFT_STYLE, OVERLAY_CLOSE, OVERLAY_TIMING } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { SESSION_COOKIE } from './auth.ts';
@@ -18,18 +18,27 @@ const OverlayMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('alive') }),
 ]);
 
-/** 本输出可能用到的文件：规则里引用的素材的画面和音效 */
+/** 本输出可能用到的文件：进场、礼物规则里引用的素材的画面和音效；礼物规则用了「B站动画」时，再加上礼物面板上各个礼物的全屏动画（放在最后） */
 export function preloadUrls(ctx: AppContext): string[] {
   const rules = ctx.enterRules.full();
   const ids = new Set<number>();
   for (const t of Object.values(rules.tiers)) if (t.enabled && t.effectId) ids.add(t.effectId);
   for (const b of rules.bands) if (b.enabled && b.effectId) ids.add(b.effectId);
+  for (const b of rules.honorBands) if (b.enabled && b.effectId) ids.add(b.effectId);
   for (const x of rules.exclusives) if (x.enabled) ids.add(x.effectId);
+  const gift = ctx.giftRules.get();
+  for (const x of [...gift.specific, ...gift.bands]) if (x.enabled && x.effectId) ids.add(x.effectId);
   const urls = new Set<string>();
+  let bili = false;
   for (const e of ctx.effects.list()) {
     if (!ids.has(e.id)) continue;
     if (e.asset) urls.add(e.asset.url);
     if (e.sound) urls.add(e.sound.url);
+    if (e.visual.type === 'builtin_style' && e.visual.style === BILI_GIFT_STYLE) bili = true;
+  }
+  if (bili) for (const g of ctx.gifts.cached()) {
+    const src = g.paid ? ctx.giftFx.forGift(g)?.fx.src : undefined;
+    if (src) urls.add(src);
   }
   return [...urls];
 }
@@ -83,11 +92,13 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       socket.close(OVERLAY_CLOSE.badKey, 'bad key');
       return;
     }
-    // 弹幕列表和特效页用同一个连接地址，多一个 view=chat
-    const role = req.query.view === 'chat' ? 'chat' : 'fx';
-    const what = role === 'chat' ? '弹幕列表' : '特效页';
-    const client = ctx.hub.addOverlay(socket, output, role === 'chat' ? [] : preloadUrls(ctx), Date.now(), role);
-    const log = req.log.child({ output: output.id, ip: req.ip, ...(role === 'chat' ? { view: 'chat' } : {}) });
+    // 弹幕列表、送礼名单和特效页用同一个连接地址，多一个 view=chat / view=gifts
+    // 浏览器查看页多一个 view=1：照样收特效，但不算在线
+    const role = req.query.view === 'chat' ? 'chat' : req.query.view === 'gifts' ? 'gifts' : 'fx';
+    const view = role === 'fx' && req.query.view === '1';
+    const what = role === 'chat' ? '弹幕列表' : role === 'gifts' ? '送礼名单' : view ? '特效页（浏览器查看）' : '特效页';
+    const client = ctx.hub.addOverlay(socket, output, role === 'fx' ? preloadUrls(ctx) : [], Date.now(), role, view);
+    const log = req.log.child({ output: output.id, ip: req.ip, ...(role !== 'fx' ? { view: role } : view ? { view: 'browser' } : {}) });
     log.info(`${what}已连接`);
     // 记录断开原因，方便排查"特效页不显示"
     let reason: string | null = null;
@@ -146,7 +157,7 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       return;
     }
     ctx.hub.addAdmin(socket);
-    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat() }));
+    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat(), gifts: ctx.hub.recentGifts(), pins: ctx.hub.pins() }));
     const stop = keepAlive(socket, () => ctx.hub.removeAdmin(socket));
     socket.on('close', () => {
       stop();

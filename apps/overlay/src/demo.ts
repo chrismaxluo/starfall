@@ -10,8 +10,10 @@ const DEMOS: Array<{ style: string; position: Position; durationMs: number; text
   { style: 'royal-cap', position: 'center', durationMs: 4000, text: '恭迎舰长 星河漫步', viewer: { name: '星河漫步', guard: 3, isMod: false, medal: { name: '星临', level: 27 } } },
   { style: 'frost', position: 'bl', durationMs: 3200, text: '晚风与你 来了', viewer: { name: '晚风与你', guard: 0, isMod: false, medal: { name: '星临', level: 27 } } },
   { style: 'line', position: 'bl', durationMs: 2400, text: '路过的猫 进入直播间', viewer: { name: '路过的猫', guard: 0, isMod: false } },
-  { style: 'glass-gift', position: 'bl', durationMs: 4000, text: '半糖主义 送出 小花花', viewer: { name: '半糖主义', guard: 0, isMod: false, medal: { name: '星临', level: 8 } }, gift: { name: '小花花', count: 200, img: 'https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png' } },
-  { style: 'glass-big', position: 'bl', durationMs: 6000, text: '晚风与星河漫步 送出 星愿水晶球', viewer: { name: '晚风与星河漫步', guard: 0, isMod: false }, gift: { name: '星愿水晶球', count: 1, img: 'https://s1.hdslb.com/bfs/live/f26242d5dc86bbc695336383e2ac4ba50ec033eb.png' } },
+  { style: 'glass-gift', position: 'bl', durationMs: 4000, text: '半糖主义 送出 小花花', viewer: { name: '半糖主义', guard: 0, isMod: false, medal: { name: '星临', level: 8 } }, gift: { name: '小花花', count: 200, value: 20_000, img: 'https://i0.hdslb.com/bfs/live/28357ba4cd566418730ca29da2c552efa7e4a390.webp' } },
+  { style: 'glass-big', position: 'bl', durationMs: 6000, text: '晚风与星河漫步 送出 星愿水晶球', viewer: { name: '晚风与星河漫步', guard: 0, isMod: false }, gift: { name: '星愿水晶球', count: 1, value: 100_000, img: 'https://i0.hdslb.com/bfs/live/602351d13e285df32c3b13d44bca4f7476d8273e.webp' } },
+  // B站动画：B站自己的礼物全屏动画（从 B站读），下方一条谁送的
+  { style: 'bili-gift', position: 'center', durationMs: 5700, text: '晚风与星河漫步 送出 极速超跑', viewer: { name: '晚风与星河漫步', guard: 0, isMod: false, medal: { name: '星临', level: 21 } }, gift: { name: '极速超跑', count: 1, value: 100_000, img: 'https://i0.hdslb.com/bfs/live/cb1f5d7663a2a3edb2012263b70282c6e5001953.webp', fx: { src: 'https://i0.hdslb.com/bfs/live/994067929be0330982d7d5b6288b172da4e0194e.mp4', w: 720, h: 1280, videoW: 1088, videoH: 1280, rgb: [0, 0, 720, 1280], alpha: [724, 0, 360, 640] } } },
   { style: 'glass-mod', position: 'bl', durationMs: 3200, text: '青柠汽水 前来巡场', viewer: { name: '青柠汽水', guard: 0, isMod: true } },
   { style: 'glass-dm', position: 'top', durationMs: 3000, text: '路过的猫：主播晚上好！', viewer: { name: '路过的猫', guard: 0, isMod: false } },
 ];
@@ -94,12 +96,28 @@ export function startLoop(stage: HTMLElement, player: Player): void {
   setInterval(tick, 8000);
 }
 
+/** ?demo=gifts：礼物卡片按价值的四种颜色和大额礼物轮流播（看礼物卡片的样子用） */
+const GIFT_SHOW: Array<{ style: string; gift: string; count: number; value: number; img: string; name: string; guard?: 0 | 1 | 2 | 3 }> = [
+  { style: 'glass-gift', gift: '小花花', count: 66, value: 6600, img: 'https://i0.hdslb.com/bfs/live/28357ba4cd566418730ca29da2c552efa7e4a390.webp', name: '路过的猫' },
+  { style: 'glass-gift', gift: '送花花', count: 20, value: 20_000, img: 'https://i0.hdslb.com/bfs/live/a9945884c0a7c0cac33192a38624086cb69a84d4.webp', name: '半糖主义' },
+  { style: 'glass-gift', gift: '告白花束', count: 3, value: 59_700, img: 'https://i0.hdslb.com/bfs/live/eaa8744f2146dd80ed238ec78be5ed5b605bc4cb.webp', name: '晚风与你', guard: 3 },
+  { style: 'glass-gift', gift: '干杯之旅', count: 10, value: 100_000, img: 'https://i0.hdslb.com/bfs/live/3671a758f0af23f58c2593af2b20454fdaf14a26.webp', name: '青柠汽水' },
+  { style: 'glass-big', gift: '星愿水晶球', count: 1, value: 100_000, img: 'https://i0.hdslb.com/bfs/live/602351d13e285df32c3b13d44bca4f7476d8273e.webp', name: '晚风与星河漫步', guard: 1 },
+];
+function giftShowItem(i: number): PlayItem {
+  const g = GIFT_SHOW[i % GIFT_SHOW.length]!;
+  const base = demoItem(g.style);
+  return { ...base, text: `${g.name} 送出 ${g.gift}`, viewer: { ...base.viewer, name: g.name, guard: g.guard ?? 0 }, gift: { name: g.gift, count: g.count, value: g.value, img: g.img } };
+}
+
 /** 轮流播放全部内置样式 */
 export function startDemo(player: Player, only?: string): void {
   const styles = only ? [only] : DEMO_STYLES;
   let i = 0;
   const next = () => {
-    const item = demoItem(styles[i++ % styles.length]!);
+    // ?demo=gifts&n=2：只播第 2 个（截图用）
+    const n = new URLSearchParams(location.search).get('n');
+    const item = only === 'gifts' ? giftShowItem(n === null ? i++ : Number(n)) : demoItem(styles[i++ % styles.length]!);
     player.play(item);
     setTimeout(next, item.effect.durationMs + 600);
   };

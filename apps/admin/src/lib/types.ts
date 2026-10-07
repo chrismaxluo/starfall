@@ -1,7 +1,7 @@
 // 接口返回的数据格式（与服务端 apps/server 的返回值一致）
-import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GuardLevel, GuardRules, Medal, MedalBand, OverlayConfig, PlayStatus, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GiftsFilter, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
 
-export type { Tier, TierRule, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules };
+export type { Tier, TierRule, HonorBand, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules, QuickButton };
 
 export interface AssetDto {
   id: number;
@@ -66,10 +66,20 @@ export interface OutputDto {
   chatSize: 'normal' | 'large';
   chatMedal: 'own' | 'all';
   chatMax: number;
+  /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示 */
+  chatFadeSec: number;
+  giftsEnabled: boolean;
+  giftsSide: 'left' | 'right';
+  giftsSize: 'normal' | 'large';
+  giftsMax: number;
+  giftsSpeed: 'off' | 'slow' | 'normal' | 'fast';
+  giftsFilter: GiftsFilter;
   key: string;
   path: string;
   /** 弹幕列表地址 */
   chatPath: string;
+  /** 送礼名单地址 */
+  giftsPath: string;
 }
 
 export type AccountStatus = { loggedIn: false } | { loggedIn: true; uid: number; name: string; face: string; expiresAt: number | null };
@@ -88,6 +98,8 @@ export interface LiveStatus {
   connection: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'stopped';
   connectionDetail: string | null;
   reason: 'ok' | 'no_room' | 'not_logged_in' | 'offline';
+  /** B站说登录已失效，要重新扫码 */
+  loginInvalid?: boolean;
   adminCount: number;
 }
 
@@ -109,6 +121,8 @@ export interface Settings {
   cooldownMode: 'minutes' | 'oncePerLive';
   queueMax: number;
   queueJump: boolean;
+  /** 礼物特效里的礼物图用动图 */
+  giftAnimImg: boolean;
   blockAnchor: boolean;
   blockAccount: boolean;
   retentionDays: 0 | 30 | 90 | 180;
@@ -116,6 +130,8 @@ export interface Settings {
   giftComboSec: number;
   autoBackup: boolean;
   onboarded: boolean;
+  /** 直播软件里的特效页连上过 */
+  overlaySeen?: boolean;
   /** 素材上下羽化（全局） */
   featherOn: boolean;
   featherPct: number;
@@ -186,6 +202,8 @@ export interface QueueBrief {
   detail: string;
   durationMs: number;
   test: boolean;
+  /** 素材快捷播放 */
+  quick: boolean;
 }
 
 export interface QueueSnapshot {
@@ -213,7 +231,9 @@ export interface RoomInfo {
 export interface OverlayInfo {
   outputId: number;
   /** fx：特效页；chat：弹幕列表 */
-  role: 'fx' | 'chat';
+  role: 'fx' | 'chat' | 'gifts';
+  /** 浏览器查看页：不算加到了直播软件 */
+  view?: boolean;
   since: number;
   env: Record<string, string | number | boolean | null> | null;
   lastError: string | null;
@@ -237,7 +257,7 @@ export interface StatsDto {
   honor: Record<'l1' | 'l21' | 'l41' | 'l61' | 'none', number>;
 }
 
-/** B 站名单里的一位观众（高能榜、舰队名单） */
+/** B站名单里的一位观众（高能榜、舰队名单） */
 export interface ListViewer {
   uid: number;
   name: string;

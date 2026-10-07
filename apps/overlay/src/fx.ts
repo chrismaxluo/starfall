@@ -140,7 +140,7 @@ const key = q.get('key');
 const offline = preview || q.get('check') === '1' || q.get('loop') === '1' || q.has('demo');
 
 if (output && key) {
-  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/overlay?output=${encodeURIComponent(output)}&key=${encodeURIComponent(key)}`;
+  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/overlay?output=${encodeURIComponent(output)}&key=${encodeURIComponent(key)}${view ? '&view=1' : ''}`;
   view?.setConn('connecting');
   conn = connect(url, {
     onMessage,

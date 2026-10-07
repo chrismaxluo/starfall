@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getLiveCounts, getRoomAdmins, getRoomGifts, getAllGifts, getGuardPage, getHonorMedals, getOnlineRank, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
+import { createLoginQrCode, logoutRemote, getAnchorInfo, getDanmuInfo, getGiftEffectLayout, getGiftEffects, parseGiftEffectLayout, getLiveCounts, getRoomAdmins, getRoomGifts, getAllGifts, getGuardPage, getHonorMedals, getOnlineRank, getRoomInfo, getRoomInit, getUserCard, pollLoginQrCode } from './api.ts';
 import { WbiSigner } from './wbi.ts';
 import { BiliApiError, BiliHttp } from './http.ts';
 
@@ -58,6 +58,18 @@ describe('B 站接口', () => {
 });
 
 describe('接口字段转换', () => {
+  it('礼物全屏动画：编号 → 文件；排布说明（画面、透明度各在哪一块，按帧数算时长）', async () => {
+    mockFetch([
+      { body: { code: 0, data: { full_sc_resource: { conf_list: [{ id: 699, type: 1, web_mp4: 'https://i0.hdslb.com/car.mp4', web_mp4_json: 'https://i0.hdslb.com/car.json' }, { id: 5, web_mp4: '', web_mp4_json: '' }] } } } },
+      { body: { info: { aFrame: [724, 0, 360, 640], rgbFrame: [0, 0, 720, 1280], w: 720, h: 1280, videoW: 1088, videoH: 1280, f: 171, fps: 30 } } },
+    ]);
+    const all = await getGiftEffects(new BiliHttp());
+    expect([...all]).toEqual([[699, { mp4: 'https://i0.hdslb.com/car.mp4', json: 'https://i0.hdslb.com/car.json' }]]);
+    expect(await getGiftEffectLayout(new BiliHttp(), 'https://i0.hdslb.com/car.json')).toEqual({ w: 720, h: 1280, videoW: 1088, videoH: 1280, rgb: [0, 0, 720, 1280], alpha: [724, 0, 360, 640], durationMs: 5700 });
+    expect(() => parseGiftEffectLayout({ info: { w: 720 } })).toThrow(BiliApiError);
+    expect(() => parseGiftEffectLayout(null)).toThrow(BiliApiError);
+  });
+
   it('房间号换算与开播状态', async () => {
     mockFetch([
       { body: { code: 0, data: { room_id: 30000, short_id: 1, uid: 20000, live_status: 1, is_portrait: true, live_time: 1790380800 } } },

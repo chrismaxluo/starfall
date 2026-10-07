@@ -7,6 +7,7 @@ import Icon from '../components/Icon.vue';
 import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import OvPanel from '../components/OvPanel.vue';
+import QuickPad from '../components/QuickPad.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
@@ -16,8 +17,11 @@ import { bigNum, clock, duration, hms, when } from '../lib/format.ts';
 import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
-import { effectById, state } from '../lib/store.ts';
+import { useQuickHotkeys } from '../lib/quick.ts';
+import { effectById, state, ui } from '../lib/store.ts';
 import type { EventDto, StatsDto, TriggerKind, Viewer } from '../lib/types.ts';
+
+useQuickHotkeys();
 
 const stats = ref<StatsDto | null>(null);
 const menu = ref<{ viewer: Viewer; x: number; y: number } | null>(null);
@@ -29,13 +33,21 @@ let tick: ReturnType<typeof setInterval> | null = null;
 const s = computed(() => state.status);
 const info = computed(() => state.roomInfo);
 const live = computed(() => Boolean(s.value?.live.live));
-/** 数据范围：开播时默认看本场，没开播时默认看今天；手动选过就保持 */
+/** 数据范围：默认看本场，没开播时看上一场（凌晨下播后看到的是完整的一场，不会被 0 点切开）；从来没开播过才看今天；手动选过就保持 */
 const picked = ref<'live' | 'today' | null>(null);
-const scope = computed(() => picked.value ?? (live.value ? 'live' : 'today'));
+/** 这个直播间还没有过完整的一场 */
+const noSession = ref(false);
+const scope = computed(() => picked.value ?? (live.value || !noSession.value ? 'live' : 'today'));
 
 async function loadStats(): Promise<void> {
-  stats.value = await get<StatsDto>(`/api/stats?scope=${scope.value}`).catch(() => stats.value);
+  const r = await get<StatsDto>(`/api/stats?scope=${scope.value}`).catch(() => null);
+  if (!r) return;
+  stats.value = r;
+  // 没开播、也没有上一场：改看今天（会再读一次）
+  if (scope.value === 'live' && !r.live && !r.lastSession && !picked.value) noSession.value = true;
 }
+// 换了直播间：重新看有没有上一场
+watch(() => s.value?.room?.roomId, () => (noSession.value = false));
 watch([scope, live, () => s.value?.room?.roomId, () => s.value?.live.liveSince], () => void loadStats());
 // 有新事件时稍后刷新统计（避免每条都请求）
 const off = onLiveEvent(() => {
@@ -52,10 +64,11 @@ onBeforeUnmount(() => {
   if (tick) clearInterval(tick);
 });
 
+// 第 3 步按「连上过一次」算：配好以后先打开星临、还没开直播软件时，不会又冒出来
 const setupSteps = computed(() => [
-  { name: '扫码登录 B 站', done: Boolean(s.value?.account.loggedIn), href: '#settings' },
-  { name: '填写直播间号', done: Boolean(s.value?.room), href: '#settings' },
-  { name: '把特效页加到直播软件', done: (s.value?.overlays ?? 0) > 0, href: '#obs' },
+  { name: '扫码登录 B站', done: Boolean(s.value?.account.loggedIn), href: '#settings', qr: true },
+  { name: '填写直播间号', done: Boolean(s.value?.room), href: '#settings', qr: false },
+  { name: '把特效页加到直播软件', done: (s.value?.overlays ?? 0) > 0 || Boolean(state.settings?.overlaySeen), href: '#obs', qr: false },
 ]);
 const needSetup = computed(() => setupSteps.value.some((x) => !x.done));
 
@@ -76,7 +89,7 @@ const connText = computed(() => {
   if (!l) return '—';
   if (l.connection === 'connected') return '已连接';
   if (l.reason === 'offline') return '未开播，未连接';
-  if (l.reason === 'not_logged_in') return '未登录 B 站';
+  if (l.reason === 'not_logged_in') return '未登录 B站';
   if (l.reason === 'no_room') return '未设置直播间';
   return l.connectionDetail ?? '连接中';
 });
@@ -135,7 +148,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
     <div v-if="needSetup" class="guide">
       <b>开始使用：</b>
       <ol>
-        <li v-for="(x, i) in setupSteps" :key="x.name" :class="{ done: x.done }"><Icon :name="x.done ? 'i-check' : 'i-todo'" />{{ i + 1 }}. <a :href="x.href">{{ x.name }}</a></li>
+        <li v-for="(x, i) in setupSteps" :key="x.name" :class="{ done: x.done }"><Icon :name="x.done ? 'i-check' : 'i-todo'" />{{ i + 1 }}. <a :href="x.href" @click="(e) => x.qr && !x.done && (e.preventDefault(), (ui.qr = true))">{{ x.name }}</a></li>
       </ol>
     </div>
 
@@ -173,12 +186,18 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
     </div>
 
     <div class="card kstrip">
-      <div><small>进场人数 · 去重</small><span class="v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardUnique ?? 0 }}</b> 人</div></div>
-      <div><small>触发特效</small><span class="v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardPlayed ?? 0 }}</b> 次</div></div>
+      <div><small>进场观众 · 每人算一次</small><span class="v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardUnique ?? 0 }}</b> 人</div></div>
+      <div><small>播放了特效</small><span class="v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardPlayed ?? 0 }}</b> 次</div></div>
       <div><small>看过<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.watched) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
       <div><small>高能榜<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.rankCount) : '—' }}</span><div class="d">{{ live ? '现在在线、登录了的观众' : '开播后显示' }}</div></div>
       <div><small>点赞<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.likes) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
       <div><small>粉丝<span class="src">B站</span></small><span class="v num">{{ bigNum(info?.followers) }}</span><div class="d"><template v-if="info?.fansClub">粉丝团 <b class="num">{{ bigNum(info.fansClub) }}</b> 人</template><template v-else>&nbsp;</template></div></div>
+    </div>
+
+    <div class="card ov-quick">
+      <div class="card-h"><h2>素材快捷播放</h2><span class="aside"><template v-if="state.quick.some((b) => b.hotkey)">按钮上的键也能按</template><a class="linkish" href="#quickplay">{{ state.quick.length ? '管理 →' : '去添加 →' }}</a></span></div>
+      <QuickPad v-if="state.quick.length" />
+      <p v-else class="qp-tip">把常用的素材做成按钮，直播时点一下就能播，不用再发弹幕触发。</p>
     </div>
 
     <div class="bento">

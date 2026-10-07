@@ -1,4 +1,5 @@
-# 星临服务（服务器部署）。安装（详见 docs/deployment.md）：
+# 星临服务（服务器部署）。一般用 deploy/starfall.sh 自动安装，它会把本文件里的 /opt/starfall 换成实际目录。
+# 手动安装（详见 docs/deployment.md 第 10.1 节）：
 #   useradd --system --no-create-home --shell /usr/sbin/nologin starfall
 #   mkdir -p /opt/starfall/data && chown -R starfall:starfall /opt/starfall/data
 #   cp deploy/starfall.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now starfall

@@ -31,6 +31,8 @@ interface Pending {
   /** zip 里带的文件：sha256 → 条目名 */
   entries: Map<string, string>;
   expires: number;
+  /** 从备份恢复：file 是备份本身，用完不删 */
+  keep?: boolean;
 }
 
 function openZip(file: string): Promise<yauzl.ZipFile> {
@@ -72,7 +74,8 @@ const badZip = () => new HttpError(400, 'invalid_config', '无法读取这个 zi
 export function backupRoutes(app: FastifyInstance, ctx: AppContext): void {
   let pending: Pending | null = null;
   const drop = () => {
-    if (pending) fs.rmSync(pending.file, { force: true });
+    // 从备份恢复时 file 是备份本身，不能删
+    if (pending && !pending.keep) fs.rmSync(pending.file, { force: true });
     pending = null;
   };
   const take = (token: string): Pending => {
@@ -183,12 +186,27 @@ export function backupRoutes(app: FastifyInstance, ctx: AppContext): void {
           zip.close();
         }
       }
+      // 导入前先把现在的配置备份一份：导错了可以在备份列表里恢复
+      const before = await ctx.backups.run(Date.now(), true);
       ctx.io.apply(p.config);
       await ctx.live.reconcile();
-      return { ok: true, savedFiles: saved };
+      return { ok: true, savedFiles: saved, backup: before.stamp };
     } finally {
       drop();
     }
+  });
+
+  // ---------- 从备份恢复：和导入一样先预览，确认后才生效 ----------
+  app.post<{ Params: { name: string } }>('/api/backup/restore/:name', async (req) => {
+    const { name } = parseBody(z.object({ name: z.string().regex(/^starfall-\d{8}-\d{4}(?:\d{2}-m)?\.json$/) }), req.params);
+    const file = ctx.backups.file(name);
+    if (!file) throw new HttpError(404, 'not_found', '这份备份已经不在了');
+    if (fs.statSync(file).size > MAX_JSON) throw new HttpError(413, 'file_too_large', '配置文件太大');
+    const config = parseConfigFile(fs.readFileSync(file, 'utf8'));
+    drop();
+    const token = crypto.randomUUID();
+    pending = { token, file, zip: false, config, entries: new Map(), expires: Date.now() + PENDING_MS, keep: true };
+    return { token, filename: name, plan: ctx.io.plan(config, new Set()) };
   });
 
   app.delete<{ Params: { token: string } }>('/api/backup/import/:token', async (req) => {

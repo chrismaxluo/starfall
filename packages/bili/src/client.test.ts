@@ -115,6 +115,27 @@ describe('LiveClient', () => {
     await until(() => srv.sockets.length >= 2);
   });
 
+  it('电脑睡眠醒来后马上重连，不等长时间没有数据', async () => {
+    const srv = fakeServer(); cleanup.push(srv.close);
+    let offset = 0; const warns: string[] = [];
+    const { c, infoCalls } = client(srv, { wakeCheckMs: 20, now: () => Date.now() + offset, onWarn: (m) => warns.push(m) });
+    c.start();
+    await until(() => c.state === 'connected');
+    offset += 60_000;
+    await until(() => srv.sockets.length === 2 && c.state === 'connected');
+    expect(infoCalls()).toBe(2);
+    expect(warns.some((w) => w.includes('睡眠'))).toBe(true);
+  });
+
+  it('时间正常走时不会误判为睡眠', async () => {
+    const srv = fakeServer(); cleanup.push(srv.close);
+    const { c } = client(srv, { wakeCheckMs: 20 });
+    c.start();
+    await until(() => c.state === 'connected');
+    await new Promise((r) => setTimeout(r, 150));
+    expect(srv.sockets.length).toBe(1);
+  });
+
   it('stop 后不再重连', async () => {
     const srv = fakeServer(); cleanup.push(srv.close);
     const { c } = client(srv);

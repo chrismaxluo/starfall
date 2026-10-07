@@ -3,7 +3,7 @@
 /** 固定的身份档位 */
 export const TIERS = ['gov', 'adm', 'cap', 'mod', 'nor'] as const;
 export type Tier = (typeof TIERS)[number];
-export const TIER_NAMES: Record<Tier, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '普通观众' };
+export const TIER_NAMES: Record<Tier, string> = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '其他观众' };
 
 /** 事件最终的处理结果，写入事件记录 */
 export const PLAY_STATUS = {

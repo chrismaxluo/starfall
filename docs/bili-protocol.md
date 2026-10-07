@@ -327,3 +327,46 @@ GET https://api.live.bilibili.com/xlive/general-interface/v1/content/get?key=wea
 | 11 | 神秘人的表现（`anon` 字段？） | ⏳ |
 | 12 | 熄灭粉丝牌的颜色、22.3.12 的含义 | ⏳ |
 | 13 | `UNIVERSAL_EVENT_GIFT` 的含义 | ✅ 连麦状态，与需求无关 |
+
+## 8. 直播开放平台（身份码）调研（2026-10-06）
+
+> 结论来自公开资料，**未实测**（需要先注册开发者）。用于判断能否用身份码代替现在的扫码登录。
+
+### 8.1 接入条件
+
+| 项目 | 内容 |
+|---|---|
+| 开发者 | 在 open-live.bilibili.com 申请入驻，审核约 2 个工作日，得到 `access_key_id` / `access_key_secret` |
+| 项目 | 创建「互动玩法」项目，得到项目 ID（`app_id`） |
+| 主播侧 | 主播在直播姬或网页开播设置里复制**身份码**，填进软件 |
+| 连接 | 用身份码和项目 ID 开启一场「游戏」，拿到长连地址；连接期间要定时发项目心跳，结束时关闭 |
+
+### 8.2 能收到的消息
+
+`LIVE_OPEN_PLATFORM_DM`（弹幕）、`_SEND_GIFT`（礼物）、`_SUPER_CHAT` / `_SUPER_CHAT_DEL`（醒目留言）、`_GUARD`（上舰）、`_LIKE`（点赞）、`_LIVE_ROOM_ENTER`（进场）、`_LIVE_START` / `_LIVE_END`（开播 / 下播）、`_INTERACTION_END`（连接结束）。
+
+### 8.3 进场消息缺少关键信息
+
+`LIVE_OPEN_PLATFORM_LIVE_ROOM_ENTER` 只有：`room_id`、`uname`、`uface`、`open_id`、`union_id`（默认为空，需单独申请）、`timestamp`、`msg_id`。
+
+- **没有大航海等级，没有粉丝牌，没有荣耀等级，没有房管标记。**
+- **没有 UID**：观众用 `open_id` 标识，同一个人在不同项目下 `open_id` 不同，和 UID 对不上。
+
+弹幕、礼物消息里有 `guard_level`、`fans_medal_name`、`fans_medal_level`、`fans_medal_wearing_status`，但 UID 同样固定为 0。
+
+三个独立来源一致：[blivedm `models/open_live.py`](https://github.com/xfgryujk/blivedm)（`RoomEnterMessage`）、[openapi-bilibili `live/cmd`](https://github.com/shynome/openapi-bilibili)（`Enter` 只含 `open_id` / `uname` / `uface`）、[Amaidesu `types/bili/enter.py`](https://github.com/Mai-with-u/Amaidesu)。
+
+### 8.4 对星临的影响
+
+| 功能 | 身份码下能否实现 |
+|---|---|
+| 舰长 / 提督 / 总督进场特效 | ✗ 进场时不知道等级（只能等他发过弹幕或送过礼后才知道） |
+| 粉丝牌、荣耀等级进场规则 | ✗ |
+| 按 UID 设置的专属特效 | ✗ 没有 UID；要改成按 `open_id` 或昵称，已有规则无法直接迁移 |
+| 弹幕关键词、礼物、上舰、醒目留言、点赞 | ✓ |
+
+另外，`access_key_secret` 不能直接放进分发给别人的电脑版安装包（会被拆出来），通常要由开发者自己的服务器代为签名，这会给电脑版增加一个在线依赖。
+
+### 8.5 结论
+
+进场特效是星临的核心功能，而身份码的进场消息拿不到等级、粉丝牌和 UID，**不能代替现在的扫码登录**。继续使用扫码登录（登录后的 Cookie 连接网页端弹幕服务器），**不接入身份码**（2026-10-06 决定）。

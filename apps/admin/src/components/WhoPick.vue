@@ -4,11 +4,13 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
 import { DANMU_UIDS_MAX, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX } from '@starfall/shared';
 import type { DanmuWho } from '@starfall/shared';
 import { get } from '../lib/api.ts';
+import { state } from '../lib/store.ts';
 import { whoText } from '../lib/danmu-who.ts';
 import type { DanmuPerson } from '../lib/danmu-who.ts';
-import { toast } from '../lib/toast.ts';
+import { toast, undoable } from '../lib/toast.ts';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
+import { pushEsc } from '../lib/esc.ts';
 
 const props = defineProps<{ modelValue: DanmuWho; people: DanmuPerson[]; blockAnchor?: boolean }>();
 const emit = defineEmits<{ change: [value: DanmuWho] }>();
@@ -83,6 +85,23 @@ function setHonorMin(e: Event): void {
   if (!n || n < 1 || Math.min(HONOR_LEVEL_MAX, n) === w.value.honorMin) return;
   set({ ...base(), honorMin: Math.min(HONOR_LEVEL_MAX, n) });
 }
+/** 最近发过弹幕的人（从实时动态里取），点一下加进指定观众，不用去查 UID */
+const recent = computed(() => {
+  const seen = new Set<number>(w.value.uids);
+  const out: Array<{ uid: number; name: string; face: string | null; guard: number }> = [];
+  for (const e of [...state.feed].reverse()) {
+    if (e.kind !== 'danmu' || e.uid <= 0 || seen.has(e.uid)) continue;
+    seen.add(e.uid);
+    out.push({ uid: e.uid, name: e.uname, face: e.viewer.face ?? null, guard: e.viewer.guard });
+    if (out.length >= 8) break;
+  }
+  return out;
+});
+function addRecent(p: { uid: number; name: string; face: string | null; guard: number }): void {
+  if (w.value.uids.length >= DANMU_UIDS_MAX) return toast(`一条规则最多指定 ${DANMU_UIDS_MAX} 位观众`, 'info');
+  added.value.push({ uid: p.uid, name: p.name, face: p.face, guard: p.guard });
+  set({ ...base(), uids: [...w.value.uids, p.uid] });
+}
 async function addUid(): Promise<void> {
   const v = uidIn.value.trim();
   if (!v) return;
@@ -91,7 +110,7 @@ async function addUid(): Promise<void> {
   if (w.value.uids.includes(uid)) return toast('已经在名单里了', 'info');
   if (w.value.uids.length >= DANMU_UIDS_MAX) return toast(`一条规则最多指定 ${DANMU_UIDS_MAX} 位观众`, 'info');
   busy.value = true;
-  // 先查一下是谁，免得填错；查不到（B 站暂时连不上）也能加
+  // 先查一下是谁，免得填错；查不到（B站暂时连不上）也能加
   const p = await get<{ uid: number; name: string; face: string; guard?: number }>(`/api/viewers/${uid}`).catch((e: Error) => (/没有 UID/.test(e.message) ? (toast(e.message, 'err'), undefined) : null));
   busy.value = false;
   if (p === undefined) return;
@@ -108,12 +127,17 @@ function toggleUids(): boolean {
     wantUids.value = true;
     return true;
   }
-  if (w.value.uids.length && !set({ ...w.value, uids: [] })) return false;
+  const prev = { ...w.value };
+  if (prev.uids.length && !set({ ...prev, uids: [] })) return false;
   wantUids.value = false;
+  if (prev.uids.length) undoable(`已清空指定观众（${prev.uids.length} 人）`, async () => void set(prev));
   return true;
 }
 
+let offEsc: (() => void) | null = null;
 function close(): void {
+  offEsc?.();
+  offEsc = null;
   open.value = false;
   removeEventListener('mousedown', outside, true);
   removeEventListener('scroll', onScroll, true);
@@ -130,6 +154,7 @@ async function toggle(): Promise<void> {
   await nextTick();
   place();
   addEventListener('mousedown', outside, true);
+  offEsc ??= pushEsc(close);
   addEventListener('scroll', onScroll, true);
 }
 function place(): void {
@@ -165,6 +190,10 @@ onBeforeUnmount(close);
         <label class="ck"><input type="checkbox" :checked="uidsOn" @change="(e) => keep(e, toggleUids())" />指定观众</label>
         <template v-if="uidsOn">
           <div class="uidin"><input v-model="uidIn" class="inp num" placeholder="输入 UID，回车添加" inputmode="numeric" aria-label="指定观众的 UID" :disabled="busy" @keydown.enter.prevent="addUid" /></div>
+          <div v-if="recent.length" class="recent">
+            <span class="lbl">最近发弹幕的人，点一下加上：</span>
+            <button v-for="p in recent" :key="p.uid" type="button" class="rchip" :title="`UID ${p.uid}`" @click="addRecent(p)"><Avatar :name="p.name" :face="p.face" :guard="p.guard" :size="18" />{{ p.name }}</button>
+          </div>
           <div v-for="p in people" :key="p.uid" class="person">
             <Avatar :name="p.name || String(p.uid)" :face="p.face" :guard="p.guard" :size="24" />
             <span class="pn">{{ p.name || '（昵称未知）' }}</span><span class="uid num">{{ p.uid }}</span>

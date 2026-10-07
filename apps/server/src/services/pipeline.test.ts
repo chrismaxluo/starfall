@@ -1,6 +1,7 @@
+import type { GiftConfig } from '@starfall/bili';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DANMU_WHO_ALL } from '@starfall/shared';
-import type { EnterEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
+import type { EnterEvent, ScEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
 import { room } from '../db/schema.ts';
 import { testApp } from '../testing.ts';
 import { Hub, PLAY_ACK_MS } from './hub.ts';
@@ -15,7 +16,7 @@ function fakeLive() {
   return {
     state,
     onEvent: (fn: (ev: StdEvent, raw: unknown) => void) => (listeners.add(fn), () => listeners.delete(fn)),
-    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, adminCount: 0 }),
+    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, loginInvalid: false, adminCount: 0 }),
     emit: (ev: StdEvent, raw?: unknown) => { for (const fn of listeners) fn(ev, raw); },
   };
 }
@@ -33,6 +34,12 @@ const medal = (level: number, anchorUid = ANCHOR) => ({ name: '星临', level, a
 let cleanup: Array<() => Promise<unknown> | void> = [];
 afterEach(async () => { for (const c of cleanup) await c(); cleanup = []; vi.useRealTimers(); });
 
+const CAR_FX = { src: 'https://i0.hdslb.com/car.mp4', w: 720, h: 1280, videoW: 1088, videoH: 1280, rgb: [0, 0, 720, 1280] as [number, number, number, number], alpha: [724, 0, 360, 640] as [number, number, number, number] };
+const GIFTS: Record<number, GiftConfig> = {
+  31036: { id: 31036, name: '小花花', price: 100, paid: true, icon: 'https://i0.hdslb.com/gift/flower.png', webp: 'https://i0.hdslb.com/gift/flower.webp' },
+  32089: { id: 32089, name: '极速超跑', price: 100_000, paid: true, icon: 'https://i0.hdslb.com/gift/car.png', webp: 'https://i0.hdslb.com/gift/car.webp', effectId: 699 },
+};
+
 async function setup(opts: { overlay?: boolean } = {}) {
   const t = await testApp();
   cleanup.push(() => t.app.close());
@@ -40,7 +47,7 @@ async function setup(opts: { overlay?: boolean } = {}) {
   t.ctx.db.insert(room).values({ id: 1, roomId: 30000, anchorUid: ANCHOR, anchorName: '主播' }).run();
   const live = fakeLive();
   const hub = new Hub();
-  const p = new Pipeline({ ...t.ctx, live, hub, gifts: { iconFor: (id: number) => (id === 31036 ? 'https://i0.hdslb.com/gift/flower.png' : undefined) }, timeZone: 'Asia/Shanghai', rng: () => 0 });
+  const p = new Pipeline({ ...t.ctx, live, hub, gifts: { find: (id: number) => GIFTS[id] }, giftFx: { forGift: (g) => (g?.effectId === 699 ? { fx: CAR_FX, durationMs: 5700 } : undefined) }, timeZone: 'Asia/Shanghai', rng: () => 0 });
   p.start();
   cleanup.push(() => p.stop());
   const sock = fakeSock();
@@ -311,6 +318,41 @@ describe('播放队列', () => {
     expect(t.p.snapshot()).toMatchObject({ playing: { test: false }, items: [{ test: true }] });
   });
 
+  it('快捷播放：马上打断正在播的观众特效，被打断的放回最前面、播完接着从头播；不显示欢迎语、不写事件记录', async () => {
+    const t = await setup();
+    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!;
+    t.live.emit(enter({ uid: 1, guard: 3 }));
+    t.live.emit(enter({ uid: 2, guard: 2 }));
+    expect(t.p.snapshot().playing).toMatchObject({ viewerGuard: 3 });
+    vi.advanceTimersByTime(1000);
+    t.p.quick(star.id);
+    expect(t.sock.sent.slice(-2)).toMatchObject([{ type: 'stop' }, { type: 'play', item: { quick: true, effect: { name: '晶耀', showText: false, guardFrame: false, honorBadge: false }, viewer: { name: '主播', guard: 0 } } }]);
+    // 被打断的舰长排在最前面，提督在后面
+    expect(t.p.snapshot()).toMatchObject({ playing: { quick: true, detail: '素材快捷播放', viewerName: '主播' }, items: [{ viewerGuard: 3 }, { viewerGuard: 2 }] });
+    vi.advanceTimersByTime(30_000);
+    expect(t.plays().map((p) => p.viewer.guard)).toEqual([3, 0, 3, 2]);
+    expect(t.events().map((e) => e.uid)).toEqual([1, 2]);
+    expect(t.statuses()).toEqual(['played', 'played']);
+  });
+
+  it('快捷播放连着按：后一个直接换掉前一个；打断测试播放时不放回；已暂停、特效页不在线时拒绝', async () => {
+    const t = await setup();
+    const [a, b] = t.ctx.effects.list();
+    t.p.quick(a!.id);
+    t.p.quick(b!.id);
+    expect(t.p.snapshot()).toMatchObject({ playing: { quick: true, effectName: b!.name }, items: [] });
+    t.p.test(a!.id);
+    vi.advanceTimersByTime(30_000);
+    t.p.test(a!.id);
+    t.p.quick(b!.id);
+    expect(t.p.snapshot()).toMatchObject({ playing: { quick: true }, items: [] });
+    t.p.pause();
+    expect(() => t.p.quick(a!.id)).toThrow('已暂停');
+    t.p.resume();
+    t.hub.removeOverlay([...(t.hub as unknown as { overlays: Set<never> }).overlays][0]!);
+    expect(() => t.p.quick(a!.id)).toThrow('特效页不在线');
+  });
+
   it('队列里每一项带头像和一句话说明；可以跳过正在播的、移出排队的', async () => {
     const t = await setup();
     t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
@@ -466,7 +508,7 @@ describe('礼物', () => {
     }
     expect(t.events()).toHaveLength(0);
     vi.advanceTimersByTime(3200);
-    expect(t.events()).toMatchObject([{ kind: 'gift', status: 'played', rule: '礼物 · 单次 ≥ 1 元', payload: { giftName: '小花花', count: 10 } }]);
+    expect(t.events()).toMatchObject([{ kind: 'gift', status: 'played', rule: '礼物 · 单次 ≥ 10电池', payload: { giftName: '小花花', count: 10 } }]);
     expect(t.plays()[0]).toMatchObject({ text: '小星 送出 小花花', gift: { name: '小花花', count: 10 } });
   });
 
@@ -479,7 +521,7 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 0, paid: false, giftName: '辣条' }, { uid: 4 }));
     expect(t.events().map((e) => [e.uid, e.rule, e.status])).toEqual([
       [1, '礼物 · 「小电视飞船」', 'played'],
-      [2, '礼物 · 单次 10 – 100 元', 'queued'],
+      [2, '礼物 · 单次 100 – 1000电池', 'queued'],
       [3, null, 'no_rule'],
       [4, null, 'no_rule'],
     ]);
@@ -489,17 +531,41 @@ describe('礼物', () => {
     const t = await setup();
     t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
     t.live.emit(gf({ unitPrice: 5000, count: 3 }));
-    expect(t.plays()[0]).toMatchObject({ kind: 'gift', effect: { name: '晶礼', visual: { style: 'glass-gift' } }, text: '小星 送出 小花花', gift: { name: '小花花', count: 3, img: 'https://i0.hdslb.com/gift/flower.png' } });
+    expect(t.plays()[0]).toMatchObject({ kind: 'gift', effect: { name: 'B站动画', visual: { style: 'glass-gift' } }, text: '小星 送出 小花花', gift: { name: '小花花', count: 3, img: 'https://i0.hdslb.com/gift/flower.webp', value: 15_000 } });
     vi.advanceTimersByTime(10_000);
     t.live.emit(gf({ giftId: 1, giftName: '别的礼物', unitPrice: 20_000 }, { uid: 5 }));
     vi.advanceTimersByTime(10);
     const last = t.plays().at(-1)!;
-    expect(last.gift).toEqual({ name: '别的礼物', count: 1 });
-    // 消息自带官方图标时优先用它（礼物面板里没有这个礼物也有图）
+    expect(last.gift).toEqual({ name: '别的礼物', count: 1, value: 20_000 });
+    // 礼物面板里没有这个礼物时用消息自带的图
     vi.advanceTimersByTime(10_000);
     t.live.emit(gf({ giftId: 2, giftName: '盲盒礼物', unitPrice: 20_000, icon: 'https://s1.hdslb.com/bfs/live/box.png' }, { uid: 6 }));
     vi.advanceTimersByTime(10);
-    expect(t.plays().at(-1)!.gift).toEqual({ name: '盲盒礼物', count: 1, img: 'https://s1.hdslb.com/bfs/live/box.png' });
+    expect(t.plays().at(-1)!.gift).toEqual({ name: '盲盒礼物', count: 1, img: 'https://s1.hdslb.com/bfs/live/box.png', value: 20_000 });
+    // 设置里关掉动图：用静态图
+    t.ctx.settings.set('giftAnimImg', false);
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ unitPrice: 5000, count: 3 }, { uid: 7 }));
+    vi.advanceTimersByTime(10);
+    expect(t.plays().at(-1)!.gift?.img).toBe('https://i0.hdslb.com/gift/flower.png');
+  });
+
+  it('「B站动画」：有官方全屏动画的礼物按动画长度播；没有动画时 100 元以上显示晶耀、以下显示晶礼', async () => {
+    const t = await setup();
+    const bili = t.ctx.effects.list().find((e) => e.name === 'B站动画')!.id;
+    const g = t.ctx.giftRules.get();
+    t.ctx.giftRules.set({ ...g, comboEnabled: false, bands: g.bands.map((b) => ({ ...b, effectId: bili, enabled: true })) });
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
+    expect(t.plays().at(-1)).toMatchObject({ effect: { visual: { style: 'bili-gift' }, durationMs: 5700 }, gift: { name: '极速超跑', img: 'https://i0.hdslb.com/gift/car.webp', fx: CAR_FX, value: 100_000 } });
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ giftId: 1, giftName: '没有动画的大礼物', unitPrice: 200_000 }, { uid: 2 }));
+    vi.advanceTimersByTime(10);
+    expect(t.plays().at(-1)).toMatchObject({ effect: { visual: { style: 'glass-big' } } });
+    expect(t.plays().at(-1)!.gift?.fx).toBeUndefined();
+    vi.advanceTimersByTime(10_000);
+    t.live.emit(gf({ unitPrice: 20_000 }, { uid: 3 }));
+    vi.advanceTimersByTime(10);
+    expect(t.plays().at(-1)).toMatchObject({ effect: { visual: { style: 'glass-gift' } } });
   });
 
   it('≥ 100 元的礼物插队；关闭插队后按优先级排（礼物仍然排在进场前面）', async () => {
@@ -510,7 +576,7 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 20_000 }, { uid: 3 }));
     t.live.emit(gf({ unitPrice: 200_000 }, { uid: 4 }));
     expect(t.p.snapshot().items.map((i) => [i.kind, i.viewerName])).toEqual([['gift', '小星'], ['gift', '小星'], ['enter', '小星']]);
-    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['晶耀', '晶礼', '门楼']);
+    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['B站动画', 'B站动画', '门楼']);
   });
 });
 
@@ -614,5 +680,53 @@ describe('弹幕列表', () => {
     expect(t.hub.overlayList()).toMatchObject([{ role: 'chat' }]);
     t.hub.outputChanged({ ...o, chatSide: 'right' }, 'update');
     expect(chat.sent.at(-1)).toMatchObject({ type: 'config', config: { chatSide: 'right', chatEnabled: true } });
+  });
+});
+
+describe('送礼名单', () => {
+  const giftItems = (sock: ReturnType<typeof fakeSock>) => sock.sent.filter((m) => m.type === 'gift_item').map((m) => (m as Extract<ServerToOverlay, { type: 'gift_item' }>).item);
+  const sc = (p: Partial<ScEvent> = {}, vp: Partial<Viewer> = {}): ScEvent => ({ kind: 'sc', id: `s${++seq}`, ts: Date.now(), viewer: v(vp), text: '主播唱首歌吧', priceYuan: 30, scId: `sc${seq}`, ...p });
+
+  it('付费礼物（连击合成后的）、上舰、醒目留言推给送礼名单（不看规则）；免费礼物不推；特效页收不到', async () => {
+    const t = await setup();
+    const gifts = fakeSock();
+    t.hub.addOverlay(gifts, t.ctx.outputs.list()[0]!, [], Date.now(), 'gifts');
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(gf({ unitPrice: 100, count: 66 }, { guard: 3 }));
+    t.live.emit(gf({ giftId: 1, giftName: '辣条', unitPrice: 100, paid: false }));
+    t.live.emit(gd({ level: 2, months: 3, op: 'renew', priceGold: 1_998_000 }));
+    vi.advanceTimersByTime(3000);
+    t.live.emit(sc());
+    expect(giftItems(gifts)).toMatchObject([
+      { kind: 'gift', value: 6600, viewer: { name: '小星', guard: 3 }, gift: { id: 31036, name: '小花花', count: 66, img: 'https://i0.hdslb.com/gift/flower.webp' } },
+      { kind: 'guard', value: 1_998_000, guard: { level: 2, months: 3, op: 'renew' } },
+      { kind: 'sc', value: 30_000, sc: { text: '主播唱首歌吧', price: 30 } },
+    ]);
+    expect(t.sock.sent.some((m) => m.type === 'gift_item')).toBe(false);
+    expect(t.hub.recentGifts()).toHaveLength(3);
+  });
+
+  it('新开一场直播时清空（没开播时保留上一场的）；服务重启后从事件记录恢复本场的', async () => {
+    const t = await setup();
+    const gifts = fakeSock();
+    t.hub.addOverlay(gifts, t.ctx.outputs.list()[0]!, [], Date.now(), 'gifts');
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(gf({ unitPrice: 1000, count: 2 }));
+    t.live.emit(sc({ priceYuan: 50 }));
+    // 重启：新的调度从事件记录里恢复
+    const hub2 = new Hub();
+    const p2 = new Pipeline({ ...t.ctx, live: t.live, hub: hub2, gifts: { find: (id: number) => GIFTS[id] }, timeZone: 'Asia/Shanghai' });
+    p2.start();
+    cleanup.push(() => p2.stop());
+    expect(hub2.recentGifts()).toMatchObject([{ kind: 'gift', value: 2000, gift: { name: '小花花', count: 2 } }, { kind: 'sc', sc: { price: 50 } }]);
+    // 下播：保留
+    t.live.state.sessionId = null;
+    vi.advanceTimersByTime(500);
+    expect(t.hub.recentGifts()).toHaveLength(2);
+    // 新开一场：清空
+    t.live.state.sessionId = 2;
+    vi.advanceTimersByTime(500);
+    expect(t.hub.recentGifts()).toEqual([]);
+    expect(gifts.sent.some((m) => m.type === 'gifts_clear')).toBe(true);
   });
 });

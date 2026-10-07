@@ -36,6 +36,23 @@ describe('进场规则', () => {
     expect(ctx.enterRules.full()).toMatchObject({ cooldownMode: 'oncePerLive', exclusives: [] });
   });
 
+  it('荣耀等级分档：默认只有 50 级及以上一段，关着、没选特效；可以保存、删光；起始等级不能重复', async () => {
+    const { req, ctx, effectId } = await setup();
+    const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();
+    expect(r.honorBands).toEqual([{ fromLevel: 50, effectId: null, cooldownMin: 10, enabled: false }]);
+    r.honorBands = [{ fromLevel: 35, effectId: await effectId('霜玻'), cooldownMin: 0, enabled: true }, { fromLevel: 60, effectId: await effectId('门楼'), cooldownMin: 5, enabled: true }];
+    const saved = (await req({ method: 'PUT', url: '/api/rules/enter', payload: r })).json();
+    expect(saved.honorBands.map((b: { fromLevel: number }) => b.fromLevel)).toEqual([60, 35]);
+    expect(ctx.enterRules.full().honorBands).toHaveLength(2);
+    // 用着的素材记在「被哪些规则使用」里
+    const usedBy = (await req({ method: 'GET', url: '/api/effects' })).json().effects.find((e: { name: string }) => e.name === '门楼').usedBy as Array<{ label: string }>;
+    expect(usedBy.map((u) => u.label)).toContain('进场 · 荣耀等级 60 级及以上');
+    expect((await req({ method: 'PUT', url: '/api/rules/enter', payload: { ...r, honorBands: [] } })).json().honorBands).toEqual([]);
+    const dup = { ...r, honorBands: [r.honorBands[0], { ...r.honorBands[0] }] };
+    expect((await req({ method: 'PUT', url: '/api/rules/enter', payload: dup })).statusCode).toBe(400);
+    expect((await req({ method: 'PUT', url: '/api/rules/enter', payload: { ...r, honorBands: [{ ...r.honorBands[0], fromLevel: 81 }] } })).statusCode).toBe(400);
+  });
+
   it('参数校验：分档起始等级不能重复、至少一档、素材必须存在、档位不能多也不能少', async () => {
     const { req } = await setup();
     const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();

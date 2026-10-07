@@ -3,6 +3,8 @@ packages:
   - apps/*
   # 电脑版的打包工具（Electron 等）只在 GitHub 打包时安装，服务器装依赖时不碰
   - '!apps/desktop'
+# 电脑版分支：better-sqlite3 照旧允许安装时编译（打包时 electron-builder 会按 Electron 重新编译）；
+# 服务器版（dev）改成了不编译，直接用它自带的各平台文件
 allowBuilds:
   better-sqlite3: true
   esbuild: true

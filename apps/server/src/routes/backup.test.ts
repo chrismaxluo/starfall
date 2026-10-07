@@ -19,7 +19,7 @@ const setup = async () => {
 };
 type T = Awaited<ReturnType<typeof setup>>;
 
-/** 准备一套有内容的配置：上传的素材、弹幕规则、专属用户、指定礼物、黑名单、第二个输出、改过的设置 */
+/** 准备一套有内容的配置：上传的素材、弹幕规则、专属用户、指定礼物、黑名单、第二个输出、改过的设置、快捷播放按钮 */
 async function populate(t: T): Promise<void> {
   const up = (await t.req({ method: 'POST', url: '/api/assets', ...formFile('生日.webm', media('alpha.webm')) })).json();
   const bday = up.effect.id as number;
@@ -34,6 +34,7 @@ async function populate(t: T): Promise<void> {
   await t.req({ method: 'POST', url: '/api/blacklist', payload: { uid: 10009, name: '欢迎机器人', note: '刷屏' } });
   await t.req({ method: 'POST', url: '/api/outputs', payload: { name: '横屏录播', app: 'obs', orient: 'landscape', width: 1920, height: 1080 } });
   await t.req({ method: 'PUT', url: '/api/settings', payload: { queueMax: 15, cooldownMode: 'oncePerLive' } });
+  await t.req({ method: 'PUT', url: '/api/quickplay/buttons', payload: { buttons: [{ effectId: bday, label: '生日歌', hotkey: '1', globalHotkey: 'Ctrl+Alt+1' }] } });
 }
 
 const importFile = (t: T, name: string, content: Buffer | string) => t.req({ method: 'POST', url: '/api/backup/import', ...formFile(name, content) });
@@ -82,7 +83,7 @@ describe('导入配置', () => {
     expect(pre.statusCode).toBe(200);
     const { token, plan } = pre.json();
     const sec = Object.fromEntries(plan.sections.map((s: { key: string; summary: string }) => [s.key, s.summary]));
-    expect(sec).toMatchObject({ effects: '新增 1', danmu: '0 条 → 1 条', exclusive: '新增 1', blacklist: '新增 1 人（已有的保留）', outputs: '新增 1', guard: '没有变化' });
+    expect(sec).toMatchObject({ effects: '新增 1', danmu: '0 条 → 1 条', exclusive: '新增 1', blacklist: '新增 1 人（已有的保留）', outputs: '新增 1', guard: '没有变化', quickplay: '0 个按钮 → 1 个' });
     expect(plan.sections.find((s: { key: string }) => s.key === 'settings').details).toEqual(['进场冷却方式：按分钟 → 每场一次', '最多排队数：10 → 15']);
     expect(plan.warnings).toEqual([]);
     expect(plan.files).toEqual({ needed: 2, missing: 0 });
@@ -92,7 +93,7 @@ describe('导入配置', () => {
     expect(await dst.effectId('生日')).toBeUndefined();
 
     const ok = await dst.req({ method: 'POST', url: `/api/backup/import/${token}` });
-    expect(ok.json()).toEqual({ ok: true, savedFiles: 2 });
+    expect(ok.json()).toMatchObject({ ok: true, savedFiles: 2 });
     const bday = await dst.effectId('生日');
     expect(bday).toBeDefined();
     const eff = (await dst.req({ method: 'GET', url: `/api/effects/${bday}` })).json();
@@ -103,6 +104,7 @@ describe('导入配置', () => {
     expect((await dst.req({ method: 'GET', url: '/api/blacklist' })).json().blacklist.map((b: { uid: number }) => b.uid)).toEqual([10009]);
     expect(dst.ctx.settings.get('queueMax')).toBe(15);
     expect(dst.ctx.settings.get('cooldownMode')).toBe('oncePerLive');
+    expect(dst.ctx.quickPlay.list()).toMatchObject([{ effectId: bday, label: '生日歌', hotkey: '1', globalHotkey: 'Ctrl+Alt+1' }]);
     // 已有的输出保留原来的地址，新的输出有自己的密钥
     const outs = dst.ctx.outputs.list();
     expect(outs.map((o) => o.name)).toEqual(['竖屏直播', '横屏录播']);
@@ -124,10 +126,12 @@ describe('导入配置', () => {
     expect(plan.warnings).toContain('素材「生日」缺少画面文件，没有导入');
     expect(plan.warnings.some((w: string) => /^专属用户 .+ 的素材找不到，这条不会导入$/.test(w))).toBe(true);
     expect(plan.warnings).toContain('规则里用到的素材「生日」找不到，这些规则会变成"未选素材"');
+    expect(plan.warnings).toContain('快捷播放按钮「生日歌」的素材找不到，这个按钮不会导入');
     await dst.req({ method: 'POST', url: `/api/backup/import/${token}` });
     expect(await dst.effectId('生日')).toBeUndefined();
     expect((await dst.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules[0]).toMatchObject({ keywords: ['生日快乐', '生快'], effectId: null });
     expect((await dst.req({ method: 'GET', url: '/api/rules/exclusive' })).json().exclusives).toEqual([]);
+    expect(dst.ctx.quickPlay.list()).toEqual([]);
   });
 
   it('导入会整体替换规则：本机多出来的弹幕规则、专属用户被删除，素材和黑名单保留', async () => {
@@ -142,6 +146,41 @@ describe('导入配置', () => {
     expect(await dst.effectId('生日')).toBeDefined();
     expect((await dst.req({ method: 'GET', url: '/api/blacklist' })).json().blacklist).toHaveLength(1);
     expect(dst.ctx.outputs.list()).toHaveLength(2);
+    expect(dst.ctx.quickPlay.list()).toEqual([]);
+  });
+
+  it('以前导出的文件没有快捷播放按钮：导入时不动现有的按钮', async () => {
+    const src = await setup();
+    const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
+    expect(f.quickPlay).toEqual([]);
+    delete f.quickPlay;
+    const dst = await setup();
+    await populate(dst);
+    const { token, plan } = (await importFile(dst, 'old.json', JSON.stringify(f))).json();
+    expect(plan.sections.map((s: { key: string }) => s.key)).not.toContain('quickplay');
+    await dst.req({ method: 'POST', url: `/api/backup/import/${token}` });
+    expect(dst.ctx.quickPlay.list()).toMatchObject([{ label: '生日歌' }]);
+  });
+
+  it('荣耀等级分档跟着导出、导入；以前导出的文件没有这一项时不动现有的分档', async () => {
+    const src = await setup();
+    const enter = (await src.req({ method: 'GET', url: '/api/rules/enter' })).json();
+    enter.honorBands = [{ fromLevel: 45, effectId: await src.effectId('门楼'), cooldownMin: 3, enabled: true }, { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false }];
+    await src.req({ method: 'PUT', url: '/api/rules/enter', payload: enter });
+    const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
+    expect(f.rules.enter.honorBands).toEqual([{ fromLevel: 45, effect: '门楼', cooldownMin: 3, enabled: true }, { fromLevel: 30, effect: null, cooldownMin: 10, enabled: false }]);
+
+    const dst = await setup();
+    const a = (await importFile(dst, 'new.json', JSON.stringify(f))).json();
+    expect(a.plan.sections.find((x: { key: string }) => x.key === 'enter').details).toContain('荣耀等级分档：1 档 → 2 档');
+    await dst.req({ method: 'POST', url: `/api/backup/import/${a.token}` });
+    expect(dst.ctx.enterRules.base().honorBands).toEqual([{ fromLevel: 45, effectId: await dst.effectId('门楼'), cooldownMin: 3, enabled: true }, { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false }]);
+
+    delete f.rules.enter.honorBands;
+    const old = await setup();
+    const b = (await importFile(old, 'old.json', JSON.stringify(f))).json();
+    await old.req({ method: 'POST', url: `/api/backup/import/${b.token}` });
+    expect(old.ctx.enterRules.base().honorBands.map((x) => x.fromLevel)).toEqual([50]);
   });
 
   it('旧版本导出的文件：弹幕规则的发送人是单选，导入后换成多选', async () => {
@@ -163,11 +202,11 @@ describe('导入配置', () => {
     const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
     expect(f.outputs[1]).toMatchObject({ chatEnabled: true, chatSide: 'right', chatSize: 'normal', chatMedal: 'all', chatMax: 12 });
     const old = structuredClone(f);
-    for (const o of old.outputs) for (const k of ['chatEnabled', 'chatSide', 'chatSize', 'chatMedal', 'chatMax']) delete o[k];
+    for (const o of old.outputs) for (const k of ['chatEnabled', 'chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec']) delete o[k];
     const dst = await setup();
     const { token } = (await importFile(dst, 'old.json', JSON.stringify(old))).json();
     expect((await dst.req({ method: 'POST', url: `/api/backup/import/${token}` })).statusCode).toBe(200);
-    expect(dst.ctx.outputs.list()[1]).toMatchObject({ name: '横屏录播', chatEnabled: true, chatSide: 'left', chatMedal: 'own', chatMax: 8 });
+    expect(dst.ctx.outputs.list()[1]).toMatchObject({ name: '横屏录播', chatEnabled: true, chatSide: 'left', chatMedal: 'own', chatMax: 8, chatFadeSec: 0 });
   });
 
   it('取消导入；无效的文件给出能看懂的错误', async () => {
@@ -252,5 +291,35 @@ describe('自动备份', () => {
     expect(list.filter((x) => x.manual)[0]!.stamp).toBe('20260903-120007-m');
     await b.run(at(4, 2), true);
     expect(await b.tick(at(4, 5))).toBe(true);
+  });
+});
+
+describe('从备份恢复', () => {
+  it('选一份备份先预览，确认后恢复；恢复前自动再备份一份现在的配置', async () => {
+    const t = await setup();
+    await populate(t);
+    const item = (await t.req({ method: 'POST', url: '/api/backup/run' })).json();
+    // 备份之后又删掉了弹幕规则
+    const rules = (await t.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules as Array<{ id: number }>;
+    for (const r of rules) await t.req({ method: 'DELETE', url: `/api/rules/danmu/${r.id}` });
+    expect((await t.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules).toHaveLength(0);
+    const pre = await t.req({ method: 'POST', url: `/api/backup/restore/${item.config}` });
+    expect(pre.statusCode).toBe(200);
+    const { token, filename } = pre.json();
+    expect(filename).toBe(item.config);
+    const before = (await t.req({ method: 'GET', url: '/api/backup/list' })).json().items.length;
+    // 备份名字精确到秒：隔开一秒，免得和上面那份同名
+    await new Promise((r) => setTimeout(r, 1100));
+    const ok = (await t.req({ method: 'POST', url: `/api/backup/import/${token}` })).json();
+    expect(ok.backup).toMatch(/-m$/);
+    expect((await t.req({ method: 'GET', url: '/api/rules/danmu' })).json().rules).toHaveLength(1);
+    // 恢复前多了一份手动备份；原来那份备份文件还在
+    expect((await t.req({ method: 'GET', url: '/api/backup/list' })).json().items.length).toBe(before + 1);
+    expect((await t.req({ method: 'GET', url: `/api/backup/files/${item.config}` })).statusCode).toBe(200);
+  });
+  it('不存在的备份、乱写的名字', async () => {
+    const t = await setup();
+    expect((await t.req({ method: 'POST', url: '/api/backup/restore/starfall-20200101-0400.json' })).statusCode).toBe(404);
+    expect((await t.req({ method: 'POST', url: '/api/backup/restore/..%2Fsecret.json' })).statusCode).toBe(400);
   });
 });

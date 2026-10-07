@@ -43,7 +43,7 @@ export async function api<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: str
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new ApiError(0, 'network', '连不上星临服务，请检查网络或服务是否在运行');
+    throw new ApiError(0, 'network', '连不上星临：请检查网络，或者星临有没有在运行');
   }
   return parse<T>(res, url);
 }

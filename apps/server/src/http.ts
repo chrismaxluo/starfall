@@ -1,6 +1,7 @@
 // 接口约定：出错时统一返回 { error: { code, message } }，message 是给人看的中文说明。
 import type { FastifyReply } from 'fastify';
 import type { z } from 'zod';
+import { issueText } from './zod-text.ts';
 
 export class HttpError extends Error {
   readonly status: number;
@@ -18,7 +19,7 @@ export function parseBody<T extends z.ZodType>(schema: T, body: unknown): z.infe
   const r = schema.safeParse(body);
   if (!r.success) {
     const first = r.error.issues[0];
-    throw new HttpError(400, 'invalid_input', first ? `${first.path.join('.') || '参数'}：${first.message}` : '参数不正确', r.error.issues);
+    throw new HttpError(400, 'invalid_input', first ? issueText(first) : '填的内容不正确', r.error.issues);
   }
   return r.data;
 }

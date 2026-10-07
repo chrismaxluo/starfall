@@ -17,6 +17,7 @@ interface About {
 }
 
 const AUTHOR = '吃喵放花椒的喵酱';
+const AUTHOR_URL = 'https://space.bilibili.com/402917316';
 const EMAIL = 'chrismaxluo@gmail.com';
 const info = ref<About | null>(null);
 const checking = ref(false);
@@ -109,7 +110,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
         </div>
         <div v-if="info" class="upd-at">{{ when(info.update.checkedAt) }} 检查过</div>
         <dl class="about-meta">
-          <dt>作者</dt><dd>{{ AUTHOR }}</dd>
+          <dt>作者</dt><dd><a class="linkish" :href="AUTHOR_URL" target="_blank" rel="noopener noreferrer" title="打开作者的 B站主页">{{ AUTHOR }}</a></dd>
           <dt>联系邮箱</dt><dd><a class="linkish" :href="`mailto:${EMAIL}`">{{ EMAIL }}</a></dd>
         </dl>
       </div>

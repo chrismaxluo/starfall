@@ -45,7 +45,7 @@ nsis:
   language: '2052'
   installerIcon: resources/icon.ico
   uninstallerIcon: resources/icon.ico
-# 安装包程序用新版 NSIS（3.12）：自带的简体中文是新译本（「卸载」而不是「解除安装」）。界面文字的其他调整见 resources/installer.nsh
+# 安装包程序用新版 NSIS（3.12）：自带的简体中文是 2020 年的新译本（「卸载」而不是旧版的「解除安装」），界面文字不另外改
 toolsets:
   nsis: '1.2.1'
 # 生成 app-update.yml，让程序到 GitHub 发布页检查更新（上传由打包流程自己做）

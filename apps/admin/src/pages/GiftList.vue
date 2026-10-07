@@ -111,7 +111,8 @@ async function loadSessions(): Promise<void> {
   if (!r) return;
   sessions.value = r.sessions;
   current.value = r.current;
-  if (sessId.value === null || (sessId.value !== 'all' && !r.sessions.some((s) => s.id === sessId.value))) sessId.value = r.current ?? r.sessions[0]?.id ?? null;
+  // 默认全部场次一起找；之前选的那一场没有了也回到全部场次
+  if (sessId.value === null || (sessId.value !== 'all' && !r.sessions.some((s) => s.id === sessId.value))) sessId.value = 'all';
 }
 async function loadRecords(): Promise<void> {
   if (sessId.value === null) return void (records.value = []);
@@ -236,7 +237,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
         <div class="card">
           <div class="card-h"><h2>送礼记录</h2><span class="aside">点「加入名单」</span></div>
           <div class="gl-tools">
-            <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次（保留期内的都找）</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
+            <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
             <input v-model.trim="q" class="inp" placeholder="观众名、UID、礼物名" aria-label="搜观众名、UID、礼物名" />
             <select v-model.number="minGold" class="sel amt" aria-label="金额"><option v-for="v in MIN_OPTIONS" :key="v" :value="v">{{ v ? `${v / 1000} 元以上` : '金额不限' }}</option></select>
           </div>

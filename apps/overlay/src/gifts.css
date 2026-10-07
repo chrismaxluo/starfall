@@ -13,9 +13,8 @@ html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%
 .gl-root.large { --k: 1.25; }
 .gl-root.off .gl { display: none; }
 .gl { position: absolute; left: 0; right: 0; top: 0; padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; zoom: var(--k); will-change: transform; }
-/* 循环滚动：上下两头淡出；一串的末尾空一段再从头开始 */
+/* 循环滚动：上下两头淡出 */
 .gl-root { -webkit-mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); }
-.gl-gap { flex: none; height: 70px; }
 .side-left .gl { align-items: flex-start; }
 .side-right .gl { align-items: flex-end; }
 

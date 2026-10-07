@@ -85,8 +85,8 @@ function enter(el: HTMLElement): void {
 }
 
 // ---------- 循环滚动 ----------
-// 所有的条目排成一串往上滚（像片尾字幕），滚出顶部的一条挪到最后面接着滚；一屏放得下时不滚。
-// 一串的末尾有一段空白（.gl-gap），看得出从头开始了。位置都按排版尺寸算（字号大时整体放大过，不受动画影响）
+// 所有的条目排成一串往上滚（像片尾字幕），滚出顶部的一条挪到最后面接着滚，首尾直接接上；一屏放得下时不滚。
+// 位置都按排版尺寸算（字号大时整体放大过，不受动画影响）
 
 /** 滚动速度：每秒多少像素（放大前），一条大约 3 秒 */
 const SPEED = 32;
@@ -95,23 +95,20 @@ const GAP = 10;
 let offset = 0;
 let scrolling = false;
 let lastT = 0;
-const gapEl = h('div', { class: 'gl-gap' });
 
 const zoomK = () => (config.giftsSize === 'large' ? 1.25 : 1);
 /** 能显示的高度（放大前） */
 const viewH = () => root.clientHeight / zoomK() - 40;
 const rows = () => [...list.children] as HTMLElement[];
 
-/** 内容比一屏高时开始滚（加上末尾的空白），放得下时停下、回到开头 */
+/** 内容比一屏高时开始滚，放得下时停下、回到开头 */
 function updateScrolling(): void {
-  const content = rows().filter((r) => r !== gapEl).reduce((sum, r) => sum + r.offsetHeight + GAP, 0);
+  const content = rows().reduce((sum, r) => sum + r.offsetHeight + GAP, 0);
   const need = content > viewH();
   if (need === scrolling) return;
   scrolling = need;
-  if (need) list.append(gapEl);
-  else {
+  if (!need) {
     // 停下：按时间先后重新排好，回到开头
-    gapEl.remove();
     offset = 0;
     list.style.transform = '';
     redraw();

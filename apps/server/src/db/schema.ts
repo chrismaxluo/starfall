@@ -107,6 +107,14 @@ export const ruleEnterBands = sqliteTable('rule_enter_bands', {
   enabled: bool('enabled').notNull(),
 });
 
+/** 进场荣耀等级分档：只存起始等级（低于最低一档的不算） */
+export const ruleEnterHonorBands = sqliteTable('rule_enter_honor_bands', {
+  fromLevel: integer('from_level').primaryKey(),
+  effectId: integer('effect_id').references(() => effects.id, { onDelete: 'restrict' }),
+  cooldownMin: integer('cooldown_min').notNull(),
+  enabled: bool('enabled').notNull(),
+});
+
 /** 专属用户（只对进场生效） */
 export const ruleExclusive = sqliteTable('rule_exclusive', {
   uid: integer('uid').primaryKey(),

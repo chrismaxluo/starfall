@@ -1,17 +1,19 @@
 // 进场匹配（需求 F-EN-01 ~ 08）：
-// 专属用户 → 总督 → 提督 → 舰长 → 房管 → 粉丝牌分档（等级从高到低）→ 普通观众，命中第一条即停止。
+// 专属用户 → 总督 → 提督 → 舰长 → 房管 → 粉丝牌分档 → 荣耀等级分档（都是等级从高到低）→ 普通观众，命中第一条即停止。
 //
 // 停用的规则：
 // - 专属用户、身份档位停用时视为不存在，继续往下匹配（例如停用了舰长档，舰长会按粉丝牌或普通观众处理）。
 // - 粉丝牌分档按等级落在唯一的一档里；这一档停用时，粉丝牌部分整体跳过，继续匹配普通观众，
-//   不会落到更低的档（否则区间就不再是"这个等级放这个特效"了）。
+//   不会落到更低的档（否则区间就不再是"这个等级放这个特效"了），接着按荣耀等级匹配。
+// - 荣耀等级分档同理；低于最低一档的人不算，按普通观众处理。
 import { isOwnMedal } from '@starfall/shared';
-import type { EnterRules, Exclusive, MedalBand, Tier, Viewer } from '@starfall/shared';
+import type { EnterRules, Exclusive, Tier, Viewer } from '@starfall/shared';
 
 export type EnterRuleRef =
   | { kind: 'exclusive'; uid: number }
   | { kind: 'tier'; tier: Tier }
-  | { kind: 'band'; fromLevel: number; toLevel: number | null };
+  | { kind: 'band'; fromLevel: number; toLevel: number | null }
+  | { kind: 'honor'; fromLevel: number; toLevel: number | null };
 
 export interface EnterMatch {
   rule: EnterRuleRef;
@@ -30,7 +32,7 @@ export function isExclusiveActive(x: Exclusive, today: string): boolean {
 }
 
 /** 分档按起始等级从高到低排列，并算出每档的结束等级（最高一档为 null，表示"及以上"） */
-export function sortedBands(bands: readonly MedalBand[]): Array<MedalBand & { toLevel: number | null }> {
+export function sortedBands<B extends { fromLevel: number }>(bands: readonly B[]): Array<B & { toLevel: number | null }> {
   const sorted = [...bands].sort((a, b) => b.fromLevel - a.fromLevel);
   return sorted.map((b, i) => ({ ...b, toLevel: i === 0 ? null : sorted[i - 1]!.fromLevel - 1 }));
 }
@@ -82,6 +84,18 @@ export function matchEnter(viewer: Viewer, ctx: EnterContext): EnterMatch | null
       };
     }
   }
+  if (viewer.honor) {
+    const level = viewer.honor;
+    const band = sortedBands(rules.honorBands).find((b) => level >= b.fromLevel);
+    if (band && band.enabled && band.effectId !== null) {
+      return {
+        rule: { kind: 'honor', fromLevel: band.fromLevel, toLevel: band.toLevel },
+        effectId: band.effectId,
+        cooldownMin: band.cooldownMin,
+        label: `进场 · 荣耀等级 ${bandLabel(band.fromLevel, band.toLevel)}`,
+      };
+    }
+  }
   return tierHit('nor');
 }
 
@@ -89,5 +103,6 @@ export function matchEnter(viewer: Viewer, ctx: EnterContext): EnterMatch | null
 export function enterRuleKey(ref: EnterRuleRef): string {
   if (ref.kind === 'exclusive') return `enter:exclusive:${ref.uid}`;
   if (ref.kind === 'tier') return `enter:tier:${ref.tier}`;
+  if (ref.kind === 'honor') return `enter:honor:${ref.fromLevel}`;
   return `enter:band:${ref.fromLevel}`;
 }

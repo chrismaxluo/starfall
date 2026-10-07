@@ -54,7 +54,7 @@ async function run(): Promise<void> {
   }
   const r = (await attempt(() => post<SimulateResult>('/api/simulate', body))) ?? null;
   res.value = r;
-  trace.value = props.kind === 'enter' ? enterTrace(uid, guardLv, viewer.isMod, w.medal > 0 && w.own ? w.medal : 0) : [];
+  trace.value = props.kind === 'enter' ? enterTrace(uid, guardLv, viewer.isMod, w.medal > 0 && w.own ? w.medal : 0, viewer.honor ?? 0) : [];
   // 会播放的话，在右侧预览里播一次，看看实际效果
   if (r?.effect && r.status === 'played') {
     const guardLv = props.kind === 'guard' ? guard.value.level : (viewer.guard as SampleViewer['guard']);
@@ -66,7 +66,7 @@ async function run(): Promise<void> {
 const uidMsg = ref('');
 /** 进场按什么顺序找规则：一步步写出来（为什么用了这条、为什么跳过） */
 const trace = ref<Array<{ text: string; hit?: boolean }>>([]);
-function enterTrace(uid: number, guardLv: number, isMod: boolean, ownMedal: number): Array<{ text: string; hit?: boolean }> {
+function enterTrace(uid: number, guardLv: number, isMod: boolean, ownMedal: number, honor: number): Array<{ text: string; hit?: boolean }> {
   const out: Array<{ text: string; hit?: boolean }> = [];
   const r = state.enter;
   if (!r) return out;
@@ -85,7 +85,12 @@ function enterTrace(uid: number, guardLv: number, isMod: boolean, ownMedal: numb
   if (ownMedal > 0) {
     const band = [...r.bands].sort((a, b) => b.fromLevel - a.fromLevel).find((b) => ownMedal >= b.fromLevel);
     if (band?.enabled) return [...out, { text: `粉丝牌 ${band.fromLevel} 级以上这一段：用这条，播放「${effectById(band.effectId)?.name ?? '未选择'}」`, hit: true }];
-    out.push({ text: band ? `粉丝牌 ${band.fromLevel} 级以上这一段关着，按其他观众处理` : '粉丝牌等级不够任何一段，按其他观众处理' });
+    out.push({ text: band ? `粉丝牌 ${band.fromLevel} 级以上这一段关着，往下找` : '粉丝牌等级不够任何一段，往下找' });
+  }
+  if (honor > 0) {
+    const band = [...r.honorBands].sort((a, b) => b.fromLevel - a.fromLevel).find((b) => honor >= b.fromLevel);
+    if (band?.enabled && band.effectId) return [...out, { text: `荣耀等级 ${band.fromLevel} 级以上这一段：用这条，播放「${effectById(band.effectId)?.name ?? '未选择'}」`, hit: true }];
+    out.push({ text: band ? `荣耀等级 ${band.fromLevel} 级以上这一段${band.enabled ? '还没选特效' : '关着'}，按其他观众处理` : `荣耀等级 ${honor} 级不够任何一段，按其他观众处理` });
   }
   const n = r.tiers.nor;
   out.push(n.enabled ? { text: `其他观众：用这条，播放「${effectById(n.effectId)?.name ?? '未选择'}」`, hit: true } : { text: '其他观众：这条关着（默认关着，直播间人多时免得刷屏），所以不播' });

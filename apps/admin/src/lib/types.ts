@@ -1,7 +1,7 @@
 // 接口返回的数据格式（与服务端 apps/server 的返回值一致）
-import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GuardLevel, GuardRules, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
 
-export type { Tier, TierRule, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules, QuickButton };
+export type { Tier, TierRule, HonorBand, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules, QuickButton };
 
 export interface AssetDto {
   id: number;

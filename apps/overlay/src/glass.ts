@@ -83,4 +83,4 @@ export const GLASS_STYLES: Record<string, Builder> = {
 };
 
 /** 占满整个画布、自己决定位置的样式 */
-export const GLASS_FULL = new Set(['glass-big']);
+export const GLASS_FULL = new Set<string>();

@@ -1,5 +1,5 @@
 // 礼物卡片（晶礼、晶耀）：按价值换颜色（和 B站连击条一样：蓝 → 紫 → 粉 → 金）。晶礼的礼物图后面转着光芒，送出时迸出星光碎片。
-// 晶礼是角落里的一条（热闹）；晶耀是一块简洁的横向卡片（深色底、细金线、礼物大图），不挡主播
+// 晶礼、晶耀都是角落里的一条，晶耀大一些、碎片多一些
 import type { PlayItem } from '@starfall/shared/overlay';
 import './giftcard.css';
 import { h } from './dom.ts';
@@ -43,46 +43,26 @@ function burst(cls: string, n: number, dist: [number, number], delay: number): H
   return box;
 }
 
-/** 晶礼：角落里的一条 */
-export function giftStrip(item: PlayItem): HTMLElement {
+/** 晶礼：角落里的一条；big 是晶耀（大一些、碎片多一些） */
+export function giftStrip(item: PlayItem, big = false): HTMLElement {
   const n = item.gift?.count ?? 1;
   const img = giftImg(item, 'gc-img');
   return h(
     'div',
-    { class: `fx gc${img ? '' : ' no-img'}`, style: colors(item) },
+    { class: `fx gc${img ? '' : ' no-img'}${big ? ' big' : ''}`, style: colors(item) },
     h('div', { class: 'gc-bar' }, h('div', { class: 'gc-sheen' }), avatar(item.viewer), h('div', { class: 'gc-tx' }, h('span', { class: 'nm' }, item.viewer.name), h('span', { class: 'say' }, ...restWithGift(item)))),
-    img ? h('div', { class: 'gc-gift' }, h('div', { class: 'gc-rays' }), h('div', { class: 'gc-glow' }), img, burst('gc-burst', 14, [70, 150], 0.45)) : null,
+    img ? h('div', { class: 'gc-gift' }, h('div', { class: 'gc-rays' }), h('div', { class: 'gc-glow' }), img, burst('gc-burst', big ? 22 : 14, big ? [90, 200] : [70, 150], 0.45)) : null,
     item.gift ? h('div', { class: 'gc-num', style: { '--pd': `${0.75 + countSec(n)}s` } }, h('small', {}, '×'), count(n, 0.75)) : null,
   );
 }
 
-/** 晶耀：一块横向的扁卡片，像节目下方的字幕条（深色底、上下细金线、礼物大图在左），不挡主播 */
-export function giftHero(item: PlayItem, stage: { width: number; height: number; fxz?: number }): HTMLElement {
-  const landscape = stage.width > stage.height;
-  const zoom = (stage.fxz ?? Math.min(1, Math.min(stage.width, stage.height) / 1080)) * (landscape ? 0.8 : 1);
-  const n = item.gift?.count ?? 1;
-  const img = giftImg(item, 'gb-img');
-  const card = h(
-    'div',
-    { class: `gb-card${img ? '' : ' no-img'}` },
-    h('i', { class: 'gb-line top' }),
-    h('i', { class: 'gb-line bot' }),
-    h('div', { class: 'gb-sheen' }),
-    img ? h('div', { class: 'gb-gift' }, h('div', { class: 'gb-glow' }), img) : null,
-    h(
-      'div',
-      { class: 'gb-tx' },
-      h('div', { class: 'gb-lbl' }, 'THANK YOU'),
-      h('div', { class: 'gb-who' }, avatar(item.viewer), h('span', { class: 'nm' }, item.viewer.name)),
-      h('div', { class: 'gb-say' }, ...restWithGift(item), n > 1 ? h('span', { class: 'gb-num' }, ' ×', count(n, 1.4)) : null),
-    ),
-  );
-  const pos = landscape ? 'center' : item.effect.position;
-  return h('div', { class: `fx gb at-${pos}`, style: { ...colors(item), '--rz': String(zoom) } }, card);
+/** 晶耀：和晶礼同一个样子，大一些、碎片多一些（100 元以上本来就是金色那一档） */
+export function giftHero(item: PlayItem): HTMLElement {
+  return giftStrip(item, true);
 }
 
 /** 晶礼、晶耀的样式名 */
-export const GIFT_STYLES: Record<string, (item: PlayItem, stage: { width: number; height: number; fxz?: number }) => HTMLElement> = {
+export const GIFT_STYLES: Record<string, (item: PlayItem) => HTMLElement> = {
   'glass-gift': giftStrip,
   'glass-big': giftHero,
 };

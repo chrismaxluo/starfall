@@ -55,7 +55,7 @@ export class Player {
 
     if (e.visual.type === 'builtin_style' && e.visual.style === BILI_GIFT_STYLE && item.gift?.fx) {
       slot.classList.add('full');
-      media = buildBiliFx(item, m, (message) => this.send({ type: 'error', id: item.id, message }));
+      media = buildBiliFx(item, (message) => this.send({ type: 'error', id: item.id, message }));
       if (e.honorBadge) addHonor(media.el, item.viewer);
       slot.append(media.el);
     } else if (e.visual.type === 'builtin_style') {

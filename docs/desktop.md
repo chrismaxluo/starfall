@@ -24,7 +24,7 @@
 
 | 内容 | 位置 |
 |---|---|
-| 程序 | `C:\Program Files\Starfall\Starfall.exe`（安装时可以改到别的盘；v1.5.0-beta.1 及以前装在 `%LOCALAPPDATA%\Programs\Starfall`，装新版时会自动移过来） |
+| 程序 | `C:\Program Files\Starfall\Starfall.exe`（安装时可以改到别的盘） |
 | 数据（数据库、素材、备份） | `%APPDATA%\Starfall\data` |
 | 日志 | `%APPDATA%\Starfall\logs`（`main.log` 窗口和托盘，`server.log` 本机服务） |
 

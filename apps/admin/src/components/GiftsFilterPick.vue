@@ -1,16 +1,13 @@
 <script setup lang="ts">
-// 送礼名单显示哪些：所有付费礼物 / 只显示勾选的礼物（从直播间礼物面板里点选）/ 只显示挂上的记录；上舰、醒目留言单独开关
+// 送礼名单「只要这几种礼物」：从直播间礼物面板里点选礼物种类（按礼物编号，名字只用来显示）
 import { computed, onMounted, ref } from 'vue';
-import type { GiftsFilter } from '@starfall/shared/overlay';
 import { get } from '../lib/api.ts';
 import { battery } from '../lib/preview.ts';
 import type { GiftConfig } from '../lib/types.ts';
 import Icon from './Icon.vue';
-import Seg from './Seg.vue';
-import Switch from './Switch.vue';
 
-const props = defineProps<{ modelValue: GiftsFilter }>();
-const emit = defineEmits<{ change: [f: GiftsFilter, msg: string] }>();
+const props = defineProps<{ modelValue: Array<{ id: number; name: string }> }>();
+const emit = defineEmits<{ change: [gifts: Array<{ id: number; name: string }>, msg: string] }>();
 
 const catalog = ref<GiftConfig[]>([]);
 const catalogErr = ref('');
@@ -22,11 +19,11 @@ onMounted(async () => {
   } catch (e) {
     catalogErr.value = e instanceof Error ? e.message : String(e);
   }
+  // 还一种都没选时直接打开选择面板
+  if (!props.modelValue.length) picking.value = true;
 });
 
-const MODE_MSG: Record<GiftsFilter['mode'], string> = { all: '送礼名单显示所有付费礼物', only: '送礼名单只显示选中的礼物', pinned: '送礼名单只显示挂上的记录' };
-
-const chosen = computed(() => new Set(props.modelValue.gifts.map((g) => g.id)));
+const chosen = computed(() => new Set(props.modelValue.map((g) => g.id)));
 // 按礼物面板分页（礼物、粉丝团、航海……）、页内顺序列出；只列付费礼物
 const groups = computed(() => {
   const tabs = new Map<string, GiftConfig[]>();
@@ -39,54 +36,40 @@ const groups = computed(() => {
 });
 const iconOf = (id: number) => catalog.value.find((g) => g.id === id)?.icon;
 
-const set = (patch: Partial<GiftsFilter>, msg: string) => emit('change', { ...props.modelValue, ...patch }, msg);
-function toggle(g: GiftConfig): void {
+function toggle(g: { id: number; name: string }): void {
   const on = chosen.value.has(g.id);
-  const gifts = on ? props.modelValue.gifts.filter((x) => x.id !== g.id) : [...props.modelValue.gifts, { id: g.id, name: g.name }];
-  set({ gifts }, on ? `送礼名单不再显示「${g.name}」` : `送礼名单会显示「${g.name}」`);
+  emit('change', on ? props.modelValue.filter((x) => x.id !== g.id) : [...props.modelValue, { id: g.id, name: g.name }], on ? `不再显示「${g.name}」` : `会显示「${g.name}」`);
 }
 </script>
 
 <template>
   <div class="gfp">
-    <div class="line">
-      <Seg :model-value="modelValue.mode" label="显示哪些" :options="[{ value: 'all', label: '所有付费礼物' }, { value: 'only', label: '只显示选中的礼物' }, { value: 'pinned', label: '只显示挂上的记录' }]" @change="(v) => set({ mode: v as GiftsFilter['mode'] }, MODE_MSG[v as GiftsFilter['mode']])" />
+    <div class="gfp-chips">
+      <span v-for="g in modelValue" :key="g.id" class="gfp-chip"><img v-if="iconOf(g.id)" :src="iconOf(g.id)" alt="" referrerpolicy="no-referrer" />{{ g.name }}<button type="button" :aria-label="`不显示「${g.name}」`" @click="toggle(g)"><Icon name="i-x" /></button></span>
+      <button class="btn" type="button" :disabled="!!catalogErr" :aria-expanded="picking" @click="picking = !picking"><Icon :name="picking ? 'i-chev' : 'i-plus'" />{{ catalogErr ? '读取礼物面板失败' : picking ? '收起' : modelValue.length ? '再选几种' : '选礼物' }}</button>
     </div>
-    <template v-if="modelValue.mode === 'only'">
-      <div class="gfp-chips">
-        <span v-for="g in modelValue.gifts" :key="g.id" class="gfp-chip"><img v-if="iconOf(g.id)" :src="iconOf(g.id)" alt="" referrerpolicy="no-referrer" />{{ g.name }}<button type="button" :aria-label="`不显示「${g.name}」`" @click="set({ gifts: modelValue.gifts.filter((x) => x.id !== g.id) }, `送礼名单不再显示「${g.name}」`)"><Icon name="i-x" /></button></span>
-        <span v-if="!modelValue.gifts.length" class="hint">还没选礼物：现在只会显示下面打开的上舰、醒目留言</span>
-        <button class="btn" type="button" :disabled="!!catalogErr" :aria-expanded="picking" @click="picking = !picking"><Icon name="i-plus" />{{ catalogErr ? '读取礼物面板失败' : '选礼物' }}</button>
+    <div v-if="picking" class="rl-gpick">
+      <div class="h"><input v-model.trim="q" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板；点一下选上，再点一下取消</span></div>
+      <div class="grid">
+        <template v-for="grp in groups" :key="grp.title">
+          <div class="sep">{{ grp.title }}</div>
+          <button v-for="g in grp.list" :key="g.id" type="button" :class="{ on: chosen.has(g.id) }" :aria-pressed="chosen.has(g.id)" @click="toggle(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ battery(g.price) }}</span></button>
+        </template>
+        <span v-if="!groups.length" class="hint">没有可选的礼物</span>
       </div>
-      <div v-if="picking" class="rl-gpick">
-        <div class="h"><input v-model.trim="q" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板；点一下选上，再点一下取消</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
-        <div class="grid">
-          <template v-for="grp in groups" :key="grp.title">
-            <div class="sep">{{ grp.title }}</div>
-            <button v-for="g in grp.list" :key="g.id" type="button" :class="{ on: chosen.has(g.id) }" :aria-pressed="chosen.has(g.id)" @click="toggle(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ battery(g.price) }}</span></button>
-          </template>
-          <span v-if="!groups.length" class="hint">没有可选的礼物</span>
-        </div>
-      </div>
-    </template>
-    <span v-if="modelValue.mode === 'pinned'" class="hint">只显示下面「已挂上」的记录（可以是以前场次的），本场新收到的不会进来。</span>
-    <div v-else class="line">
-      <Switch :model-value="modelValue.guard" label="显示上舰" @change="(v) => set({ guard: v }, v ? '送礼名单会显示上舰' : '送礼名单不再显示上舰')" /><span>上舰（开通、续费大航海）</span>
-      <Switch :model-value="modelValue.sc" label="显示醒目留言" @change="(v) => set({ sc: v }, v ? '送礼名单会显示醒目留言' : '送礼名单不再显示醒目留言')" /><span>醒目留言</span>
     </div>
   </div>
 </template>
 
 <style scoped>
 .gfp { display: flex; flex-direction: column; gap: 10px; }
-.gfp .line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--t2); }
-.gfp .line > span + :deep(.switch), .gfp .line > span + button { margin-left: 14px; }
 .gfp-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .gfp-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 6px; border-radius: 8px; background: var(--l3); box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; }
 .gfp-chip img { width: 22px; height: 22px; object-fit: contain; }
 .gfp-chip button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 6px; background: none; color: var(--t3); }
 .gfp-chip button:hover { background: var(--hover); color: var(--t1); }
 .gfp-chip button svg { width: 12px; height: 12px; }
+.rl-gpick { margin-top: 0; }
 .rl-gpick .grid button.on { border-color: var(--accent); background: var(--accent-soft); }
 .hint { font-size: 12px; color: var(--t3); }
 </style>

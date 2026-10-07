@@ -60,7 +60,7 @@ defineExpose({ test });
   <div class="chatpv" :class="{ alpha }" :style="{ width: `${GIFTS_WIDTH * K}px`, height: `${H * K}px` }">
     <iframe ref="frame" src="/overlay/?preview=1&gifts=1" title="送礼名单预览" :style="{ width: `${GIFTS_WIDTH}px`, height: `${H}px`, transform: `scale(${K})` }" />
     <div v-if="!config.giftsEnabled" class="chatpv-off">送礼名单已关闭</div>
-    <div v-else-if="config.giftsFilter.mode === 'pinned' && !state.giftPins.length" class="chatpv-empty">还没有挂上的记录<br />在下面的送礼记录里点「挂上」</div>
+    <div v-else-if="config.giftsFilter.mode === 'pinned' && !state.giftPins.length" class="chatpv-empty">名单是空的<br />在下面的送礼记录里点「加入名单」</div>
     <div v-else-if="config.giftsFilter.mode !== 'pinned' && !state.gifts.length && !tested" class="chatpv-empty">本场还没有收到礼物<br />点下面的「测试」看看效果</div>
   </div>
 </template>

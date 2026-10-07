@@ -33,6 +33,23 @@ describe('送礼名单：挑记录、挂上', () => {
     expect(r.items[1]).toMatchObject({ kind: 'gift', value: 6600, viewer: { name: '半糖主义' }, gift: { name: '小花花', count: 66 } });
   });
 
+  it('全部场次一起找：按观众名、UID、礼物名、醒目留言内容搜；按总价值筛', async () => {
+    const { req } = await setup();
+    const find = async (qs: string) => (await req({ method: 'GET', url: `/api/gift-list/records?session=all${qs}` })).json().items.map((x: { viewer: { name: string }; sessionId: number }) => `${x.viewer.name}@${x.sessionId}`);
+    expect(await find('')).toEqual(['路过的猫@2', '长夜未央@1', '半糖主义@1']);
+    expect(await find('&q=' + encodeURIComponent('半糖'))).toEqual(['半糖主义@1']);
+    // 按 UID 找（测试数据里三个人的 UID 都是 4，路人是 2 而且送的是免费礼物）
+    expect(await find('&q=4')).toEqual(['路过的猫@2', '长夜未央@1', '半糖主义@1']);
+    expect(await find('&q=2')).toEqual([]);
+    expect(await find('&q=' + encodeURIComponent('小花花'))).toEqual(['半糖主义@1']);
+    expect(await find('&q=' + encodeURIComponent('唱首歌'))).toEqual(['路过的猫@2']);
+    // 小花花 66 个 = 6.6 元；醒目留言 30 元；上舰 198 元
+    expect(await find('&min=10000')).toEqual(['路过的猫@2', '长夜未央@1']);
+    expect(await find('&min=100000')).toEqual(['长夜未央@1']);
+    expect(await find('&min=100000&q=' + encodeURIComponent('半糖'))).toEqual([]);
+    expect((await req({ method: 'GET', url: '/api/gift-list/records?session=1&min=10000' })).json().items.map((x: { kind: string }) => x.kind)).toEqual(['guard']);
+  });
+
   it('挂上（不重复挂）、调顺序、撤下；送礼名单收到整份；免费礼物、不存在的记录不能挂', async () => {
     const { req, ids, ctx } = await setup();
     const pin = (eventId: number) => req({ method: 'POST', url: '/api/gift-list/pins', payload: { eventId } });

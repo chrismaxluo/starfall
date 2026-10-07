@@ -144,6 +144,8 @@ export interface PlayItem {
   gift?: { name: string; count: number; img?: string };
   /** 后台"测试播放"发出的 */
   test?: boolean;
+  /** 素材快捷播放发出的 */
+  quick?: boolean;
 }
 
 /** 特效页的版本：构建出的入口脚本名（带哈希），重新构建后会变 */

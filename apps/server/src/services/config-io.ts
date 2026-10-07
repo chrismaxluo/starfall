@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -21,6 +21,7 @@ import type { BlacklistStore } from './blacklist.ts';
 import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rules.ts';
 import { OutputInputSchema } from './outputs.ts';
 import type { OutputStore } from './outputs.ts';
+import type { QuickPlayStore } from './quick-play.ts';
 import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
 
@@ -160,12 +161,17 @@ export const ConfigFileSchema = z.object({
   rules: RulesPart,
   blacklist: z.array(z.object({ uid: z.number().int().positive(), name: z.string().max(60).default(''), note: z.string().max(200).default('') })).max(5000),
   outputs: z.array(OutputPart).max(20),
+  // 素材快捷播放是 v1.5 加的：以前导出的文件里没有，导入时不动现有的按钮
+  quickPlay: z
+    .array(z.object({ effect: z.string().min(1), label: QuickButtonSchema.shape.label, hotkey: QuickButtonSchema.shape.hotkey, globalHotkey: QuickButtonSchema.shape.globalHotkey }))
+    .max(QUICK_MAX)
+    .optional(),
 });
 export type ConfigFile = z.infer<typeof ConfigFileSchema>;
 
 /** 导入预览里的一组变化 */
 export interface PlanSection {
-  key: 'settings' | 'effects' | 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard' | 'blacklist' | 'outputs';
+  key: 'settings' | 'effects' | 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard' | 'quickplay' | 'blacklist' | 'outputs';
   label: string;
   /** 一句话概括，例如"新增 2 · 修改 1" */
   summary: string;
@@ -209,6 +215,7 @@ interface Deps {
   danmuRules: DanmuRuleStore;
   giftRules: GiftRuleStore;
   guardRules: GuardRuleStore;
+  quickPlay: QuickPlayStore;
   blacklist: BlacklistStore;
   outputs: OutputStore;
 }
@@ -293,6 +300,10 @@ export class ConfigIO {
         guard: Object.fromEntries((['gov', 'adm', 'cap'] as const).map((t) => [t, { open: ref(guard[t].openEffectId), renew: ref(guard[t].renewEffectId), enabled: guard[t].enabled }])) as ConfigFile['rules']['guard'],
       },
       blacklist: this.d.blacklist.list().map((b) => ({ uid: b.uid, name: b.name, note: b.note })),
+      quickPlay: this.d.quickPlay.list().flatMap((b) => {
+        const effect = ref(b.effectId);
+        return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
+      }),
       outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec })),
     };
   }
@@ -449,6 +460,20 @@ export class ConfigIO {
       sections.push({ key: 'guard', label: '上舰规则', summary: details.length ? `修改 ${details.length} 处` : '没有变化', changed: details.length > 0, details });
     }
 
+    // 素材快捷播放（整体替换；旧版本导出的文件里没有，不动）
+    if (file.quickPlay) {
+      const fq = file.quickPlay;
+      const changed = !same(cur.quickPlay, fq);
+      for (const b of fq) if (!names.has(b.effect)) warnings.push(`快捷播放按钮「${b.label || b.effect}」的素材找不到，这个按钮不会导入`);
+      sections.push({
+        key: 'quickplay',
+        label: '素材快捷播放',
+        summary: changed ? `${cur.quickPlay?.length ?? 0} 个按钮 → ${fq.length} 个` : '没有变化',
+        changed,
+        details: changed ? clip(fq.map((b, i) => `${i + 1}. ${b.label || b.effect}${b.hotkey ? `（快捷键 ${b.hotkey}）` : ''}`)) : [],
+      });
+    }
+
     // 黑名单（合并）
     {
       const have = new Set(cur.blacklist.map((b) => b.uid));
@@ -550,11 +575,20 @@ export class ConfigIO {
       const guard = Object.fromEntries((['gov', 'adm', 'cap'] as const).map((t) => [t, { openEffectId: ref(r.guard[t].open), renewEffectId: ref(r.guard[t].renew), enabled: r.guard[t].enabled }])) as GuardRules;
       this.d.guardRules.set(guard);
 
-      // 7. 黑名单：合并
+      // 7. 素材快捷播放：整体替换；找不到素材的跳过
+      if (file.quickPlay) {
+        const keep = file.quickPlay.flatMap((b) => {
+          const effectId = ref(b.effect);
+          return effectId === null ? [] : [{ effectId, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
+        });
+        this.d.quickPlay.save(keep);
+      }
+
+      // 8. 黑名单：合并
       const have = new Set(this.d.blacklist.list().map((b) => b.uid));
       for (const b of file.blacklist) if (!have.has(b.uid)) this.d.blacklist.add(b);
 
-      // 8. 输出：提交后再改，改动会立刻推给在线的特效页
+      // 9. 输出：提交后再改，改动会立刻推给在线的特效页
       const curOut = new Map(this.d.outputs.list().map((o) => [o.name, o]));
       for (const o of file.outputs) {
         const c = curOut.get(o.name);

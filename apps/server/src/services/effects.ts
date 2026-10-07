@@ -7,7 +7,7 @@ import type { Effect, SvgaRole } from '@starfall/shared';
 import type { Readable } from 'node:stream';
 import type { z } from 'zod';
 import type { Db } from '../db/index.ts';
-import { effects, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, viewers } from '../db/schema.ts';
+import { effects, quickPlay, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, viewers } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 import { assetDto } from './assets.ts';
 import type { AssetDto, AssetRow, AssetStore } from './assets.ts';
@@ -223,7 +223,7 @@ export class EffectStore {
     return this.get(id);
   }
 
-  /** 复制素材；replaceRefs 为真时把原来用它的规则都换成副本（F-AS-13） */
+  /** 复制素材；replaceRefs 为真时把原来用它的规则（和快捷播放按钮）都换成副本（F-AS-13） */
   copy(id: number, opts: { name?: string; replaceRefs?: boolean }): EffectDto {
     const src = this.row(id);
     const name = opts.name ?? this.uniqueName(`${src.name} 副本`);
@@ -240,6 +240,7 @@ export class EffectStore {
         tx.update(ruleGiftBands).set({ effectId: n }).where(eq(ruleGiftBands.effectId, id)).run();
         tx.update(ruleGuard).set({ openEffectId: n }).where(eq(ruleGuard.openEffectId, id)).run();
         tx.update(ruleGuard).set({ renewEffectId: n }).where(eq(ruleGuard.renewEffectId, id)).run();
+        tx.update(quickPlay).set({ effectId: n }).where(eq(quickPlay.effectId, id)).run();
       }
       return n;
     });

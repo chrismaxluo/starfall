@@ -120,6 +120,13 @@
       "when": 1791041360446,
       "tag": "0016_chat_fade",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791372331988,
+      "tag": "0017_quick_play",
+      "breakpoints": true
     }
   ]
 }

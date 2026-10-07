@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>星临 · 触发规则改版预览</title>
+<!-- 用的是后台真实的样式表和内置特效缩略图（复制到 assets/，不进仓库）：
+  mkdir -p design/preview/assets/admin design/preview/assets/thumbs
+  cp apps/admin/src/styles/app.css apps/admin/src/styles/extra.css design/preview/assets/admin/
+  cp apps/admin/public/thumbs/*-w.jpg design/preview/assets/thumbs/
+  这个页面由 rules-v2.src.html 生成（把后台的图标表放进来）：python3 design/tools/build_rules_preview.py -->
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/admin/app.css">
+<link rel="stylesheet" href="assets/admin/extra.css">
+<style>
+:root { --font-sans: "Geist Sans", "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace; }
+body { margin: 0; }
+
+/* ---- 预览说明条（只在预览里有） ---- */
+.mockbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; margin: -8px 0 18px; border-radius: 10px; background: var(--accent-soft); color: var(--t2); font-size: 12.5px; }
+.mockbar b { color: var(--accent); font-weight: 600; }
+.mockbar .sp { flex: 1; }
+
+/* ---- 标签：一排紧凑的下划线标签 ---- */
+.rtabs { display: flex; align-items: center; gap: 2px; margin: -6px 0 18px; border-bottom: 1px solid var(--line); }
+.rtab { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px; border: 0; background: none; color: var(--t3); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.rtab svg.i { width: 15px; height: 15px; }
+.rtab:hover { color: var(--t1); }
+.rtab[aria-selected="true"] { color: var(--t1); }
+.rtab[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.rtab .cnt { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--hover); color: var(--t3); font-size: 11.5px; font-family: var(--font-mono); display: inline-grid; place-items: center; }
+.rtab[aria-selected="true"] .cnt { background: var(--accent-soft); color: var(--accent); }
+
+/* ---- 每页顶部：一句话说明 + 右边的设置 ---- */
+.rtool { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; min-height: 36px; flex-wrap: wrap; }
+.rtool .say { font-size: 13px; color: var(--t2); display: flex; align-items: center; gap: 8px; }
+.rtool .say .linkish { display: inline-flex; align-items: center; gap: 4px; }
+.rtool .say .linkish svg.i { width: 13px; height: 13px; }
+.rtool .sp { flex: 1; }
+.rtool .set { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--t3); }
+.rtool .seg button { height: 26px; padding: 0 10px; font-size: 12.5px; }
+.rtool .btn { height: 32px; }
+.rtool .inp { height: 32px; width: 220px; }
+.rhelp { margin: -4px 0 12px; padding: 12px 14px; border-radius: 10px; background: var(--l2); border: 1px solid var(--line); font-size: 12.5px; color: var(--t2); line-height: 1.75; }
+.rhelp[hidden] { display: none; }
+.rhelp b { color: var(--t1); font-weight: 600; }
+.rhelp .flow { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rhelp .flow span { padding: 0 7px; border-radius: 6px; background: var(--l3); box-shadow: inset 0 0 0 1px var(--line); color: var(--t1); }
+
+/* ---- 规则表：每列对齐，表头只写一次 ---- */
+.rt { background: var(--l3); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-card); overflow: hidden; }
+.rt + .rt, .rt + .rsec { margin-top: 18px; }
+.rt-h, .rt-r { display: grid; align-items: center; column-gap: 16px; padding: 0 14px 0 16px; }
+.rt-h { height: 36px; font-size: 12px; color: var(--t3); background: var(--l2); border-bottom: 1px solid var(--line); }
+.rt-h > :last-child { text-align: right; }
+.rt-r { min-height: 56px; border-top: 1px solid var(--line); transition: background .12s; }
+.rt-h + .rt-r, .rt-g + .rt-r { border-top: 0; }
+.rt-r:hover { background: color-mix(in srgb, var(--hover) 60%, transparent); }
+.rt-r.off > :not(.c-sw):not(.c-act) { opacity: .42; }
+.rt-g { display: flex; align-items: baseline; gap: 10px; padding: 14px 16px 6px; border-top: 1px solid var(--line); font-size: 12px; color: var(--t3); }
+.rt-h + .rt-g { border-top: 0; }
+.rt-g b { font-size: 12.5px; color: var(--t1); font-weight: 600; }
+.rt-g .r { margin-left: auto; }
+.c-who { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13.5px; }
+.c-who .sub { font-size: 12px; color: var(--t3); }
+.c-who .nm { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.c-who .nm b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-who .uid { font-family: var(--font-mono); font-size: 11.5px; color: var(--t3); }
+.c-eff .effbtn { max-width: 260px; }
+.effbtn.same { border-style: dashed; color: var(--t3); background: transparent; padding-left: 12px; }
+.c-cd { font-size: 12.5px; color: var(--t3); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.c-cd .cdpick { height: 30px; }
+.c-cd .muted { color: var(--t3); }
+.c-act { display: flex; justify-content: flex-end; gap: 2px; position: relative; }
+.c-act .icon-btn { width: 30px; height: 30px; border-color: transparent; background: transparent; box-shadow: none; color: var(--t3); }
+.c-act .icon-btn:hover { background: var(--hover); color: var(--t1); }
+.c-act .icon-btn svg.i { width: 14px; height: 14px; }
+.c-sw .switch { transform: scale(.9); transform-origin: left center; }
+.c-grip { color: var(--t3); font-size: 12px; font-family: var(--font-mono); display: flex; align-items: center; gap: 2px; cursor: grab; }
+.c-grip svg.i { width: 12px; height: 12px; }
+.c-kw { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; padding: 10px 0; }
+.c-kw .mode { height: 26px; padding: 0 6px 0 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--l2); font: inherit; font-size: 12px; color: var(--t2); display: inline-flex; align-items: center; gap: 3px; }
+.c-kw .mode svg.i { width: 11px; height: 11px; color: var(--t3); }
+.kw { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 9px; border-radius: 7px; background: var(--accent-soft); color: var(--t1); font-size: 13px; }
+.kw button { width: 18px; height: 18px; border: 0; border-radius: 5px; background: none; color: var(--t3); display: grid; place-items: center; }
+.kw button svg.i { width: 10px; height: 10px; }
+.kw-add { height: 26px; padding: 0 8px; border-radius: 7px; border: 1px dashed var(--line-strong); background: none; color: var(--t3); font: inherit; font-size: 12.5px; }
+.who-btn { height: 30px; padding: 0 8px 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; white-space: nowrap; overflow: hidden; }
+.who-btn svg.i { width: 12px; height: 12px; color: var(--t3); flex: none; }
+.who-btn span { overflow: hidden; text-overflow: ellipsis; }
+.cd2 { display: grid; grid-template-columns: auto auto; gap: 4px 6px; align-items: center; font-size: 12px; color: var(--t3); padding: 8px 0; }
+.cd2 .cdpick { height: 26px; font-size: 12.5px; }
+.jump { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; background: rgba(224, 130, 40, .12); color: #C26A12; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+[data-theme="dark"] .jump { color: #F2A65A; }
+.val { display: flex; flex-direction: column; line-height: 1.35; }
+.val b { font-size: 13.5px; font-weight: 600; font-family: var(--font-mono); }
+.val span { font-size: 12px; color: var(--t3); }
+.gift-ic { width: 28px; height: 28px; object-fit: contain; flex: none; }
+.rt-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--l2); font-size: 12.5px; color: var(--t3); }
+.rt-foot .btn { height: 30px; }
+.rt-foot .chipadd { height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--l3); color: var(--t2); font: inherit; font-size: 12.5px; }
+.rsec { display: flex; align-items: baseline; gap: 10px; margin: 0 2px 8px; }
+.rsec h3 { margin: 0; font-size: 13.5px; font-weight: 600; }
+.rsec span { font-size: 12px; color: var(--t3); }
+.rsec .r { margin-left: auto; }
+
+/* 进场：专属用户提示行 */
+.excl-row { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--accent-soft) 60%, transparent); font-size: 13px; color: var(--t2); }
+.excl-row b { color: var(--t1); }
+.excl-row .linkish { margin-left: auto; }
+.excl-row svg.i { width: 15px; height: 15px; color: var(--accent); }
+
+/* 粉丝牌分段：表头下面一条细的分段条 */
+.bandline { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; margin: 0 16px 6px; }
+.bandline i { display: block; }
+/* 礼物价值分段条（比原来的矮一些） */
+.valbar { padding: 14px 16px 6px; }
+.valbar .bar { display: flex; height: 30px; border-radius: 8px; overflow: hidden; gap: 2px; }
+.valbar .bar > div { display: flex; align-items: center; padding: 0 10px; font-size: 12px; color: #fff; font-weight: 500; white-space: nowrap; overflow: hidden; }
+.valbar .bar .no { background: repeating-linear-gradient(135deg, var(--hover) 0 8px, transparent 8px 16px); color: var(--t3); box-shadow: inset 0 0 0 1px var(--line); }
+.valbar .ticks { position: relative; height: 18px; font-family: var(--font-mono); font-size: 11px; color: var(--t3); }
+.valbar .ticks span { position: absolute; transform: translateX(-50%); top: 3px; }
+
+/* ⋯ 菜单 */
+.rmenu { position: absolute; right: 0; top: 34px; z-index: 30; min-width: 150px; padding: 5px; border-radius: 10px; background: var(--l3); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); display: flex; flex-direction: column; animation: pop .12s ease-out; }
+.rmenu button { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 0; border-radius: 7px; background: none; color: var(--t1); font: inherit; font-size: 13px; text-align: left; }
+.rmenu button:hover { background: var(--hover); }
+.rmenu button svg.i { width: 14px; height: 14px; color: var(--t3); }
+.rmenu button.danger { color: #D64545; }
+.rmenu button.danger svg.i { color: #D64545; }
+.rmenu button:disabled { opacity: .4; }
+.rmenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+
+.pane[hidden] { display: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 1.8l2.3 7.2 7.5.1-6 4.5 2.2 7.2L12 16.5l-6 4.3 2.2-7.2-6-4.5 7.5-.1z"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2c.6 4.8 2.2 6.4 7 7-4.8.6-6.4 2.2-7 7-.6-4.8-2.2-6.4-7-7 4.8-.6 6.4-2.2 7-7z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24"><path d="M4 20L15 9"/><path d="M14 4v2M19 9h2M17.5 5.5l1.5-1.5M17.5 12.5l1.5 1.5M10 5.5L8.5 4"/><path d="M13 7l4 4"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-5-5-9 9"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".9"/><circle cx="4.5" cy="12" r=".9"/><circle cx="4.5" cy="18" r=".9"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M19.38 10.17 L21.84 10.20 L21.84 13.80 L19.38 13.83 L18.51 15.92 L20.23 17.69 L17.69 20.23 L15.92 18.51 L13.83 19.38 L13.80 21.84 L10.20 21.84 L10.17 19.38 L8.08 18.51 L6.31 20.23 L3.77 17.69 L5.49 15.92 L4.62 13.83 L2.16 13.80 L2.16 10.20 L4.62 10.17 L5.49 8.08 L3.77 6.31 L6.31 3.77 L8.08 5.49 L10.17 4.62 L10.20 2.16 L13.80 2.16 L13.83 4.62 L15.92 5.49 L17.69 3.77 L20.23 6.31 L18.51 8.08Z"/><circle cx="12" cy="12" r="3.2"/></symbol>
+    <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 019.5 3.5a8.5 8.5 0 1011 11z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.5" height="14" rx="1"/><rect x="14" y="5" width="3.5" height="14" rx="1"/></symbol>
+    <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h2v2h-2zM18.5 18.5h2v2h-2zM14.5 18.5h2M18.5 14.5h2"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3.5" y="8.5" width="17" height="4" rx="1"/><path d="M5 12.5v8h14v-8M12 8.5v12M12 8.5C10 4 6.5 4.5 7 7c.3 1.2 2.5 1.5 5 1.5zM12 8.5c2-4.5 5.5-4 5-1.5-.3 1.2-2.5 1.5-5 1.5z"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-5 4z"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+    <!-- 复制一份来改（复制出一个新的）；只复制文字用 i-copy -->
+    <symbol id="i-dup" viewBox="0 0 24 24"><path d="M8 8V5.5A1.5 1.5 0 019.5 4h9A1.5 1.5 0 0120 5.5v9a1.5 1.5 0 01-1.5 1.5H16"/><rect x="4" y="8" width="12" height="12" rx="1.5"/><path d="M10 11.5v5M7.5 14h5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 018 0v3"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M12 16.5V20M8 20h8"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19.2 8.8a2.1 2.1 0 00-3-3L5 17v3z"/><path d="M14.5 7.5l3 3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10 11v5M14 11v5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5a1.5 1.5 0 00-1.5-1.5H5A1.5 1.5 0 003.5 5v9A1.5 1.5 0 005 15.5h3.5"/></symbol>
+    <symbol id="i-replay" viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8 8.5 8.5 0 00-6 2.5L4 8"/><path d="M4 3.5V8h4.5"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5"/><path d="M16 4.8a3.5 3.5 0 010 6.4M18 14.8c1.8.8 3 2.6 3.5 5.2"/></symbol>
+    <!-- 粉丝牌：牌子名 + 等级格 -->
+    <symbol id="i-medal" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2.5"/><path d="M15 7v10M5.8 12h5.8"/><path d="M17.3 10.6l.9-.6v4"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h5a1 1 0 011 1v14a1 1 0 01-1 1h-5M10 16l-4-4 4-4M6 12h10"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.7A9.8 9.8 0 0112 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 01-3.2 4M6.3 6.9C3.9 8.6 2.5 12 2.5 12S6 18.5 12 18.5a9.6 9.6 0 004.3-1"/><path d="M9.9 10a3 3 0 004.1 4.1"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <!-- 上舰、大航海 -->
+    <symbol id="i-anchor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M12 7v13M8.5 10.5h7M4.5 13.5a7.5 7.5 0 0015 0M4.5 13.5l-1.3 1.6M4.5 13.5l1.8.9M19.5 13.5l1.3 1.6M19.5 13.5l-1.8.9"/></symbol>
+    <!-- 特效页演示：窗口里一个播放键 -->
+    <symbol id="i-demo" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8.5h18"/><path d="M10.5 11.6v5.3l4.4-2.65z"/></symbol>
+    <!-- 有新版本 -->
+    <symbol id="i-update" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16.5v-9M8.3 11.2L12 7.5l3.7 3.7"/></symbol>
+    <!-- 还没完成的步骤（完成了用 i-check） -->
+    <symbol id="i-todo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/></symbol>
+    <!-- 普通提示 -->
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.01"/></symbol>
+    <!-- 播放队列 -->
+    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 6.5h10M4 12h10M4 17.5h6"/><path d="M16.5 14.5v6l4.5-3z"/></symbol>
+    <!-- 礼物榜 -->
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 5.5H4.5a3 3 0 003.6 4.2M16 5.5h3.5a3 3 0 01-3.6 4.2M12 13v3.5M8.5 20h7M9.5 20l.8-3.5h3.4l.8 3.5"/></symbol>
+    <symbol id="g-gov" viewBox="0 0 24 24"><path d="M3 18.5h18M4 16l-1-9 5.5 4L12 4l3.5 7L21 7l-1 9z"/></symbol>
+    <symbol id="g-adm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5M5 5l3.5 3.5M15.5 15.5L19 19M19 5l-3.5 3.5M8.5 15.5L5 19"/></symbol>
+    <symbol id="g-cap" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M12 7v14M8 11h8M4.5 14.5A7.5 7.5 0 0012 21a7.5 7.5 0 007.5-6.5"/></symbol>
+    <symbol id="g-mod" viewBox="0 0 24 24"><path d="M12 2.5l7.5 3v5.8c0 4.6-3.2 8.6-7.5 10.2-4.3-1.6-7.5-5.6-7.5-10.2V5.5z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></symbol>
+  </svg>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img src="assets/logo.svg" width="32" height="32" alt=""><span><div class="brand-name">星临</div><div class="brand-sub">STARFALL</div></span></div>
+    <div>
+      <div class="nav-label">工作台</div>
+      <nav class="nav" aria-label="主导航">
+        <a href="#"><svg class="i"><use href="#i-grid"/></svg>总览</a>
+        <a href="#"><svg class="i"><use href="#i-bolt"/></svg>素材快捷播放</a>
+        <a href="#" aria-current="page"><svg class="i"><use href="#i-wand"/></svg>触发规则</a>
+        <a href="#"><svg class="i"><use href="#i-image"/></svg>素材库</a>
+        <a href="#"><svg class="i"><use href="#i-list"/></svg>事件记录</a>
+        <a href="#"><svg class="i"><use href="#i-screen"/></svg>直播软件输出</a>
+      </nav>
+    </div>
+    <div>
+      <div class="nav-label">其他</div>
+      <nav class="nav">
+        <a href="#"><svg class="i"><use href="#i-demo"/></svg>内置特效演示<svg class="i"><use href="#i-ext"/></svg></a>
+        <a href="#"><svg class="i"><use href="#i-gear"/></svg>设置</a>
+      </nav>
+    </div>
+    <div class="side-foot"><a class="acct" href="#"><span class="avatar" style="background:#2BB5A0">星</span><span class="acct-meta"><b>星临小助手</b><span>登录有效 · 剩余 171 天</span></span></a></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb">直播间 <b class="num">10086000</b></div>
+      <span class="live ok"><i></i>已连接</span>
+      <span class="livestate on"><i></i>直播中 · 2 小时 14 分</span>
+      <span class="live fxlamp"><i></i>特效页在线</span>
+      <button class="search"><svg class="i"><use href="#i-search"/></svg>搜索或执行命令<span class="kbd">Ctrl K</span></button>
+      <button class="pausebtn"><svg class="i"><use href="#i-pause"/></svg><span>暂停所有特效</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="切换亮色 / 暗色"><svg class="i theme-light-only"><use href="#i-moon"/></svg><svg class="i theme-dark-only"><use href="#i-sun"/></svg></button>
+      <button class="icon-btn"><svg class="i"><use href="#i-logout"/></svg></button>
+    </header>
+
+    <section class="page">
+      <div class="page-head">
+        <div><h1>触发规则</h1><p>谁、做了什么时，播放哪个特效。改完马上生效。</p></div>
+        <div class="actions"><button class="btn"><svg class="i"><use href="#i-bolt"/></svg>模拟一下</button></div>
+      </div>
+
+      <div class="mockbar"><b>改版预览</b>这是能点的样子，不会改任何设置。可以切换标签、开关、⋯ 菜单、右上角亮暗色。<span class="sp"></span></div>
+
+      <div class="rtabs" role="tablist">
+        <button class="rtab" role="tab" data-tab="enter" aria-selected="true"><svg class="i"><use href="#i-users"/></svg>进场<span class="cnt">6/7</span></button>
+        <button class="rtab" role="tab" data-tab="excl" aria-selected="false"><svg class="i"><use href="#i-user"/></svg>专属用户<span class="cnt">2</span></button>
+        <button class="rtab" role="tab" data-tab="danmu" aria-selected="false"><svg class="i"><use href="#i-chat"/></svg>弹幕<span class="cnt">2/2</span></button>
+        <button class="rtab" role="tab" data-tab="gift" aria-selected="false"><svg class="i"><use href="#i-gift"/></svg>礼物<span class="cnt">3/4</span></button>
+        <button class="rtab" role="tab" data-tab="guard" aria-selected="false"><svg class="i"><use href="#i-anchor"/></svg>上舰<span class="cnt">3/3</span></button>
+      </div>
+
+      <!-- ================= 进场 ================= -->
+      <div class="pane" data-pane="enter">
+        <div class="rtool">
+          <span class="say">观众进场时，从上往下找第一条符合的，播放对应的特效。<button class="linkish" data-help="h-enter"><svg class="i"><use href="#i-info"/></svg>怎么判断</button></span>
+          <span class="sp"></span>
+          <span class="set">不重复播放<span class="seg" id="cdMode"><button aria-pressed="true" data-v="time">按时间</button><button aria-pressed="false" data-v="live">每场只播一次</button></span></span>
+        </div>
+        <div class="rhelp" id="h-enter" hidden>
+          判断顺序：<span class="flow"><span>专属用户</span>→<span>大航海</span>→<span>房管</span>→<span>粉丝牌</span>→<span>其他观众</span></span>。<br>
+          一个人同时是舰长和房管，按<b>舰长</b>算；粉丝牌只算<b>本直播间</b>的牌子。<b>不重复播放</b>：「按时间」时每条规则自己设多久内只播一次；「每场只播一次」时同一个人一场直播只播一次。
+        </div>
+        <div class="rt" id="tEnter"></div>
+      </div>
+
+      <!-- ================= 专属用户 ================= -->
+      <div class="pane" data-pane="excl" hidden>
+        <div class="rtool">
+          <span class="say">给某几位观众单独指定进场特效，比身份规则优先。只对进场有效。</span>
+          <span class="sp"></span>
+          <input class="inp" placeholder="搜索昵称或 UID">
+          <button class="btn primary"><svg class="i"><use href="#i-plus"/></svg>添加专属用户</button>
+        </div>
+        <div class="rt" id="tExcl"></div>
+        <p style="margin: 10px 2px 0; font-size: 12.5px; color: var(--t3)">在总览的实时动态里点某个观众，也能直接设置专属特效。</p>
+      </div>
+
+      <!-- ================= 弹幕 ================= -->
+      <div class="pane" data-pane="danmu" hidden>
+        <div class="rtool">
+          <span class="say">弹幕里有关键词就播放。多条都符合时，用排在上面的一条。<button class="linkish" data-help="h-danmu"><svg class="i"><use href="#i-info"/></svg>怎么判断</button></span>
+          <span class="sp"></span>
+          <button class="btn primary"><svg class="i"><use href="#i-plus"/></svg>新建弹幕规则</button>
+        </div>
+        <div class="rhelp" id="h-danmu" hidden>
+          <b>包含</b>：弹幕里带这个词就算，例如「晚安」也包括「主播晚安啦」。<b>整条就是</b>：整条弹幕和关键词一样才算，英文不分大小写。<br>
+          <b>冷却</b>：「全体」是这条规则播放后任何人再触发都要等多久；「每人」是同一个人再触发要等多久。按住左边的编号拖动可以调整顺序。
+        </div>
+        <div class="rt" id="tDanmu"></div>
+      </div>
+
+      <!-- ================= 礼物 ================= -->
+      <div class="pane" data-pane="gift" hidden>
+        <div class="rtool">
+          <span class="say">先看是不是指定礼物，不是的话按这次送的总价值找对应的一段。<button class="linkish" data-help="h-gift"><svg class="i"><use href="#i-info"/></svg>怎么判断</button></span>
+          <span class="sp"></span>
+          <span class="set">连击合并 <button class="switch" role="switch" aria-checked="true" aria-label="连击合并"></button> 同一个人 <button class="cdpick">3 秒<svg class="i"><use href="#i-chev"/></svg></button> 内连续送，合并成一次</span>
+        </div>
+        <div class="rhelp" id="h-gift" hidden>
+          <b>总价值</b> = 单价 × 数量，按 B站礼物面板的电池计算（1 电池 = 0.1 元）。免费礼物不播放。<br>
+          <b>1000 电池（100 元）以上</b>的礼物会插队优先播放（可在总览「排队设置」里关掉）。<b>连击合并</b>：连续送同一种礼物时只播一次，欢迎语里显示合计数量。
+        </div>
+        <div class="rsec"><h3>指定礼物</h3><span>送这些礼物时用这里的特效，优先于按价值</span></div>
+        <div class="rt" id="tGiftSp"></div>
+        <div class="rsec" style="margin-top: 22px"><h3>按价值</h3><span>每一段放一种特效</span></div>
+        <div class="rt" id="tGiftBand"></div>
+      </div>
+
+      <!-- ================= 上舰 ================= -->
+      <div class="pane" data-pane="guard" hidden>
+        <div class="rtool">
+          <span class="say">有人开通或续费大航海时播放，会插队优先播放。同一次上舰 B站会发好几条消息，只播一次。</span>
+        </div>
+        <div class="rt" id="tGuard"></div>
+        <p style="margin: 10px 2px 0; font-size: 12.5px; color: var(--t3)">欢迎语里可以用 <code>{act}</code> 显示「上舰 / 续费」，<code>{months}</code> 显示月数，在素材库里改。</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ic = (n) => `<svg class="i"><use href="#${n}"/></svg>`;
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const BADGES = { gov: BADGE + 'governor-DpDXKEdA.png', adm: BADGE + 'supervisor-u43ElIjU.png', cap: BADGE + 'captain-Bjw5Byb5.png' };
+const NAMES = { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', nor: '其他观众' };
+const STY = { 金銮: 'royal-gov', 亭阁: 'royal-adm', 门楼: 'royal-cap', 晶巡: 'glass-mod', 霜玻: 'frost', 一行字: 'line', 晶语: 'glass-dm', 晶礼: 'glass-gift', 晶耀: 'glass-big' };
+
+const tag = (id) => id === 'mod' ? `<span class="tag mod"><i class="fang">房</i>房管</span>`
+  : id === 'nor' ? `<span class="tag nor">其他观众</span>`
+  : `<span class="tag ${id}"><img class="badge" src="${BADGES[id]}" alt="">${NAMES[id]}</span>`;
+const medalC = (lv) => (lv <= 10 ? '#5762A7' : lv <= 20 ? '#C770A4' : lv <= 30 ? '#3FB4F6' : lv <= 40 ? '#4C7DFF' : lv <= 50 ? '#A773F1' : '#EC4F6E');
+const medal = (lv, name = '星临') => `<span class="medal" style="--mc:${medalC(lv)}99;--ml:${medalC(lv)}E6;--mb:${medalC(lv)}99;color:#fff"><span>${name}</span><b>${lv}</b></span>`;
+const eff = (name, cls = '') => name
+  ? `<button class="effbtn ${cls}"><span class="effthumb"><img src="assets/thumbs/${STY[name]}-w.jpg" alt=""></span><span class="nm">${name}</span>${ic('i-chev').replace('class="i"', 'class="i chev"')}</button>`
+  : `<button class="effbtn same"><span class="nm">和开通时一样</span>${ic('i-chev').replace('class="i"', 'class="i chev"')}</button>`;
+const cd = (t) => `<button class="cdpick">${t}${ic('i-chev')}</button>`;
+const sw = (on) => `<div class="c-sw"><button class="switch" role="switch" aria-checked="${on}" aria-label="开关"></button></div>`;
+const act = (menu) => `<div class="c-act"><button class="icon-btn" title="预览">${ic('i-play')}</button><button class="icon-btn more" title="更多" data-menu="${menu}">${ic('i-more')}</button></div>`;
+const row = (cols, on, inner, extra = '') => `<div class="rt-r${on ? '' : ' off'}" style="grid-template-columns:${cols}" ${extra}>${sw(on)}${inner}</div>`;
+
+// ---------- 进场 ----------
+let cdMode = 'time';
+function renderEnter() {
+  const C = '44px 190px minmax(200px, 300px) 1fr 76px';
+  const cdCell = (t) => `<div class="c-cd">${cdMode === 'time' ? cd(t) : '<span class="muted">每场只播一次</span>'}</div>`;
+  const r = (who, e, t, on) => row(C, on, `<div class="c-who">${who}</div><div class="c-eff">${eff(e)}</div>${cdCell(t)}${act('row')}`);
+  $('#tEnter').innerHTML = `
+    <div class="excl-row">${ic('i-user')}<span><b>专属用户 2 人</b>最优先，各自用自己的特效</span><button class="linkish" data-goto="excl">去设置 →</button></div>
+    <div class="rt-h" style="grid-template-columns:${C}"><span>开关</span><span>身份</span><span>播放的特效</span><span>${cdMode === 'time' ? '同一个人多久内只播一次' : '不重复播放'}</span><span>操作</span></div>
+    <div class="rt-g"><b>大航海</b><span>本直播间的总督、提督、舰长</span></div>
+    ${r(tag('gov'), '金銮', '5 分钟', true)}
+    ${r(tag('adm'), '亭阁', '5 分钟', true)}
+    ${r(tag('cap'), '门楼', '5 分钟', true)}
+    <div class="rt-g"><b>房管</b></div>
+    ${r(tag('mod'), '晶巡', '10 分钟', true)}
+    <div class="rt-g"><b>粉丝牌</b><span>只算本直播间的牌子，按等级分段</span><span class="r"><button class="linkish">＋ 加一段</button></span></div>
+    ${r(`${medal(1)}<span>–</span>${medal(20)}<span class="sub">1 – 20 级</span>`, '霜玻', '30 分钟', true)}
+    ${r(`${medal(21)}<span class="sub">21 级以上</span>`, '霜玻', '30 分钟', true)}
+    <div class="rt-g"><b>其他观众</b><span>上面都不符合的人</span></div>
+    ${r(tag('nor'), '一行字', '1 小时', false)}`;
+}
+
+// ---------- 专属用户 ----------
+function renderExcl() {
+  const C = '44px minmax(160px, 1.2fr) minmax(150px, 1fr) minmax(190px, 260px) 120px 90px 76px';
+  const face = (n, c) => `<span class="avatar" style="background:${c}">${n[0]}</span>`;
+  const r = (n, uid, c, tags, e, t, until, on) => row(C, on, `<div class="c-who">${face(n, c)}<span class="nm"><b>${n}</b><span class="uid">UID ${uid}</span></span></div><div class="c-who">${tags}</div><div class="c-eff">${eff(e)}</div><div class="c-cd">${cd(t)}</div><div class="c-cd">${cd(until)}</div>${act('excl')}`);
+  $('#tExcl').innerHTML = `
+    <div class="rt-h" style="grid-template-columns:${C}"><span>开关</span><span>观众</span><span>身份</span><span>专属特效</span><span>多久内只播一次</span><span>有效期</span><span>操作</span></div>
+    ${r('长夜未央', 101, '#E0689B', `<span class="tag" style="color:#7C5CE0;background:rgba(124,92,224,.12)">荣耀 68</span>${tag('gov')}${medal(44)}`, '金銮', '30 分钟', '长期', true)}
+    ${r('白开水不加糖', 103, '#2BB5A0', `<span class="tag" style="color:#7C5CE0;background:rgba(124,92,224,.12)">荣耀 61</span>${medal(22)}`, '晶耀', '1 小时', '长期', true)}`;
+}
+
+// ---------- 弹幕 ----------
+function renderDanmu() {
+  const C = '30px 44px minmax(220px, 1.3fr) minmax(130px, 170px) minmax(170px, 230px) 150px 76px';
+  const kws = (mode, ks) => `<div class="c-kw"><button class="mode">${mode}${ic('i-chev')}</button>${ks.map((k) => `<span class="kw">${k}<button aria-label="删掉">${ic('i-x')}</button></span>`).join('')}<button class="kw-add">＋ 关键词</button></div>`;
+  const who = (t) => `<div><button class="who-btn"><span>${t}</span>${ic('i-chev')}</button></div>`;
+  const cds = (a, b) => `<div class="cd2"><span>全体</span>${cd(a)}<span>每人</span>${cd(b)}</div>`;
+  const r = (n, mode, ks, w, e, a, b, on) => `<div class="rt-r${on ? '' : ' off'}" style="grid-template-columns:${C}"><div class="c-grip" title="按住拖动调整顺序">${ic('i-grip')}${n}</div>${sw(on)}${kws(mode, ks)}${who(w)}<div class="c-eff">${eff(e)}</div>${cds(a, b)}${act('danmu')}</div>`;
+  $('#tDanmu').innerHTML = `
+    <div class="rt-h" style="grid-template-columns:${C}"><span></span><span>开关</span><span>关键词</span><span>谁发的才算</span><span>播放的特效</span><span>冷却</span><span>操作</span></div>
+    ${r(1, '包含', ['晚安', '好梦'], '主播、房管、大航海 等', '晶语', '10 秒', '10 分钟', true)}
+    ${r(2, '整条就是', ['打卡'], '荣耀 30 级以上', '晶语', '30 秒', '1 小时', true)}
+    <div class="rt-foot">常用：<button class="chipadd">＋ 生日快乐</button><button class="chipadd">＋ 签到</button><button class="chipadd">＋ 主播好</button></div>`;
+}
+
+// ---------- 礼物 ----------
+function renderGift() {
+  const C1 = '44px minmax(180px, 1fr) minmax(200px, 300px) 1fr 76px';
+  $('#tGiftSp').innerHTML = `
+    <div class="rt-h" style="grid-template-columns:${C1}"><span>开关</span><span>礼物</span><span>播放的特效</span><span></span><span>操作</span></div>
+    ${row(C1, true, `<div class="c-who"><img class="gift-ic" src="https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png" alt=""><span class="nm"><b>小花花</b><span class="uid">1 电池</span></span></div><div class="c-eff">${eff('晶礼')}</div><div></div>${act('row')}`)}
+    <div class="rt-foot"><button class="btn"><svg class="i"><use href="#i-plus"/></svg>从礼物列表里选</button></div>`;
+  const C2 = '44px 190px minmax(200px, 300px) 1fr 76px';
+  const band = (v, y, e, on, jump) => row(C2, on, `<div class="val"><b>${v}</b><span>${y}</span></div><div class="c-eff">${eff(e)}</div><div>${jump ? '<span class="jump">插队优先播放</span>' : ''}</div>${act('band')}`);
+  $('#tGiftBand').innerHTML = `
+    <div class="valbar">
+      <div class="bar"><div class="no" style="flex:1">不播放</div><div class="no" style="flex:1">已关闭</div><div style="flex:1;background:#E0568F">晶礼</div><div style="flex:1;background:#C9622A">晶耀</div></div>
+      <div class="ticks"><span style="left:25%">10</span><span style="left:50%">100</span><span style="left:75%">1000 电池</span></div>
+    </div>
+    <div class="rt-h" style="grid-template-columns:${C2};border-top:1px solid var(--line)"><span>开关</span><span>一次送出的价值</span><span>播放的特效</span><span></span><span>操作</span></div>
+    ${band('≥ 1000 电池', '100 元以上', '晶耀', true, true)}
+    ${band('100 – 1000 电池', '10 – 100 元', '晶礼', true)}
+    ${band('10 – 100 电池', '1 – 10 元', '一行字', false)}
+    <div class="rt-foot"><span>10 电池以下不播放</span><span style="flex:1"></span><button class="linkish">＋ 加一段</button></div>`;
+}
+
+// ---------- 上舰 ----------
+function renderGuard() {
+  const C = '44px 150px minmax(200px, 280px) minmax(200px, 280px) 1fr 76px';
+  const r = (id, e) => row(C, true, `<div class="c-who">${tag(id)}</div><div class="c-eff">${eff(e)}</div><div class="c-eff">${eff(null)}</div><div></div>${act('row')}`);
+  $('#tGuard').innerHTML = `
+    <div class="rt-h" style="grid-template-columns:${C}"><span>开关</span><span>等级</span><span>开通时播放</span><span>续费时播放</span><span></span><span>操作</span></div>
+    ${r('gov', '金銮')}${r('adm', '亭阁')}${r('cap', '门楼')}`;
+}
+
+function renderAll() { renderEnter(); renderExcl(); renderDanmu(); renderGift(); renderGuard(); }
+renderAll();
+
+// ---------- 交互 ----------
+function go(tab) {
+  $$('.rtab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  $$('.pane').forEach((p) => (p.hidden = p.dataset.pane !== tab));
+}
+const MENUS = {
+  row: [['i-pen', '调整这个特效（素材设置）']],
+  excl: [['i-list', '查看 TA 的事件记录'], ['i-copy', '复制 UID'], null, ['i-trash', '删除', 'danger']],
+  danmu: [['i-up', '往上挪'], ['i-dup', '复制一条'], null, ['i-trash', '删除', 'danger']],
+  band: [['i-trash', '删掉这一段（并入下面一段）', 'danger']],
+};
+let openMenu = null;
+function closeMenu() { openMenu?.remove(); openMenu = null; }
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button');
+  if (!t) return closeMenu();
+  if (t.classList.contains('rtab')) return go(t.dataset.tab);
+  if (t.dataset.goto) return go(t.dataset.goto);
+  if (t.dataset.help) { const h = document.getElementById(t.dataset.help); h.hidden = !h.hidden; return; }
+  if (t.classList.contains('switch')) {
+    const on = t.getAttribute('aria-checked') !== 'true';
+    t.setAttribute('aria-checked', String(on));
+    t.closest('.rt-r')?.classList.toggle('off', !on);
+    return;
+  }
+  if (t.parentElement?.id === 'cdMode') {
+    cdMode = t.dataset.v;
+    $$('#cdMode button').forEach((b) => b.setAttribute('aria-pressed', String(b === t)));
+    return renderEnter();
+  }
+  if (t.dataset.menu) {
+    const same = openMenu && openMenu.parentElement === t.parentElement;
+    closeMenu();
+    if (same) return;
+    const m = document.createElement('div');
+    m.className = 'rmenu';
+    m.innerHTML = MENUS[t.dataset.menu].map((x) => (x ? `<button class="${x[2] ?? ''}">${ic(x[0])}${x[1]}</button>` : '<hr>')).join('');
+    t.parentElement.appendChild(m);
+    openMenu = m;
+    return;
+  }
+  closeMenu();
+});
+$('#themeBtn').onclick = (e) => { e.stopPropagation(); document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; };
+const fromHash = () => { const h = location.hash.slice(1); if (['enter', 'excl', 'danmu', 'gift', 'guard'].includes(h)) go(h); };
+addEventListener('hashchange', fromHash);
+fromHash();
+</script>
+</body>
+</html>

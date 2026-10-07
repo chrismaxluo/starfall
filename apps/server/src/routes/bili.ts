@@ -73,6 +73,7 @@ export function biliRoutes(app: FastifyInstance, ctx: AppContext): void {
         cooldownMode: z.enum(['minutes', 'oncePerLive']).optional(),
         queueMax: z.number().int().min(3).max(30).optional(),
         queueJump: z.boolean().optional(),
+        giftAnimImg: z.boolean().optional(),
         blockAnchor: z.boolean().optional(),
         blockAccount: z.boolean().optional(),
         retentionDays: z.union([z.literal(0), z.literal(30), z.literal(90), z.literal(180)]).optional(),

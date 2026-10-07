@@ -140,8 +140,8 @@ export interface PlayItem {
   };
   /** 上舰事件：开通还是续费（宫廷特效的印章用） */
   guardOp?: 'open' | 'renew';
-  /** 礼物事件：礼物名称、数量（连击合并后的）、礼物图（从直播间礼物面板查，查不到时没有） */
-  gift?: { name: string; count: number; img?: string };
+  /** 礼物事件：名称、数量（连击合并后的）、礼物图（从礼物面板查，设置里选了动图时是动图，查不到时没有）、总价值（金瓜子）；fx 是 B站全屏动画（「B站动画」样式用） */
+  gift?: { name: string; count: number; img?: string; value?: number; fx?: GiftFx };
   /** 后台"测试播放"发出的 */
   test?: boolean;
   /** 素材快捷播放发出的 */
@@ -192,3 +192,19 @@ export const OVERLAY_CLOSE = {
   /** 输出不存在或密钥不对（包括重置了密钥、删除了输出）：特效页不再重连 */
   badKey: 4003,
 } as const;
+
+/** 「B站动画」样式：有 B站全屏动画的礼物播官方动画，没有时按价值显示晶耀（不低于 BIG_GIFT_GOLD）或晶礼 */
+export const BILI_GIFT_STYLE = 'bili-gift';
+/** 礼物「大额」的分界（金瓜子）：100 元 */
+export const BIG_GIFT_GOLD = 100_000;
+
+/** B站礼物全屏动画：一个 MP4 里一块是画面、一块是透明度（x, y, 宽, 高，按视频像素） */
+export interface GiftFx {
+  src: string;
+  w: number;
+  h: number;
+  videoW: number;
+  videoH: number;
+  rgb: [number, number, number, number];
+  alpha: [number, number, number, number];
+}

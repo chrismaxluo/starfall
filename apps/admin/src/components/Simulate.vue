@@ -46,7 +46,7 @@ async function run(): Promise<void> {
     const g = catalog.value.find((x) => x.id === Number(giftPick.value));
     const unitPrice = g ? g.price : Math.round(customBattery.value) * 100;
     body = g ? { kind: 'gift', viewer, giftId: g.id, giftName: g.name, unitPrice, count: count.value } : { kind: 'gift', viewer, giftName: '礼物', unitPrice, count: count.value };
-    vars = { gift: g?.name ?? '礼物', count: count.value, valueGold: unitPrice * count.value };
+    vars = { gift: g?.name ?? '礼物', ...(g ? { giftId: g.id } : {}), count: count.value, valueGold: unitPrice * count.value };
   }
   if (props.kind === 'guard') {
     body = { kind: 'guard', viewer, ...guard.value };

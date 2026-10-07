@@ -32,13 +32,14 @@ export const CONFIG_VERSION = 2;
 export const CONFIG_ENTRY = 'starfall-config.json';
 
 /** 导出的设置项（不含暂停状态这类运行时状态） */
-const SETTING_KEYS = ['connectMode', 'offlinePolicy', 'cooldownMode', 'queueMax', 'queueJump', 'blockAnchor', 'blockAccount', 'retentionDays', 'giftComboEnabled', 'giftComboSec', 'autoBackup', 'featherOn', 'featherPct'] as const;
+const SETTING_KEYS = ['connectMode', 'offlinePolicy', 'cooldownMode', 'queueMax', 'queueJump', 'giftAnimImg', 'blockAnchor', 'blockAccount', 'retentionDays', 'giftComboEnabled', 'giftComboSec', 'autoBackup', 'featherOn', 'featherPct'] as const;
 const SETTING_NAMES: Record<(typeof SETTING_KEYS)[number], string> = {
   connectMode: '连接直播间的时机',
   offlinePolicy: '未开播时是否播放',
   cooldownMode: '进场冷却方式',
   queueMax: '最多排队数',
   queueJump: '高价值插队',
+  giftAnimImg: '礼物图用动图',
   blockAnchor: '主播本人不触发',
   blockAccount: '登录的账号不触发',
   retentionDays: '事件记录保留期',
@@ -60,6 +61,7 @@ const SettingsPart = z
     cooldownMode: z.enum(['minutes', 'oncePerLive']),
     queueMax: z.number().int().min(3).max(30),
     queueJump: z.boolean(),
+    giftAnimImg: z.boolean(),
     blockAnchor: z.boolean(),
     blockAccount: z.boolean(),
     retentionDays: z.union([z.literal(0), z.literal(30), z.literal(90), z.literal(180)]),

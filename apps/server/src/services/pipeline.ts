@@ -4,7 +4,7 @@
 // 四种事件共用同一套判断（黑名单 → 匹配规则 → 暂停 → 开播 → 冷却 → 特效页在线），只有匹配规则、冷却、欢迎语变量、是否插队不同。
 import { Cooldowns, EnterMerger, GiftComboMerger, GuardDeduper, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchDanmu, matchEnter, matchGift, matchGuard, pickText } from '@starfall/core';
 import type { QueueItem, TextVars } from '@starfall/core';
-import { GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD, isOwnMedal } from '@starfall/shared';
+import { BIG_GIFT_GOLD, BILI_GIFT_STYLE, GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD, isOwnMedal } from '@starfall/shared';
 import type { ChatItem, DanmuEvent, PlayItem, PlayStatus, StdEvent, SvgaDyn, TriggerKind, Viewer } from '@starfall/shared';
 import { HttpError } from '../http.ts';
 import type { BlacklistStore } from './blacklist.ts';
@@ -13,6 +13,7 @@ import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rule
 import type { EventLog } from './events.ts';
 import type { Hub } from './hub.ts';
 import type { LiveService } from './live.ts';
+import type { GiftEffects, GiftFxHit } from './gift-fx.ts';
 import type { GiftCatalog } from './gifts.ts';
 import type { HonorMedals } from './honor.ts';
 import type { RoomStore } from './room.ts';
@@ -26,7 +27,9 @@ export type TriggerEvent = Exclude<StdEvent, { kind: 'live' | 'sc' }>;
 const SC_DEDUPE_MS = 10 * 60_000;
 /** 欢迎语变量（除观众以外） */
 export type Vars = Omit<TextVars, 'viewer'> & {
-  /** 礼物图（不进欢迎语，放进播放内容给礼物特效用） */
+  /** 礼物编号：查礼物图、动图和 B站全屏动画（不进欢迎语） */
+  giftId?: number;
+  /** 礼物图（不进欢迎语）：礼物面板里查不到时用这张，一般是送礼消息自带的 */
   giftImg?: string;
 };
 
@@ -34,7 +37,7 @@ export type Vars = Omit<TextVars, 'viewer'> & {
 const SAMPLE_VARS: Record<TriggerKind, Vars> = {
   enter: {},
   danmu: { text: '主播晚上好！' },
-  gift: { gift: '小花花', count: 10, valueGold: 1000, giftImg: 'https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png' },
+  gift: { gift: '小花花', giftId: 31036, count: 10, valueGold: 1000, giftImg: 'https://s1.hdslb.com/bfs/live/5126973892625f3a43a8290be6b625b5e54261a5.png' },
   guard: { months: 1, guardLevel: 3, op: 'open' },
 };
 
@@ -49,6 +52,16 @@ interface Judgement {
 }
 
 /** 测试播放、预览用的观众 */
+/** 没给的用示例补上；换了礼物却没有礼物图时，不能沿用示例（小花花）的图 */
+function withSample(kind: TriggerKind, vars?: Vars): Vars {
+  const v = { ...SAMPLE_VARS[kind], ...vars };
+  if (kind === 'gift' && vars?.gift !== undefined && vars.gift !== SAMPLE_VARS.gift.gift) {
+    if (!vars.giftImg) delete v.giftImg;
+    if (!vars.giftId) delete v.giftId;
+  }
+  return v;
+}
+
 const SAMPLE_VIEWER: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, honor: 28 };
 
 const honorOf = (level: number, url: string | undefined) => ({ level, ...(url ? { url } : {}) });
@@ -116,7 +129,9 @@ export interface SimulateResult {
 export interface PipelineDeps {
   live: Pick<LiveService, 'onEvent' | 'status'>;
   /** 查礼物图；测试里可以不传 */
-  gifts?: Pick<GiftCatalog, 'iconFor'>;
+  gifts?: Pick<GiftCatalog, 'find'>;
+  /** 查 B站礼物全屏动画；测试里可以不传 */
+  giftFx?: Pick<GiftEffects, 'forGift'>;
   /** 查荣耀等级勋章图；测试里可以不传 */
   honor?: Pick<HonorMedals, 'urlFor'>;
   room: RoomStore;
@@ -355,12 +370,8 @@ export class Pipeline {
       }
       case 'gift': {
         const m = matchGift(ev, this.d.giftRules.get());
-        vars = { gift: ev.giftName, count: ev.count, valueGold: ev.unitPrice * ev.count };
-        {
-          // 优先用送礼消息里自带的官方图标，没有时再查礼物面板
-          const img = ev.icon || this.d.gifts?.iconFor(ev.giftId);
-          if (img) vars.giftImg = img;
-        }
+        // 礼物图按编号查礼物面板（可以用动图）；送礼消息自带的图（已经用面板补过）兜底
+        vars = { gift: ev.giftName, giftId: ev.giftId, count: ev.count, valueGold: ev.unitPrice * ev.count, ...(ev.icon ? { giftImg: ev.icon } : {}) };
         hit = m;
         jump = queueJump && ev.unitPrice * ev.count >= JUMP_GOLD;
         break;
@@ -405,7 +416,7 @@ export class Pipeline {
   private process(ev: TriggerEvent): void {
     // 消息没带礼物图时用礼物面板里的图补上（事件记录里也显示）
     if (ev.kind === 'gift' && !ev.icon) {
-      const icon = this.d.gifts?.iconFor(ev.giftId);
+      const icon = this.d.gifts?.find(ev.giftId)?.icon;
       if (icon) ev = { ...ev, icon };
     }
     const j = this.judge(ev);
@@ -458,10 +469,27 @@ export class Pipeline {
     return out.length ? out : undefined;
   }
 
+  /** 礼物图（设置里选了动图并且有动图时用动图）和 B站全屏动画 */
+  private giftOf(vars: Vars): { img?: string; fx?: GiftFxHit } {
+    const g = vars.giftId ? this.d.gifts?.find(vars.giftId) : undefined;
+    const anim = this.d.settings.get('giftAnimImg') ? g?.webp || g?.gif : undefined;
+    const img = anim || g?.icon || vars.giftImg;
+    const fx = this.d.giftFx?.forGift(g);
+    return { ...(img ? { img } : {}), ...(fx ? { fx } : {}) };
+  }
+
   private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {
     const a = effect.asset;
     const text = fillText(pickText(effect.texts, kind, this.rng), { viewer, ...vars });
     const dyn = this.svgaDyn(effect, viewer, text);
+    const gift = kind === 'gift' && vars.gift ? this.giftOf(vars) : undefined;
+    // 「B站动画」：有官方全屏动画时按动画的长度播；没有时按价值换成晶耀或晶礼的样子
+    let style = effect.visual.type === 'builtin_style' ? effect.visual.style : 'line';
+    let durationMs = effect.durationMs;
+    if (style === BILI_GIFT_STYLE) {
+      if (gift?.fx) durationMs = gift.fx.durationMs;
+      else style = (vars.valueGold ?? 0) >= BIG_GIFT_GOLD ? 'glass-big' : 'glass-gift';
+    }
     return {
       id: `p${this.now()}-${++this.seq}`,
       kind,
@@ -471,10 +499,10 @@ export class Pipeline {
         visual:
           effect.visual.type === 'asset' && a
             ? { type: 'asset', url: a.url, ext: a.ext, kind: a.kind === 'audio' ? 'video' : a.kind, width: a.width, height: a.height, hasAlpha: a.hasAlpha, ...(dyn ? { dyn } : {}) }
-            : { type: 'builtin_style', style: effect.visual.type === 'builtin_style' ? effect.visual.style : 'line' },
+            : { type: 'builtin_style', style },
         showText: effect.showText,
         position: effect.position,
-        durationMs: effect.durationMs,
+        durationMs,
         fadeIn: effect.fadeIn,
         fadeOut: effect.fadeOut,
         fadeInMs: effect.fadeInMs,
@@ -498,12 +526,14 @@ export class Pipeline {
         ...(viewer.honor ? { honor: honorOf(viewer.honor, this.d.honor?.urlFor(viewer.honor)) } : {}),
       },
       ...(kind === 'guard' && vars.op ? { guardOp: vars.op } : {}),
-      ...(kind === 'gift' && vars.gift ? { gift: { name: vars.gift, count: vars.count ?? 1, ...(vars.giftImg ? { img: vars.giftImg } : {}) } } : {}),
+      ...(gift ? { gift: { name: vars.gift!, count: vars.count ?? 1, ...(gift.img ? { img: gift.img } : {}), ...(vars.valueGold !== undefined ? { value: vars.valueGold } : {}), ...(gift.fx && style === BILI_GIFT_STYLE ? { fx: gift.fx.fx } : {}) } } : {}),
       ...(test ? { test: true } : {}),
     };
   }
 
   private enqueue(item: PlayItem, eventId: number | null, jump: boolean, detail: string, undo?: () => void): void {
+    // B站动画：排队时就让特效页先下载，轮到时不用现下
+    if (item.gift?.fx) this.d.hub.toOverlays({ type: 'preload', preload: [item.gift.fx.src] });
     this.queue.max = this.d.settings.get('queueMax');
     const { dropped } = this.queue.enqueue({ id: item.id, kind: item.kind, enqueuedAt: this.now(), jump, payload: { item, eventId, detail, ...(undo ? { undo } : {}) } });
     if (dropped) this.unplayed(dropped, 'dropped');
@@ -598,7 +628,7 @@ export class Pipeline {
     if (this.d.hub.overlayCount() === 0) throw new HttpError(409, 'no_overlay', '特效页不在线：请先把特效页地址加到直播软件的浏览器源里');
     const e = typeof effect === 'number' ? this.d.effects.get(effect) : effect;
     const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
-    const item = this.playItem(e, v, kind, kind === 'enter' && !vars ? {} : { ...SAMPLE_VARS[kind], ...vars }, true);
+    const item = this.playItem(e, v, kind, kind === 'enter' && !vars ? {} : withSample(kind, vars), true);
     // 正在播的也是测试：直接换成新的，不用等它播完（真实观众的特效不打断）
     if (this.current?.q.payload.item.test) this.stopCurrent();
     this.enqueue(item, null, true, '测试播放');
@@ -631,7 +661,7 @@ export class Pipeline {
   /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
   preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): PlayItem {
     const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
-    return this.playItem(effect, v, kind, { ...SAMPLE_VARS[kind], ...vars }, true);
+    return this.playItem(effect, v, kind, withSample(kind, vars), true);
   }
 
   snapshot(): QueueSnapshot {

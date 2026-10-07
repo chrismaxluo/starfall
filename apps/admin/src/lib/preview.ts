@@ -8,7 +8,7 @@ export interface PreviewRequest {
   viewer: SampleViewer;
   label: string;
   kind?: TriggerKind;
-  vars?: { text?: string; gift?: string; count?: number; valueGold?: number; months?: number; guardLevel?: 1 | 2 | 3; op?: 'open' | 'renew' };
+  vars?: { text?: string; gift?: string; giftId?: number; count?: number; valueGold?: number; months?: number; guardLevel?: 1 | 2 | 3; op?: 'open' | 'renew' };
 }
 
 /** 按事件类型预览时用的示例观众和内容（礼物带礼物图和数量、弹幕带弹幕内容） */

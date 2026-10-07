@@ -138,7 +138,7 @@ describe('数据库', () => {
   it('被规则引用的素材不能删除（F-AS-14）', () => {
     const db = openDb(':memory:');
     seed(db);
-    const used = db.select().from(effects).where(eq(effects.name, '晶耀')).get()!;
+    const used = db.select().from(effects).where(eq(effects.name, 'B站动画')).get()!;
     expect(() => db.delete(effects).where(eq(effects.id, used.id)).run()).toThrow(/FOREIGN KEY/);
   });
 

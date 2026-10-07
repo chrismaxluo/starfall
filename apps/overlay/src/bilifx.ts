@@ -5,7 +5,7 @@ import { BIG_GIFT_GOLD } from '@starfall/shared/overlay';
 import type { GiftFx, PlayItem } from '@starfall/shared';
 import type { StageSize } from './builtin.ts';
 import { h } from './dom.ts';
-import { GLASS_STYLES } from './glass.ts';
+import { giftHero, giftStrip } from './giftcard.ts';
 import type { Media } from './media.ts';
 
 /** 视频这么久还没出画面就换成卡片 */
@@ -74,8 +74,8 @@ export interface BiliFx extends Media {
 }
 
 /** 「谁送了什么」：沿用晶礼的样子，放在画面上方居中 */
-function bar(item: PlayItem, stage: StageSize): HTMLElement {
-  return h('div', { class: 'bfx-bar' }, GLASS_STYLES['glass-gift']!(item, stage));
+function bar(item: PlayItem): HTMLElement {
+  return h('div', { class: 'bfx-bar' }, giftStrip(item));
 }
 
 /** onFallback：动画没放出来、换成卡片时告诉服务端原因（写进日志） */
@@ -103,7 +103,7 @@ export function buildBiliFx(item: PlayItem, stage: StageSize, onFallback?: (why:
     out.video = null;
     clear();
     canvas.remove();
-    if ((item.gift?.value ?? 0) >= BIG_GIFT_GOLD) el.replaceChildren(GLASS_STYLES['glass-big']!(item, stage));
+    if ((item.gift?.value ?? 0) >= BIG_GIFT_GOLD) el.replaceChildren(giftHero(item, stage));
   };
   const clear = () => {
     clearTimeout(stalled);
@@ -141,6 +141,6 @@ export function buildBiliFx(item: PlayItem, stage: StageSize, onFallback?: (why:
   }
 
   if (gl) el.append(canvas);
-  el.append(bar(item, stage));
+  el.append(bar(item));
   return out;
 }

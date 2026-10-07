@@ -148,7 +148,7 @@ function setGiftsMax(v: number): void {
   const n = Math.round(v);
   if (!(n >= 1 && n <= GIFTS_MAX_LIMIT)) return toast(`条数要在 1 – ${GIFTS_MAX_LIMIT} 之间`, 'err');
   if (n === o.value.giftsMax) return;
-  void save({ giftsMax: n }, `最多显示 ${n} 条；浏览器源的高度建议改成 ${giftsHeight(n, o.value.giftsSize)}`);
+  void save({ giftsMax: n }, `一屏显示 ${n} 条；浏览器源的高度建议改成 ${giftsHeight(n, o.value.giftsSize)}`);
 }
 const setGiftsFilter = (f: GiftsFilter, msg: string) => void save({ giftsFilter: f }, msg);
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
@@ -344,7 +344,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           <div class="srcbox" :class="{ off: !o.giftsEnabled }">
             <div class="src-h">
               <span class="src-ic gf"><Icon name="i-gift" /></span>
-              <span class="src-t"><b>送礼名单</b><span>本场收到的礼物、上舰、醒目留言，最新的在上，最多 {{ o.giftsMax }} 条 · 拖到画面一侧</span></span>
+              <span class="src-t"><b>送礼名单</b><span>本场收到的礼物、上舰、醒目留言，一屏 {{ o.giftsMax }} 条，放不下时循环往上滚 · 拖到画面一侧</span></span>
               <span class="right">
                 <span class="live" :class="o.giftsEnabled && giftLists.length ? '' : 'off'"><i />{{ o.giftsEnabled ? liveText(giftLists) : '已关闭' }}</span>
                 <button class="switch" role="switch" type="button" :aria-checked="o.giftsEnabled" aria-label="启用送礼名单" @click="save({ giftsEnabled: !o.giftsEnabled }, o.giftsEnabled ? '已关闭送礼名单：直播画面上不再显示' : '已打开送礼名单')" />
@@ -357,7 +357,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
             <div class="src-f">
               <span class="wh2">宽高填 <code>{{ giftsWh.w }} × {{ giftsWh.h }}</code></span>
-              <span>高度按 {{ o.giftsMax }} 条算好了，矮了就少显示几条</span>
+              <span>高度按一屏 {{ o.giftsMax }} 条算好了</span>
               <span class="links"><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
             </div>
           </div>
@@ -520,10 +520,10 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                 <div class="line">
                   <span class="stepper">
                     <button type="button" aria-label="少一条" :disabled="o.giftsMax <= 1" @click="setGiftsMax(o.giftsMax - 1)">−</button>
-                    <input :key="`${o.id}-g${o.giftsMax}`" class="inp num" type="number" min="1" :max="GIFTS_MAX_LIMIT" :value="o.giftsMax" aria-label="送礼名单最多显示几条" @change="(e) => setGiftsMax(Number((e.target as HTMLInputElement).value))" />
+                    <input :key="`${o.id}-g${o.giftsMax}`" class="inp num" type="number" min="1" :max="GIFTS_MAX_LIMIT" :value="o.giftsMax" aria-label="送礼名单一屏显示几条" @change="(e) => setGiftsMax(Number((e.target as HTMLInputElement).value))" />
                     <button type="button" aria-label="多一条" :disabled="o.giftsMax >= GIFTS_MAX_LIMIT" @click="setGiftsMax(o.giftsMax + 1)">+</button>
                   </span>
-                  <span class="hint">最多显示几条（1 – {{ GIFTS_MAX_LIMIT }}），新的在上，旧的从下面挤出去</span>
+                  <span class="hint">一屏显示几条（1 – {{ GIFTS_MAX_LIMIT }}）；本场的礼物比这多时，从下往上循环滚动，新收到的从下面滚进来</span>
                 </div>
               </div>
             </div>

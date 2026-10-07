@@ -1,4 +1,4 @@
-/* 送礼名单：和礼物特效（晶礼）同一套样子的小号横条。尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍（--k）。
+/* 送礼名单：和礼物特效（晶礼）同一套样子的小号横条，一屏放不下时从下往上循环滚动。尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍（--k）。
    颜色按价值分档（--c1 主色、--c2 渐变色、--c3 亮色），上舰按舰长蓝、提督紫、总督金 */
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -12,7 +12,10 @@ html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%
 .gl-root { position: fixed; inset: 0; overflow: hidden; --k: 1; }
 .gl-root.large { --k: 1.25; }
 .gl-root.off .gl { display: none; }
-.gl { position: absolute; left: 0; right: 0; top: 0; padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; zoom: var(--k); }
+.gl { position: absolute; left: 0; right: 0; top: 0; padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; zoom: var(--k); will-change: transform; }
+/* 循环滚动：上下两头淡出；一串的末尾空一段再从头开始 */
+.gl-root { -webkit-mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); }
+.gl-gap { flex: none; height: 70px; }
 .side-left .gl { align-items: flex-start; }
 .side-right .gl { align-items: flex-end; }
 

@@ -62,7 +62,7 @@ export interface GiftsFilter {
   sc: boolean;
 }
 export const GIFTS_FILTER_DEFAULT: GiftsFilter = { mode: 'all', gifts: [], guard: true, sc: true };
-/** 送礼名单条数：默认 6 条，最多 GIFTS_MAX_LIMIT 条（服务端记住本场最近 GIFTS_KEEP 条） */
+/** 送礼名单一屏显示几条：默认 6 条，最多 GIFTS_MAX_LIMIT 条；本场最近 GIFTS_KEEP 条都在循环滚动里（服务端也记这么多） */
 export const GIFTS_MAX_DEFAULT = 6;
 export const GIFTS_MAX_LIMIT = 20;
 export const GIFTS_KEEP = 200;

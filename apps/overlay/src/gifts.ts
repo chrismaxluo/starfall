@@ -1,5 +1,5 @@
 // 送礼名单：本场直播（没开播时是上一场）收到的礼物、上舰、醒目留言，每次一条彩色小横条（和礼物特效同一套样子），
-// 最新的在最上面，往下顶，最多显示设置的条数（放不下时少显示几条）。连击合成一条。
+// 按时间先后排成一串，一屏放不下时从下往上循环滚动。连击合成一条。
 // 地址形如 /overlay/?output=1&key=...&gifts=1，在直播软件里单独加一个浏览器源（建议 640 宽），拖到画面一侧
 import './gifts.css';
 import { GUARD_BADGES, GIFTS_KEEP, giftListShows } from '@starfall/shared/overlay';
@@ -75,45 +75,78 @@ function build(it: GiftListItem): HTMLElement {
   );
 }
 
-/** 新来的一条：从侧面滑进来，礼物图弹一下 */
+/** 新来的一条：从下面浮上来，礼物图弹一下 */
 function enter(el: HTMLElement): void {
-  const dx = config.giftsSide === 'right' ? 60 : -60;
-  el.animate([{ opacity: 0, transform: `translateX(${dx}px) scale(.96)` }, { opacity: 1, transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.9,.25,1.08)' });
+  el.animate([{ opacity: 0, transform: 'translateY(40px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.9,.25,1.08)' });
   el.querySelector('.gl-pic')?.animate([{ opacity: 0, transform: 'scale(.3) rotate(-16deg)' }, { opacity: 1, transform: 'none' }], { duration: 560, delay: 160, easing: 'cubic-bezier(.3,1.6,.5,1)', fill: 'backwards' });
   el.querySelector('.gl-num')?.animate([{ opacity: 0, transform: 'scale(2.2)' }, { opacity: 1, transform: 'scale(.92)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 480, delay: 360, easing: 'ease-out', fill: 'backwards' });
   el.querySelector('.gl-sheen')?.animate([{ left: '-30%', opacity: 0 }, { opacity: 1, offset: 0.15 }, { left: '120%', opacity: 0 }], { duration: 1000, delay: 420, easing: 'cubic-bezier(.45,0,.3,1)', fill: 'backwards' });
 }
 
-/** 放不下的从最下面淡出 */
-function trim(animate: boolean): void {
-  const rows = [...list.children] as HTMLElement[];
-  // 按排版位置算（不受正在滑动的动画影响）；字号大时整体放大过，换算回放大前的尺寸
-  const k = config.giftsSize === 'large' ? 1.25 : 1;
-  const limit = root.clientHeight / k - 12;
-  rows.forEach((r, i) => {
-    if (r.classList.contains('out')) return;
-    const over = i >= config.giftsMax || r.offsetTop + r.offsetHeight > limit;
-    if (!over) return;
-    if (!animate) return void r.remove();
-    r.classList.add('out');
-    r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 360, easing: 'ease-in' }).onfinish = () => r.remove();
-  });
+// ---------- 循环滚动 ----------
+// 所有的条目排成一串往上滚（像片尾字幕），滚出顶部的一条挪到最后面接着滚；一屏放得下时不滚。
+// 一串的末尾有一段空白（.gl-gap），看得出从头开始了。位置都按排版尺寸算（字号大时整体放大过，不受动画影响）
+
+/** 滚动速度：每秒多少像素（放大前），一条大约 3 秒 */
+const SPEED = 32;
+/** 相邻两条的间距（和 CSS 里 .gl 的 gap 一致） */
+const GAP = 10;
+let offset = 0;
+let scrolling = false;
+let lastT = 0;
+const gapEl = h('div', { class: 'gl-gap' });
+
+const zoomK = () => (config.giftsSize === 'large' ? 1.25 : 1);
+/** 能显示的高度（放大前） */
+const viewH = () => root.clientHeight / zoomK() - 40;
+const rows = () => [...list.children] as HTMLElement[];
+
+/** 内容比一屏高时开始滚（加上末尾的空白），放得下时停下、回到开头 */
+function updateScrolling(): void {
+  const content = rows().filter((r) => r !== gapEl).reduce((sum, r) => sum + r.offsetHeight + GAP, 0);
+  const need = content > viewH();
+  if (need === scrolling) return;
+  scrolling = need;
+  if (need) list.append(gapEl);
+  else {
+    // 停下：按时间先后重新排好，回到开头
+    gapEl.remove();
+    offset = 0;
+    list.style.transform = '';
+    redraw();
+  }
 }
+
+function tick(t: number): void {
+  const dt = lastT ? Math.min(0.1, (t - lastT) / 1000) : 0;
+  lastT = t;
+  if (scrolling && config.giftsEnabled) {
+    offset += SPEED * dt;
+    // 第一条整个滚出顶部：挪到最后面
+    for (let first = list.firstElementChild as HTMLElement | null; first && offset >= first.offsetHeight + GAP; first = list.firstElementChild as HTMLElement | null) {
+      offset -= first.offsetHeight + GAP;
+      list.append(first);
+    }
+    list.style.transform = `translateY(${-offset}px)`;
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
 
 function add(it: GiftListItem, animate = true): void {
   if (!giftListShows(config.giftsFilter, it)) return;
-  // FLIP：记下原来的位置，插到最上面后，让原来的几条从旧位置滑到新位置
-  const before = new Map([...list.children].map((r) => [r, (r as HTMLElement).offsetTop]));
   const el = build(it);
-  list.prepend(el);
-  if (animate) {
-    for (const [r, top] of before) {
-      const dy = top - (r as HTMLElement).offsetTop;
-      if (Math.abs(dy) > 0.5) (r as HTMLElement).animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 460, easing: 'cubic-bezier(.22,1,.36,1)' });
-    }
-    enter(el);
+  if (scrolling) {
+    // 插在下边缘、马上要滚进来的位置（不用等一整轮）
+    const bottom = offset + viewH();
+    const next = rows().find((r) => r.offsetTop >= bottom);
+    if (next) list.insertBefore(el, next);
+    else list.append(el);
+  } else {
+    list.append(el);
+    if (animate) enter(el);
   }
-  trim(animate);
+  updateScrolling();
 }
 
 function push(it: GiftListItem): void {
@@ -121,10 +154,17 @@ function push(it: GiftListItem): void {
   add(it);
 }
 
-/** 按现在的设置重新画一遍（不要动画）：最新的在上 */
+/** 按现在的设置重新画一遍（不要动画）：按时间先后，旧的在上 */
 function redraw(): void {
   list.replaceChildren();
-  for (const it of items) add(it, false);
+  scrolling = false;
+  offset = 0;
+  list.style.transform = '';
+  for (const it of items) {
+    if (!giftListShows(config.giftsFilter, it)) continue;
+    list.append(build(it));
+  }
+  updateScrolling();
 }
 
 function applyConfig(next: OverlayConfig): void {
@@ -160,7 +200,7 @@ function onMessage(m: ServerToOverlay): void {
       break;
     case 'gifts_clear':
       items = [];
-      list.replaceChildren();
+      redraw();
       break;
     case 'version':
       onBuild(m.build);

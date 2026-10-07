@@ -1,8 +1,10 @@
 packages:
   - packages/*
   - apps/*
+# better-sqlite3 自带各平台编译好的文件（Linux / Windows / macOS 的 x64、arm64），不用现场编译；
+# 打开的话 pnpm 会多跑一次 node-gyp，没装 make 的新服务器上会失败
 allowBuilds:
-  better-sqlite3: true
+  better-sqlite3: false
   esbuild: true
 minimumReleaseAgeExclude:
   - '@vitest/mocker@5.0.2'

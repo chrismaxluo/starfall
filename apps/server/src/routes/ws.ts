@@ -1,7 +1,7 @@
 // WebSocket（方案设计 9.3）：/ws/overlay 给特效页，/ws/admin 给管理后台。
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from '@fastify/websocket';
-import { BILI_GIFT_STYLE, OVERLAY_CLOSE, OVERLAY_TIMING } from '@starfall/shared';
+import { OVERLAY_CLOSE, OVERLAY_TIMING } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { SESSION_COOKIE } from './auth.ts';
@@ -18,7 +18,8 @@ const OverlayMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('alive') }),
 ]);
 
-/** 本输出可能用到的文件：进场、礼物规则里引用的素材的画面和音效；礼物规则用了「B站动画」时，再加上礼物面板上各个礼物的全屏动画（放在最后） */
+/** 本输出可能用到的文件：进场、礼物规则里引用的素材的画面和音效。
+ * B站动画的全屏动画不在这里预下载（礼物面板上几十个，直播中重连时会占带宽），礼物排队时再单独让特效页先下载 */
 export function preloadUrls(ctx: AppContext): string[] {
   const rules = ctx.enterRules.full();
   const ids = new Set<number>();
@@ -29,16 +30,10 @@ export function preloadUrls(ctx: AppContext): string[] {
   const gift = ctx.giftRules.get();
   for (const x of [...gift.specific, ...gift.bands]) if (x.enabled && x.effectId) ids.add(x.effectId);
   const urls = new Set<string>();
-  let bili = false;
   for (const e of ctx.effects.list()) {
     if (!ids.has(e.id)) continue;
     if (e.asset) urls.add(e.asset.url);
     if (e.sound) urls.add(e.sound.url);
-    if (e.visual.type === 'builtin_style' && e.visual.style === BILI_GIFT_STYLE) bili = true;
-  }
-  if (bili) for (const g of ctx.gifts.cached()) {
-    const src = g.paid ? ctx.giftFx.forGift(g)?.fx.src : undefined;
-    if (src) urls.add(src);
   }
   return [...urls];
 }

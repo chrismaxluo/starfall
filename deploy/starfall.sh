@@ -210,7 +210,8 @@ EOF
     step "安装系统软件（git、curl、ffmpeg）"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq </dev/null
-    apt-get install -y -qq git curl ca-certificates ffmpeg </dev/null >/dev/null
+    # make、python3：v1.4.0 及更早的版本安装依赖时会跑一次 node-gyp（只检查、不编译），没有它们会失败；退回旧版本时也用得上
+    apt-get install -y -qq git curl ca-certificates ffmpeg make python3 </dev/null >/dev/null
     ok "完成"
 
     local major=0
@@ -245,7 +246,7 @@ EOF
     git_in -c advice.detachedHead=false checkout -q --detach "$target"
     ok "版本 $(current_label)"
 
-    install_deps || die "安装依赖失败。网络慢可以加 --registry https://registry.npmmirror.com 重试（先删掉 $DIR）"
+    install_deps || die "安装依赖失败（原因见上面的输出）。如果是网络慢、下载超时，可以加 --registry https://registry.npmmirror.com 重试（先删掉 $DIR）"
     build_pages || die "构建失败（多半是内存不够），先删掉 $DIR 再重试"
 
     step "创建服务账号和系统服务"

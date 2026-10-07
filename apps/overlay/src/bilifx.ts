@@ -1,11 +1,9 @@
 // 「B站动画」：播 B站礼物全屏动画，上方叠一条「谁送了什么」。
 // 动画是一个 MP4，里面一块是画面、一块是透明度（排布由服务端从 B站读好放在 gift.fx 里），用 WebGL 合成带透明的画面。
-// 浏览器不支持 WebGL、视频读不出来或迟迟不开始时：100 元以上换成晶耀，以下只留下面那条
-import { BIG_GIFT_GOLD } from '@starfall/shared/overlay';
+// 浏览器不支持 WebGL、视频读不出来或迟迟不开始时：只留那一条
 import type { GiftFx, PlayItem } from '@starfall/shared';
-import type { StageSize } from './builtin.ts';
 import { h } from './dom.ts';
-import { GLASS_STYLES } from './glass.ts';
+import { giftStrip } from './giftcard.ts';
 import type { Media } from './media.ts';
 
 /** 视频这么久还没出画面就换成卡片 */
@@ -74,12 +72,12 @@ export interface BiliFx extends Media {
 }
 
 /** 「谁送了什么」：沿用晶礼的样子，放在画面上方居中 */
-function bar(item: PlayItem, stage: StageSize): HTMLElement {
-  return h('div', { class: 'bfx-bar' }, GLASS_STYLES['glass-gift']!(item, stage));
+function bar(item: PlayItem): HTMLElement {
+  return h('div', { class: 'bfx-bar' }, giftStrip(item));
 }
 
 /** onFallback：动画没放出来、换成卡片时告诉服务端原因（写进日志） */
-export function buildBiliFx(item: PlayItem, stage: StageSize, onFallback?: (why: string) => void): BiliFx {
+export function buildBiliFx(item: PlayItem, onFallback?: (why: string) => void): BiliFx {
   const fx = item.gift!.fx!;
   const el = h('div', { class: 'fx bfx' });
   const canvas = h('canvas', { class: 'bfx-cv' });
@@ -96,14 +94,13 @@ export function buildBiliFx(item: PlayItem, stage: StageSize, onFallback?: (why:
   let stopped = false;
   const out: BiliFx = { el, video: gl ? video : null, start, stop };
 
-  /** 动画放不了：100 元以上换成晶耀，以下只留下面那条 */
+  /** 动画放不了：只留那一条 */
   const fallback = (why: string) => {
     if (stopped || !out.video) return;
     onFallback?.(`B站动画没放出来（${why}），换成了卡片`);
     out.video = null;
     clear();
     canvas.remove();
-    if ((item.gift?.value ?? 0) >= BIG_GIFT_GOLD) el.replaceChildren(GLASS_STYLES['glass-big']!(item, stage));
   };
   const clear = () => {
     clearTimeout(stalled);
@@ -141,6 +138,6 @@ export function buildBiliFx(item: PlayItem, stage: StageSize, onFallback?: (why:
   }
 
   if (gl) el.append(canvas);
-  el.append(bar(item, stage));
+  el.append(bar(item));
   return out;
 }

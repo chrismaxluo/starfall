@@ -17,7 +17,7 @@
 @keyframes gxSheen { 0% { opacity: 0; left: -40%; } 15% { opacity: 1; } 100% { opacity: 0; left: 130%; } }
 
 /* 头像、标签、文字 */
-.g .av, .fx-glassbig .av { position: relative; width: var(--as, 64px); height: var(--as, 64px); font-size: calc(var(--as, 64px) * .42);
+.g .av { position: relative; width: var(--as, 64px); height: var(--as, 64px); font-size: calc(var(--as, 64px) * .42);
   box-shadow: 0 0 0 2px rgba(255,255,255,.18), 0 0 0 4.5px color-mix(in srgb, var(--acc, #fff) 70%, transparent), 0 6px 16px -4px rgba(0,0,0,.5); }
 .g .av::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(160deg, rgba(255,255,255,.35), transparent 42%); }
 .g .chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; font-size: 18px; font-weight: 500; letter-spacing: .04em;
@@ -40,8 +40,6 @@
 .cnt::after { content: counter(gxn); }
 @keyframes gxCount { from { --gxn: 1; } to { --gxn: var(--to); } }
 
-@keyframes gxPop { from { opacity: 0; transform: translateY(26px) scale(.6); } to { opacity: 1; transform: none; } }
-@keyframes gxBob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
 
 /* ---- 房管 ---- */
 .gx-card { display: flex; align-items: center; gap: 18px; padding: 12px 34px 12px 12px; --as: 68px; }
@@ -50,71 +48,11 @@
 .gx-card .nm { font-size: 32px; max-width: 10em; }
 .gx-card .say { font-size: 23px; }
 
-/* ---- 礼物（10 ~ 100 元）：礼物图（有动图时是动图）从右上角弹出来、悬在边上浮动；数完数字跳一下；送得多的更亮 ---- */
-.gx-gift { display: flex; align-items: center; gap: 18px; padding: 14px 176px 14px 14px; --r: 30px; --as: 68px; min-width: 520px; }
-.gx-gift.no-img { padding-right: 130px; }
-.gx-gift .tx { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.gx-gift .nm { font-size: 32px; max-width: 9em; }
-.gx-gift .say { font-size: 23px; }
-.gx-gift .gimg { position: absolute; right: 18px; top: -64px; width: 150px; height: 150px; animation: gxPop .7s .25s cubic-bezier(.3,1.5,.5,1) both, gxBob 2.4s 1s ease-in-out infinite; filter: drop-shadow(0 10px 18px rgba(0,0,0,.45)); }
-.gx-gift .gimg img { width: 100%; height: 100%; object-fit: contain; }
-.gx-gift .num { position: absolute; right: 26px; bottom: 12px; font-family: var(--font-mono); font-weight: 600; font-size: 40px; line-height: 1; letter-spacing: -.02em;
-  background: linear-gradient(180deg, #fff 30%, color-mix(in srgb, var(--acc) 85%, #fff)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.gx-gift.no-img .num { top: 50%; bottom: auto; transform: translateY(-50%); }
-.gx-gift .num small { font-size: 26px; margin-right: 2px; }
-.gx-gift .num { animation: gxNumPop .5s var(--pd, 1.6s) cubic-bezier(.3,1.6,.5,1) both; transform-origin: 100% 100%; }
-.gx-gift.no-img .num { animation: none; }
-@keyframes gxNumPop { 0% { scale: 1; } 40% { scale: 1.32; } 100% { scale: 1; } }
-/* 送得多（50 元以上）：描边和左侧柔光更亮，礼物图带光晕，扫光扫两遍 */
-.gx-gift.hot { box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 0 1px color-mix(in srgb, var(--acc) 55%, transparent), 0 0 46px -6px color-mix(in srgb, var(--acc) 70%, transparent), 0 26px 60px -20px rgba(0,0,0,.6); }
-.gx-gift.hot > .gl::before { opacity: .75; }
-.gx-gift.hot > .gl::after { animation: gxSheen 1.1s .35s cubic-bezier(.45,0,.3,1) 2; }
-.gx-gift.hot .gimg { filter: drop-shadow(0 0 18px color-mix(in srgb, var(--acc) 80%, transparent)) drop-shadow(0 10px 18px rgba(0,0,0,.45)); }
-
-/* ---- 大额礼物（100 元以上）：大玻璃面板，礼物图放大、落在面板上沿 ---- */
-.fx-glassbig { position: absolute; inset: 0; pointer-events: none; }
-.gx-vig { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 55% at 50% var(--hy), transparent 40%, rgba(0,0,0,.38)); opacity: 0; animation: gxVig var(--dur) ease forwards; }
-@keyframes gxVig { 0% { opacity: 0; } 12% { opacity: 1; } 86% { opacity: 1; } 100% { opacity: 0; } }
-.gx-hero { position: absolute; left: 50%; top: var(--hy); transform: translate(-50%, -50%) scale(var(--rz, 1)); }
-.gx-hero-wrap { position: relative; width: 820px; padding-top: 170px; }
-.gx-hero-wrap.no-img { padding-top: 0; }
-.gx-big { --r: 44px; --as: 84px; padding: 110px 48px 40px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px;
-  animation: gxHeroLife var(--dur) cubic-bezier(.2,.8,.2,1) forwards; }
-.no-img > .gx-big { padding-top: 40px; }
-@keyframes gxHeroLife { 0% { opacity: 0; transform: translateY(50px) scale(.95); } 10% { opacity: 1; transform: none; } 90% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(20px) scale(.97); } }
-.gx-big .lbl { font-family: var(--font-mono); font-size: 16px; letter-spacing: .32em; color: rgba(255,255,255,.62); text-transform: uppercase; }
-.gx-big .who { display: flex; align-items: center; gap: 18px; max-width: 100%; }
-.gx-big .nm { font-size: 48px; max-width: 11em; }
-.gx-big .say { font-size: 28px; white-space: normal; }
-.gx-big .num { font-family: var(--font-mono); font-weight: 600; font-size: 34px; color: color-mix(in srgb, var(--acc) 70%, #fff); }
-.bg-gift { position: absolute; left: 50%; top: 0; width: 280px; height: 280px; margin-left: -140px; z-index: 2; --acc: #FFC37A; animation: gxGiftLife var(--dur) linear forwards; }
-@keyframes gxGiftLife { 0%, 90% { opacity: 1; } 100% { opacity: 0; } }
-.bg-gift .halo { position: absolute; inset: -80px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--acc) 55%, transparent), transparent 72%); opacity: 0; animation: gxFin 1s .7s forwards; }
-.bg-gift .ring { position: absolute; inset: 14px; border-radius: 50%; opacity: 0; background: radial-gradient(circle at 35% 25%, rgba(255,255,255,.22), rgba(255,255,255,.03) 60%);
-  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55), inset 0 0 0 5px rgba(255,255,255,.06), 0 0 40px color-mix(in srgb, var(--acc) 45%, transparent); animation: gxRingIn .9s .45s cubic-bezier(.2,.8,.2,1) forwards; }
-.bg-gift .img { position: absolute; inset: 30px; animation: gxDrop 1s .6s cubic-bezier(.3,1.35,.5,1) both, gxBob 2.8s 1.8s ease-in-out infinite; filter: drop-shadow(0 18px 26px rgba(0,0,0,.5)); }
-.bg-gift .img img { width: 100%; height: 100%; object-fit: contain; }
-@keyframes gxRingIn { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
-@keyframes gxDrop { from { opacity: 0; transform: translateY(-120px) scale(.7); } to { opacity: 1; transform: none; } }
-@keyframes gxFin { to { opacity: 1; } }
-.fx-glassbig .rise { opacity: 0; animation: gxRise .7s var(--d) cubic-bezier(.2,.8,.2,1) forwards; }
-@keyframes gxRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-
-/* ---- 弹幕回应 ---- */
-.gx-dm { display: flex; align-items: center; gap: 14px; padding: 10px 30px 10px 10px; --as: 52px; max-width: 900px; }
-.g .honor { height: 26px; margin-right: 10px; }
-.gx-big .honor { height: 38px; margin-right: 12px; }
-.gx-dm .honor { height: 22px; margin-right: 8px; }
-.gx-dm .nm { font-size: 26px; color: color-mix(in srgb, var(--acc) 55%, #fff); flex: none; max-width: 8em; margin-right: -8px; }
-.gx-dm .say { font-size: 26px; color: #fff; overflow: hidden; text-overflow: ellipsis; }
-
 /* ---- 省资源模式：不做毛玻璃（直播软件关了硬件加速时很卡），改成更实的深色底；礼物不循环浮动 ---- */
 .lite .g { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 45%), rgba(16,18,28,.86); }
-.lite .gx-gift .gimg, .lite .bg-gift .img { animation-iteration-count: 1, 0; }
-.lite .gx-vig { display: none; }
 
 /* ---- B站动画：官方全屏动画铺满画面（保持比例）；「谁送了什么」放在上方居中，不挡住动画的主体（大多在中间偏下） ---- */
 .bfx { position: absolute; inset: 0; pointer-events: none; }
 .bfx-cv { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .bfx-bar { position: absolute; left: 50%; top: calc(var(--st) + 90px); transform: translateX(-50%); zoom: var(--fxz, 1); }
-.bfx-bar .gx-gift { --fx: 0px; }
+.bfx-bar .gc { --fx: 0px; }

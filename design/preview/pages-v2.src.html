@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>星临 · 事件记录、设置、素材库改版预览</title>
+<!-- 用的是后台真实的样式表和缩略图（复制到 assets/，不进仓库），见 rules-v2.src.html 顶部。
+  这个页面由 pages-v2.src.html 生成：python3 design/tools/build_pages_preview.py -->
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/admin/app.css">
+<link rel="stylesheet" href="assets/admin/extra.css">
+<style>
+:root { --font-sans: "Geist Sans", "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --font-mono: "Geist Mono", "Geist", ui-monospace, monospace; }
+body { margin: 0; }
+.mockbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; margin: -8px 0 18px; border-radius: 10px; background: var(--accent-soft); color: var(--t2); font-size: 12.5px; }
+.mockbar b { color: var(--accent); font-weight: 600; }
+.pane[hidden] { display: none; }
+
+/* ===== 事件记录 ===== */
+.lg-tool { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.lg-tool .s { position: relative; }
+.lg-tool .s svg { position: absolute; left: 10px; top: 10px; width: 14px; height: 14px; color: var(--t3); }
+.lg-tool .s .inp { width: 220px; padding-left: 32px; }
+.lg-tool .sel { width: auto; }
+.lg-tool .sp { flex: 1; }
+.lg-tool .set { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--t2); }
+.c-time { font-family: var(--font-mono); font-size: 12px; color: var(--t3); white-space: nowrap; }
+.c-time b { display: block; color: var(--t2); font-weight: 500; font-size: 12.5px; }
+.c-ev { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.c-ev .ev { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; font-size: 10.5px; color: #fff; flex: none; }
+.c-ev span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+.res .l1 { display: flex; align-items: center; gap: 6px; }
+.res .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.res .dot.ok { background: var(--ok); }
+.res .dot.warn { background: var(--gov); }
+.res .dot.bad { background: #D64545; }
+.res .dot.skip { background: var(--line-strong); }
+.res .l1 b { font-weight: 500; }
+.res .l1 .muted { color: var(--t3); }
+.res .l2 { font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.res .fix { font-size: 12px; opacity: 0; transition: opacity .12s; }
+.rt-r:hover .res .fix, .res .fix:focus { opacity: 1; }
+.rt-r.quiet .c-who b, .rt-r.quiet .c-ev { color: var(--t2); }
+.excl-tag { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; border-radius: 5px; font-size: 10.5px; font-weight: 500; color: var(--accent); background: var(--accent-soft); white-space: nowrap; flex: none; }
+.c-who .nm b { display: flex; align-items: center; gap: 5px; }
+.lg-more { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--line); }
+
+/* ===== 设置：两列各自往下排，不再按行对齐 ===== */
+.set-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.set-cols > div { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.bk-t { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.bk-t .r { display: grid; grid-template-columns: 1fr auto auto auto; gap: 14px; align-items: center; padding: 9px 12px; font-size: 13px; border-top: 1px solid var(--line); }
+.bk-t .r:first-child { border-top: 0; }
+.bk-t .r .num { font-family: var(--font-mono); }
+.bk-t .r .tag { font-size: 11px; }
+.bk-t .r .sz { font-family: var(--font-mono); font-size: 12px; color: var(--t3); }
+.bk-t .more { display: block; width: 100%; padding: 8px; border: 0; border-top: 1px solid var(--line); background: var(--l2); color: var(--t3); font: inherit; font-size: 12.5px; }
+.set-sub { font-size: 12.5px; font-weight: 500; color: var(--t2); margin: 16px 0 8px; display: flex; align-items: center; gap: 8px; }
+.set-sub:first-of-type { margin-top: 0; }
+.set-hint { font-size: 12px; color: var(--t3); line-height: 1.6; margin-top: 6px; }
+.card-h .aside .btn { height: 28px; font-size: 12.5px; }
+
+/* ===== 素材库：有素材时拖放区收成一条 ===== */
+.drop-slim { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 10px 14px; border-radius: var(--r-md); border: 1px dashed var(--line-strong); font-size: 12.5px; color: var(--t3); }
+.drop-slim svg.i { width: 15px; height: 15px; color: var(--accent); }
+.drop-slim b { color: var(--t2); font-weight: 500; }
+.drop-slim .linkish { margin-left: auto; }
+.fmts { margin: -10px 0 16px; padding: 10px 14px; border-radius: var(--r-md); background: var(--l2); border: 1px solid var(--line); font-size: 12.5px; color: var(--t2); line-height: 1.7; }
+.fmts[hidden] { display: none; }
+.ecard .ethumb img.cover { width: 100%; height: 100%; object-fit: cover; }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.cmp h4 { margin: 0 0 8px; font-size: 12.5px; color: var(--t3); font-weight: 500; }
+</style>
+</head>
+<body>
+%%SPRITE%%
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img src="assets/logo.svg" width="32" height="32" alt=""><span><div class="brand-name">星临</div><div class="brand-sub">STARFALL</div></span></div>
+    <div>
+      <div class="nav-label">工作台</div>
+      <nav class="nav" aria-label="主导航">
+        <a href="#"><svg class="i"><use href="#i-grid"/></svg>总览</a>
+        <a href="#"><svg class="i"><use href="#i-bolt"/></svg>素材快捷播放</a>
+        <a href="#"><svg class="i"><use href="#i-wand"/></svg>触发规则</a>
+        <a href="#assets" data-go="assets"><svg class="i"><use href="#i-image"/></svg>素材库</a>
+        <a href="#logs" data-go="logs" aria-current="page"><svg class="i"><use href="#i-list"/></svg>事件记录</a>
+        <a href="#"><svg class="i"><use href="#i-screen"/></svg>直播软件输出</a>
+      </nav>
+    </div>
+    <div>
+      <div class="nav-label">其他</div>
+      <nav class="nav">
+        <a href="#"><svg class="i"><use href="#i-demo"/></svg>内置特效演示<svg class="i"><use href="#i-ext"/></svg></a>
+        <a href="#settings" data-go="settings"><svg class="i"><use href="#i-gear"/></svg>设置</a>
+      </nav>
+    </div>
+    <div class="side-foot"><a class="acct" href="#"><span class="avatar" style="background:#2BB5A0">星</span><span class="acct-meta"><b>星临小助手</b><span>登录有效 · 剩余 171 天</span></span></a></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb">直播间 <b class="num">10086000</b></div>
+      <span class="live ok"><i></i>已连接</span>
+      <span class="livestate on"><i></i>直播中 · 2 小时 14 分</span>
+      <span class="live fxlamp"><i></i>特效页在线</span>
+      <button class="search"><svg class="i"><use href="#i-search"/></svg>搜索或执行命令<span class="kbd">Ctrl K</span></button>
+      <button class="pausebtn"><svg class="i"><use href="#i-pause"/></svg><span>暂停所有特效</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="切换亮色 / 暗色"><svg class="i theme-light-only"><use href="#i-moon"/></svg><svg class="i theme-dark-only"><use href="#i-sun"/></svg></button>
+      <button class="icon-btn"><svg class="i"><use href="#i-logout"/></svg></button>
+    </header>
+
+    <!-- ============ 事件记录 ============ -->
+    <section class="page pane" data-pane="logs">
+      <div class="page-head"><div><h1>事件记录</h1><p>进场、弹幕、礼物、上舰都会记录，包括命中了哪条规则、有没有播放、没播的原因。</p></div></div>
+      <div class="mockbar"><b>改版预览</b>左边导航可以切换「事件记录 / 素材库 / 设置」。鼠标停在没播的行上，会出现处理按钮；点「⋯」看菜单；打开「只看命中规则的」试试。</div>
+      <div class="lg-tool">
+        <span class="seg"><button aria-pressed="true">全部</button><button aria-pressed="false">进场</button><button aria-pressed="false">弹幕</button><button aria-pressed="false">礼物</button><button aria-pressed="false">上舰</button><button aria-pressed="false">醒目留言</button></span>
+        <span class="s"><svg class="i"><use href="#i-search"/></svg><input class="inp" placeholder="搜索昵称或 UID"></span>
+        <select class="sel"><option>全部状态</option></select>
+        <select class="sel"><option>本场</option><option>今天</option><option>最近 7 天</option><option>全部时间</option></select>
+        <span class="sp"></span>
+        <span class="set">只看命中规则的 <button class="switch" role="switch" aria-checked="false" id="hitOnly" aria-label="只看命中规则的"></button></span>
+      </div>
+      <div class="rt" id="tLogs"></div>
+    </section>
+
+    <!-- ============ 素材库 ============ -->
+    <section class="page pane" data-pane="assets" hidden>
+      <div class="page-head">
+        <div><h1>素材库</h1><p>上传的动画和图片就是进场特效，在触发规则里直接选用。音效单独管理，可以被多个素材共用。</p></div>
+        <div class="actions"><span class="usage"><span class="num">已用 182 MB</span></span><button class="btn primary"><svg class="i"><use href="#i-upload"/></svg>上传素材</button></div>
+      </div>
+      <div class="mockbar"><b>改版预览</b>已经有素材时，顶部的大拖放框收成一条细的提示；一个素材都没有时还是原来的大框。</div>
+      <div class="drop-slim"><svg class="i"><use href="#i-upload"/></svg><span><b>把文件拖到这个页面任何地方</b>就能上传，单个文件不超过 100 MB</span><button class="linkish" id="fmtBtn">支持哪些格式</button></div>
+      <div class="fmts" id="fmts" hidden>动画：透明 WebM（推荐）· MP4（没有透明背景，会挡住画面）· SVGA · Lottie（.json）· GIF · PNG · APNG · WebP · JPG<br>音效：MP3 · WAV · OGG</div>
+      <div class="toolbar">
+        <div class="seg"><button aria-pressed="true">动画素材 <span class="num">12</span></button><button aria-pressed="false">音效 <span class="num">3</span></button></div>
+        <div class="s"><svg class="i"><use href="#i-search"/></svg><input class="inp" placeholder="搜索素材名称"></div>
+        <select class="sel" style="width: 130px"><option>最近上传</option></select>
+      </div>
+      <div class="a-sec" style="margin-top: 4px"><h2>我的素材</h2><span>12 个</span></div>
+      <div class="ecards" id="mine"></div>
+    </section>
+
+    <!-- ============ 设置 ============ -->
+    <section class="page pane" data-pane="settings" hidden>
+      <div class="page-head"><div><h1>设置</h1><p>账号、直播间、播放方式和数据。</p></div><div class="actions"><button class="btn"><svg class="i"><use href="#i-star"/></svg>重新打开新手引导</button></div></div>
+      <div class="mockbar"><b>改版预览</b>两列各自往下排，不再一行一行对齐，右边不会空出一大块；「立即备份」放到「数据」右上角，成了正常的按钮。</div>
+      <div class="set-cols">
+        <div>
+          <div class="card">
+            <div class="card-h"><h2>B站账号</h2><span class="aside">用来读取直播间消息（昵称、UID）</span></div>
+            <div style="display:flex;align-items:center;gap:12px"><span class="avatar" style="width:44px;height:44px;background:#2BB5A0;font-size:16px">星</span><span style="display:flex;flex-direction:column;gap:2px"><b>星临小助手</b><span class="num" style="font-size:12.5px;color:var(--t3)">UID 30001 · 登录有效，剩余 171 天</span></span></div>
+            <div style="display:flex;gap:8px;margin-top:14px"><button class="btn"><svg class="i"><use href="#i-qr"/></svg>换个账号</button><button class="btn">退出登录</button></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>直播间</h2></div>
+            <div class="field"><label>房间号 <span class="hint">短号、长号都可以</span></label>
+              <div class="url"><input class="inp num" value="10086000"><button class="btn">更换</button></div>
+              <div class="lookup ok">当前：房间 10086000 · 主播 星临演示主播 · 直播中</div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>播放</h2></div>
+            <div class="set-sub">未开播时</div>
+            <span class="seg"><button aria-pressed="true">不播放</button><button aria-pressed="false">照常播放（排练用）</button></span>
+            <div class="set-hint">默认只在开播时播放。打开「照常播放」后，没开播也会连接直播间、播放特效，用来排练。</div>
+            <div class="set-sub">连接直播间</div>
+            <span class="seg"><button aria-pressed="true">只在开播时（推荐）</button><button aria-pressed="false">一直连接</button></span>
+            <div class="set-hint">开播后 1 分钟内自动连上；没开播时不连接、也不记录，账号不在线，更安全。</div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>管理后台</h2></div>
+            <div class="field"><label>修改登录密码</label>
+              <div class="row2"><input class="inp" type="password" placeholder="当前密码"><input class="inp" type="password" placeholder="新密码（至少 8 位）"></div>
+              <div style="display:flex;justify-content:flex-end;margin-top:4px"><button class="btn">保存密码</button></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-h"><h2>黑名单</h2><span class="aside">这些人不会触发任何特效，事件照常记录</span></div>
+            <div class="toggle-line">主播本人不触发 <button class="switch" role="switch" aria-checked="true"></button></div>
+            <div class="toggle-line" style="margin-top:8px">登录的 B站账号不触发 <span class="hint">通常是小号</span><button class="switch" role="switch" aria-checked="true"></button></div>
+            <div class="add-user" style="margin-top:12px"><input class="inp num" placeholder="输入 UID，回车添加"><button class="btn">添加</button></div>
+            <div class="set-hint">还没有。事件记录、实时动态里点观众也可以直接加入黑名单。</div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>素材显示</h2><span class="aside">对所有上传的素材生效，单个素材可以另外设置</span></div>
+            <div class="toggle-line">视频上下羽化 <span class="hint">边缘慢慢变透明，不再一刀切</span><button class="switch" role="switch" aria-checked="false"></button></div>
+            <div class="set-hint">按素材高度算。只对没有透明通道的视频和图片生效（MP4、JPG 等）；透明 WebM 本身边缘就是透明的，不受影响。现在有 5 个素材跟随这里的设置。</div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>数据</h2><span class="aside"><button class="btn"><svg class="i"><use href="#i-check"/></svg>立即备份</button></span></div>
+            <div class="toggle-line">每天自动备份 <span class="hint">凌晨备份，保留最近 7 份；手动备份另外保留 5 份</span><button class="switch" role="switch" aria-checked="true"></button></div>
+            <div class="bk-t" style="margin-top:12px">
+              <div class="r"><span class="num">10月7日 04:00</span><span class="sz">170 KB</span><button class="linkish">恢复到这份</button><a class="linkish" href="#">下载</a></div>
+              <div class="r"><span class="num">10月6日 21:12 <span class="tag" style="margin-left:6px">手动</span></span><span class="sz">168 KB</span><button class="linkish">恢复到这份</button><a class="linkish" href="#">下载</a></div>
+              <button class="more">全部 9 份</button>
+            </div>
+            <div class="set-sub" style="margin-top:16px">事件记录保留 <select class="sel" style="width:110px;margin-left:auto"><option>90 天</option></select></div>
+            <div class="set-hint" style="margin-top:0">原始消息只保留 7 天，用于排查问题。</div>
+            <div class="set-sub">导出 / 导入配置</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px"><button class="btn"><svg class="i"><use href="#i-upload"/></svg>导出配置</button><button class="btn">导出（含素材文件）</button><button class="btn">导入配置</button></div>
+            <div class="set-hint">配置包括规则、素材设置、输出和播放设置，不含 B站登录信息和后台密码。换电脑时建议用「含素材文件」的 zip。导入前会自动备份一份现在的配置。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ic = (n) => `<svg class="i"><use href="#${n}"/></svg>`;
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const tag = (id) => ({ gov: `<span class="tag gov"><img class="badge" src="${BADGE}governor-DpDXKEdA.png" alt="">总督</span>`, adm: `<span class="tag adm"><img class="badge" src="${BADGE}supervisor-u43ElIjU.png" alt="">提督</span>`, cap: `<span class="tag cap"><img class="badge" src="${BADGE}captain-Bjw5Byb5.png" alt="">舰长</span>`, mod: `<span class="tag mod"><i class="fang">房</i>房管</span>`, nor: `<span class="tag nor">普通</span>` })[id] ?? '';
+const medalC = (lv) => (lv <= 10 ? '#5762A7' : lv <= 20 ? '#C770A4' : lv <= 30 ? '#3FB4F6' : lv <= 40 ? '#4C7DFF' : lv <= 50 ? '#A773F1' : '#EC4F6E');
+const medal = (lv) => `<span class="medal" style="--mc:${medalC(lv)}99;--ml:${medalC(lv)}E6;--mb:${medalC(lv)}99;color:#fff"><span>星临</span><b>${lv}</b></span>`;
+const honor = (lv) => `<span class="tag" style="color:#7C5CE0;background:rgba(124,92,224,.12)">荣耀 ${lv}</span>`;
+const EV = { enter: ['进', 'var(--accent)'], danmu: ['弹', '#4C6FE0'], gift: ['礼', 'linear-gradient(135deg,#FFB38A,#E0568F)'], guard: ['舰', 'var(--cap)'], sc: ['SC', 'linear-gradient(135deg,#F0B45A,#E0568F)'] };
+const COLORS = ['#E0689B', '#4C7DFF', '#2BB5A0', '#A773F1', '#E0823A', '#3FB4F6'];
+// [时间, 昵称, uid, 专属, 身份html, 事件, 事件文字, 状态类, 状态文字, 规则 → 特效, 处理]
+const ROWS = [
+  ['20:09:59', '长夜未央', 101, true, honor(68) + tag('gov') + medal(44), 'enter', '进场', 'ok', '已播放', '专属 长夜未央 → 金銮', null],
+  ['20:09:44', '一颗柠檬糖', 112, false, honor(9) + tag('nor'), 'enter', '进场', 'skip', '未命中规则', '', '去看规则'],
+  ['20:09:24', '南山有鹿', 107, false, honor(33) + medal(18), 'danmu', '「这首歌好好听」', 'skip', '未命中规则', '', '去看规则'],
+  ['20:08:59', '晚风与你', 108, false, honor(28) + medal(21), 'enter', '进场', 'ok', '已播放', '粉丝牌 21 级及以上 → 霜玻', null],
+  ['20:08:19', '长夜未央', 101, true, honor(68) + tag('gov') + medal(44), 'gift', '送出 星愿水晶球 ×1', 'ok', '已播放', '礼物 · 单次 10 – 100 元 → 晶礼', null],
+  ['20:07:49', '青柠汽水', 109, false, honor(12) + tag('mod') + medal(15), 'danmu', '「欢迎新来的朋友～」', 'skip', '未命中规则', '', '去看规则'],
+  ['20:07:24', '路过的猫', 111, false, honor(5) + tag('nor'), 'enter', '进场', 'skip', '冷却中', '其他观众 → 一行字', '去改'],
+  ['20:06:44', '白开水不加糖', 103, true, honor(61) + medal(22), 'sc', '醒目留言 50 元「生日快乐！今天也要开心」', 'skip', '只记录', '醒目留言现在只记录，不触发特效', null],
+  ['20:06:14', '月下独酌', 102, false, honor(53) + tag('adm') + medal(38), 'gift', '送出 小花花 ×66', 'warn', '特效页不在线', '礼物 · 单次 1 – 10 元 → 一行字', '去检查特效页'],
+  ['20:05:44', '今天也要早睡', 110, false, honor(17) + medal(9), 'danmu', '「打卡」', 'ok', '已播放', '弹幕「打卡」→ 晶语', null],
+  ['20:05:19', '听雨的鲸', 104, false, honor(44) + tag('cap') + medal(31), 'guard', '续费舰长 1 个月 · 138 元', 'ok', '已播放', '上舰 · 续费舰长 → 门楼', null],
+];
+const COLS = '86px minmax(150px, 1fr) minmax(140px, 1fr) minmax(170px, 1.3fr) minmax(190px, 1.4fr) 40px';
+let hitOnly = false;
+function renderLogs() {
+  const rows = ROWS.filter((r) => !hitOnly || r[8] !== '未命中规则');
+  $('#tLogs').innerHTML = `<div class="rt-h" style="grid-template-columns:${COLS}"><span>时间</span><span>观众</span><span>身份</span><span>事件</span><span>结果</span><span></span></div>` +
+    rows.map((r, i) => {
+      const quiet = r[7] === 'skip';
+      const ev = EV[r[5]];
+      return `<div class="rt-r${quiet ? ' quiet' : ''}" style="grid-template-columns:${COLS}">
+        <div class="c-time">${r[0]}</div>
+        <div class="c-who"><span class="avatar" style="background:${COLORS[r[2] % 6]}">${r[1][0]}</span><span class="nm"><b><span style="overflow:hidden;text-overflow:ellipsis">${r[1]}</span>${r[3] ? '<span class="excl-tag">专属</span>' : ''}</b><span class="uid">UID ${r[2]}</span></span></div>
+        <div class="c-who">${r[4]}</div>
+        <div class="c-ev"><span class="ev" style="background:${ev[1]}">${ev[0]}</span><span class="t" title="${r[6]}">${r[6]}</span></div>
+        <div class="res"><span class="l1"><i class="dot ${r[7]}"></i>${r[7] === 'ok' ? `<b>${r[8]}</b>` : `<span class="${quiet ? 'muted' : ''}">${r[8]}</span>`}${r[10] ? `<button class="linkish fix">${r[10]} →</button>` : ''}</span>${r[9] ? `<span class="l2" title="${r[9]}">${r[9]}</span>` : ''}</div>
+        <div class="c-act"><button class="icon-btn more" data-row="${i}" aria-label="更多">${ic('i-more')}</button></div>
+      </div>`;
+    }).join('') + `<div class="lg-more"><button class="btn">加载更多</button></div>`;
+}
+renderLogs();
+
+// 素材卡片
+const MINE = [['钻石嘉年华', 'royal-gov', 'MP4', '用于 弹幕「牛来」'], ['黑金嘉年华', 'royal-adm', 'MP4', '用于 弹幕「嘉年华」'], ['闪身步视频梗', 'glass-big', 'WEBM', '用于 弹幕「闪身步」'], ['要礼物', 'glass-gift', 'MP4', '用于 弹幕「给我刷」'], ['胡迪警长广西鬼火', 'frost', 'MP4', '用于 弹幕「鬼火」'], ['金銮 副本', 'royal-cap', 'SVGA', '还没有规则在用']];
+$('#mine').innerHTML = `<button class="ecard new"><div>${ic('i-upload')}上传素材</div></button>` + MINE.map((m) => `<div class="ecard"><div class="ethumb"><img class="cover" src="assets/thumbs/${m[1]}-w.jpg" alt=""><div class="fmt"><span>${m[2]}</span></div></div><div class="meta"><b>${m[0]}</b><span class="used">${m[3]}</span></div></div>`).join('');
+
+// ---------- 交互 ----------
+function go(p) {
+  $$('.pane').forEach((x) => (x.hidden = x.dataset.pane !== p));
+  $$('[data-go]').forEach((a) => a.setAttribute('aria-current', a.dataset.go === p ? 'page' : 'false'));
+}
+const fromHash = () => { const h = location.hash.slice(1); if (['logs', 'assets', 'settings'].includes(h)) go(h); };
+addEventListener('hashchange', fromHash);
+fromHash();
+let menu = null;
+const closeMenu = () => { menu?.remove(); menu = null; };
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('button');
+  if (!t) return closeMenu();
+  if (t.id === 'hitOnly') { hitOnly = !hitOnly; t.setAttribute('aria-checked', String(hitOnly)); return renderLogs(); }
+  if (t.id === 'fmtBtn') { $('#fmts').hidden = !$('#fmts').hidden; return; }
+  if (t.classList.contains('switch')) { t.setAttribute('aria-checked', String(t.getAttribute('aria-checked') !== 'true')); return; }
+  if (t.dataset.row !== undefined) {
+    const same = menu && menu.dataset.row === t.dataset.row;
+    closeMenu();
+    if (same) return;
+    const r = ROWS[Number(t.dataset.row)];
+    const b = t.getBoundingClientRect();
+    menu = document.createElement('div');
+    menu.className = 'rmenu';
+    menu.dataset.row = t.dataset.row;
+    menu.style.right = `${innerWidth - b.right}px`;
+    menu.style.top = `${b.bottom + 4}px`;
+    const items = [r[5] === 'enter' ? ['i-user', r[3] ? '修改专属特效' : '设为专属'] : null, ['i-list', '只看 TA 的记录'], ['i-copy', '复制 UID'], 'hr', ['i-ban', '加入黑名单', 'danger']].filter(Boolean);
+    menu.innerHTML = items.map((x) => (x === 'hr' ? '<hr>' : `<button class="${x[2] ?? ''}">${ic(x[0])}${x[1]}</button>`)).join('');
+    document.body.appendChild(menu);
+    return;
+  }
+  closeMenu();
+});
+$('#themeBtn').onclick = (e) => { e.stopPropagation(); document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; };
+</script>
+</body>
+</html>

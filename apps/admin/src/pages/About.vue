@@ -111,7 +111,6 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
         <dl class="about-meta">
           <dt>作者</dt><dd>{{ AUTHOR }}</dd>
           <dt>联系邮箱</dt><dd><a class="linkish" :href="`mailto:${EMAIL}`">{{ EMAIL }}</a></dd>
-          <dt>开源协议</dt><dd>GPL-3.0</dd>
         </dl>
       </div>
 

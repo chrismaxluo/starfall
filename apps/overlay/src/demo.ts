@@ -97,17 +97,17 @@ export function startLoop(stage: HTMLElement, player: Player): void {
 }
 
 /** ?demo=gifts：礼物卡片按价值的四种颜色和大额礼物轮流播（看礼物卡片的样子用） */
-const GIFT_SHOW: Array<{ style: string; gift: string; count: number; value: number; img: string; name: string }> = [
+const GIFT_SHOW: Array<{ style: string; gift: string; count: number; value: number; img: string; name: string; guard?: 0 | 1 | 2 | 3 }> = [
   { style: 'glass-gift', gift: '小花花', count: 66, value: 6600, img: 'https://i0.hdslb.com/bfs/live/28357ba4cd566418730ca29da2c552efa7e4a390.webp', name: '路过的猫' },
   { style: 'glass-gift', gift: '送花花', count: 20, value: 20_000, img: 'https://i0.hdslb.com/bfs/live/a9945884c0a7c0cac33192a38624086cb69a84d4.webp', name: '半糖主义' },
-  { style: 'glass-gift', gift: '告白花束', count: 3, value: 59_700, img: 'https://i0.hdslb.com/bfs/live/eaa8744f2146dd80ed238ec78be5ed5b605bc4cb.webp', name: '晚风与你' },
+  { style: 'glass-gift', gift: '告白花束', count: 3, value: 59_700, img: 'https://i0.hdslb.com/bfs/live/eaa8744f2146dd80ed238ec78be5ed5b605bc4cb.webp', name: '晚风与你', guard: 3 },
   { style: 'glass-gift', gift: '干杯之旅', count: 10, value: 100_000, img: 'https://i0.hdslb.com/bfs/live/3671a758f0af23f58c2593af2b20454fdaf14a26.webp', name: '青柠汽水' },
-  { style: 'glass-big', gift: '星愿水晶球', count: 1, value: 100_000, img: 'https://i0.hdslb.com/bfs/live/602351d13e285df32c3b13d44bca4f7476d8273e.webp', name: '晚风与星河漫步' },
+  { style: 'glass-big', gift: '星愿水晶球', count: 1, value: 100_000, img: 'https://i0.hdslb.com/bfs/live/602351d13e285df32c3b13d44bca4f7476d8273e.webp', name: '晚风与星河漫步', guard: 1 },
 ];
 function giftShowItem(i: number): PlayItem {
   const g = GIFT_SHOW[i % GIFT_SHOW.length]!;
   const base = demoItem(g.style);
-  return { ...base, text: `${g.name} 送出 ${g.gift}`, viewer: { ...base.viewer, name: g.name }, gift: { name: g.gift, count: g.count, value: g.value, img: g.img } };
+  return { ...base, text: `${g.name} 送出 ${g.gift}`, viewer: { ...base.viewer, name: g.name, guard: g.guard ?? 0 }, gift: { name: g.gift, count: g.count, value: g.value, img: g.img } };
 }
 
 /** 轮流播放全部内置样式 */

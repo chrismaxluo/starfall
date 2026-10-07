@@ -4,7 +4,7 @@ import type { PlayItem } from '@starfall/shared/overlay';
 import './giftcard.css';
 import { h } from './dom.ts';
 import { count, countSec, giftImg, restWithGift } from './glass.ts';
-import { avatar } from './parts.ts';
+import { avatar, withGuardFrame } from './parts.ts';
 
 
 /** 价值分档的颜色（金瓜子）：B站连击条的四种颜色 */
@@ -50,7 +50,8 @@ export function giftStrip(item: PlayItem, big = false): HTMLElement {
   return h(
     'div',
     { class: `fx gc${img ? '' : ' no-img'}${big ? ' big' : ''}`, style: colors(item) },
-    h('div', { class: 'gc-bar' }, h('div', { class: 'gc-sheen' }), avatar(item.viewer), h('div', { class: 'gc-tx' }, h('span', { class: 'nm' }, item.viewer.name), h('span', { class: 'say' }, ...restWithGift(item)))),
+    // 大航海送的礼物：头像套上 B站的头像框
+    h('div', { class: 'gc-bar' }, h('div', { class: 'gc-sheen' }), withGuardFrame(avatar(item.viewer), item.viewer.guard), h('div', { class: 'gc-tx' }, h('span', { class: 'nm' }, item.viewer.name), h('span', { class: 'say' }, ...restWithGift(item)))),
     img ? h('div', { class: 'gc-gift' }, h('div', { class: 'gc-rays' }), h('div', { class: 'gc-glow' }), img, burst('gc-burst', big ? 22 : 14, big ? [90, 200] : [70, 150], 0.45)) : null,
     item.gift ? h('div', { class: 'gc-num', style: { '--pd': `${0.75 + countSec(n)}s` } }, h('small', {}, '×'), count(n, 0.75)) : null,
   );

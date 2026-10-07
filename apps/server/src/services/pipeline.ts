@@ -81,6 +81,8 @@ interface QueueBrief {
   giftImg: string | null;
   durationMs: number;
   test: boolean;
+  /** 素材快捷播放 */
+  quick: boolean;
 }
 
 export interface QueueSnapshot {
@@ -513,24 +515,28 @@ export class Pipeline {
     while (!this.current) {
       const q = this.queue.next();
       if (!q) return;
-      const { item, eventId } = q.payload;
       // 排队期间特效页全部掉线：不积压（F-OU-12）
       if (this.d.hub.overlayCount() === 0) {
         this.unplayed(q, 'no_overlay');
         continue;
       }
-      this.d.hub.toOverlays({ type: 'play', item });
-      if (eventId) this.d.log.setStatus(eventId, 'played');
-      // 播放节奏由服务端控制：时长 + 间隔后播下一个，多个特效页始终同步
-      const timer = setTimeout(() => {
-        this.current = null;
-        this.guard('播放下一个', () => {
-          this.pump();
-          this.emitQueue();
-        });
-      }, item.effect.durationMs + PLAY_GAP_MS);
-      this.current = { q, startedAt: this.now(), timer };
+      this.play(q);
     }
+  }
+
+  /** 推给特效页开始播；播放节奏由服务端控制：时长 + 间隔后播下一个，多个特效页始终同步 */
+  private play(q: QueueItem<Queued>): void {
+    const { item, eventId } = q.payload;
+    this.d.hub.toOverlays({ type: 'play', item });
+    if (eventId) this.d.log.setStatus(eventId, 'played');
+    const timer = setTimeout(() => {
+      this.current = null;
+      this.guard('播放下一个', () => {
+        this.pump();
+        this.emitQueue();
+      });
+    }, item.effect.durationMs + PLAY_GAP_MS);
+    this.current = { q, startedAt: this.now(), timer };
   }
 
   /** 排队的特效没播出来：写明原因，并撤销冷却 / 每场一次的记录（下次还能播） */
@@ -599,6 +605,29 @@ export class Pipeline {
     return { id: item.id };
   }
 
+  /**
+   * 素材快捷播放：马上播，打断正在播的。被打断的观众特效放回最前面，播完接着从头播；
+   * 被打断的是快捷播放或测试播放时直接换掉。不显示欢迎语，不算进观众统计
+   */
+  quick(effectId: number): { id: string } {
+    if (this.d.settings.get('paused')) throw new HttpError(409, 'paused', '已暂停所有特效，恢复播放后才能用快捷播放');
+    if (this.d.hub.overlayCount() === 0) throw new HttpError(409, 'no_overlay', '特效页不在线：请先把特效页地址加到直播软件的浏览器源里');
+    const e = this.d.effects.get(effectId, { uses: false });
+    const room = this.d.room.get();
+    const face = room ? this.d.viewers.cached(room.anchorUid)?.face : undefined;
+    const anchor: Viewer = { uid: room?.anchorUid ?? 0, name: room?.anchorName || '主播', guard: 0, isMod: false, mystery: false, ...(face ? { face } : {}) };
+    const item: PlayItem = { ...this.playItem({ ...e, showText: false, guardFrame: false, honorBadge: false }, anchor, 'enter'), quick: true };
+    const cur = this.current;
+    if (cur) {
+      this.stopCurrent();
+      const it = cur.q.payload.item;
+      if (!it.test && !it.quick) this.queue.front(cur.q);
+    }
+    this.play({ id: item.id, kind: item.kind, enqueuedAt: this.now(), payload: { item, eventId: null, detail: '素材快捷播放' } });
+    this.emitQueue();
+    return { id: item.id };
+  }
+
   /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
   preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): PlayItem {
     const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
@@ -608,7 +637,7 @@ export class Pipeline {
   snapshot(): QueueSnapshot {
     const brief = (q: QueueItem<Queued>): QueueBrief => {
       const it = q.payload.item;
-      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, viewerGuard: it.viewer.guard, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test) };
+      return { id: q.id, kind: q.kind, effectName: it.effect.name, viewerName: it.viewer.name, viewerFace: it.viewer.face ?? null, viewerGuard: it.viewer.guard, detail: q.payload.detail, giftImg: it.gift?.img ?? null, durationMs: it.effect.durationMs, test: Boolean(it.test), quick: Boolean(it.quick) };
     };
     const c = this.current;
     return {

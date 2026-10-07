@@ -311,6 +311,41 @@ describe('播放队列', () => {
     expect(t.p.snapshot()).toMatchObject({ playing: { test: false }, items: [{ test: true }] });
   });
 
+  it('快捷播放：马上打断正在播的观众特效，被打断的放回最前面、播完接着从头播；不显示欢迎语、不写事件记录', async () => {
+    const t = await setup();
+    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!;
+    t.live.emit(enter({ uid: 1, guard: 3 }));
+    t.live.emit(enter({ uid: 2, guard: 2 }));
+    expect(t.p.snapshot().playing).toMatchObject({ viewerGuard: 3 });
+    vi.advanceTimersByTime(1000);
+    t.p.quick(star.id);
+    expect(t.sock.sent.slice(-2)).toMatchObject([{ type: 'stop' }, { type: 'play', item: { quick: true, effect: { name: '晶耀', showText: false, guardFrame: false, honorBadge: false }, viewer: { name: '主播', guard: 0 } } }]);
+    // 被打断的舰长排在最前面，提督在后面
+    expect(t.p.snapshot()).toMatchObject({ playing: { quick: true, detail: '素材快捷播放', viewerName: '主播' }, items: [{ viewerGuard: 3 }, { viewerGuard: 2 }] });
+    vi.advanceTimersByTime(30_000);
+    expect(t.plays().map((p) => p.viewer.guard)).toEqual([3, 0, 3, 2]);
+    expect(t.events().map((e) => e.uid)).toEqual([1, 2]);
+    expect(t.statuses()).toEqual(['played', 'played']);
+  });
+
+  it('快捷播放连着按：后一个直接换掉前一个；打断测试播放时不放回；已暂停、特效页不在线时拒绝', async () => {
+    const t = await setup();
+    const [a, b] = t.ctx.effects.list();
+    t.p.quick(a!.id);
+    t.p.quick(b!.id);
+    expect(t.p.snapshot()).toMatchObject({ playing: { quick: true, effectName: b!.name }, items: [] });
+    t.p.test(a!.id);
+    vi.advanceTimersByTime(30_000);
+    t.p.test(a!.id);
+    t.p.quick(b!.id);
+    expect(t.p.snapshot()).toMatchObject({ playing: { quick: true }, items: [] });
+    t.p.pause();
+    expect(() => t.p.quick(a!.id)).toThrow('已暂停');
+    t.p.resume();
+    t.hub.removeOverlay([...(t.hub as unknown as { overlays: Set<never> }).overlays][0]!);
+    expect(() => t.p.quick(a!.id)).toThrow('特效页不在线');
+  });
+
   it('队列里每一项带头像和一句话说明；可以跳过正在播的、移出排队的', async () => {
     const t = await setup();
     t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });

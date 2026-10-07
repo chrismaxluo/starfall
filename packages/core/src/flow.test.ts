@@ -131,6 +131,17 @@ describe('播放队列（F-PL-01 ~ 04）', () => {
     expect(q.next()?.id).toBe('big');
   });
 
+  it('放到最前面的一项（被快捷播放打断的）：排在后来的插队项前面，队列满了也不会被挤掉', () => {
+    const q = new PlayQueue(3);
+    q.enqueue(item('e1', 'enter', 1));
+    q.front(item('cut', 'danmu', 0));
+    q.enqueue(item('big', 'gift', 2, true));
+    expect(q.list().map((x) => x.id)).toEqual(['cut', 'big', 'e1']);
+    const r = q.enqueue(item('d', 'danmu', 3));
+    expect(r.dropped?.id).toBe('d');
+    expect([q.next(), q.next()].map((x) => x?.id)).toEqual(['cut', 'big']);
+  });
+
   it('队列满时丢弃优先级最低中最早进入的一项', () => {
     const q = new PlayQueue(3);
     q.enqueue(item('e1', 'enter', 1));

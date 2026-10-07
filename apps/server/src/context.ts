@@ -29,6 +29,7 @@ import { RoomInfoService } from './services/room-info.ts';
 import type { RoomInfoDeps } from './services/room-info.ts';
 import { OutputStore } from './services/outputs.ts';
 import { Pipeline } from './services/pipeline.ts';
+import { QuickPlayStore } from './services/quick-play.ts';
 import { RoomStore } from './services/room.ts';
 import { EnterRuleStore } from './services/rules.ts';
 import { Secret } from './services/secret.ts';
@@ -52,6 +53,7 @@ export interface AppContext {
   danmuRules: DanmuRuleStore;
   giftRules: GiftRuleStore;
   guardRules: GuardRuleStore;
+  quickPlay: QuickPlayStore;
   gifts: GiftCatalog;
   honor: HonorMedals;
   audience: AudienceService;
@@ -88,6 +90,8 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const danmuRules = new DanmuRuleStore(db);
   const giftRules = new GiftRuleStore(db, settings);
   const guardRules = new GuardRuleStore(db);
+  const quickPlay = new QuickPlayStore(db, settings);
+  quickPlay.seedOnce();
   const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
   const honor = new HonorMedals(settings, () => account.anon, opts.fetchHonor);
   const audience = new AudienceService({ room, live, anon: () => account.anon, ...opts.audience });
@@ -98,7 +102,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const hub = new Hub({ build: () => overlayBuild.current() });
   const pipeline = new Pipeline({ live, gifts, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
 
-  const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
+  const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, quickPlay, blacklist, outputs });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
 
   // 把变化推给在线的特效页和管理后台
@@ -112,7 +116,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   });
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, quickPlay, gifts, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;

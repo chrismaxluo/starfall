@@ -4,7 +4,7 @@ import { get } from './api.ts';
 import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
 import type { ChatItem } from '@starfall/shared/overlay';
-import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, QuickButton, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
 /** 实时动态在内存里留多少条（总览按类型筛选时从这里挑） */
 export const FEED_KEEP = 150;
@@ -24,6 +24,8 @@ export const state = reactive({
   gift: null as GiftRules | null,
   guard: null as GuardRules | null,
   outputs: [] as OutputDto[],
+  /** 素材快捷播放的按钮 */
+  quick: [] as QuickButton[],
   overlays: [] as OverlayInfo[],
   /** 最近的几条弹幕（弹幕列表的预览用） */
   chat: [] as ChatItem[],
@@ -79,6 +81,9 @@ export async function refreshRules(): Promise<void> {
 export async function refreshOutputs(): Promise<void> {
   state.outputs = (await get<{ outputs: OutputDto[] }>('/api/outputs')).outputs;
 }
+export async function refreshQuick(): Promise<void> {
+  state.quick = (await get<{ buttons: QuickButton[] }>('/api/quickplay/buttons')).buttons;
+}
 export async function refreshFeed(): Promise<void> {
   state.feed = (await get<{ events: EventDto[] }>(`/api/events?limit=${FEED_KEEP}`)).events;
 }
@@ -90,7 +95,7 @@ export async function refreshHonorMedals(): Promise<void> {
 }
 
 export async function loadAll(): Promise<void> {
-  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshFeed(), refreshHonorMedals()]);
+  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshQuick(), refreshFeed(), refreshHonorMedals()]);
 }
 
 /** 全局弹窗：素材设置、快捷设置专属、新手引导、命令面板 */

@@ -11,8 +11,8 @@ import EffThumb from './EffThumb.vue';
 import Icon from './Icon.vue';
 import { pushEsc } from '../lib/esc.ts';
 
-/** kind：这个选择框用在哪类事件上（预览时按它播放：礼物带礼物图、弹幕带弹幕内容） */
-const props = withDefaults(defineProps<{ kind?: TriggerKind }>(), { kind: 'enter' });
+/** kind：这个选择框用在哪类事件上（预览时按它播放：礼物带礼物图、弹幕带弹幕内容）；add：显示成「＋ 添加」按钮（选好后由外面清空） */
+const props = withDefaults(defineProps<{ kind?: TriggerKind; add?: string }>(), { kind: 'enter', add: '' });
 const model = defineModel<number | null>({ required: true });
 const emit = defineEmits<{ change: [id: number] }>();
 const btn = ref<HTMLButtonElement | null>(null);
@@ -104,7 +104,8 @@ onBeforeUnmount(close);
 </script>
 
 <template>
-  <button ref="btn" type="button" class="effbtn" :class="{ missing: model !== null && !current }" :aria-label="`选择特效，当前：${current?.name ?? '未选择'}`" @click.stop="toggle">
+  <button v-if="add" ref="btn" type="button" class="btn" @click.stop="toggle"><Icon name="i-plus" />{{ add }}</button>
+  <button v-else ref="btn" type="button" class="effbtn" :class="{ missing: model !== null && !current }" :aria-label="`选择特效，当前：${current?.name ?? '未选择'}`" @click.stop="toggle">
     <EffThumb :effect="current" />
     <span class="nm">{{ current ? current.name : model !== null ? '素材已删除' : '未选择' }}</span>
     <Icon name="i-chev" />

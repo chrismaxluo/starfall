@@ -59,6 +59,7 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   giftsSide: o.giftsSide,
   giftsSize: o.giftsSize,
   giftsMax: o.giftsMax,
+  giftsSpeed: o.giftsSpeed,
   giftsFilter: o.giftsFilter,
 });
 

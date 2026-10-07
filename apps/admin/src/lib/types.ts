@@ -72,6 +72,7 @@ export interface OutputDto {
   giftsSide: 'left' | 'right';
   giftsSize: 'normal' | 'large';
   giftsMax: number;
+  giftsSpeed: 'off' | 'slow' | 'normal' | 'fast';
   giftsFilter: GiftsFilter;
   key: string;
   path: string;

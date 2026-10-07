@@ -158,6 +158,7 @@ const OutputPart = OutputInputSchema.extend({
   giftsSide: OutputInputSchema.shape.giftsSide.default('right'),
   giftsSize: OutputInputSchema.shape.giftsSize.default('normal'),
   giftsMax: OutputInputSchema.shape.giftsMax.default(GIFTS_MAX_DEFAULT),
+  giftsSpeed: OutputInputSchema.shape.giftsSpeed.default('normal'),
   giftsFilter: OutputInputSchema.shape.giftsFilter.default(GIFTS_FILTER_DEFAULT),
 });
 
@@ -315,7 +316,7 @@ export class ConfigIO {
         const effect = ref(b.effectId);
         return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
       }),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsFilter: o.giftsFilter })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter })),
     };
   }
 

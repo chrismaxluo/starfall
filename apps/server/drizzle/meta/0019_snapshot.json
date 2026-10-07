@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ff5b7ebc-8927-4775-a0f7-5557733b311c",
+  "id": "7d311186-0df8-4021-9b1e-90f292153387",
   "prevId": "7b7ec5ee-a4da-46ba-91c5-fd52cf9fb3cb",
   "tables": {
     "account": {
@@ -836,6 +836,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 6
+        },
+        "gifts_speed": {
+          "name": "gifts_speed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'normal'"
         },
         "gifts_filter": {
           "name": "gifts_filter",

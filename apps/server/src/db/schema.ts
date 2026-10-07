@@ -197,6 +197,7 @@ export const outputs = sqliteTable('outputs', {
   giftsSide: text('gifts_side', { enum: ['left', 'right'] }).notNull().default('right'),
   giftsSize: text('gifts_size', { enum: ['normal', 'large'] }).notNull().default('normal'),
   giftsMax: integer('gifts_max').notNull().default(6),
+  giftsSpeed: text('gifts_speed', { enum: ['off', 'slow', 'normal', 'fast'] }).notNull().default('normal'),
   giftsFilter: text('gifts_filter', { mode: 'json' }).$type<GiftsFilter>().notNull().default({ mode: 'all', gifts: [], guard: true, sc: true }),
   key: text('key').notNull().unique(),
   createdAt: integer('created_at').notNull().default(now),

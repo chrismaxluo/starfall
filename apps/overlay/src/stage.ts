@@ -1,7 +1,7 @@
 // 画布：按输出设置的宽高、安全区、缩放设置 CSS 变量，并把画布等比缩放到浏览器源的实际大小。
 import type { OverlayConfig } from '@starfall/shared';
 
-export const DEFAULT_CONFIG: OverlayConfig = { outputId: 0, name: '', app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: 8, chatFadeSec: 0, giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: 6, giftsFilter: { mode: 'all', gifts: [], guard: true, sc: true } };
+export const DEFAULT_CONFIG: OverlayConfig = { outputId: 0, name: '', app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: 8, chatFadeSec: 0, giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: 6, giftsSpeed: 'normal', giftsFilter: { mode: 'all', gifts: [], guard: true, sc: true } };
 
 export interface StageMetrics {
   width: number;

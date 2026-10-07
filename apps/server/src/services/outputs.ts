@@ -41,6 +41,7 @@ export const OutputInputSchema = z
     giftsSide: z.enum(['left', 'right']),
     giftsSize: z.enum(['normal', 'large']),
     giftsMax: z.number().int().min(1).max(GIFTS_MAX_LIMIT),
+    giftsSpeed: z.enum(['off', 'slow', 'normal', 'fast']),
     giftsFilter: GiftsFilterSchema,
   })
   .strict();
@@ -48,7 +49,7 @@ export type OutputInput = z.infer<typeof OutputInputSchema>;
 export const OutputPatchSchema = OutputInputSchema.partial().strict();
 
 /** 新建输出的默认值：竖屏 1080×1920，安全区按手机竖屏实测（P0 报告） */
-const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT, chatFadeSec: 0, giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: GIFTS_MAX_DEFAULT, giftsFilter: GIFTS_FILTER_DEFAULT };
+const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT, chatFadeSec: 0, giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: GIFTS_MAX_DEFAULT, giftsSpeed: 'normal', giftsFilter: GIFTS_FILTER_DEFAULT };
 
 const newKey = () => crypto.randomBytes(16).toString('base64url');
 

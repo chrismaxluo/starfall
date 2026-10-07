@@ -528,6 +528,18 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               </div>
             </div>
             <div class="srow">
+              <span class="lb">滚动</span>
+              <div class="ctl"><div class="line">
+                <span class="seg" role="group" aria-label="送礼名单滚动速度">
+                  <button :aria-pressed="o.giftsSpeed === 'off'" @click="save({ giftsSpeed: 'off' }, '不滚动：名单固定挂着，放不下时只留最新的几条')">不滚动</button>
+                  <button :aria-pressed="o.giftsSpeed === 'slow'" @click="save({ giftsSpeed: 'slow' }, '滚动速度：慢（约 5 秒一条）')">慢</button>
+                  <button :aria-pressed="o.giftsSpeed === 'normal'" @click="save({ giftsSpeed: 'normal' }, '滚动速度：中（约 3 秒一条）')">中</button>
+                  <button :aria-pressed="o.giftsSpeed === 'fast'" @click="save({ giftsSpeed: 'fast' }, '滚动速度：快（约 2 秒一条）')">快</button>
+                </span>
+                <span class="hint">{{ o.giftsSpeed === 'off' ? '名单固定挂着，放不下时只留最新的几条，新来的从下面加进来；配合「只显示选中的礼物」可以把特定礼物挂在画面上' : '一屏放不下时循环往上滚的速度：慢约 5 秒一条，中约 3 秒，快约 2 秒' }}</span>
+              </div></div>
+            </div>
+            <div class="srow">
               <span class="lb">显示哪些</span>
               <div class="ctl">
                 <GiftsFilterPick :model-value="o.giftsFilter" @change="setGiftsFilter" />

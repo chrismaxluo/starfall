@@ -2,7 +2,7 @@
 // 按时间先后排成一串，一屏放不下时从下往上循环滚动。连击合成一条。
 // 地址形如 /overlay/?output=1&key=...&gifts=1，在直播软件里单独加一个浏览器源（建议 640 宽），拖到画面一侧
 import './gifts.css';
-import { GUARD_BADGES, GIFTS_KEEP, giftListShows } from '@starfall/shared/overlay';
+import { GUARD_BADGES, GIFTS_KEEP, GIFTS_SPEED_PX, giftListShows } from '@starfall/shared/overlay';
 import type { GiftListItem, OverlayConfig, ServerToOverlay } from '@starfall/shared/overlay';
 import { connect } from './conn.ts';
 import type { Conn } from './conn.ts';
@@ -86,10 +86,9 @@ function enter(el: HTMLElement): void {
 
 // ---------- 循环滚动 ----------
 // 所有的条目排成一串往上滚（像片尾字幕），滚出顶部的一条挪到最后面接着滚，首尾直接接上；一屏放得下时不滚。
+// 设成不滚动时固定挂着，放不下只留最新的几条。
 // 位置都按排版尺寸算（字号大时整体放大过，不受动画影响）
 
-/** 滚动速度：每秒多少像素（放大前），一条大约 3 秒 */
-const SPEED = 32;
 /** 相邻两条的间距（和 CSS 里 .gl 的 gap 一致） */
 const GAP = 10;
 let offset = 0;
@@ -101,8 +100,18 @@ const zoomK = () => (config.giftsSize === 'large' ? 1.25 : 1);
 const viewH = () => root.clientHeight / zoomK() - 40;
 const rows = () => [...list.children] as HTMLElement[];
 
-/** 内容比一屏高时开始滚，放得下时停下、回到开头 */
+/** 不滚动时：放不下就从最上面（最旧的）开始去掉，只留最新的几条 */
+function trimStatic(): void {
+  let content = rows().reduce((sum, r) => sum + r.offsetHeight + GAP, 0);
+  for (let first = list.firstElementChild as HTMLElement | null; first && content > viewH(); first = list.firstElementChild as HTMLElement | null) {
+    content -= first.offsetHeight + GAP;
+    first.remove();
+  }
+}
+
+/** 内容比一屏高时开始滚，放得下时停下、回到开头；设成不滚动时只留最新的几条 */
 function updateScrolling(): void {
+  if (config.giftsSpeed === 'off') return trimStatic();
   const content = rows().reduce((sum, r) => sum + r.offsetHeight + GAP, 0);
   const need = content > viewH();
   if (need === scrolling) return;
@@ -119,7 +128,7 @@ function tick(t: number): void {
   const dt = lastT ? Math.min(0.1, (t - lastT) / 1000) : 0;
   lastT = t;
   if (scrolling && config.giftsEnabled) {
-    offset += SPEED * dt;
+    offset += (GIFTS_SPEED_PX[config.giftsSpeed] || GIFTS_SPEED_PX.normal) * dt;
     // 第一条整个滚出顶部：挪到最后面
     for (let first = list.firstElementChild as HTMLElement | null; first && offset >= first.offsetHeight + GAP; first = list.firstElementChild as HTMLElement | null) {
       offset -= first.offsetHeight + GAP;
@@ -166,7 +175,7 @@ function redraw(): void {
 }
 
 function applyConfig(next: OverlayConfig): void {
-  const redrawNeeded = next.giftsSize !== config.giftsSize || next.giftsMax !== config.giftsMax || JSON.stringify(next.giftsFilter) !== JSON.stringify(config.giftsFilter);
+  const redrawNeeded = next.giftsSize !== config.giftsSize || next.giftsMax !== config.giftsMax || (next.giftsSpeed === 'off') !== (config.giftsSpeed === 'off') || JSON.stringify(next.giftsFilter) !== JSON.stringify(config.giftsFilter);
   config = next;
   const lite = q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
   root.className = `gl-root side-${config.giftsSide}${config.giftsSize === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${config.giftsEnabled ? '' : ' off'}`;

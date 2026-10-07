@@ -48,8 +48,17 @@ export interface OverlayConfig {
   giftsSide: 'left' | 'right';
   giftsSize: 'normal' | 'large';
   giftsMax: number;
+  /** 循环滚动的速度 */
+  giftsSpeed: GiftsSpeed;
   giftsFilter: GiftsFilter;
 }
+
+/**
+ * 送礼名单滚动速度：每秒多少像素（按 1080 宽设计的尺寸）；慢约 5 秒一条、中约 3 秒、快约 2 秒。
+ * off 为不滚动：固定挂着，放不下时只留最新的几条（配合「只显示选中的礼物」把特定礼物挂在画面上）
+ */
+export type GiftsSpeed = 'off' | 'slow' | 'normal' | 'fast';
+export const GIFTS_SPEED_PX: Record<GiftsSpeed, number> = { off: 0, slow: 20, normal: 32, fast: 50 };
 
 /**
  * 送礼名单显示哪些：all 为所有付费礼物；only 为只显示 gifts 里勾选的礼物（按礼物编号，名字只用来在后台显示）。

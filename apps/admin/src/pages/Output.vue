@@ -345,7 +345,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             <div class="src-f">
               <span class="wh2">宽高填 <code>{{ giftsWh.w }} × {{ giftsWh.h }}</code></span>
               <span>高度按一屏 {{ o.giftsMax }} 条算好了</span>
-              <span class="links"><a class="linkish" href="#giftlist">显示设置、挂记录 →</a><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
+              <span class="links"><a class="linkish" href="#giftlist">名单内容、外观 →</a><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
             </div>
           </div>
 

@@ -2,7 +2,7 @@
 // 用特效页的演示模式（?demo=样式，不连服务端）播放一次，在好看的那一刻截图，按 9:14 裁到特效所在的区域。
 // 需要一个能打开特效页的星临服务（例如演示服务）和 Playwright：
 //   STARFALL_DATA=<空目录> STARFALL_PORT=17601 node apps/server/src/cli/demo.ts
-//   PLAYWRIGHT=<playwright 包所在目录> node design/tools/thumbs.mjs http://127.0.0.1:17601
+//   PLAYWRIGHT=<playwright 包所在目录> node design/tools/thumbs.mjs http://127.0.0.1:17601 [只生成这几个样式，逗号分隔]
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
@@ -12,7 +12,7 @@ const { chromium } = require(process.env.PLAYWRIGHT ?? 'playwright');
 const OUT = path.resolve(import.meta.dirname, '../../apps/admin/public/thumbs');
 
 /** 每个样式在第几毫秒截图（动画走到最完整的时候） */
-const AT = { 'royal-gov': 3600, 'royal-adm': 3000, 'royal-cap': 2200, frost: 1500, line: 1100, 'glass-gift': 2000, 'glass-big': 3000, 'glass-mod': 1600, 'glass-dm': 1400 };
+const AT = { 'royal-gov': 3600, 'royal-adm': 3000, 'royal-cap': 2200, frost: 1500, line: 1100, 'glass-gift': 2400, 'glass-big': 2400, 'glass-mod': 1600, 'glass-dm': 1400 };
 const W = 1080;
 const H = 1920;
 // 和后台卡片一样的深色底，加两团柔光：玻璃特效要有东西在后面才看得出毛玻璃
@@ -34,7 +34,8 @@ await page.addInitScript((k) => {
   };
   requestAnimationFrame(tick);
 }, SLOW);
-for (const [style, at] of Object.entries(AT)) {
+const only = process.argv[3]?.split(',');
+for (const [style, at] of Object.entries(AT).filter(([s]) => !only || only.includes(s))) {
   await page.goto(`${base}/overlay/?demo=${style}`);
   await page.addStyleTag({ content: BG });
   // 从特效真正出现在舞台上开始计时（第一次打开要先加载字体）

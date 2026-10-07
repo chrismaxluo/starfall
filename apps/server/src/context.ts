@@ -18,6 +18,8 @@ import { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './services/event-
 import { EventLog } from './services/events.ts';
 import { parseMessage } from '@starfall/bili';
 import type { getHonorMedals, getRoomGifts } from '@starfall/bili';
+import { GiftEffects } from './services/gift-fx.ts';
+import { GiftPinStore } from './services/gift-pins.ts';
 import { GiftCatalog } from './services/gifts.ts';
 import { HonorMedals } from './services/honor.ts';
 import { AudienceService } from './services/audience.ts';
@@ -29,6 +31,7 @@ import { RoomInfoService } from './services/room-info.ts';
 import type { RoomInfoDeps } from './services/room-info.ts';
 import { OutputStore } from './services/outputs.ts';
 import { Pipeline } from './services/pipeline.ts';
+import { QuickPlayStore } from './services/quick-play.ts';
 import { RoomStore } from './services/room.ts';
 import { EnterRuleStore } from './services/rules.ts';
 import { Secret } from './services/secret.ts';
@@ -52,7 +55,10 @@ export interface AppContext {
   danmuRules: DanmuRuleStore;
   giftRules: GiftRuleStore;
   guardRules: GuardRuleStore;
+  quickPlay: QuickPlayStore;
   gifts: GiftCatalog;
+  giftFx: GiftEffects;
+  giftPins: GiftPinStore;
   honor: HonorMedals;
   audience: AudienceService;
   outputs: OutputStore;
@@ -88,7 +94,10 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const danmuRules = new DanmuRuleStore(db);
   const giftRules = new GiftRuleStore(db, settings);
   const guardRules = new GuardRuleStore(db);
+  const quickPlay = new QuickPlayStore(db, settings);
+  quickPlay.seedOnce();
   const gifts = new GiftCatalog(room, () => account.anon, opts.fetchGifts);
+  const giftFx = new GiftEffects(() => account.anon);
   const honor = new HonorMedals(settings, () => account.anon, opts.fetchHonor);
   const audience = new AudienceService({ room, live, anon: () => account.anon, ...opts.audience });
   const blacklist = new BlacklistStore({ db, settings, room, account });
@@ -96,9 +105,11 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const overlayBuild = new BuildVersion(config.overlayDist);
   const adminBuild = new BuildVersion(config.adminDist);
   const hub = new Hub({ build: () => overlayBuild.current() });
-  const pipeline = new Pipeline({ live, gifts, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const pipeline = new Pipeline({ live, gifts, giftFx, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const giftPins = new GiftPinStore(db);
+  hub.setPins(giftPins.items());
 
-  const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, blacklist, outputs });
+  const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, quickPlay, blacklist, outputs });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
 
   // 把变化推给在线的特效页和管理后台
@@ -112,7 +123,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   });
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, gifts, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, quickPlay, gifts, giftFx, giftPins, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -146,6 +157,7 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   prune();
   const timer = setInterval(prune, PRUNE_MS);
   ctx.gifts.start();
+  ctx.giftFx.start(() => ctx.gifts.list());
   ctx.honor.start();
   ctx.pipeline.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));

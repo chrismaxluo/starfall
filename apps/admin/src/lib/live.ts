@@ -1,15 +1,19 @@
 // 管理后台的实时连接：事件、队列、连接状态、特效页上下线
 import { setTimeZone } from './format.ts';
-import { CHAT_MAX_LIMIT, OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
-import type { ChatItem } from '@starfall/shared/overlay';
-import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
+import { CHAT_MAX_LIMIT, GIFTS_KEEP, OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
+import type { ChatItem, GiftListItem } from '@starfall/shared/overlay';
+import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshQuick, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
-  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[] }
+  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[]; gifts?: GiftListItem[]; pins?: GiftListItem[] }
   /** 弹幕列表：新的一条、换直播间清空 */
   | { type: 'chat'; item: ChatItem }
   | { type: 'chat_clear' }
+  /** 送礼名单：新的一条、新开一场清空 */
+  | { type: 'gift_item'; item: GiftListItem }
+  | { type: 'gifts_clear' }
+  | { type: 'gift_pins'; items: GiftListItem[] }
   /** 服务端的后台重新构建了 */
   | { type: 'version'; build: string }
   | { type: 'room_info'; info: RoomInfo | null }
@@ -19,7 +23,7 @@ type Msg =
   | { type: 'event'; event: EventDto }
   | { type: 'event_status'; id: number; status: PlayStatus }
   /** 别的设备（或这台）改了规则、素材、设置、输出 */
-  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'all' };
+  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'quickplay' | 'all' };
 
 const eventListeners = new Set<(e: EventDto) => void>();
 const statusListeners = new Set<(id: number, s: PlayStatus) => void>();
@@ -37,6 +41,13 @@ export function onLiveEventStatus(fn: (id: number, s: PlayStatus) => void): () =
 }
 
 /** 订阅新弹幕（弹幕列表预览）；null 表示清空 */
+const giftListeners = new Set<(item: GiftListItem | null) => void>();
+/** 送礼名单新的一条（null 为清空） */
+export function onGiftItem(fn: (item: GiftListItem | null) => void): () => void {
+  giftListeners.add(fn);
+  return () => giftListeners.delete(fn);
+}
+
 export function onChat(fn: (item: ChatItem | null) => void): () => void {
   chatListeners.add(fn);
   return () => chatListeners.delete(fn);
@@ -70,14 +81,16 @@ function handle(m: Msg): void {
       state.overlays = m.overlays;
       state.roomInfo = m.roomInfo;
       state.chat = m.chat ?? [];
+      state.gifts = m.gifts ?? [];
+      state.giftPins = m.pins ?? [];
       // 重连：断开期间的事件和别处的修改都补回来
       if (hellos++ > 0) {
-        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs()]).catch(() => undefined);
+        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs(), refreshQuick()]).catch(() => undefined);
         for (const fn of resyncListeners) fn();
       }
       break;
     case 'changed': {
-      const jobs = { rules: [refreshRules], library: [refreshEffects, refreshRules], settings: [refreshSettings, refreshStatus], outputs: [refreshOutputs], all: [refreshRules, refreshEffects, refreshSettings, refreshOutputs] }[m.what] ?? [];
+      const jobs = { rules: [refreshRules], library: [refreshEffects, refreshRules, refreshQuick], settings: [refreshSettings, refreshStatus], outputs: [refreshOutputs], quickplay: [refreshQuick], all: [refreshRules, refreshEffects, refreshSettings, refreshOutputs, refreshQuick] }[m.what] ?? [];
       void Promise.all(jobs.map((f) => f())).catch(() => undefined);
       break;
     }
@@ -111,6 +124,17 @@ function handle(m: Msg): void {
     case 'chat_clear':
       state.chat = [];
       for (const fn of chatListeners) fn(null);
+      break;
+    case 'gift_item':
+      state.gifts = [...state.gifts, m.item].slice(-GIFTS_KEEP);
+      for (const fn of giftListeners) fn(m.item);
+      break;
+    case 'gifts_clear':
+      state.gifts = [];
+      for (const fn of giftListeners) fn(null);
+      break;
+    case 'gift_pins':
+      state.giftPins = m.items;
       break;
     case 'event':
       state.feed.unshift(m.event);

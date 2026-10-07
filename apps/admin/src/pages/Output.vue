@@ -9,7 +9,7 @@ import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay';
+import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
@@ -76,18 +76,20 @@ const chatPv = ref<InstanceType<typeof ChatPreview> | null>(null);
 const showSafe = ref(true);
 const showKey = ref(false);
 const showChatKey = ref(false);
+const showGiftsKey = ref(false);
 const alphaBg = ref(false);
 
-// 右侧预览：特效页 / 弹幕列表（记住上次看的）
+// 右侧预览：特效页 / 弹幕列表 / 送礼名单（记住上次看的）
 const TAB_KEY = 'sf-out-tab';
-const readTab = (): 'fx' | 'chat' => {
+type PTab = 'fx' | 'chat';
+const readTab = (): PTab => {
   try {
     return localStorage.getItem(TAB_KEY) === 'chat' ? 'chat' : 'fx';
   } catch {
     return 'fx';
   }
 };
-const ptab = ref<'fx' | 'chat'>(readTab());
+const ptab = ref<PTab>(readTab());
 watch(ptab, (t) => {
   try {
     localStorage.setItem(TAB_KEY, t);
@@ -132,6 +134,10 @@ const chatUrl = computed(() => (o.value ? `${location.origin}${o.value.chatPath}
 const mask = (u: string, show: boolean) => (show || !o.value ? u : u.replace(o.value.key, '••••••••••'));
 const shownUrl = computed(() => mask(url.value, showKey.value));
 const shownChatUrl = computed(() => mask(chatUrl.value, showChatKey.value));
+const giftsUrl = computed(() => (o.value ? `${location.origin}${o.value.giftsPath}` : ''));
+const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
+/** 送礼名单浏览器源的建议宽高 */
+const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize) } : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
 function setChatMax(v: number): void {
@@ -148,12 +154,13 @@ function setChatFade(v: number): void {
   if (!o.value || v === o.value.chatFadeSec) return;
   void save({ chatFadeSec: v }, v ? `没人发弹幕 ${v} 秒后，从最旧的开始一条一条消失` : '弹幕一直显示，只被新弹幕顶走');
 }
-async function copy(which: 'fx' | 'chat'): Promise<void> {
+async function copy(which: 'fx' | 'chat' | 'gifts'): Promise<void> {
   try {
-    await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : url.value);
-    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : '已复制特效页地址');
+    await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : which === 'gifts' ? giftsUrl.value : url.value);
+    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : which === 'gifts' ? `已复制送礼名单地址，宽高填 ${giftsWh.value.w} × ${giftsWh.value.h}` : '已复制特效页地址');
   } catch {
     if (which === 'chat') showChatKey.value = true;
+    else if (which === 'gifts') showGiftsKey.value = true;
     else showKey.value = true;
     toast('浏览器不允许自动复制，请手动选中地址复制', 'info');
   }
@@ -161,7 +168,7 @@ async function copy(which: 'fx' | 'chat'): Promise<void> {
 async function resetKey(): Promise<void> {
   const target = o.value;
   if (!target) return;
-  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：特效页、弹幕列表的旧地址立即失效，请把新地址重新填到直播软件');
+  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：特效页、弹幕列表、送礼名单的旧地址立即失效，请把新地址重新填到直播软件');
   if (r) Object.assign(target, r);
 }
 
@@ -178,6 +185,7 @@ const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.va
 /** 「在浏览器里查看」打开的页面：能看特效，但不算加到了直播软件 */
 const viewing = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && isFxView(x)));
 const chats = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'chat'));
+const giftLists = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'gifts'));
 /** 在线状态：「在线 · 直播姬」，几个同时在线时写个数 */
 function liveText(list: OverlayInfo[]): string {
   if (!list.length) return '不在线';
@@ -320,6 +328,27 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
           </div>
 
+          <div class="srcbox" :class="{ off: !o.giftsEnabled }">
+            <div class="src-h">
+              <span class="src-ic gf"><Icon name="i-gift" /></span>
+              <span class="src-t"><b>送礼名单</b><span>本场收到的礼物、上舰、醒目留言，一屏 {{ o.giftsMax }} 条，放不下时循环往上滚 · 拖到画面一侧</span></span>
+              <span class="right">
+                <span class="live" :class="o.giftsEnabled && giftLists.length ? '' : 'off'"><i />{{ o.giftsEnabled ? liveText(giftLists) : '已关闭' }}</span>
+                <button class="switch" role="switch" type="button" :aria-checked="o.giftsEnabled" aria-label="启用送礼名单" @click="save({ giftsEnabled: !o.giftsEnabled }, o.giftsEnabled ? '已关闭送礼名单：直播画面上不再显示' : '已打开送礼名单')" />
+              </span>
+            </div>
+            <div class="src-url">
+              <input class="inp" :value="shownGiftsUrl" readonly aria-label="送礼名单地址" @focus="(e) => showGiftsKey && (e.target as HTMLInputElement).select()" />
+              <button class="btn primary" @click="copy('gifts')"><Icon name="i-copy" />复制地址</button>
+              <button class="btn ic" :title="showGiftsKey ? '隐藏密钥' : '显示密钥'" :aria-label="showGiftsKey ? '隐藏密钥' : '显示密钥'" @click="showGiftsKey = !showGiftsKey"><Icon :name="showGiftsKey ? 'i-eye-off' : 'i-eye'" /></button>
+            </div>
+            <div class="src-f">
+              <span class="wh2">宽高填 <code>{{ giftsWh.w }} × {{ giftsWh.h }}</code></span>
+              <span>高度按一屏 {{ o.giftsMax }} 条算好了</span>
+              <span class="links"><a class="linkish" href="#giftlist">名单内容、外观 →</a><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
+            </div>
+          </div>
+
           <details class="howto" :open="howtoOpen" @toggle="(e) => (howtoOpen = (e.target as HTMLDetailsElement).open)">
             <summary><Icon name="i-chev" /><span>{{ o.app === 'obs' ? '在 OBS 中添加' : '在 B站直播姬中添加' }}</span><span class="aside">特效页没连上时自动展开{{ o.app === 'livehime' ? ' · 菜单名称以实际版本为准' : '' }}</span></summary>
             <AddSteps :output="o" @copy-check="copyCheck" />
@@ -447,6 +476,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
           </div>
         </div>
+
       </div>
 
       <!-- 右侧：实时预览 -->

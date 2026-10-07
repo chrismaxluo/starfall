@@ -5,6 +5,7 @@ import { clearQueue, togglePause } from '../lib/actions.ts';
 import { post } from '../lib/api.ts';
 import { IDENTITY, SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
+import { playQuick, quickName } from '../lib/quick.ts';
 import { go } from '../lib/route.ts';
 import { state, ui } from '../lib/store.ts';
 import { toggleTheme } from '../lib/theme.ts';
@@ -39,7 +40,10 @@ const cmds = computed<Cmd[]>(() => {
     { g: '特效测试', icon: 'i-demo', label: '打开特效页演示', kw: 'demo 测试', run: () => void open('/overlay/?demo=1', '_blank', 'noopener') },
     { g: '直播中', icon: 'i-pause', label: paused ? '恢复播放' : '暂停所有特效', kw: '暂停 恢复 紧急', kbd: 'Ctrl Shift P', run: () => void togglePause() },
     { g: '直播中', icon: 'i-x', label: '清空播放队列', kw: '排队', run: () => void clearQueue() },
+    ...state.quick.map((b): Cmd => ({ g: '直播中', icon: 'i-bolt', label: `快捷播放：${quickName(b)}`, kw: '素材 按钮 梗', ...(b.hotkey ? { kbd: b.hotkey } : {}), run: () => void playQuick(b) })),
     { g: '跳转', icon: 'i-grid', label: '总览', kw: '首页 实时动态', run: () => go('overview') },
+    { g: '跳转', icon: 'i-bolt', label: '素材快捷播放', kw: '按钮 快捷键 梗', run: () => go('quickplay') },
+    { g: '跳转', icon: 'i-gift', label: '送礼名单', kw: '礼物 挂 轮播 滚动 名单', run: () => go('giftlist') },
     { g: '跳转', icon: 'i-wand', label: '进场规则', kw: '触发规则 身份 大航海 粉丝牌', run: () => go('rules', 'enter') },
     { g: '跳转', icon: 'i-user', label: '专属用户', kw: '触发规则 专属特效 专属素材', run: () => go('rules', 'exclusive') },
     { g: '跳转', icon: 'i-chat', label: '弹幕规则', kw: '触发规则 关键词', run: () => go('rules', 'danmu') },
@@ -49,6 +53,7 @@ const cmds = computed<Cmd[]>(() => {
     { g: '跳转', icon: 'i-image', label: '音效', kw: '素材库 声音', run: () => go('assets', 'sound') },
     { g: '跳转', icon: 'i-list', label: '事件记录', kw: '日志 历史', run: () => go('logs') },
     { g: '跳转', icon: 'i-screen', label: '直播软件输出', kw: 'OBS 直播姬 浏览器源 地址 竖屏 横屏 分辨率 兼容', run: () => go('obs') },
+    { g: '跳转', icon: 'i-info', label: '关于', kw: '版本 更新 检查更新 作者 运行信息 更新记录', run: () => go('about') },
     { g: '跳转', icon: 'i-gear', label: '设置', kw: '账号 直播间 黑名单 密码', run: () => go('settings') },
     { g: '跳转', icon: 'i-ban', label: '黑名单', kw: '设置 屏蔽', run: () => go('settings') },
     { g: '其他', icon: 'i-star', label: '新手引导', kw: '帮助 开始', run: () => (ui.wizard = true) },

@@ -10,6 +10,8 @@ export interface QueueItem<T = unknown> {
   enqueuedAt: number;
   /** 插队项直接排到队首（高价值事件） */
   jump?: boolean;
+  /** 钉在最前面：被快捷播放打断、放回去接着播的那一项；后来的插队项也排在它后面，队列满了也不会被挤掉 */
+  pin?: boolean;
   payload: T;
 }
 
@@ -43,13 +45,18 @@ export class PlayQueue<T = unknown> {
       let victim = -1;
       for (let i = 0; i < this.items.length; i++) {
         const it = this.items[i]!;
-        if (it.jump) continue;
+        if (it.jump || it.pin) continue;
         const v = victim === -1 ? undefined : this.items[victim]!;
         if (!v || PRIORITY[it.kind] < PRIORITY[v.kind] || (PRIORITY[it.kind] === PRIORITY[v.kind] && it.enqueuedAt < v.enqueuedAt)) victim = i;
       }
       if (victim !== -1) dropped = this.items.splice(victim, 1)[0]!;
     }
     return { dropped };
+  }
+
+  /** 放到最前面（钉住，见 pin） */
+  front(item: QueueItem<T>): void {
+    this.items.unshift({ ...item, pin: true });
   }
 
   next(): QueueItem<T> | undefined {
@@ -71,6 +78,8 @@ export class PlayQueue<T = unknown> {
 }
 
 function compare(a: QueueItem, b: QueueItem): number {
+  if (!!a.pin !== !!b.pin) return a.pin ? -1 : 1;
+  if (a.pin) return 0;
   if (!!a.jump !== !!b.jump) return a.jump ? -1 : 1;
   const p = PRIORITY[b.kind] - PRIORITY[a.kind];
   if (p !== 0) return p;

@@ -33,6 +33,7 @@ const FIELD: Record<string, string> = {
   uids: '指定观众',
   guards: '大航海',
   bands: '分段',
+  honorBands: '荣耀等级分档',
   specific: '指定礼物',
   exclusives: '专属用户',
   queueMax: '排队上限',

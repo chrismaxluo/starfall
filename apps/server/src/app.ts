@@ -12,12 +12,15 @@ import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
 import { backupRoutes } from './routes/backup.ts';
+import { giftListRoutes } from './routes/gift-list.ts';
 import { biliRoutes } from './routes/bili.ts';
 import { eventRuleRoutes } from './routes/event-rules.ts';
 import { eventRoutes } from './routes/events.ts';
 import { libraryRoutes } from './routes/library.ts';
 import { outputRoutes } from './routes/outputs.ts';
 import { playbackRoutes } from './routes/playback.ts';
+import { quickPlayRoutes } from './routes/quick-play.ts';
+import { aboutRoutes } from './routes/about.ts';
 import { ruleRoutes } from './routes/rules.ts';
 import { wsRoutes } from './routes/ws.ts';
 
@@ -77,7 +80,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   });
 
   // 规则、素材、设置、输出改动成功后通知所有打开的管理后台重新读取（多台设备同时打开时，不会拿着旧数据把别人的修改覆盖掉）
-  const CHANGED: Array<[string, string]> = [['/api/rules', 'rules'], ['/api/effects', 'library'], ['/api/assets', 'library'], ['/api/sounds', 'library'], ['/api/settings', 'settings'], ['/api/blacklist', 'settings'], ['/api/outputs', 'outputs'], ['/api/room', 'settings'], ['/api/backup/import', 'all']];
+  const CHANGED: Array<[string, string]> = [['/api/rules', 'rules'], ['/api/effects', 'library'], ['/api/assets', 'library'], ['/api/sounds', 'library'], ['/api/settings', 'settings'], ['/api/blacklist', 'settings'], ['/api/outputs', 'outputs'], ['/api/quickplay/buttons', 'quickplay'], ['/api/room', 'settings'], ['/api/backup/import', 'all']];
   app.addHook('onResponse', async (req, reply) => {
     if (req.method === 'GET' || reply.statusCode >= 400) return;
     const route = req.routeOptions.url ?? '';
@@ -140,8 +143,11 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   eventRuleRoutes(app, ctx);
   outputRoutes(app, ctx);
   playbackRoutes(app, ctx);
+  quickPlayRoutes(app, ctx);
+  aboutRoutes(app, ctx);
   eventRoutes(app, ctx);
   backupRoutes(app, ctx);
+  giftListRoutes(app, ctx);
   await app.register(async (scope) => wsRoutes(scope, ctx));
   app.addHook('onClose', async () => ctx.hub.closeAll());
 

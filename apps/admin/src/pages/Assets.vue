@@ -195,6 +195,11 @@ onBeforeUnmount(() => {
   audio?.pause();
   audio = null;
 });
+/** 支持的格式（拖放框里的说明） */
+const FORMATS = '动画：透明 WebM（推荐）· MP4（没有透明背景，会挡住画面）· SVGA · Lottie（.json）· GIF · PNG · APNG · WebP · JPG　音效：MP3 · WAV · OGG';
+const showFormats = ref(false);
+/** 自己的动画素材和音效都还没有：显示大的拖放框 */
+const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.sounds.length && !uploads.length);
 </script>
 
 <template>
@@ -210,15 +215,23 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="drop" :class="{ over }">
+    <!-- 还没有素材时是一个大的拖放框；有了素材就收成一条提示（右上角和列表里都有「上传素材」） -->
+    <div v-if="empty" class="drop" :class="{ over }">
       <span class="ico"><Icon name="i-upload" /></span>
       <div>
         <b>把文件拖到这里，或点击选择</b>
-        <span>动画：透明 WebM（推荐）· MP4（没有透明背景，会挡住画面）· SVGA · Lottie（.json）· GIF · PNG · APNG · WebP · JPG　音效：MP3 · WAV · OGG　单个文件不超过 100 MB；拖到这个页面任何地方都可以</span>
+        <span>{{ FORMATS }}　单个文件不超过 100 MB；拖到这个页面任何地方都可以</span>
       </div>
       <button class="btn" @click="fileIn?.click()">选择文件</button>
-      <input ref="fileIn" type="file" multiple hidden :accept="ACCEPT" @change="onPick" />
     </div>
+    <template v-else>
+      <div class="drop-slim" :class="{ over }">
+        <Icon name="i-upload" /><span><b>把文件拖到这个页面任何地方</b>就能上传，单个文件不超过 100 MB</span>
+        <button type="button" class="linkish" :aria-expanded="showFormats" @click="showFormats = !showFormats">支持哪些格式</button>
+      </div>
+      <div v-if="showFormats" class="fmts">{{ FORMATS }}</div>
+    </template>
+    <input ref="fileIn" type="file" multiple hidden :accept="ACCEPT" @change="onPick" />
 
     <div class="toolbar">
       <div class="seg" role="tablist" aria-label="素材类型">

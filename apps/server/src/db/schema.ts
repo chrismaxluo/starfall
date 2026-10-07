@@ -2,7 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { DanmuWho, EffectTexts, FeatherMode, Position, SvgaRole, Tier } from '@starfall/shared';
+import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
 
 const now = sql`(unixepoch() * 1000)`;
@@ -107,6 +107,14 @@ export const ruleEnterBands = sqliteTable('rule_enter_bands', {
   enabled: bool('enabled').notNull(),
 });
 
+/** 进场荣耀等级分档：只存起始等级（低于最低一档的不算） */
+export const ruleEnterHonorBands = sqliteTable('rule_enter_honor_bands', {
+  fromLevel: integer('from_level').primaryKey(),
+  effectId: integer('effect_id').references(() => effects.id, { onDelete: 'restrict' }),
+  cooldownMin: integer('cooldown_min').notNull(),
+  enabled: bool('enabled').notNull(),
+});
+
 /** 专属用户（只对进场生效） */
 export const ruleExclusive = sqliteTable('rule_exclusive', {
   uid: integer('uid').primaryKey(),
@@ -184,7 +192,23 @@ export const outputs = sqliteTable('outputs', {
   chatMedal: text('chat_medal', { enum: ['own', 'all'] }).notNull().default('own'),
   chatMax: integer('chat_max').notNull().default(8),
   chatFadeSec: integer('chat_fade_sec').notNull().default(0),
+  // 送礼名单（同一个输出的又一个浏览器源）；默认靠右，和靠左的弹幕列表错开
+  giftsEnabled: integer('gifts_enabled', { mode: 'boolean' }).notNull().default(true),
+  giftsSide: text('gifts_side', { enum: ['left', 'right'] }).notNull().default('right'),
+  giftsSize: text('gifts_size', { enum: ['normal', 'large'] }).notNull().default('normal'),
+  giftsMax: integer('gifts_max').notNull().default(6),
+  giftsSpeed: text('gifts_speed', { enum: ['off', 'slow', 'normal', 'fast'] }).notNull().default('normal'),
+  giftsFilter: text('gifts_filter', { mode: 'json' }).$type<GiftsFilter>().notNull().default({ mode: 'all', gifts: [], guard: true, sc: true }),
   key: text('key').notNull().unique(),
+  createdAt: integer('created_at').notNull().default(now),
+});
+
+/** 送礼名单挂上的记录：存一份当时的样子（事件记录过期删掉了也不影响），event_id 防止同一条挂两次 */
+export const giftPins = sqliteTable('gift_pins', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  eventId: integer('event_id').notNull().unique(),
+  item: text('item', { mode: 'json' }).$type<GiftListItem>().notNull(),
+  sort: integer('sort').notNull(),
   createdAt: integer('created_at').notNull().default(now),
 });
 
@@ -218,6 +242,21 @@ export const events = sqliteTable(
   },
   (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id)],
 );
+
+/** 素材快捷播放的按钮（按 sort 排列）。素材删除时按钮一起删掉 */
+export const quickPlay = sqliteTable('quick_play', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sort: integer('sort').notNull(),
+  effectId: integer('effect_id')
+    .notNull()
+    .references(() => effects.id, { onDelete: 'cascade' }),
+  /** 按钮上显示的名字（空的时候显示素材名） */
+  label: text('label').notNull().default(''),
+  /** 后台页面里的快捷键（单个数字或字母） */
+  hotkey: text('hotkey'),
+  /** 电脑版的全局快捷键，例如 Ctrl+Alt+1 */
+  globalHotkey: text('global_hotkey'),
+});
 
 /** 观众缓存：昵称、头像（专属用户、黑名单显示用） */
 export const viewers = sqliteTable('viewers', {

@@ -126,13 +126,17 @@ export interface GiftConfig {
   paid: boolean;
   icon: string;
   gif?: string;
+  /** 会动的礼物图（比 gif 清楚、有透明） */
+  webp?: string;
+  /** B站全屏动画的编号（大礼物才有），用 getGiftEffects 查动画文件 */
+  effectId?: number;
   /** 在直播间礼物面板上的哪一页（礼物、粉丝团、航海……）；不在面板上显示的礼物没有 */
   tab?: string;
   /** 在这一页里的位置（从 1 开始） */
   panel?: number;
 }
 
-type RawGift = { id: number; name: string; price: number; coin_type: string; img_basic: string; gif?: string };
+type RawGift = { id: number; name: string; price: number; coin_type: string; img_basic: string; gif?: string; webp?: string; effect_id?: number };
 const toGift = (g: RawGift): GiftConfig => ({
   id: g.id,
   name: g.name,
@@ -140,6 +144,8 @@ const toGift = (g: RawGift): GiftConfig => ({
   paid: g.coin_type === 'gold',
   icon: g.img_basic,
   ...(g.gif ? { gif: g.gif } : {}),
+  ...(g.webp ? { webp: g.webp } : {}),
+  ...(g.effect_id ? { effectId: g.effect_id } : {}),
 });
 
 /**
@@ -176,6 +182,55 @@ export async function getRoomGifts(http: BiliHttp, roomId: number): Promise<Gift
 export async function getAllGifts(http: BiliHttp): Promise<GiftConfig[]> {
   const d = await http.getData<{ list?: RawGift[] }>(`${LIVE}/xlive/web-room/v1/giftPanel/giftConfig?platform=pc`, { auth: false });
   return (d.list ?? []).filter((g) => g?.id).map(toGift);
+}
+
+/** B站礼物全屏动画：一个 MP4 里左边是画面、右边是透明度，配一个 JSON 说明两块各在哪 */
+export interface GiftEffectFile {
+  mp4: string;
+  json: string;
+}
+
+/** 全部礼物全屏动画（公开接口，约 2500 个）：动画编号 → 文件 */
+export async function getGiftEffects(http: BiliHttp): Promise<Map<number, GiftEffectFile>> {
+  const d = await http.getData<{ full_sc_resource?: { conf_list?: Array<{ id?: number; web_mp4?: string; web_mp4_json?: string }> } }>(
+    `${LIVE}/xlive/general-interface/v1/fullScSpecialEffect/GetEffectConfListV2?platform=pc`,
+    { auth: false },
+  );
+  const out = new Map<number, GiftEffectFile>();
+  for (const c of d.full_sc_resource?.conf_list ?? []) if (c?.id && c.web_mp4 && c.web_mp4_json) out.set(c.id, { mp4: c.web_mp4, json: c.web_mp4_json });
+  return out;
+}
+
+/** 动画的排布：输出多大、视频多大、画面和透明度各在视频的哪一块（x, y, 宽, 高）、一共多长 */
+export interface GiftEffectLayout {
+  w: number;
+  h: number;
+  videoW: number;
+  videoH: number;
+  rgb: [number, number, number, number];
+  alpha: [number, number, number, number];
+  durationMs: number;
+}
+
+/** 读一个动画的 JSON；格式不对时抛错 */
+export async function getGiftEffectLayout(http: BiliHttp, url: string): Promise<GiftEffectLayout> {
+  const res = await http.request(url, { auth: false });
+  if (!res.ok) throw new BiliApiError(-1, `读取动画说明失败（HTTP ${res.status}）`);
+  return parseGiftEffectLayout(await res.json());
+}
+
+export function parseGiftEffectLayout(j: unknown): GiftEffectLayout {
+  const i = (j as { info?: Record<string, unknown> } | null)?.info ?? {};
+  const num = (k: string) => (typeof i[k] === 'number' && Number.isFinite(i[k]) ? (i[k] as number) : NaN);
+  const rect = (k: string) => {
+    const r = i[k];
+    return Array.isArray(r) && r.length === 4 && r.every((x) => typeof x === 'number' && x >= 0) ? (r as [number, number, number, number]) : null;
+  };
+  const rgb = rect('rgbFrame');
+  const alpha = rect('aFrame');
+  const [w, h, videoW, videoH, f, fps] = [num('w'), num('h'), num('videoW'), num('videoH'), num('f'), num('fps')];
+  if (!rgb || !alpha || !(w > 0 && h > 0 && videoW > 0 && videoH > 0 && f > 0 && fps > 0)) throw new BiliApiError(-1, '动画说明的格式不认识');
+  return { w, h, videoW, videoH, rgb, alpha, durationMs: Math.round((f / fps) * 1000) };
 }
 
 /** 荣耀等级勋章：每级一张图（数字画在图上），animated 为动图 */

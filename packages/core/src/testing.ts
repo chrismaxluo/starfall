@@ -25,6 +25,11 @@ export function defaultRules(p: Partial<EnterRules> = {}): EnterRules {
       { fromLevel: 21, effectId: 5, cooldownMin: 10, enabled: true },
       { fromLevel: 1, effectId: 5, cooldownMin: 15, enabled: true },
     ],
+    honorBands: [
+      { fromLevel: 50, effectId: 23, cooldownMin: 10, enabled: true },
+      { fromLevel: 40, effectId: 22, cooldownMin: 10, enabled: true },
+      { fromLevel: 30, effectId: 21, cooldownMin: 10, enabled: true },
+    ],
     exclusives: [],
     cooldownMode: 'minutes',
     ...p,

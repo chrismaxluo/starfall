@@ -6,16 +6,27 @@ import { get, put } from '../lib/api.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import { battery, batteryYuan, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
-import { effectById, refreshEffects, state } from '../lib/store.ts';
-import { attempt, undoable } from '../lib/toast.ts';
+import { effectById, refreshEffects, refreshSettings, state, ui } from '../lib/store.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { GiftBand, GiftConfig, GiftRules } from '../lib/types.ts';
 import CdPick from './CdPick.vue';
-import ConfirmButton from './ConfirmButton.vue';
 import EffectPicker from './EffectPicker.vue';
 import Icon from './Icon.vue';
+import RowMenu from './RowMenu.vue';
+import type { MenuItem } from './RowMenu.vue';
 import Switch from './Switch.vue';
 
 const emit = defineEmits<{ preview: [p: PreviewRequest] }>();
+/** 「怎么判断」展开（由页面传进来，换标签时收起） */
+const help = defineModel<boolean>('help', { default: false });
+/** 列宽：开关 | 礼物 / 价值 | 特效 | 备注 | 操作 */
+const COLS = '44px minmax(150px, 220px) minmax(190px, 300px) minmax(0, 1fr) 68px';
+/** 「＋ 加一段」展开输入框 */
+const adding = ref(false);
+function editEffect(id: number | null): void {
+  if (!id) return toast('这条规则还没有选特效', 'info');
+  ui.editorId = id;
+}
 const catalog = ref<GiftConfig[]>([]);
 const catalogErr = ref('');
 const picking = ref(false);
@@ -65,6 +76,11 @@ const valueBar = computed(() => {
 });
 const ticks = computed(() => [...bands.value].reverse().map((b, i, arr) => ({ key: b.fromGold, text: battery(b.fromGold), note: yuan(b.fromGold), left: ((i + 1) / (arr.length + 1)) * 100 })));
 
+/** 礼物图用动图还是静态图（全局设置，所有礼物特效都按它） */
+async function setAnim(v: boolean): Promise<void> {
+  await attempt(() => put('/api/settings', { giftAnimImg: v }), v ? '礼物图改用动图' : '礼物图改用静态图');
+  await refreshSettings().catch(() => undefined);
+}
 async function save(msg?: string, undo?: () => Promise<unknown>): Promise<void> {
   if (!rules.value) return;
   const r = await attempt(() => put<GiftRules>('/api/rules/gift', rules.value), undo ? undefined : msg);
@@ -101,7 +117,8 @@ function addBand(): void {
   const parent = bands.value.find((b) => b.fromGold < gold) ?? bands.value[bands.value.length - 1]!;
   rules.value.bands.push({ fromGold: gold, effectId: parent.effectId, enabled: parent.enabled });
   addBattery.value = null;
-  bandMsg.value = { text: '低于最低一段的礼物不播特效', err: false };
+  adding.value = false;
+  bandMsg.value = { text: '分出来的新一段先沿用原来的特效', err: false };
   void save(`已在 ${batteryYuan(gold)}处分出一段`);
 }
 function removeBand(b: GiftBand): void {
@@ -114,14 +131,36 @@ function removeBand(b: GiftBand): void {
     await save('已恢复这一段');
   });
 }
+const specMenu = (giftId: number, effectId: number | null): Array<MenuItem | null> => [
+  { icon: 'i-pen', label: '调整这个特效（素材设置）', run: () => editEffect(effectId) },
+  null,
+  { icon: 'i-trash', label: '删除（可以撤销）', danger: true, run: () => removeSpecific(giftId) },
+];
+const bandMenu = (b: GiftBand): Array<MenuItem | null> => [
+  { icon: 'i-pen', label: '调整这个特效（素材设置）', run: () => editEffect(b.effectId) },
+  null,
+  { icon: 'i-trash', label: '删掉这一段（并入相邻的一段）', danger: true, disabled: bands.value.length <= 1, run: () => removeBand(b) },
+];
 const jumps = (gold: number) => gold >= JUMP_GOLD && state.settings?.queueJump;
 function previewSpec(giftId: number, name: string, effectId: number | null): void {
   const g = giftOf(giftId);
-  emit('preview', { effectId, viewer: SAMPLES.fan, label: `礼物「${name}」`, kind: 'gift', vars: { gift: name, count: 1, valueGold: g?.price ?? 0 } });
+  emit('preview', { effectId, viewer: SAMPLES.fan, label: `礼物「${name}」`, kind: 'gift', vars: { gift: name, giftId, count: 1, valueGold: g?.price ?? 0 } });
+}
+/** 价值分段预览用的礼物：礼物面板上落在这一段里最便宜的一个；没有时用比这一段便宜的最贵的一个，多送几个凑够 */
+function bandSample(from: number, to: number | undefined): { gift: string; giftId?: number; count: number; valueGold: number } {
+  const paid = catalog.value.filter((g) => g.paid && g.price > 0 && g.tab).sort((a, b) => a.price - b.price);
+  const inside = paid.find((g) => g.price >= from && (to === undefined || g.price < to));
+  if (inside) return { gift: inside.name, giftId: inside.id, count: 1, valueGold: inside.price };
+  const below = [...paid].reverse().find((g) => g.price < from);
+  if (below) {
+    const count = Math.ceil(from / below.price);
+    return { gift: below.name, giftId: below.id, count, valueGold: below.price * count };
+  }
+  return { gift: '礼物', count: 1, valueGold: from };
 }
 function previewBand(i: number): void {
   const b = bands.value[i]!;
-  emit('preview', { effectId: b.effectId, viewer: SAMPLES.fan, label: `礼物 ${bandLabel(i)}`, kind: 'gift', vars: { gift: '告白花束', count: Math.max(1, Math.ceil(b.fromGold / 22_000)), valueGold: b.fromGold } });
+  emit('preview', { effectId: b.effectId, viewer: SAMPLES.fan, label: `礼物 ${bandLabel(i)}`, kind: 'gift', vars: bandSample(b.fromGold, bandHi(i)) });
 }
 
 onMounted(async () => {
@@ -135,26 +174,37 @@ onMounted(async () => {
 
 <template>
   <div v-if="rules">
-    <div class="rl-flow"><span>有人送礼时，先看是不是下面的<b>指定礼物</b>；不是的话，再按这次送的<b>总价值</b>（单价 × 数量）找对应的一段。价值按 B站礼物面板的电池计算（1 电池 = 0.1 元）。免费礼物不播放。</span></div>
+    <div class="rtool">
+      <span class="say">先看是不是指定礼物，不是的话按这次送的总价值找对应的一段。<button class="linkish" :aria-expanded="help" @click="help = !help"><Icon name="i-info" />怎么判断</button></span>
+      <span class="sp" />
+      <span v-if="state.settings" class="set" title="礼物特效里的礼物图用 B站的动图；关掉用静态图（直播电脑比较卡时可以关掉）">礼物图用动图<Switch v-model="state.settings.giftAnimImg" label="礼物图用动图" @change="setAnim" /></span>
+      <span class="set">连击合并<Switch v-model="rules.comboEnabled" label="连击合并" @change="(v) => save(v ? '已开启连击合并' : '已关闭连击合并，每次送礼都单独处理')" /><template v-if="rules.comboEnabled">同一个人 <CdPick v-model="rules.comboSec" unit="sec" :options="[1, 2, 3, 5, 8, 10, 15]" :max="15" :allow-zero="false" hint="这段时间里连续送同一种礼物，合成一次特效" @change="(v) => save(`连击合并时间：${v} 秒`)" /> 内连续送，合成一次</template></span>
+    </div>
+    <div v-if="help" class="rhelp">
+      <b>总价值</b> = 单价 × 数量，按 B站礼物面板的电池计算（1 电池 = 0.1 元）。免费礼物不播放。<br />
+      <b>{{ battery(JUMP_GOLD) }}（{{ yuan(JUMP_GOLD) }}）以上</b>的礼物{{ state.settings?.queueJump === false ? '按顺序排队（排队设置里关掉了插队）' : '会插队优先播放（可在总览「排队设置」里关掉）' }}。<br />
+      <b>B站动画</b>：有 B站全屏动画的礼物（大多是 5 元以上的）播 B站官方的动画，下方显示是谁送的；没有动画的礼物 100 元以上显示晶耀、以下显示晶礼。观众在 B站 App 里也会看到 App 自己播的动画，不想重复可以给这一段换成别的特效。<br />
+      <b>礼物图用动图</b>：礼物特效里的礼物图用 B站的动图，关掉用静态图，对所有礼物特效都有效。<br />
+      <b>连击合并</b>：同一个人在设定的几秒内连续送同一种礼物，合成一次特效，显示总数量，按合起来的总价值选特效；连击停下后才播放，会晚几秒。关掉后每次送礼都单独处理。
+    </div>
 
-    <div class="rl-sec"><h3>指定礼物</h3><span>送这些礼物时，用这里的特效（优先）</span></div>
-    <div class="rl-gifts">
-      <div v-for="s in rules.specific" :key="s.giftId" class="rl-gift" :class="{ off: !s.enabled }">
-        <img v-if="giftOf(s.giftId)?.icon" :src="giftOf(s.giftId)!.icon" alt="" referrerpolicy="no-referrer" />
-        <span v-else class="gico">{{ [...s.giftName][0] ?? '礼' }}</span>
-        <div class="body">
-          <div class="nm">{{ s.giftName || `礼物 ${s.giftId}` }}<span v-if="giftOf(s.giftId)" class="pr">{{ battery(giftOf(s.giftId)!.price) }} / 个（{{ yuan(giftOf(s.giftId)!.price) }}）</span></div>
-          <EffectPicker v-model="s.effectId" kind="gift" @change="(id) => save(`「${s.giftName}」改为播放「${effectById(id)?.name}」`)" />
+    <div class="rsec"><h3>指定礼物</h3><span>送这些礼物时用这里的特效，优先于按价值</span></div>
+    <div class="rt">
+      <div v-if="rules.specific.length" class="rt-h" :style="{ gridTemplateColumns: COLS }"><span>开关</span><span>礼物</span><span>播放的特效</span><span /><span>操作</span></div>
+      <div v-for="s in rules.specific" :key="s.giftId" class="rt-r" :class="{ off: !s.enabled }" :style="{ gridTemplateColumns: COLS }" :title="s.enabled ? undefined : `已关闭：「${s.giftName}」按价值分段处理`">
+        <div class="c-sw"><Switch v-model="s.enabled" :label="`指定礼物 ${s.giftName}`" @change="(v) => save(v ? `已打开「${s.giftName}」` : `已关闭「${s.giftName}」，按价值分段处理`)" /></div>
+        <div class="c-who">
+          <img v-if="giftOf(s.giftId)?.icon" class="gico" :src="giftOf(s.giftId)!.icon" alt="" referrerpolicy="no-referrer" />
+          <span class="nm"><b>{{ s.giftName || `礼物 ${s.giftId}` }}</b><span v-if="giftOf(s.giftId)" class="uid">{{ battery(giftOf(s.giftId)!.price) }} / 个（{{ yuan(giftOf(s.giftId)!.price) }}）</span></span>
         </div>
-        <div class="side">
-          <Switch v-model="s.enabled" :label="`指定礼物 ${s.giftName}`" @change="(v) => save(v ? `已打开「${s.giftName}」` : `已关闭「${s.giftName}」，按价值分段处理`)" />
-          <span>
-            <button class="playmini" :aria-label="`预览送出 ${s.giftName}`" :title="`预览送出 ${s.giftName}`" @click="previewSpec(s.giftId, s.giftName, s.effectId)"><svg><use href="#i-play" /></svg></button>
-            <ConfirmButton label="" confirm-label="删除" cls="playmini" armed-cls="delb" :aria-label="`删除指定礼物 ${s.giftName}`" :title="`删除指定礼物 ${s.giftName}`" @confirm="removeSpecific(s.giftId)"><Icon name="i-x" /></ConfirmButton>
-          </span>
-        </div>
+        <div class="c-eff"><EffectPicker v-model="s.effectId" kind="gift" @change="(id) => save(`「${s.giftName}」改为播放「${effectById(id)?.name}」`)" /></div>
+        <div />
+        <div class="c-act"><button class="icon-btn play" :aria-label="`预览送出 ${s.giftName}`" :title="`预览送出 ${s.giftName}`" @click="previewSpec(s.giftId, s.giftName, s.effectId)"><svg><use href="#i-play" /></svg></button><RowMenu :items="specMenu(s.giftId, s.effectId)" :label="`指定礼物 ${s.giftName}：更多操作`" /></div>
       </div>
-      <button class="rl-gift add" :disabled="!!catalogErr" @click="picking = !picking"><span><Icon name="i-plus" />{{ catalogErr ? '读取礼物面板失败' : '从礼物列表里选' }}</span></button>
+      <div class="rt-foot">
+        <button class="btn" :disabled="!!catalogErr" :aria-expanded="picking" @click="picking = !picking"><Icon name="i-plus" />{{ catalogErr ? '读取礼物面板失败' : '从礼物列表里选' }}</button>
+        <span v-if="!rules.specific.length">还没有指定礼物：所有礼物都按下面的价值分段处理</span>
+      </div>
     </div>
     <div v-if="picking" class="rl-gpick">
       <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致；点一下就加上，可以连着选几个</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
@@ -167,43 +217,27 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="rl-sec"><h3>按价值</h3><span>每一段放一种特效</span></div>
-    <div class="rl-val">
-      <div class="valbar">
-        <div v-for="x in valueBar" :key="x.key" :class="{ none: !x.color }" :style="x.color ? { background: x.color } : {}"><b>{{ x.name }}</b><span>{{ x.range }}</span></div>
+    <div class="rsec"><h3>按价值</h3><span>一次送出的总价值落在哪一段，就播哪一段的特效</span></div>
+    <div class="rt">
+      <div class="rl-val">
+        <div class="valbar">
+          <div v-for="x in valueBar" :key="x.key" :class="{ none: !x.color }" :style="x.color ? { background: x.color } : {}"><b>{{ x.name }}</b><span>{{ x.range }}</span></div>
+        </div>
+        <div class="valticks two"><span v-for="t in ticks" :key="t.key" :style="{ left: `${t.left}%` }">{{ t.text }}<i>{{ t.note }}</i></span></div>
       </div>
-      <div class="valticks two"><span v-for="t in ticks" :key="t.key" :style="{ left: `${t.left}%` }">{{ t.text }}<i>{{ t.note }}</i></span></div>
-      <div class="lvadd">
-        <Icon name="i-plus" />在 <input v-model.number="addBattery" class="inp num" type="number" min="1" step="1" placeholder="500" aria-label="在多少电池处分一段" @keydown.enter="addBand" /> 电池<span v-if="Number(addBattery) >= 1" class="hint">（{{ yuan(Math.round(Number(addBattery)) * 100) }}）</span>处再分一段
-        <button class="btn" @click="addBand">分段</button>
-        <span class="hint" :style="{ color: bandMsg.err ? '#D64545' : '' }">{{ bandMsg.text }}</span>
+      <div class="rt-h" :style="{ gridTemplateColumns: COLS, borderTop: '1px solid var(--line)' }"><span>开关</span><span>一次送出的价值</span><span>播放的特效</span><span /><span>操作</span></div>
+      <div v-for="(b, i) in bands" :key="b.fromGold" class="rt-r" :class="{ off: !b.enabled }" :style="{ gridTemplateColumns: COLS }" :title="b.enabled ? undefined : `已关闭：${bandLabel(i)}的礼物不播放特效`">
+        <div class="c-sw"><Switch v-model="b.enabled" :label="`${bandLabel(i)}的礼物特效`" @change="(v) => save(v ? `已打开 ${bandLabel(i)}` : `已关闭 ${bandLabel(i)}，这段价值的礼物不播放特效`)" /></div>
+        <div class="val"><b>{{ bandLabel(i) }}</b><span>{{ bandYuan(i) }}</span></div>
+        <div class="c-eff"><EffectPicker v-model="b.effectId" kind="gift" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" /></div>
+        <div><span v-if="jumps(b.fromGold)" class="jump">插队优先播放</span></div>
+        <div class="c-act"><button class="icon-btn play" :aria-label="`预览 ${bandLabel(i)}的礼物`" :title="`预览 ${bandLabel(i)}的礼物`" @click="previewBand(i)"><svg><use href="#i-play" /></svg></button><RowMenu :items="bandMenu(b)" :label="`${bandLabel(i)}：更多操作`" /></div>
       </div>
-    </div>
-    <div class="rl-list" style="margin-top: 8px">
-      <div v-for="(b, i) in bands" :key="b.fromGold" class="rl" :class="{ off: !b.enabled }">
-        <span class="who"><span class="tag">{{ battery(b.fromGold) }}+</span></span>
-        <span class="say">
-          一次送出 <b>{{ bandLabel(i) }}</b><span class="hint">（{{ bandYuan(i) }}）</span> 时，播放 <EffectPicker v-model="b.effectId" kind="gift" @change="(id) => save(`${bandLabel(i)}的礼物改为播放「${effectById(id)?.name}」`)" />
-          <span v-if="jumps(b.fromGold)" class="hint">· 会插队优先播放</span>
-          <span v-if="!b.enabled" class="offnote">已关闭：{{ bandLabel(i) }}的礼物不播放特效</span>
-        </span>
-        <span class="acts">
-          <button class="playmini" :aria-label="`预览 ${bandLabel(i)}的礼物`" :title="`预览 ${bandLabel(i)}的礼物`" @click="previewBand(i)"><svg><use href="#i-play" /></svg></button>
-          <ConfirmButton v-if="bands.length > 1" label="" confirm-label="删除" cls="playmini" armed-cls="delb" :aria-label="`删除 ${bandLabel(i)}这一段`" @confirm="removeBand(b)"><Icon name="i-x" /></ConfirmButton>
-          <Switch v-model="b.enabled" :label="`${bandLabel(i)}的礼物特效`" @change="(v) => save(v ? `已打开 ${bandLabel(i)}` : `已关闭 ${bandLabel(i)}，这段价值的礼物不播放特效`)" />
-        </span>
-      </div>
-    </div>
-
-    <div class="rl-sec"><h3>连击合并</h3></div>
-    <div class="rl-list">
-      <div class="rl" :class="{ off: !rules.comboEnabled }">
-        <span class="who"><span class="tag">连击</span></span>
-        <span class="say">
-          同一个人 <CdPick v-model="rules.comboSec" unit="sec" :options="[1, 2, 3, 5, 8, 10, 15]" :max="15" :allow-zero="false" hint="这段时间里连续送同一种礼物，合成一次特效" @change="(v) => save(`连击合并时间：${v} 秒`)" /> 内连续送同一种礼物，合成一次特效，显示总数量<span class="hint">（连击停下后才播放，会晚几秒；按合起来的总价值选特效）</span>
-          <span v-if="!rules.comboEnabled" class="offnote">已关闭：每次送礼都单独处理</span>
-        </span>
-        <span class="acts"><Switch v-model="rules.comboEnabled" label="连击合并" @change="(v) => save(v ? '已开启连击合并' : '已关闭连击合并，每次送礼都单独处理')" /></span>
+      <div class="rt-foot">
+        <span v-if="bands.length">{{ battery(bands[bands.length - 1]!.fromGold) }}以下的礼物不播放</span>
+        <span style="flex: 1" />
+        <span v-if="adding" class="lvadd">在 <input v-model.number="addBattery" class="inp num" type="number" min="1" step="1" placeholder="500" aria-label="在多少电池处分一段" @keydown.enter="addBand" @keydown.esc="adding = false" /> 电池<span v-if="Number(addBattery) >= 1" class="hint">（{{ yuan(Math.round(Number(addBattery)) * 100) }}）</span>处再分一段 <button class="btn" @click="addBand">分段</button><button class="linkish" style="color: var(--t3)" @click="adding = false">取消</button><span class="hint" :style="{ color: bandMsg.err ? '#D64545' : '' }">{{ bandMsg.text }}</span></span>
+        <button v-else class="linkish" @click="adding = true">＋ 加一段</button>
       </div>
     </div>
   </div>

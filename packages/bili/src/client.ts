@@ -25,12 +25,18 @@ export interface LiveClientOptions {
   backoffMaxMs?: number;
   /** 测试用：替换随机数（重连抖动） */
   random?: () => number;
+  /** 多久看一次时间，发现电脑睡眠过（0 为不检查） */
+  wakeCheckMs?: number;
+  /** 测试用：替换当前时间 */
+  now?: () => number;
 }
 
 const STABLE_MS = 60_000;
+/** 两次检查之间实际过去的时间比预期多出这么多，说明电脑睡眠或进程被暂停过 */
+const WAKE_GAP_MS = 15_000;
 
 export class LiveClient {
-  private readonly o: Required<Omit<LiveClientOptions, 'onState' | 'onWarn' | 'urlFor' | 'random'>> & Pick<LiveClientOptions, 'onState' | 'onWarn' | 'urlFor'> & { random: () => number };
+  private readonly o: Required<Omit<LiveClientOptions, 'onState' | 'onWarn' | 'urlFor' | 'random' | 'now'>> & Pick<LiveClientOptions, 'onState' | 'onWarn' | 'urlFor'> & { random: () => number; now: () => number };
   private ws: WebSocket | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,6 +46,10 @@ export class LiveClient {
   private attempt = 0;
   private hostIndex = 0;
   private _state: ClientState = 'idle';
+  /** 睡眠检查 */
+  private wakeTimer: ReturnType<typeof setInterval> | null = null;
+  /** 每次重新开始连接加 1：唤醒时丢掉还在进行中的旧连接过程 */
+  private gen = 0;
 
   constructor(opts: LiveClientOptions) {
     this.o = {
@@ -48,6 +58,8 @@ export class LiveClient {
       backoffMinMs: 1000,
       backoffMaxMs: 30_000,
       random: Math.random,
+      wakeCheckMs: 5000,
+      now: Date.now,
       ...opts,
     };
   }
@@ -64,12 +76,39 @@ export class LiveClient {
   start(): void {
     if (this._state !== 'idle' && this._state !== 'stopped') return;
     this.attempt = 0;
+    this.watchWake();
     void this.connect();
   }
 
   stop(): void {
     this.setState('stopped');
+    if (this.wakeTimer) clearInterval(this.wakeTimer);
+    this.wakeTimer = null;
     this.cleanup();
+  }
+
+  /**
+   * 电脑睡眠时连接已经断了，但要等「长时间没有收到数据」（70 秒）加上重连等待才发现。
+   * 定时看一眼时间：两次之间实际过去的时间远多于预期，就是刚醒来，马上重连
+   */
+  private watchWake(): void {
+    if (this.wakeTimer || !this.o.wakeCheckMs) return;
+    let last = this.o.now();
+    this.wakeTimer = setInterval(() => {
+      const t = this.o.now();
+      const gap = t - last;
+      last = t;
+      if (gap > this.o.wakeCheckMs + WAKE_GAP_MS) this.onWake(gap);
+    }, this.o.wakeCheckMs);
+    this.wakeTimer.unref?.();
+  }
+
+  private onWake(gap: number): void {
+    if (this.isStopped()) return;
+    this.o.onWarn?.(`电脑睡眠或程序暂停了约 ${Math.round(gap / 1000)} 秒，马上重新连接直播间`);
+    this.cleanup();
+    this.attempt = 0;
+    void this.connect();
   }
 
   private setState(s: ClientState, detail?: string): void {
@@ -97,14 +136,16 @@ export class LiveClient {
 
   private async connect(): Promise<void> {
     if (this.isStopped()) return;
+    const gen = ++this.gen;
     this.setState(this.attempt === 0 ? 'connecting' : 'reconnecting');
     let info: DanmuInfo;
     try {
       info = await this.o.getDanmuInfo();
     } catch (e) {
+      if (gen !== this.gen) return;
       return this.scheduleRetry(`获取弹幕服务器失败：${(e as Error).message}`);
     }
-    if (this.isStopped()) return;
+    if (this.isStopped() || gen !== this.gen) return;
     const host = info.hosts[this.hostIndex % info.hosts.length]!;
     const url = this.o.urlFor ? this.o.urlFor(host) : `wss://${host.host}:${host.wssPort}/sub`;
     let ws: WebSocket;

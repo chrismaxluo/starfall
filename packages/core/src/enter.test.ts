@@ -133,10 +133,57 @@ describe('专属用户（F-EN-06 ~ 07）', () => {
   });
 });
 
+describe('荣耀等级分档', () => {
+  it('按荣耀等级落进唯一的一档，标签正确', () => {
+    expect(matchEnter(viewer({ honor: 30 }), ctx())?.effectId).toBe(21);
+    expect(matchEnter(viewer({ honor: 39 }), ctx())?.effectId).toBe(21);
+    expect(matchEnter(viewer({ honor: 45 }), ctx())?.label).toBe('进场 · 荣耀等级 40 – 49 级');
+    expect(matchEnter(viewer({ honor: 72 }), ctx())?.rule).toEqual({ kind: 'honor', fromLevel: 50, toLevel: null });
+  });
+
+  it('低于最低一档、没有荣耀等级时按其他观众处理', () => {
+    expect(matchEnter(viewer({ honor: 29 }), ctx())).toBeNull();
+    expect(matchEnter(viewer(), ctx())).toBeNull();
+    const r = defaultRules();
+    r.tiers.nor.enabled = true;
+    expect(matchEnter(viewer({ honor: 29 }), ctx(r))?.rule).toEqual({ kind: 'tier', tier: 'nor' });
+  });
+
+  it('排在粉丝牌后面：戴本房间粉丝牌的按粉丝牌，大航海、房管也优先', () => {
+    expect(matchEnter(viewer({ honor: 60, medal: medal(5) }), ctx())?.effectId).toBe(5);
+    expect(matchEnter(viewer({ honor: 60, guard: 3 }), ctx())?.effectId).toBe(3);
+    expect(matchEnter(viewer({ honor: 60, isMod: true }), ctx())?.effectId).toBe(4);
+    // 别的直播间的牌子不算，按荣耀等级
+    expect(matchEnter(viewer({ honor: 60, medal: medal(25, 999) }), ctx())?.effectId).toBe(23);
+  });
+
+  it('粉丝牌那一档关着时，接着按荣耀等级', () => {
+    const r = defaultRules();
+    r.bands[0]!.enabled = false;
+    expect(matchEnter(viewer({ honor: 42, medal: medal(25) }), ctx(r))?.effectId).toBe(22);
+  });
+
+  it('所在档关着或没选特效时不落到更低的档', () => {
+    const r = defaultRules();
+    r.honorBands[1]!.enabled = false; // 40 – 49 级
+    expect(matchEnter(viewer({ honor: 45 }), ctx(r))).toBeNull();
+    r.honorBands[0]!.effectId = null; // 50 级及以上
+    expect(matchEnter(viewer({ honor: 55 }), ctx(r))).toBeNull();
+  });
+
+  it('一档都没有时也能用；起始等级重复时校验不通过', () => {
+    expect(matchEnter(viewer({ honor: 60 }), ctx(defaultRules({ honorBands: [] })))).toBeNull();
+    expect(EnterRulesSchema.safeParse(defaultRules({ honorBands: [] })).success).toBe(true);
+    const dup = defaultRules({ honorBands: [{ fromLevel: 30, effectId: 1, cooldownMin: 0, enabled: true }, { fromLevel: 30, effectId: 2, cooldownMin: 0, enabled: true }] });
+    expect(EnterRulesSchema.safeParse(dup).success).toBe(false);
+  });
+});
+
 describe('冷却键', () => {
   it('同一条规则共用一个键', () => {
     expect(enterRuleKey({ kind: 'tier', tier: 'cap' })).toBe('enter:tier:cap');
     expect(enterRuleKey({ kind: 'band', fromLevel: 21, toLevel: 30 })).toBe('enter:band:21');
     expect(enterRuleKey({ kind: 'exclusive', uid: 5 })).toBe('enter:exclusive:5');
+    expect(enterRuleKey({ kind: 'honor', fromLevel: 40, toLevel: 49 })).toBe('enter:honor:40');
   });
 });

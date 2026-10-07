@@ -107,6 +107,8 @@ export type TierRule = z.infer<typeof TierRuleSchema>;
 /** 粉丝牌分档：只存起始等级，区间由相邻两档推出，所以不会重叠 */
 /** 粉丝牌等级上限（B 站现在最高 120 级）：进场分段、弹幕「谁发的才算」、模拟都用这个 */
 export const MEDAL_LEVEL_MAX = 120;
+/** 荣耀等级上限（B 站目前到 80 级） */
+export const HONOR_LEVEL_MAX = 80;
 export const MedalBandSchema = z.object({
   fromLevel: z.number().int().min(1).max(MEDAL_LEVEL_MAX),
   effectId: z.number().int().positive().nullable(),
@@ -114,6 +116,15 @@ export const MedalBandSchema = z.object({
   enabled: z.boolean(),
 });
 export type MedalBand = z.infer<typeof MedalBandSchema>;
+
+/** 进场荣耀等级分档：和粉丝牌一样只存起始等级；低于最低一档的人不算（按其他观众处理） */
+export const HonorBandSchema = z.object({
+  fromLevel: z.number().int().min(1).max(HONOR_LEVEL_MAX),
+  effectId: z.number().int().positive().nullable(),
+  cooldownMin,
+  enabled: z.boolean(),
+});
+export type HonorBand = z.infer<typeof HonorBandSchema>;
 
 export const ExclusiveSchema = z.object({
   uid: z.number().int().positive(),
@@ -132,6 +143,8 @@ export const EnterRulesSchema = z
   .object({
     tiers: z.object({ gov: TierRuleSchema, adm: TierRuleSchema, cap: TierRuleSchema, mod: TierRuleSchema, nor: TierRuleSchema }),
     bands: z.array(MedalBandSchema).min(1).max(20),
+    /** 荣耀等级分档（排在粉丝牌后面、其他观众前面）；可以一档都没有 */
+    honorBands: z.array(HonorBandSchema).max(20),
     exclusives: z.array(ExclusiveSchema).max(2000),
     /** 冷却方式：按分钟，或每场直播每人只播一次 */
     cooldownMode: z.enum(['minutes', 'oncePerLive']),
@@ -139,6 +152,8 @@ export const EnterRulesSchema = z
   .superRefine((r, ctx) => {
     const levels = r.bands.map((b) => b.fromLevel);
     if (new Set(levels).size !== levels.length) ctx.addIssue({ code: 'custom', path: ['bands'], message: '粉丝牌分档的起始等级不能重复' });
+    const honors = r.honorBands.map((b) => b.fromLevel);
+    if (new Set(honors).size !== honors.length) ctx.addIssue({ code: 'custom', path: ['honorBands'], message: '荣耀等级分档的起始等级不能重复' });
     const uids = r.exclusives.map((x) => x.uid);
     if (new Set(uids).size !== uids.length) ctx.addIssue({ code: 'custom', path: ['exclusives'], message: '同一个 UID 只能设一条专属规则' });
   });
@@ -149,9 +164,6 @@ export type EnterRules = z.infer<typeof EnterRulesSchema>;
 /** 以前的发送人条件（单选）：导入旧版本的配置文件、升级旧数据时换成下面的多选 */
 export const DANMU_WHO_OLD = ['all', 'fan', 'fan10', 'guard', 'mod'] as const;
 
-/** 粉丝牌等级上限 */
-/** 荣耀等级上限（B 站目前到 80 级） */
-export const HONOR_LEVEL_MAX = 80;
 /** 一条规则最多指定多少位观众 */
 export const DANMU_UIDS_MAX = 100;
 
@@ -255,3 +267,42 @@ export type GuardRule = z.infer<typeof GuardRuleSchema>;
 export const GuardRulesSchema = z.object({ gov: GuardRuleSchema, adm: GuardRuleSchema, cap: GuardRuleSchema });
 export type GuardRules = z.infer<typeof GuardRulesSchema>;
 
+
+// ---------- 素材快捷播放 ----------
+
+/** 最多多少个按钮 */
+export const QUICK_MAX = 40;
+/** 后台页面里的快捷键：单个数字或字母（不带 Ctrl 等，小键盘数字也算） */
+export const QUICK_KEY_RE = /^[0-9A-Z]$/;
+/** 电脑版的全局快捷键（在游戏、直播软件里也能按）：至少一个 Ctrl / Alt / Shift 加数字、字母或 F1–F12，例如 Ctrl+Alt+1 */
+export const QUICK_GLOBAL_RE = /^(?:(?:Ctrl|Alt|Shift)\+){1,3}(?:[0-9A-Z]|F[1-9]|F1[0-2])$/;
+
+export const QuickButtonSchema = z.object({
+  id: z.number().int().positive(),
+  effectId: z.number().int().positive(),
+  /** 按钮上显示的名字；空的时候显示素材名 */
+  label: z.string().trim().max(20),
+  hotkey: z.string().regex(QUICK_KEY_RE, '快捷键只能是一个数字或字母').nullable(),
+  globalHotkey: z.string().regex(QUICK_GLOBAL_RE, '全局快捷键要带 Ctrl、Alt 或 Shift，例如 Ctrl+Alt+1').nullable(),
+});
+export type QuickButton = z.infer<typeof QuickButtonSchema>;
+
+/** 保存整个按钮列表（按顺序）：快捷键不能重复 */
+export const QuickButtonsInputSchema = z
+  .array(QuickButtonSchema.omit({ id: true }))
+  .max(QUICK_MAX)
+  .superRefine((list, ctx) => {
+    const dup = (xs: Array<string | null>) => {
+      const seen = new Set<string>();
+      return xs.findIndex((x) => x !== null && (seen.has(x) || !seen.add(x)));
+    };
+    const k = dup(list.map((b) => b.hotkey));
+    if (k >= 0) ctx.addIssue({ code: 'custom', path: [k, 'hotkey'], message: `快捷键 ${list[k]!.hotkey} 被两个按钮用了` });
+    const g = dup(list.map((b) => b.globalHotkey));
+    if (g >= 0) ctx.addIssue({ code: 'custom', path: [g, 'globalHotkey'], message: `全局快捷键 ${list[g]!.globalHotkey} 被两个按钮用了` });
+    list.forEach((b, i) => {
+      const mods = b.globalHotkey?.split('+').slice(0, -1) ?? [];
+      if (new Set(mods).size !== mods.length) ctx.addIssue({ code: 'custom', path: [i, 'globalHotkey'], message: '全局快捷键里有重复的按键' });
+    });
+  });
+export type QuickButtonsInput = z.infer<typeof QuickButtonsInputSchema>;

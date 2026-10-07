@@ -1,6 +1,7 @@
 // 播放一个特效。播放节奏由服务端控制：新的 play 到来时，上一个一定已经结束（stop 时立即清掉）。
-import { FEATHER_MAX } from '@starfall/shared/overlay';
+import { BILI_GIFT_STYLE, FEATHER_MAX } from '@starfall/shared/overlay';
 import type { OverlayToServer, PlayItem } from '@starfall/shared';
+import { buildBiliFx } from './bilifx.ts';
 import { buildBuiltin, isFullStage } from './builtin.ts';
 import { h } from './dom.ts';
 import { buildMedia, fitSize } from './media.ts';
@@ -52,7 +53,12 @@ export class Player {
     let media: Media | null = null;
     let wrap: HTMLElement | null = null;
 
-    if (e.visual.type === 'builtin_style') {
+    if (e.visual.type === 'builtin_style' && e.visual.style === BILI_GIFT_STYLE && item.gift?.fx) {
+      slot.classList.add('full');
+      media = buildBiliFx(item, (message) => this.send({ type: 'error', id: item.id, message }));
+      if (e.honorBadge) addHonor(media.el, item.viewer);
+      slot.append(media.el);
+    } else if (e.visual.type === 'builtin_style') {
       const full = isFullStage(e.visual.style);
       slot.classList.add(full ? 'full' : `pos-${e.position}`);
       const fx = buildBuiltin(item, e.visual.style, m);
@@ -101,7 +107,7 @@ export class Player {
     };
     // 视频按真正开始播放的时间算：加载慢、开始晚了也不提前切掉（下一个特效来了照常停止）
     // 跟随素材时放完（ended）就结束；手动设置了更短的时长时到点结束
-    const vid = media?.el instanceof HTMLVideoElement ? media.el : null;
+    const vid = media?.el instanceof HTMLVideoElement ? media.el : (media?.video ?? null);
     vid?.addEventListener('ended', finish, { once: true });
     const w = e.fadeOut ? wrap : null;
     const fadeOutMs = Math.min(e.fadeOutMs, e.durationMs / 2);

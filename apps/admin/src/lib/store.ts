@@ -3,8 +3,8 @@ import { reactive } from 'vue';
 import { get } from './api.ts';
 import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
-import type { ChatItem } from '@starfall/shared/overlay';
-import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
+import type { ChatItem, GiftListItem } from '@starfall/shared/overlay';
+import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, QuickButton, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
 /** 实时动态在内存里留多少条（总览按类型筛选时从这里挑） */
 export const FEED_KEEP = 150;
@@ -24,9 +24,15 @@ export const state = reactive({
   gift: null as GiftRules | null,
   guard: null as GuardRules | null,
   outputs: [] as OutputDto[],
+  /** 素材快捷播放的按钮 */
+  quick: [] as QuickButton[],
   overlays: [] as OverlayInfo[],
   /** 最近的几条弹幕（弹幕列表的预览用） */
   chat: [] as ChatItem[],
+  /** 本场的送礼名单（送礼名单的预览用） */
+  gifts: [] as GiftListItem[],
+  /** 送礼名单挂上的记录（按顺序） */
+  giftPins: [] as GiftListItem[],
   queue: { playing: null, items: [] } as QueueSnapshot,
   /** 实时动态（最新在前） */
   feed: [] as EventDto[],
@@ -41,13 +47,13 @@ export const state = reactive({
 export const effectById = (id: number | null | undefined) => (id ? state.effects.find((e) => e.id === id) : undefined);
 export const output = () => state.outputs[0];
 /** 加到直播软件里的特效页（不算弹幕列表，也不算「在浏览器里查看」打开的页面） */
-export const isFxLive = (x: OverlayInfo) => x.role !== 'chat' && !x.view && !x.env?.view;
+export const isFxLive = (x: OverlayInfo) => x.role !== 'chat' && x.role !== 'gifts' && !x.view && !x.env?.view;
 /** 「在浏览器里查看」打开的特效页 */
-export const isFxView = (x: OverlayInfo) => x.role !== 'chat' && Boolean(x.view || x.env?.view);
+export const isFxView = (x: OverlayInfo) => x.role !== 'chat' && x.role !== 'gifts' && Boolean(x.view || x.env?.view);
 
-/** 输出的设置换成特效页、弹幕列表收到的格式（预览用） */
+/** 输出的设置换成特效页、弹幕列表收到的格式（预览用）；嵌套的设置复制一份（发给预览页时不能带响应式代理） */
 export function overlayConfigOf(o: OutputDto): OverlayConfig {
-  return { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec };
+  return { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: JSON.parse(JSON.stringify(o.giftsFilter)) as OverlayConfig['giftsFilter'] };
 }
 
 export async function refreshStatus(): Promise<void> {
@@ -79,6 +85,9 @@ export async function refreshRules(): Promise<void> {
 export async function refreshOutputs(): Promise<void> {
   state.outputs = (await get<{ outputs: OutputDto[] }>('/api/outputs')).outputs;
 }
+export async function refreshQuick(): Promise<void> {
+  state.quick = (await get<{ buttons: QuickButton[] }>('/api/quickplay/buttons')).buttons;
+}
 export async function refreshFeed(): Promise<void> {
   state.feed = (await get<{ events: EventDto[] }>(`/api/events?limit=${FEED_KEEP}`)).events;
 }
@@ -90,7 +99,7 @@ export async function refreshHonorMedals(): Promise<void> {
 }
 
 export async function loadAll(): Promise<void> {
-  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshFeed(), refreshHonorMedals()]);
+  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshQuick(), refreshFeed(), refreshHonorMedals()]);
 }
 
 /** 全局弹窗：素材设置、快捷设置专属、新手引导、命令面板 */

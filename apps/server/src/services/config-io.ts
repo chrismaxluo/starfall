@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -21,6 +21,7 @@ import type { BlacklistStore } from './blacklist.ts';
 import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rules.ts';
 import { OutputInputSchema } from './outputs.ts';
 import type { OutputStore } from './outputs.ts';
+import type { QuickPlayStore } from './quick-play.ts';
 import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
 
@@ -31,13 +32,14 @@ export const CONFIG_VERSION = 2;
 export const CONFIG_ENTRY = 'starfall-config.json';
 
 /** 导出的设置项（不含暂停状态这类运行时状态） */
-const SETTING_KEYS = ['connectMode', 'offlinePolicy', 'cooldownMode', 'queueMax', 'queueJump', 'blockAnchor', 'blockAccount', 'retentionDays', 'giftComboEnabled', 'giftComboSec', 'autoBackup', 'featherOn', 'featherPct'] as const;
+const SETTING_KEYS = ['connectMode', 'offlinePolicy', 'cooldownMode', 'queueMax', 'queueJump', 'giftAnimImg', 'blockAnchor', 'blockAccount', 'retentionDays', 'giftComboEnabled', 'giftComboSec', 'autoBackup', 'featherOn', 'featherPct'] as const;
 const SETTING_NAMES: Record<(typeof SETTING_KEYS)[number], string> = {
   connectMode: '连接直播间的时机',
   offlinePolicy: '未开播时是否播放',
   cooldownMode: '进场冷却方式',
   queueMax: '最多排队数',
   queueJump: '高价值插队',
+  giftAnimImg: '礼物图用动图',
   blockAnchor: '主播本人不触发',
   blockAccount: '登录的账号不触发',
   retentionDays: '事件记录保留期',
@@ -59,6 +61,7 @@ const SettingsPart = z
     cooldownMode: z.enum(['minutes', 'oncePerLive']),
     queueMax: z.number().int().min(3).max(30),
     queueJump: z.boolean(),
+    giftAnimImg: z.boolean(),
     blockAnchor: z.boolean(),
     blockAccount: z.boolean(),
     retentionDays: z.union([z.literal(0), z.literal(30), z.literal(90), z.literal(180)]),
@@ -114,7 +117,9 @@ const TierPart = z.object({ effect: effectRef, cooldownMin, enabled: z.boolean()
 const RulesPart = z.object({
   enter: z.object({
     tiers: z.object({ gov: TierPart, adm: TierPart, cap: TierPart, mod: TierPart, nor: TierPart }),
-    bands: z.array(z.object({ fromLevel: z.number().int().min(1).max(60), effect: effectRef, cooldownMin, enabled: z.boolean() })).min(1).max(20),
+    bands: z.array(z.object({ fromLevel: z.number().int().min(1).max(MEDAL_LEVEL_MAX), effect: effectRef, cooldownMin, enabled: z.boolean() })).min(1).max(20),
+    /** 旧版本导出的没有这一项：导入时不改动现有的荣耀等级分档 */
+    honorBands: z.array(z.object({ fromLevel: z.number().int().min(1).max(HONOR_LEVEL_MAX), effect: effectRef, cooldownMin, enabled: z.boolean() })).max(20).optional(),
   }),
   exclusives: z
     .array(z.object({ uid: z.number().int().positive(), name: z.string().max(60).default(''), effect: effectRef, cooldownMin, until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), enabled: z.boolean() }))
@@ -148,6 +153,13 @@ const OutputPart = OutputInputSchema.extend({
   chatMedal: OutputInputSchema.shape.chatMedal.default('own'),
   chatMax: OutputInputSchema.shape.chatMax.default(8),
   chatFadeSec: OutputInputSchema.shape.chatFadeSec.default(0),
+  // 送礼名单是 v1.5 加的
+  giftsEnabled: OutputInputSchema.shape.giftsEnabled.default(true),
+  giftsSide: OutputInputSchema.shape.giftsSide.default('right'),
+  giftsSize: OutputInputSchema.shape.giftsSize.default('normal'),
+  giftsMax: OutputInputSchema.shape.giftsMax.default(GIFTS_MAX_DEFAULT),
+  giftsSpeed: OutputInputSchema.shape.giftsSpeed.default('normal'),
+  giftsFilter: OutputInputSchema.shape.giftsFilter.default(GIFTS_FILTER_DEFAULT),
 });
 
 export const ConfigFileSchema = z.object({
@@ -160,12 +172,17 @@ export const ConfigFileSchema = z.object({
   rules: RulesPart,
   blacklist: z.array(z.object({ uid: z.number().int().positive(), name: z.string().max(60).default(''), note: z.string().max(200).default('') })).max(5000),
   outputs: z.array(OutputPart).max(20),
+  // 素材快捷播放是 v1.5 加的：以前导出的文件里没有，导入时不动现有的按钮
+  quickPlay: z
+    .array(z.object({ effect: z.string().min(1), label: QuickButtonSchema.shape.label, hotkey: QuickButtonSchema.shape.hotkey, globalHotkey: QuickButtonSchema.shape.globalHotkey }))
+    .max(QUICK_MAX)
+    .optional(),
 });
 export type ConfigFile = z.infer<typeof ConfigFileSchema>;
 
 /** 导入预览里的一组变化 */
 export interface PlanSection {
-  key: 'settings' | 'effects' | 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard' | 'blacklist' | 'outputs';
+  key: 'settings' | 'effects' | 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard' | 'quickplay' | 'blacklist' | 'outputs';
   label: string;
   /** 一句话概括，例如"新增 2 · 修改 1" */
   summary: string;
@@ -209,6 +226,7 @@ interface Deps {
   danmuRules: DanmuRuleStore;
   giftRules: GiftRuleStore;
   guardRules: GuardRuleStore;
+  quickPlay: QuickPlayStore;
   blacklist: BlacklistStore;
   outputs: OutputStore;
 }
@@ -283,6 +301,7 @@ export class ConfigIO {
         enter: {
           tiers: Object.fromEntries(TIERS.map((t) => [t, { effect: ref(base.tiers[t].effectId), cooldownMin: base.tiers[t].cooldownMin, enabled: base.tiers[t].enabled }])) as ConfigFile['rules']['enter']['tiers'],
           bands: base.bands.map((b) => ({ fromLevel: b.fromLevel, effect: ref(b.effectId), cooldownMin: b.cooldownMin, enabled: b.enabled })),
+          honorBands: base.honorBands.map((b) => ({ fromLevel: b.fromLevel, effect: ref(b.effectId), cooldownMin: b.cooldownMin, enabled: b.enabled })),
         },
         exclusives: exclusives.map((x) => ({ uid: x.uid, name: x.name ?? '', effect: ref(x.effectId), cooldownMin: x.cooldownMin, until: x.until, enabled: x.enabled })),
         danmu: this.d.danmuRules.list().map((r) => ({ keywords: r.keywords, mode: r.mode, who: r.who, effect: ref(r.effectId), globalCdSec: r.globalCdSec, userCdMin: r.userCdMin, enabled: r.enabled })),
@@ -293,7 +312,11 @@ export class ConfigIO {
         guard: Object.fromEntries((['gov', 'adm', 'cap'] as const).map((t) => [t, { open: ref(guard[t].openEffectId), renew: ref(guard[t].renewEffectId), enabled: guard[t].enabled }])) as ConfigFile['rules']['guard'],
       },
       blacklist: this.d.blacklist.list().map((b) => ({ uid: b.uid, name: b.name, note: b.note })),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec })),
+      quickPlay: this.d.quickPlay.list().flatMap((b) => {
+        const effect = ref(b.effectId);
+        return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
+      }),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter })),
     };
   }
 
@@ -377,9 +400,12 @@ export class ConfigIO {
       const r = file.rules.enter;
       for (const t of TIERS) refOk(r.tiers[t].effect);
       for (const b of r.bands) refOk(b.effect);
+      for (const b of r.honorBands ?? []) refOk(b.effect);
       const details: string[] = [];
       for (const t of TIERS) if (!same(cur.rules.enter.tiers[t], r.tiers[t])) details.push(`${TIER_LABEL[t]}：${describeTier(cur.rules.enter.tiers[t])} → ${describeTier(r.tiers[t])}`);
       if (!same(cur.rules.enter.bands, r.bands)) details.push(`粉丝牌分档：${cur.rules.enter.bands.length} 档 → ${r.bands.length} 档`);
+      const curHonor = cur.rules.enter.honorBands ?? [];
+      if (r.honorBands && !same(curHonor, r.honorBands)) details.push(`荣耀等级分档：${curHonor.length} 档 → ${r.honorBands.length} 档`);
       sections.push({ key: 'enter', label: '进场规则', summary: details.length ? `修改 ${details.length} 处` : '没有变化', changed: details.length > 0, details });
     }
 
@@ -447,6 +473,20 @@ export class ConfigIO {
         if (!same(cur.rules.guard[t], f)) details.push(`${TIER_LABEL[t]}：开通 ${f.open ?? '无'}，续费 ${f.renew ?? '无'}${f.enabled ? '' : '（停用）'}`);
       }
       sections.push({ key: 'guard', label: '上舰规则', summary: details.length ? `修改 ${details.length} 处` : '没有变化', changed: details.length > 0, details });
+    }
+
+    // 素材快捷播放（整体替换；旧版本导出的文件里没有，不动）
+    if (file.quickPlay) {
+      const fq = file.quickPlay;
+      const changed = !same(cur.quickPlay, fq);
+      for (const b of fq) if (!names.has(b.effect)) warnings.push(`快捷播放按钮「${b.label || b.effect}」的素材找不到，这个按钮不会导入`);
+      sections.push({
+        key: 'quickplay',
+        label: '素材快捷播放',
+        summary: changed ? `${cur.quickPlay?.length ?? 0} 个按钮 → ${fq.length} 个` : '没有变化',
+        changed,
+        details: changed ? clip(fq.map((b, i) => `${i + 1}. ${b.label || b.effect}${b.hotkey ? `（快捷键 ${b.hotkey}）` : ''}`)) : [],
+      });
     }
 
     // 黑名单（合并）
@@ -525,6 +565,7 @@ export class ConfigIO {
       this.d.enterRules.setBase({
         tiers: Object.fromEntries(TIERS.map((t) => [t, { effectId: ref(r.enter.tiers[t].effect), cooldownMin: r.enter.tiers[t].cooldownMin, enabled: r.enter.tiers[t].enabled }])) as Record<Tier, { effectId: number | null; cooldownMin: number; enabled: boolean }>,
         bands: r.enter.bands.map((b) => ({ fromLevel: b.fromLevel, effectId: ref(b.effect), cooldownMin: b.cooldownMin, enabled: b.enabled })),
+        honorBands: r.enter.honorBands ? r.enter.honorBands.map((b) => ({ fromLevel: b.fromLevel, effectId: ref(b.effect), cooldownMin: b.cooldownMin, enabled: b.enabled })) : this.d.enterRules.base().honorBands,
         cooldownMode: file.settings.cooldownMode ?? this.d.settings.get('cooldownMode'),
       });
 
@@ -550,11 +591,20 @@ export class ConfigIO {
       const guard = Object.fromEntries((['gov', 'adm', 'cap'] as const).map((t) => [t, { openEffectId: ref(r.guard[t].open), renewEffectId: ref(r.guard[t].renew), enabled: r.guard[t].enabled }])) as GuardRules;
       this.d.guardRules.set(guard);
 
-      // 7. 黑名单：合并
+      // 7. 素材快捷播放：整体替换；找不到素材的跳过
+      if (file.quickPlay) {
+        const keep = file.quickPlay.flatMap((b) => {
+          const effectId = ref(b.effect);
+          return effectId === null ? [] : [{ effectId, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
+        });
+        this.d.quickPlay.save(keep);
+      }
+
+      // 8. 黑名单：合并
       const have = new Set(this.d.blacklist.list().map((b) => b.uid));
       for (const b of file.blacklist) if (!have.has(b.uid)) this.d.blacklist.add(b);
 
-      // 8. 输出：提交后再改，改动会立刻推给在线的特效页
+      // 9. 输出：提交后再改，改动会立刻推给在线的特效页
       const curOut = new Map(this.d.outputs.list().map((o) => [o.name, o]));
       for (const o of file.outputs) {
         const c = curOut.get(o.name);

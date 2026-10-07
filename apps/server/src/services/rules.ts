@@ -1,10 +1,10 @@
-// 进场规则（需求 F-EN-01 ~ 08）：身份档位、粉丝牌分档、冷却方式，以及专属用户。
+// 进场规则（需求 F-EN-01 ~ 08）：身份档位、粉丝牌分档、荣耀等级分档、冷却方式，以及专属用户。
 import { eq, inArray } from 'drizzle-orm';
-import { ExclusiveSchema, MedalBandSchema, TIERS, TierRuleSchema } from '@starfall/shared';
-import type { EnterRules, Exclusive, MedalBand, Tier, TierRule } from '@starfall/shared';
+import { ExclusiveSchema, HonorBandSchema, MedalBandSchema, TIERS, TierRuleSchema } from '@starfall/shared';
+import type { EnterRules, Exclusive, HonorBand, MedalBand, Tier, TierRule } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
-import { effects, ruleEnterBands, ruleEnterTiers, ruleExclusive } from '../db/schema.ts';
+import { effects, ruleEnterBands, ruleEnterHonorBands, ruleEnterTiers, ruleExclusive } from '../db/schema.ts';
 import { HttpError } from '../http.ts';
 import type { SettingsStore } from './settings.ts';
 import type { ViewerStore } from './viewers.ts';
@@ -22,12 +22,15 @@ export const EnterBaseSchema = z
   .object({
     tiers: z.object({ gov: TierRuleSchema, adm: TierRuleSchema, cap: TierRuleSchema, mod: TierRuleSchema, nor: TierRuleSchema }).strict(),
     bands: z.array(MedalBandSchema.strict()).min(1).max(20),
+    honorBands: z.array(HonorBandSchema.strict()).max(20),
     cooldownMode: z.enum(['minutes', 'oncePerLive']),
   })
   .strict()
   .superRefine((r, ctx) => {
     const levels = r.bands.map((b) => b.fromLevel);
     if (new Set(levels).size !== levels.length) ctx.addIssue({ code: 'custom', path: ['bands'], message: '粉丝牌分档的起始等级不能重复' });
+    const honors = r.honorBands.map((b) => b.fromLevel);
+    if (new Set(honors).size !== honors.length) ctx.addIssue({ code: 'custom', path: ['honorBands'], message: '荣耀等级分档的起始等级不能重复' });
   });
 export type EnterBase = z.infer<typeof EnterBaseSchema>;
 
@@ -65,9 +68,16 @@ export class EnterRuleStore {
       .all()
       .sort((a, b) => b.fromLevel - a.fromLevel)
       .map((b) => ({ fromLevel: b.fromLevel, effectId: b.effectId, cooldownMin: b.cooldownMin, enabled: b.enabled }));
+    const honorBands: HonorBand[] = this.db
+      .select()
+      .from(ruleEnterHonorBands)
+      .all()
+      .sort((a, b) => b.fromLevel - a.fromLevel)
+      .map((b) => ({ fromLevel: b.fromLevel, effectId: b.effectId, cooldownMin: b.cooldownMin, enabled: b.enabled }));
     return {
       tiers: { gov: tier('gov'), adm: tier('adm'), cap: tier('cap'), mod: tier('mod'), nor: tier('nor') },
       bands,
+      honorBands,
       cooldownMode: this.settings.get('cooldownMode'),
     };
   }
@@ -83,7 +93,7 @@ export class EnterRuleStore {
   }
 
   setBase(b: EnterBase): EnterBase {
-    this.checkEffects([...TIERS.map((t) => b.tiers[t].effectId), ...b.bands.map((x) => x.effectId)]);
+    this.checkEffects([...TIERS.map((t) => b.tiers[t].effectId), ...b.bands.map((x) => x.effectId), ...b.honorBands.map((x) => x.effectId)]);
     this.db.transaction((tx) => {
       for (const tier of TIERS) {
         const v = b.tiers[tier];
@@ -91,6 +101,8 @@ export class EnterRuleStore {
       }
       tx.delete(ruleEnterBands).run();
       tx.insert(ruleEnterBands).values(b.bands).run();
+      tx.delete(ruleEnterHonorBands).run();
+      if (b.honorBands.length) tx.insert(ruleEnterHonorBands).values(b.honorBands).run();
     });
     this.settings.set('cooldownMode', b.cooldownMode);
     return this.base();

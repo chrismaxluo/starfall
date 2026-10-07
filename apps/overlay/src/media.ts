@@ -11,6 +11,8 @@ export interface Media {
   el: HTMLElement;
   start(): Promise<void>;
   stop(): void;
+  /** el 不是视频本身、里面有视频时（B站动画）：播放器按它算结束时间 */
+  video?: HTMLVideoElement | null;
 }
 
 export interface Box {

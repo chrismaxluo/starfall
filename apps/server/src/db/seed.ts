@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type { EffectTexts, Position } from '@starfall/shared';
 import type { Db } from './index.ts';
-import { effects, outputs, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, settings } from './schema.ts';
+import { effects, outputs, ruleDanmu, ruleEnterBands, ruleEnterHonorBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, settings } from './schema.ts';
 
 interface BuiltinEffect {
   name: string;
@@ -26,6 +26,8 @@ export const BUILTIN_EFFECTS: BuiltinEffect[] = [
   // 玻璃质感（大航海以外）：礼物 10 ~ 100 元、礼物 100 元以上、房管进场、弹幕回应。数量和礼物图由特效页单独显示，欢迎语里不用写
   { name: '晶礼', style: 'glass-gift', position: 'bl', durationMs: 4000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
   { name: '晶耀', style: 'glass-big', position: 'bl', durationMs: 6000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
+  // 礼物：有 B站全屏动画的播官方动画（时长跟动画走）；没有动画时按价值显示晶耀或晶礼，position、durationMs 是那时的位置和时长
+  { name: 'B站动画', style: 'bili-gift', position: 'bl', durationMs: 5000, texts: { enter: ['{name} 来了'], gift: ['{name} 送出 {gift}'] } },
   { name: '晶巡', style: 'glass-mod', position: 'bl', durationMs: 3200, texts: { enter: ['{name} 前来巡场'] } },
   { name: '晶语', style: 'glass-dm', position: 'top', durationMs: 3000, texts: { enter: ['{name}：{text}'], danmu: ['{name}：{text}'] } },
 ];
@@ -55,6 +57,8 @@ export const DEFAULT_SETTINGS = {
   cooldownMode: 'minutes' as 'minutes' | 'oncePerLive',
   queueMax: 10,
   queueJump: true,
+  /** 礼物特效里的礼物图用动图（B站的动态礼物图）；关掉用静态图 */
+  giftAnimImg: true,
   /** 主播本人不触发特效（F-PL-08） */
   blockAnchor: true,
   /** 用来连接直播间的账号不触发特效（F-PL-08，通常是小号） */
@@ -91,7 +95,7 @@ export function seed(db: Db): void {
       tx.update(effects).set({ style: toStyle }).where(and(eq(effects.style, r.style), eq(effects.builtin, false))).run();
       const old = tx.select({ id: effects.id }).from(effects).where(and(eq(effects.name, r.name), eq(effects.builtin, true))).get();
       if (!old) continue;
-      for (const [table, col] of [[ruleEnterTiers, ruleEnterTiers.effectId], [ruleEnterBands, ruleEnterBands.effectId], [ruleExclusive, ruleExclusive.effectId], [ruleDanmu, ruleDanmu.effectId], [ruleGiftBands, ruleGiftBands.effectId], [ruleGiftSpecific, ruleGiftSpecific.effectId]] as const) {
+      for (const [table, col] of [[ruleEnterTiers, ruleEnterTiers.effectId], [ruleEnterBands, ruleEnterBands.effectId], [ruleEnterHonorBands, ruleEnterHonorBands.effectId], [ruleExclusive, ruleExclusive.effectId], [ruleDanmu, ruleDanmu.effectId], [ruleGiftBands, ruleGiftBands.effectId], [ruleGiftSpecific, ruleGiftSpecific.effectId]] as const) {
         tx.update(table).set({ effectId: to }).where(eq(col, old.id)).run();
       }
       tx.update(ruleGuard).set({ openEffectId: to }).where(eq(ruleGuard.openEffectId, old.id)).run();
@@ -112,11 +116,11 @@ export function seed(db: Db): void {
         { fromLevel: 1, effectId: id('霜玻'), cooldownMin: 15, enabled: true },
       ]).run();
     }
-    // 礼物：≥ 100 元晶耀、10 ~ 100 元晶礼、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
+    // 礼物：≥ 10 元播 B站动画（没有动画的礼物按价值显示晶耀、晶礼）、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
     if (!tx.select().from(ruleGiftBands).limit(1).get()) {
       tx.insert(ruleGiftBands).values([
-        { fromGold: 100_000, effectId: id('晶耀'), enabled: true },
-        { fromGold: 10_000, effectId: id('晶礼'), enabled: true },
+        { fromGold: 100_000, effectId: id('B站动画'), enabled: true },
+        { fromGold: 10_000, effectId: id('B站动画'), enabled: true },
         { fromGold: 1000, effectId: id('一行字'), enabled: false },
       ]).run();
     }

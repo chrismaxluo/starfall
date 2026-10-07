@@ -14,7 +14,7 @@ export class GiftCatalog {
   private readonly fetchGifts: typeof getRoomGifts;
   private readonly fetchAll: typeof getAllGifts;
   private cache: { roomId: number; at: number; gifts: GiftConfig[] } | null = null;
-  private all: { at: number; icons: Map<number, string> } | null = null;
+  private all: { at: number; gifts: Map<number, GiftConfig> } | null = null;
   private loadingAll: Promise<void> | null = null;
   private allTriedAt = 0;
 
@@ -30,17 +30,33 @@ export class GiftCatalog {
    * 播放判断不能等 B 站接口，查不到就不显示礼物图
    */
   iconFor(giftId: number): string | undefined {
+    return this.find(giftId)?.icon || undefined;
+  }
+
+  /** 查礼物（只查缓存）：先查本直播间礼物面板，没有（别的直播间的礼物、下架的活动礼物等）再查全站礼物列表 */
+  find(giftId: number): GiftConfig | undefined {
     const room = this.room.get();
     const c = this.cache;
     const hit = c && room && c.roomId === room.roomId ? c.gifts.find((g) => g.id === giftId) : undefined;
     if (this.autoRefresh && !hit && room && !this.refreshing && (!c || c.roomId !== room.roomId || Date.now() - c.at > 60_000)) {
       this.refreshing = this.list(true).then(() => undefined, () => undefined).finally(() => (this.refreshing = null));
     }
-    if (hit?.icon) return hit.icon;
-    // 面板里没有（别的直播间的礼物、下架的活动礼物等）：查全站礼物列表
-    const any = this.all?.icons.get(giftId);
+    if (hit?.icon) return hit;
+    const any = this.all?.gifts.get(giftId);
     if (this.autoRefresh && !any) this.loadAll();
-    return any;
+    return any ?? hit;
+  }
+
+  /** 本直播间礼物面板（只查缓存，还没读过时为空） */
+  cached(): GiftConfig[] {
+    const room = this.room.get();
+    const c = this.cache;
+    return c && room && c.roomId === room.roomId ? c.gifts : [];
+  }
+
+  /** 按名字找本直播间礼物面板里的礼物（预览时后台只给了名字；只查缓存） */
+  byName(name: string): GiftConfig | undefined {
+    return this.cached().find((g) => g.name === name && g.icon);
   }
 
   /** 读全站礼物列表（只留图）；失败时最多 10 分钟再试一次 */
@@ -49,7 +65,7 @@ export class GiftCatalog {
     if (this.loadingAll || (this.all && now - this.all.at < ALL_TTL_MS) || now - this.allTriedAt < 600_000) return;
     this.allTriedAt = now;
     this.loadingAll = this.fetchAll(this.http())
-      .then((gifts) => void (this.all = { at: Date.now(), icons: new Map(gifts.filter((g) => g.icon).map((g) => [g.id, g.icon])) }))
+      .then((gifts) => void (this.all = { at: Date.now(), gifts: new Map(gifts.filter((g) => g.icon).map((g) => [g.id, g])) }))
       .catch(() => undefined)
       .finally(() => (this.loadingAll = null));
   }

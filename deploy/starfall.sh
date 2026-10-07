@@ -165,8 +165,16 @@ EOF
       db.backup(process.argv[2]).then(() => db.close(), (e) => { console.error(e.message); process.exit(1); });' "$db" "$out") || return 1
     chown starfall:starfall "$out" 2>/dev/null || true
     chmod 600 "$out"
+    # 退回要用的那一份（上一次更新前的备份）一直留着，不算在里面
+    local keep='' f n=0
+    # shellcheck disable=SC1090
+    [[ -f $STATE ]] && keep=$(source "$STATE" && printf '%s' "${BACKUP:-}")
     # shellcheck disable=SC2012
-    ls -1t "$DIR"/data/backups/update-*.db 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm -f --
+    while IFS= read -r f; do
+      if [[ $f == "$keep" ]]; then continue; fi
+      n=$((n + 1))
+      if ((n > KEEP_BACKUPS)); then rm -f -- "$f"; fi
+    done < <(ls -1t "$DIR"/data/backups/update-*.db 2>/dev/null)
     printf '%s' "$out"
   }
 

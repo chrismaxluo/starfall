@@ -95,10 +95,15 @@ interface Sess {
 }
 const sessions = ref<Sess[]>([]);
 const current = ref<number | null>(null);
-const sessId = ref<number | null>(null);
+/** 某一场，或 'all' 全部场次 */
+const sessId = ref<number | 'all' | null>(null);
 const records = ref<Rec[]>([]);
 const loading = ref(false);
 const q = ref('');
+/** 总价值下限（金瓜子）：不限 / 1 / 10 / 50 / 100 / 500 元以上 */
+const minGold = ref(0);
+const MIN_OPTIONS = [0, 1000, 10_000, 50_000, 100_000, 500_000];
+const more = ref(false);
 const sessLabel = (s: Sess) => `${s.id === current.value ? '本场（直播中）' : dateTime(s.startedAt)}${s.endedAt ? ` – ${clock(s.endedAt)}` : ''} · ${s.gifts} 条`;
 
 async function loadSessions(): Promise<void> {
@@ -106,20 +111,27 @@ async function loadSessions(): Promise<void> {
   if (!r) return;
   sessions.value = r.sessions;
   current.value = r.current;
-  if (sessId.value === null || !r.sessions.some((s) => s.id === sessId.value)) sessId.value = r.current ?? r.sessions[0]?.id ?? null;
+  if (sessId.value === null || (sessId.value !== 'all' && !r.sessions.some((s) => s.id === sessId.value))) sessId.value = r.current ?? r.sessions[0]?.id ?? null;
 }
 async function loadRecords(): Promise<void> {
   if (sessId.value === null) return void (records.value = []);
   loading.value = true;
-  const r = await attempt(() => get<{ items: Rec[] }>(`/api/gift-list/records?session=${sessId.value}`));
+  const qs = new URLSearchParams({ session: String(sessId.value), q: q.value, min: String(minGold.value) });
+  const r = await attempt(() => get<{ items: Rec[]; more: boolean }>(`/api/gift-list/records?${qs}`));
   loading.value = false;
   records.value = r?.items ?? [];
+  more.value = r?.more ?? false;
 }
-watch(sessId, () => void loadRecords());
+watch([sessId, minGold], () => void loadRecords());
+// 打字停下 0.3 秒后再搜
+let qTimer: ReturnType<typeof setTimeout> | undefined;
+watch(q, () => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => void loadRecords(), 300);
+});
 onMounted(async () => {
   await Promise.all([loadSessions(), loadPins()]);
 });
-const shown = computed(() => (q.value ? records.value.filter((r) => r.viewer.name.includes(q.value) || (r.gift?.name ?? '').includes(q.value) || (r.sc?.text ?? '').includes(q.value)) : records.value));
 
 // ---------- 名单里的记录 ----------
 interface Pin {
@@ -224,15 +236,16 @@ async function move(i: number, d: -1 | 1): Promise<void> {
         <div class="card">
           <div class="card-h"><h2>送礼记录</h2><span class="aside">点「加入名单」</span></div>
           <div class="gl-tools">
-            <select v-model="sessId" class="sel" aria-label="场次"><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
-            <input v-model.trim="q" class="inp" placeholder="搜观众或礼物" aria-label="搜观众或礼物" />
+            <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次（保留期内的都找）</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
+            <input v-model.trim="q" class="inp" placeholder="观众名、UID、礼物名" aria-label="搜观众名、UID、礼物名" />
+            <select v-model.number="minGold" class="sel amt" aria-label="金额"><option v-for="v in MIN_OPTIONS" :key="v" :value="v">{{ v ? `${v / 1000} 元以上` : '金额不限' }}</option></select>
           </div>
           <div v-if="!sessions.length" class="inline-hint">还没有直播记录。开播后收到的礼物会出现在这里。</div>
           <div v-else-if="loading && !records.length" class="inline-hint">读取中…</div>
-          <div v-else-if="!shown.length" class="inline-hint">{{ q ? '没有符合的记录' : '这一场没有收到付费礼物、上舰或醒目留言' }}</div>
-          <div v-else class="gl-recs">
-            <div v-for="r in shown" :key="r.eventId" class="gl-rec" :class="{ on: inList.has(r.eventId) }">
-              <span class="t num">{{ clock(r.ts) }}</span>
+          <div v-else-if="!records.length" class="inline-hint">{{ q || minGold ? '没有符合的记录' : sessId === 'all' ? '还没有收到付费礼物、上舰或醒目留言' : '这一场没有收到付费礼物、上舰或醒目留言' }}</div>
+          <div v-else class="gl-recs" :class="{ all: sessId === 'all' }">
+            <div v-for="r in records" :key="r.eventId" class="gl-rec" :class="{ on: inList.has(r.eventId) }">
+              <span class="t num">{{ sessId === 'all' ? dateTime(r.ts) : clock(r.ts) }}</span>
               <Avatar :name="r.viewer.name" :face="r.viewer.face" :guard="r.viewer.guard" :size="30" />
               <span class="who"><b>{{ r.viewer.name }}</b><span>{{ what(r) }}</span></span>
               <img v-if="r.gift?.img" class="gimg" :src="r.gift.img" alt="" referrerpolicy="no-referrer" /><span v-else class="gimg" />
@@ -241,6 +254,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
               <button v-else class="btn sm" type="button" :disabled="pins.length >= pinMax" @click="add(r)"><Icon name="i-plus" />加入名单</button>
             </div>
           </div>
+          <p v-if="more" class="inline-hint" style="margin: 10px 0 0">只列出了最新的 {{ records.length }} 条，更早的请加上观众名或金额缩小范围。</p>
         </div>
 
         <div class="card">
@@ -345,6 +359,8 @@ async function move(i: number, d: -1 | 1): Promise<void> {
 .gl-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .gl-tools .inp { width: 180px; height: 32px; }
 .gl-tools .sel { height: 32px; min-width: 240px; max-width: 100%; }
+.gl-tools .sel.amt { min-width: 0; width: 120px; }
+.gl-recs.all .gl-rec { grid-template-columns: 112px 30px minmax(0, 1fr) 34px 96px 100px; }
 .gl-recs { display: flex; flex-direction: column; max-height: 560px; overflow: auto; margin: 0 -6px; }
 .gl-rec { display: grid; grid-template-columns: 62px 30px minmax(0, 1fr) 34px 96px 100px; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; font-size: 13px; }
 .gl-rec + .gl-rec { border-top: 1px solid var(--line); }

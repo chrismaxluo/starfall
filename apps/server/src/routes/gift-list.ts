@@ -7,8 +7,9 @@ import { HttpError, parseBody } from '../http.ts';
 import { PINS_MAX } from '../services/gift-pins.ts';
 import { eventFromLog } from '../services/pipeline.ts';
 
-/** 一场最多列出多少条 */
+/** 一场最多列出多少条；全部场次一起找时最多多少条 */
 const RECORDS_MAX = 1000;
+const RECORDS_ALL_MAX = 500;
 
 export function giftListRoutes(app: FastifyInstance, ctx: AppContext): void {
   /** 一条事件记录变成送礼名单的一条；不是礼物、上舰、醒目留言或者是免费礼物时为 null */
@@ -27,15 +28,23 @@ export function giftListRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { current: ctx.live.status().sessionId, sessions: room ? ctx.log.sessionList(room.roomId) : [] };
   });
 
-  // 某一场收到的礼物、上舰、醒目留言（最新的在前），带上事件编号（挂上用）
+  // 找送礼记录（最新的在前）：session 为某一场或 all（全部场次）；q 搜观众名、UID、礼物名、醒目留言内容；min 为总价值下限（金瓜子）。
+  // 带上事件编号（加入名单用）和场次
   app.get('/api/gift-list/records', async (req) => {
-    const { session } = parseBody(z.object({ session: z.coerce.number().int().positive() }).passthrough(), req.query);
-    const items: Array<GiftListItem & { eventId: number }> = [];
-    for (const row of ctx.log.giftListEvents(session, RECORDS_MAX)) {
+    const p = parseBody(
+      z.object({ session: z.union([z.literal('all'), z.coerce.number().int().positive()]), q: z.string().max(40).default(''), min: z.coerce.number().int().min(0).max(1e9).default(0) }).passthrough(),
+      req.query,
+    );
+    const room = ctx.room.get();
+    if (!room) return { items: [], more: false, limit: 0 };
+    const limit = p.session === 'all' ? RECORDS_ALL_MAX : RECORDS_MAX;
+    const rows = ctx.log.searchGiftEvents({ roomId: room.roomId, sessionId: p.session === 'all' ? null : p.session, q: p.q, minGold: p.min, limit });
+    const items: Array<GiftListItem & { eventId: number; sessionId: number | null }> = [];
+    for (const row of rows) {
       const it = itemOf(row);
-      if (it) items.push({ ...it, eventId: row.id });
+      if (it) items.push({ ...it, eventId: row.id, sessionId: row.sessionId });
     }
-    return { items: items.reverse(), max: RECORDS_MAX };
+    return { items, more: rows.length >= limit, limit };
   });
 
   app.get('/api/gift-list/pins', async () => ({ pins: ctx.giftPins.list(), max: PINS_MAX }));

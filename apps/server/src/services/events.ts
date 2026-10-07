@@ -271,6 +271,39 @@ export class EventLog {
       .reverse();
   }
 
+  /**
+   * 找送礼记录（送礼名单挑记录用）：本直播间的付费礼物、上舰、醒目留言，最新的在前。
+   * sessionId 为 null 时找全部场次；q 匹配观众名、UID、礼物名、醒目留言内容；minGold 为总价值下限（金瓜子）
+   */
+  searchGiftEvents(o: { roomId: number; sessionId: number | null; q: string; minGold: number; limit: number }): Array<{ id: number; ts: number; kind: string; viewer: unknown; payload: unknown; sessionId: number | null }> {
+    const where = ["kind in ('gift', 'guard', 'sc')", 'room_id = ?', "not (kind = 'gift' and coalesce(json_extract(payload, '$.paid'), 1) = 0)"];
+    const args: unknown[] = [o.roomId];
+    if (o.sessionId !== null) {
+      where.push('session_id = ?');
+      args.push(o.sessionId);
+    }
+    if (o.minGold > 0) {
+      // 总价值：礼物 单价 × 数量，上舰 实际价格，醒目留言 元 × 1000
+      where.push(`(case kind when 'gift' then coalesce(json_extract(payload, '$.unitPrice'), 0) * coalesce(json_extract(payload, '$.count'), 1) when 'guard' then coalesce(json_extract(payload, '$.price'), 0) else coalesce(json_extract(payload, '$.price'), 0) * 1000 end) >= ?`);
+      args.push(o.minGold);
+    }
+    const q = o.q.trim();
+    if (q) {
+      const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const conds = ["uname like ? escape '\\'", "json_extract(payload, '$.giftName') like ? escape '\\'", "(kind = 'sc' and json_extract(payload, '$.text') like ? escape '\\')"];
+      args.push(like, like, like);
+      if (/^\d+$/.test(q)) {
+        conds.push('uid = ?');
+        args.push(Number(q));
+      }
+      where.push(`(${conds.join(' or ')})`);
+    }
+    const rows = this.db.$client
+      .prepare(`select id, ts, kind, viewer, payload, session_id as sessionId from events where ${where.join(' and ')} order by id desc limit ?`)
+      .all(...args, o.limit) as Array<{ id: number; ts: number; kind: string; viewer: string; payload: string | null; sessionId: number | null }>;
+    return rows.map((r) => ({ ...r, viewer: JSON.parse(r.viewer), payload: r.payload ? JSON.parse(r.payload) : null }));
+  }
+
   /** 服务启动时：上次退出（包括崩溃）时还在排队的事件没有播出来，改为"已清空" */
   clearStaleQueued(): number {
     return this.db.update(events).set({ status: 'cleared' }).where(eq(events.status, 'queued')).run().changes;

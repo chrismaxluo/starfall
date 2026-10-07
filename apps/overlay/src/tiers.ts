@@ -14,8 +14,13 @@ const TIERS: Array<Tier & { from: number }> = [
 
 export const tierOf = (value: number): Tier => TIERS.find((t) => value >= t.from)!;
 
-/** 大航海的颜色：舰长蓝、提督紫、总督金（和上面三档一样） */
-export const guardTier = (level: 1 | 2 | 3): Tier => TIERS[[0, 0, 2, 3][level]!]!;
+/** 大航海自己的颜色（和弹幕列表、B站里一样）：舰长蓝、提督紫、总督红金，和礼物的价值档分开 */
+const GUARD_TIERS: Record<1 | 2 | 3, Tier> = {
+  3: { c1: '#2F7BFF', c2: '#4FB2FF', c3: '#CFE6FF' },
+  2: { c1: '#8F4DFF', c2: '#C77DFF', c3: '#ECDDFF' },
+  1: { c1: '#FF4E3A', c2: '#FFB13D', c3: '#FFE3B0' },
+};
+export const guardTier = (level: 1 | 2 | 3): Tier => GUARD_TIERS[level];
 
 /** 写成 CSS 变量 */
 export const tierVars = (t: Tier) => ({ '--c1': t.c1, '--c2': t.c2, '--c3': t.c3 });

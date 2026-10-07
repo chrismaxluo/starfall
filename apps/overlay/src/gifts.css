@@ -1,5 +1,5 @@
 /* 送礼名单：和礼物特效（晶礼）同一套样子的小号横条，一屏放不下时从下往上循环滚动。尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍（--k）。
-   颜色按价值分档（--c1 主色、--c2 渐变色、--c3 亮色），上舰按舰长蓝、提督紫、总督金 */
+   颜色按价值分档（--c1 主色、--c2 渐变色、--c3 亮色），上舰按舰长蓝、提督紫、总督红金 */
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;

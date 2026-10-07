@@ -1,5 +1,5 @@
 // 礼物卡片（晶礼、晶耀）：按价值换颜色（和 B站连击条一样：蓝 → 紫 → 粉 → 金）。晶礼的礼物图后面转着光芒，送出时迸出星光碎片。
-// 晶礼、晶耀都是角落里的一条，晶耀大一些、碎片多一些
+// 晶礼、晶耀都是角落里的一条，晶耀碎片多一些
 import type { PlayItem } from '@starfall/shared/overlay';
 import './giftcard.css';
 import { h } from './dom.ts';
@@ -43,7 +43,7 @@ function burst(cls: string, n: number, dist: [number, number], delay: number): H
   return box;
 }
 
-/** 晶礼：角落里的一条；big 是晶耀（大一些、碎片多一些） */
+/** 晶礼：角落里的一条；big 是晶耀（碎片多一些） */
 export function giftStrip(item: PlayItem, big = false): HTMLElement {
   const n = item.gift?.count ?? 1;
   const img = giftImg(item, 'gc-img');
@@ -56,7 +56,7 @@ export function giftStrip(item: PlayItem, big = false): HTMLElement {
   );
 }
 
-/** 晶耀：和晶礼同一个样子，大一些、碎片多一些（100 元以上本来就是金色那一档） */
+/** 晶耀：和晶礼同一个样子、一样大，碎片多一些（100 元以上本来就是金色那一档） */
 export function giftHero(item: PlayItem): HTMLElement {
   return giftStrip(item, true);
 }

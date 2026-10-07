@@ -69,9 +69,6 @@
   100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 70px)) rotate(calc(var(--rot) * 1.4)) scale(.6); }
 }
 
-/* ---------------- 晶耀：和晶礼一样，放大一些 ---------------- */
-.gc.big { zoom: 1.15; }
-
 /* ---------------- 省资源模式：碎片减半、光芒不转 ---------------- */
 .lite .gc-burst i:nth-child(n+8) { display: none; }
 .lite .gc-rays { animation-iteration-count: 1, 0; }

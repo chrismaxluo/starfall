@@ -757,7 +757,8 @@ body:has(.editor) .toasts { bottom: 92px; }
 .about-kv { margin-top: 0; }
 .about-meta dt, .about-kv dt { color: var(--t3); }
 .about-meta dd, .about-kv dd { margin: 0; color: var(--t1); min-width: 0; overflow-wrap: anywhere; }
-.about-kv dd.mono { font-family: var(--font-mono); font-size: 12px; }
+.about-meta .author { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.about-meta .author svg.i { width: 13px; height: 13px; }
 .cl-sec { border-top: 1px solid var(--line); }
 .cl-sec:first-of-type { border-top: 0; }
 .cl-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 2px; border: 0; background: none; color: var(--t1); font: inherit; font-size: 14px; font-weight: 600; text-align: left; }

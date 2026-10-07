@@ -46,7 +46,7 @@ onMounted(() => void load());
 
 const EDITION = { server: '服务器版', desktop: '电脑版' } as const;
 const published = (iso: string | null) => (iso ? `${iso.slice(0, 10)} 发布` : '');
-/** 运行信息（一行一项），也用来「复制运行信息」发给作者 */
+/** 复制给作者的完整运行信息（一行一项） */
 const rows = computed(() => {
   const i = info.value;
   if (!i) return [];
@@ -63,6 +63,16 @@ const rows = computed(() => {
     ['数据库', fileSize(r.dbBytes)],
     ['素材文件', fileSize(r.assetBytes)],
     ['备份', fileSize(r.backupBytes)],
+  ] as Array<[string, string]>;
+});
+/** 页面上只给主播看这几项，其余的只在复制时带上 */
+const shown = computed(() => {
+  const i = info.value;
+  if (!i) return [];
+  const r = i.runtime;
+  return [
+    ['已运行', `${duration(now.value - r.startedAt)}（${dateTime(r.startedAt)} 启动）`],
+    ['占用空间', `${fileSize(r.dbBytes + r.assetBytes + r.backupBytes)}（素材 ${fileSize(r.assetBytes)} · 备份 ${fileSize(r.backupBytes)}）`],
   ] as Array<[string, string]>;
 });
 async function copyInfo(): Promise<void> {
@@ -110,7 +120,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
         </div>
         <div v-if="info" class="upd-at">{{ when(info.update.checkedAt) }} 检查过</div>
         <dl class="about-meta">
-          <dt>作者</dt><dd><a class="linkish" :href="AUTHOR_URL" target="_blank" rel="noopener noreferrer" title="打开作者的 B站主页">{{ AUTHOR }}</a></dd>
+          <dt>B站作者</dt><dd><a class="linkish author" :href="AUTHOR_URL" target="_blank" rel="noopener noreferrer" title="打开作者的 B站主页">{{ AUTHOR }}<Icon name="i-ext" /></a></dd>
           <dt>联系邮箱</dt><dd><a class="linkish" :href="`mailto:${EMAIL}`">{{ EMAIL }}</a></dd>
         </dl>
       </div>
@@ -119,9 +129,9 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
         <div class="card-h"><h2>运行信息</h2><span class="aside"><button class="btn" :disabled="!info" @click="copyInfo"><Icon name="i-copy" />复制运行信息</button></span></div>
         <div v-if="failed" class="inline-hint">没读到运行信息（可能是和星临的连接断了）。<button class="linkish" @click="load()">重试</button></div>
         <dl v-else class="about-kv">
-          <template v-for="[k, v] in rows" :key="k"><dt>{{ k }}</dt><dd :class="{ mono: k === '数据目录' }">{{ v }}</dd></template>
+          <template v-for="[k, v] in shown" :key="k"><dt>{{ k }}</dt><dd>{{ v }}</dd></template>
         </dl>
-        <p class="inline-hint" style="margin: 12px 0 0">遇到问题给作者发邮件时，附上这些信息会更容易查出原因。</p>
+        <p class="inline-hint" style="margin: 12px 0 0">反馈问题时，点「复制运行信息」一起发给作者，里面有更详细的系统信息，更容易查出原因。</p>
       </div>
     </div>
 

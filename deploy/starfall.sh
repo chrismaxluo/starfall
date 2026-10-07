@@ -265,13 +265,15 @@ EOF
     install_cli
 
     local pw=''
-    [[ -f $DIR/data/initial-password.txt ]] && pw=$(<"$DIR/data/initial-password.txt")
+    # 文件里是一句话「星临管理后台初始密码：xxx」，只取密码
+    [[ -f $DIR/data/initial-password.txt ]] && pw=$(sed -n 's/.*初始密码：//p' "$DIR/data/initial-password.txt" | head -n1)
     step "安装完成"
     if [[ -n $DOMAIN ]]; then
       echo "管理后台：https://$DOMAIN/"
     else
       echo "管理后台：http://<服务器的公网 IP>:$PORT/"
-      dim "  本机地址：$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^$' | head -n3 | sed "s#.*#http://&:$PORT/#" | paste -sd' ')"
+      # IPv6 地址要加方括号才是能打开的网址
+      dim "  本机地址：$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^$' | head -n3 | sed -e 's#.*:.*#[&]#' -e "s#.*#http://&:$PORT/#" | paste -sd' ')"
       dim "  云服务器的公网 IP 在服务商的控制台里查看"
     fi
     [[ -n $pw ]] && echo "初始密码：$pw（登录后在「设置 → 管理后台」里修改）"

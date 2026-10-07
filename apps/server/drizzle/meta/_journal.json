@@ -141,6 +141,13 @@
       "when": 1791405853073,
       "tag": "0019_gift_list",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791407060843,
+      "tag": "0020_gift_pins",
+      "breakpoints": true
     }
   ]
 }

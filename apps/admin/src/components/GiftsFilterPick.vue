@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 送礼名单显示哪些：所有付费礼物 / 只显示勾选的礼物（从直播间礼物面板里点选）；上舰、醒目留言单独开关
+// 送礼名单显示哪些：所有付费礼物 / 只显示勾选的礼物（从直播间礼物面板里点选）/ 只显示挂上的记录；上舰、醒目留言单独开关
 import { computed, onMounted, ref } from 'vue';
 import type { GiftsFilter } from '@starfall/shared/overlay';
 import { get } from '../lib/api.ts';
@@ -23,6 +23,8 @@ onMounted(async () => {
     catalogErr.value = e instanceof Error ? e.message : String(e);
   }
 });
+
+const MODE_MSG: Record<GiftsFilter['mode'], string> = { all: '送礼名单显示所有付费礼物', only: '送礼名单只显示选中的礼物', pinned: '送礼名单只显示挂上的记录' };
 
 const chosen = computed(() => new Set(props.modelValue.gifts.map((g) => g.id)));
 // 按礼物面板分页（礼物、粉丝团、航海……）、页内顺序列出；只列付费礼物
@@ -48,7 +50,7 @@ function toggle(g: GiftConfig): void {
 <template>
   <div class="gfp">
     <div class="line">
-      <Seg :model-value="modelValue.mode" label="显示哪些礼物" :options="[{ value: 'all', label: '所有付费礼物' }, { value: 'only', label: '只显示选中的礼物' }]" @change="(v) => set({ mode: v as GiftsFilter['mode'] }, v === 'all' ? '送礼名单显示所有付费礼物' : '送礼名单只显示选中的礼物')" />
+      <Seg :model-value="modelValue.mode" label="显示哪些" :options="[{ value: 'all', label: '所有付费礼物' }, { value: 'only', label: '只显示选中的礼物' }, { value: 'pinned', label: '只显示挂上的记录' }]" @change="(v) => set({ mode: v as GiftsFilter['mode'] }, MODE_MSG[v as GiftsFilter['mode']])" />
     </div>
     <template v-if="modelValue.mode === 'only'">
       <div class="gfp-chips">
@@ -67,7 +69,8 @@ function toggle(g: GiftConfig): void {
         </div>
       </div>
     </template>
-    <div class="line">
+    <span v-if="modelValue.mode === 'pinned'" class="hint">只显示下面「已挂上」的记录（可以是以前场次的），本场新收到的不会进来。</span>
+    <div v-else class="line">
       <Switch :model-value="modelValue.guard" label="显示上舰" @change="(v) => set({ guard: v }, v ? '送礼名单会显示上舰' : '送礼名单不再显示上舰')" /><span>上舰（开通、续费大航海）</span>
       <Switch :model-value="modelValue.sc" label="显示醒目留言" @change="(v) => set({ sc: v }, v ? '送礼名单会显示醒目留言' : '送礼名单不再显示醒目留言')" /><span>醒目留言</span>
     </div>

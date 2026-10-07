@@ -31,6 +31,8 @@ export const state = reactive({
   chat: [] as ChatItem[],
   /** 本场的送礼名单（送礼名单的预览用） */
   gifts: [] as GiftListItem[],
+  /** 送礼名单挂上的记录（按顺序） */
+  giftPins: [] as GiftListItem[],
   queue: { playing: null, items: [] } as QueueSnapshot,
   /** 实时动态（最新在前） */
   feed: [] as EventDto[],

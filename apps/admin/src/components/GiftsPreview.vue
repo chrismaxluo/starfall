@@ -22,11 +22,13 @@ function onMessage(e: MessageEvent): void {
   if (e.origin !== location.origin || e.source !== frame.value?.contentWindow) return;
   if ((e.data as { type?: string })?.type !== 'starfall-preview-ready') return;
   ready = true;
-  send({ type: 'hello', config: JSON.parse(JSON.stringify(props.config)), preload: [], build: null, gifts: JSON.parse(JSON.stringify(state.gifts)) });
+  send({ type: 'hello', config: JSON.parse(JSON.stringify(props.config)), preload: [], build: null, gifts: JSON.parse(JSON.stringify(state.gifts)), pins: JSON.parse(JSON.stringify(state.giftPins)) });
 }
 
 watch(() => props.config, (c) => send({ type: 'config', config: JSON.parse(JSON.stringify(c)) }), { deep: true });
 const off = onGiftItem((item) => send(item ? { type: 'gift_item', item: JSON.parse(JSON.stringify(item)) } : { type: 'gifts_clear' }));
+// 挂上的记录变了：整份发过去
+watch(() => state.giftPins, (items) => send({ type: 'gift_pins', items: JSON.parse(JSON.stringify(items)) }), { deep: true });
 
 onMounted(() => addEventListener('message', onMessage));
 onBeforeUnmount(() => {
@@ -58,6 +60,7 @@ defineExpose({ test });
   <div class="chatpv" :class="{ alpha }" :style="{ width: `${GIFTS_WIDTH * K}px`, height: `${H * K}px` }">
     <iframe ref="frame" src="/overlay/?preview=1&gifts=1" title="送礼名单预览" :style="{ width: `${GIFTS_WIDTH}px`, height: `${H}px`, transform: `scale(${K})` }" />
     <div v-if="!config.giftsEnabled" class="chatpv-off">送礼名单已关闭</div>
-    <div v-else-if="!state.gifts.length && !tested" class="chatpv-empty">本场还没有收到礼物<br />点下面的「测试」看看效果</div>
+    <div v-else-if="config.giftsFilter.mode === 'pinned' && !state.giftPins.length" class="chatpv-empty">还没有挂上的记录<br />在下面的送礼记录里点「挂上」</div>
+    <div v-else-if="config.giftsFilter.mode !== 'pinned' && !state.gifts.length && !tested" class="chatpv-empty">本场还没有收到礼物<br />点下面的「测试」看看效果</div>
   </div>
 </template>

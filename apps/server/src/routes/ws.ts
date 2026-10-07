@@ -157,7 +157,7 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       return;
     }
     ctx.hub.addAdmin(socket);
-    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat(), gifts: ctx.hub.recentGifts() }));
+    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat(), gifts: ctx.hub.recentGifts(), pins: ctx.hub.pins() }));
     const stop = keepAlive(socket, () => ctx.hub.removeAdmin(socket));
     socket.on('close', () => {
       stop();

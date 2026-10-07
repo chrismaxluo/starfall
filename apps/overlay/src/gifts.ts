@@ -1,5 +1,5 @@
 // 送礼名单：本场直播（没开播时是上一场）收到的礼物、上舰、醒目留言，每次一条彩色小横条（和礼物特效同一套样子），
-// 按时间先后排成一串，一屏放不下时从下往上循环滚动。连击合成一条。
+// 按时间先后排成一串，一屏放不下时从下往上循环滚动。连击合成一条。设成「只显示挂上的记录」时只显示后台挂上的那几条。
 // 地址形如 /overlay/?output=1&key=...&gifts=1，在直播软件里单独加一个浏览器源（建议 640 宽），拖到画面一侧
 import './gifts.css';
 import { GUARD_BADGES, GIFTS_KEEP, GIFTS_SPEED_PX, giftListShows } from '@starfall/shared/overlay';
@@ -21,6 +21,8 @@ const env = detect();
 let config: OverlayConfig = { ...DEFAULT_CONFIG };
 /** 本场收到的（最多 GIFTS_KEEP 条，旧的在前）：改设置（筛选、条数）时按它重新画 */
 let items: GiftListItem[] = [];
+/** 后台挂上的记录（按顺序）：设成「只显示挂上的记录」时只显示这些 */
+let pins: GiftListItem[] = [];
 
 document.getElementById('stage')?.remove();
 const root = h('div', { class: 'gl-root' });
@@ -167,10 +169,8 @@ function redraw(): void {
   scrolling = false;
   offset = 0;
   list.style.transform = '';
-  for (const it of items) {
-    if (!giftListShows(config.giftsFilter, it)) continue;
-    list.append(build(it));
-  }
+  if (config.giftsFilter.mode === 'pinned') for (const it of pins) list.append(build(it));
+  else for (const it of items) if (giftListShows(config.giftsFilter, it)) list.append(build(it));
   updateScrolling();
 }
 
@@ -196,6 +196,7 @@ function onMessage(m: ServerToOverlay): void {
       onBuild(m.build);
       applyConfig(m.config);
       items = (m.gifts ?? []).slice(-GIFTS_KEEP);
+      pins = m.pins ?? [];
       redraw();
       conn?.send({ type: 'report', env: { ...detect(), lite: root.classList.contains('lite'), gifts: true, build: build0, ...(q.get('view') === '1' ? { view: true } : {}) } });
       break;
@@ -204,6 +205,10 @@ function onMessage(m: ServerToOverlay): void {
       break;
     case 'gift_item':
       push(m.item);
+      break;
+    case 'gift_pins':
+      pins = m.items;
+      if (config.giftsFilter.mode === 'pinned') redraw();
       break;
     case 'gifts_clear':
       items = [];

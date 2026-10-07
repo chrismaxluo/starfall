@@ -2,8 +2,6 @@
 import { computed, ref, watch } from 'vue';
 import CdPick from '../components/CdPick.vue';
 import ChatPreview from '../components/ChatPreview.vue';
-import GiftsFilterPick from '../components/GiftsFilterPick.vue';
-import GiftsPreview from '../components/GiftsPreview.vue';
 import AddSteps from '../components/AddSteps.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
@@ -11,8 +9,7 @@ import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_MAX_LIMIT, GIFTS_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
-import type { GiftsFilter } from '@starfall/shared/overlay';
+import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
@@ -76,7 +73,6 @@ async function removeOutput(): Promise<void> {
 }
 const stage = ref<InstanceType<typeof PreviewStage> | null>(null);
 const chatPv = ref<InstanceType<typeof ChatPreview> | null>(null);
-const giftsPv = ref<InstanceType<typeof GiftsPreview> | null>(null);
 const showSafe = ref(true);
 const showKey = ref(false);
 const showChatKey = ref(false);
@@ -85,11 +81,10 @@ const alphaBg = ref(false);
 
 // 右侧预览：特效页 / 弹幕列表 / 送礼名单（记住上次看的）
 const TAB_KEY = 'sf-out-tab';
-type PTab = 'fx' | 'chat' | 'gifts';
+type PTab = 'fx' | 'chat';
 const readTab = (): PTab => {
   try {
-    const t = localStorage.getItem(TAB_KEY);
-    return t === 'chat' || t === 'gifts' ? t : 'fx';
+    return localStorage.getItem(TAB_KEY) === 'chat' ? 'chat' : 'fx';
   } catch {
     return 'fx';
   }
@@ -143,14 +138,6 @@ const giftsUrl = computed(() => (o.value ? `${location.origin}${o.value.giftsPat
 const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 /** 送礼名单浏览器源的建议宽高 */
 const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize) } : { w: GIFTS_WIDTH, h: 650 }));
-function setGiftsMax(v: number): void {
-  if (!o.value) return;
-  const n = Math.round(v);
-  if (!(n >= 1 && n <= GIFTS_MAX_LIMIT)) return toast(`条数要在 1 – ${GIFTS_MAX_LIMIT} 之间`, 'err');
-  if (n === o.value.giftsMax) return;
-  void save({ giftsMax: n }, `一屏显示 ${n} 条；浏览器源的高度建议改成 ${giftsHeight(n, o.value.giftsSize)}`);
-}
-const setGiftsFilter = (f: GiftsFilter, msg: string) => void save({ giftsFilter: f }, msg);
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
 function setChatMax(v: number): void {
@@ -167,7 +154,7 @@ function setChatFade(v: number): void {
   if (!o.value || v === o.value.chatFadeSec) return;
   void save({ chatFadeSec: v }, v ? `没人发弹幕 ${v} 秒后，从最旧的开始一条一条消失` : '弹幕一直显示，只被新弹幕顶走');
 }
-async function copy(which: PTab): Promise<void> {
+async function copy(which: 'fx' | 'chat' | 'gifts'): Promise<void> {
   try {
     await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : which === 'gifts' ? giftsUrl.value : url.value);
     toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : which === 'gifts' ? `已复制送礼名单地址，宽高填 ${giftsWh.value.w} × ${giftsWh.value.h}` : '已复制特效页地址');
@@ -358,7 +345,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             <div class="src-f">
               <span class="wh2">宽高填 <code>{{ giftsWh.w }} × {{ giftsWh.h }}</code></span>
               <span>高度按一屏 {{ o.giftsMax }} 条算好了</span>
-              <span class="links"><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
+              <span class="links"><a class="linkish" href="#giftlist">显示设置、挂记录 →</a><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
             </div>
           </div>
 
@@ -490,64 +477,6 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           </div>
         </div>
 
-        <!-- ④ 送礼名单设置 -->
-        <div class="card" :class="{ dimmed: !o.giftsEnabled }">
-          <div class="card-h"><h2>送礼名单设置</h2><span class="aside">{{ o.giftsEnabled ? '改了马上生效' : '送礼名单已关闭' }}</span></div>
-          <div class="srows">
-            <div class="srow">
-              <span class="lb">对齐</span>
-              <div class="ctl"><div class="line">
-                <span class="seg" role="group" aria-label="送礼名单对齐">
-                  <button :aria-pressed="o.giftsSide === 'left'" @click="save({ giftsSide: 'left' })">靠左</button>
-                  <button :aria-pressed="o.giftsSide === 'right'" @click="save({ giftsSide: 'right' })">靠右</button>
-                </span>
-                <span class="hint">放在画面左边选靠左，右边选靠右</span>
-              </div></div>
-            </div>
-            <div class="srow">
-              <span class="lb">字号</span>
-              <div class="ctl"><div class="line">
-                <span class="seg" role="group" aria-label="送礼名单字号">
-                  <button :aria-pressed="o.giftsSize === 'normal'" @click="save({ giftsSize: 'normal' })">标准</button>
-                  <button :aria-pressed="o.giftsSize === 'large'" @click="save({ giftsSize: 'large' })">大</button>
-                </span>
-                <span class="hint">字号改了，浏览器源的高度也跟着变（上面「宽高填」已经算好）</span>
-              </div></div>
-            </div>
-            <div class="srow">
-              <span class="lb">条数</span>
-              <div class="ctl">
-                <div class="line">
-                  <span class="stepper">
-                    <button type="button" aria-label="少一条" :disabled="o.giftsMax <= 1" @click="setGiftsMax(o.giftsMax - 1)">−</button>
-                    <input :key="`${o.id}-g${o.giftsMax}`" class="inp num" type="number" min="1" :max="GIFTS_MAX_LIMIT" :value="o.giftsMax" aria-label="送礼名单一屏显示几条" @change="(e) => setGiftsMax(Number((e.target as HTMLInputElement).value))" />
-                    <button type="button" aria-label="多一条" :disabled="o.giftsMax >= GIFTS_MAX_LIMIT" @click="setGiftsMax(o.giftsMax + 1)">+</button>
-                  </span>
-                  <span class="hint">一屏显示几条（1 – {{ GIFTS_MAX_LIMIT }}）；本场的礼物比这多时，从下往上循环滚动，新收到的从下面滚进来</span>
-                </div>
-              </div>
-            </div>
-            <div class="srow">
-              <span class="lb">滚动</span>
-              <div class="ctl"><div class="line">
-                <span class="seg" role="group" aria-label="送礼名单滚动速度">
-                  <button :aria-pressed="o.giftsSpeed === 'off'" @click="save({ giftsSpeed: 'off' }, '不滚动：名单固定挂着，放不下时只留最新的几条')">不滚动</button>
-                  <button :aria-pressed="o.giftsSpeed === 'slow'" @click="save({ giftsSpeed: 'slow' }, '滚动速度：慢（约 5 秒一条）')">慢</button>
-                  <button :aria-pressed="o.giftsSpeed === 'normal'" @click="save({ giftsSpeed: 'normal' }, '滚动速度：中（约 3 秒一条）')">中</button>
-                  <button :aria-pressed="o.giftsSpeed === 'fast'" @click="save({ giftsSpeed: 'fast' }, '滚动速度：快（约 2 秒一条）')">快</button>
-                </span>
-                <span class="hint">{{ o.giftsSpeed === 'off' ? '名单固定挂着，放不下时只留最新的几条，新来的从下面加进来；配合「只显示选中的礼物」可以把特定礼物挂在画面上' : '一屏放不下时循环往上滚的速度：慢约 5 秒一条，中约 3 秒，快约 2 秒' }}</span>
-              </div></div>
-            </div>
-            <div class="srow">
-              <span class="lb">显示哪些</span>
-              <div class="ctl">
-                <GiftsFilterPick :model-value="o.giftsFilter" @change="setGiftsFilter" />
-                <span class="hint">本场直播收到的都算，没开播时显示上一场的；新开一场自动清空。连着送同一种礼物合成一条。免费礼物不显示。</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- 右侧：实时预览 -->
@@ -556,24 +485,19 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           <div class="ptabs" role="tablist" aria-label="预览">
             <button role="tab" :aria-selected="ptab === 'fx'" @click="ptab = 'fx'">特效页</button>
             <button role="tab" :aria-selected="ptab === 'chat'" @click="ptab = 'chat'">弹幕列表</button>
-            <button role="tab" :aria-selected="ptab === 'gifts'" @click="ptab = 'gifts'">送礼名单</button>
-            <span class="aside">{{ ptab === 'fx' ? `${o.width} × ${o.height} · 只在这里播放` : ptab === 'chat' ? (o.chatEnabled ? `${chatWh.w} × ${chatWh.h} · 实时弹幕` : '弹幕列表已关闭') : o.giftsEnabled ? `${giftsWh.w} × ${giftsWh.h} · 本场礼物` : '送礼名单已关闭' }}</span>
+            <span class="aside">{{ ptab === 'fx' ? `${o.width} × ${o.height} · 只在这里播放` : o.chatEnabled ? `${chatWh.w} × ${chatWh.h} · 实时弹幕` : '弹幕列表已关闭' }}</span>
           </div>
           <div class="ostage-wrap">
             <PreviewStage v-if="ptab === 'fx'" ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && o.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
-            <ChatPreview v-else-if="cfg && ptab === 'chat'" ref="chatPv" :key="`c${o.id}`" :config="cfg" :alpha="alphaBg" />
-            <GiftsPreview v-else-if="cfg" ref="giftsPv" :key="`g${o.id}`" :config="cfg" :alpha="alphaBg" />
+            <ChatPreview v-else-if="cfg" ref="chatPv" :key="`c${o.id}`" :config="cfg" :alpha="alphaBg" />
           </div>
           <div class="prev-tools">
             <template v-if="ptab === 'fx'">
               <button v-for="id in (['gov', 'adm', 'cap', 'mod', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" :title="tierEffect(id) ? '' : '这个身份还没选特效'" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', fan: '粉丝牌', nor: '其他' }[id as 'gov'] }}</button>
             </template>
-            <template v-else-if="ptab === 'chat'">
+            <template v-else>
               <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('normal')"><i style="background: var(--nor)" />测试弹幕</button>
               <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('guard')"><i style="background: var(--gov)" />大航海发言</button>
-            </template>
-            <template v-else>
-              <button class="btn" :disabled="!o.giftsEnabled" @click="giftsPv?.test()"><i style="background: #FF9D00" />测试（只在这里显示）</button>
             </template>
             <span class="prev-bg"><span>背景</span><Seg :model-value="alphaBg ? 'alpha' : 'game'" label="预览背景" :options="[{ value: 'game', label: '游戏画面' }, { value: 'alpha', label: '透明' }]" @change="(v) => (alphaBg = v === 'alpha')" /></span>
           </div>

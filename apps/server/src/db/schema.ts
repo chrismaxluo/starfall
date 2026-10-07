@@ -2,7 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { DanmuWho, EffectTexts, FeatherMode, GiftsFilter, Position, SvgaRole, Tier } from '@starfall/shared';
+import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
 
 const now = sql`(unixepoch() * 1000)`;
@@ -200,6 +200,15 @@ export const outputs = sqliteTable('outputs', {
   giftsSpeed: text('gifts_speed', { enum: ['off', 'slow', 'normal', 'fast'] }).notNull().default('normal'),
   giftsFilter: text('gifts_filter', { mode: 'json' }).$type<GiftsFilter>().notNull().default({ mode: 'all', gifts: [], guard: true, sc: true }),
   key: text('key').notNull().unique(),
+  createdAt: integer('created_at').notNull().default(now),
+});
+
+/** 送礼名单挂上的记录：存一份当时的样子（事件记录过期删掉了也不影响），event_id 防止同一条挂两次 */
+export const giftPins = sqliteTable('gift_pins', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  eventId: integer('event_id').notNull().unique(),
+  item: text('item', { mode: 'json' }).$type<GiftListItem>().notNull(),
+  sort: integer('sort').notNull(),
   createdAt: integer('created_at').notNull().default(now),
 });
 

@@ -19,6 +19,7 @@ import { EventLog } from './services/events.ts';
 import { parseMessage } from '@starfall/bili';
 import type { getHonorMedals, getRoomGifts } from '@starfall/bili';
 import { GiftEffects } from './services/gift-fx.ts';
+import { GiftPinStore } from './services/gift-pins.ts';
 import { GiftCatalog } from './services/gifts.ts';
 import { HonorMedals } from './services/honor.ts';
 import { AudienceService } from './services/audience.ts';
@@ -57,6 +58,7 @@ export interface AppContext {
   quickPlay: QuickPlayStore;
   gifts: GiftCatalog;
   giftFx: GiftEffects;
+  giftPins: GiftPinStore;
   honor: HonorMedals;
   audience: AudienceService;
   outputs: OutputStore;
@@ -104,6 +106,8 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const adminBuild = new BuildVersion(config.adminDist);
   const hub = new Hub({ build: () => overlayBuild.current() });
   const pipeline = new Pipeline({ live, gifts, giftFx, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const giftPins = new GiftPinStore(db);
+  hub.setPins(giftPins.items());
 
   const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, quickPlay, blacklist, outputs });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
@@ -119,7 +123,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   });
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, quickPlay, gifts, giftFx, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, quickPlay, gifts, giftFx, giftPins, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;

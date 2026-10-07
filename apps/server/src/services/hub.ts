@@ -73,6 +73,8 @@ export class Hub {
   private chatRecent: ChatItem[] = [];
   /** 本场（没开播时是上一场）的送礼名单，最多记 GIFTS_KEEP 条：送礼名单打开时先显示这些，页面按自己的筛选和条数取 */
   private giftsRecent: GiftListItem[] = [];
+  /** 送礼名单挂上的记录（按顺序） */
+  private giftPins: GiftListItem[] = [];
 
   constructor(opts: { build?: () => string | null } = {}) {
     this.build = opts.build ?? (() => null);
@@ -92,7 +94,7 @@ export class Hub {
     const c: OverlayClient = { sock, outputId: output.id, role, view, since: now, env: null, lastError: null, pending: new Map() };
     this.overlays.add(c);
     if (role === 'chat') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), chat: this.chatRecent });
-    else if (role === 'gifts') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), gifts: this.giftsRecent });
+    else if (role === 'gifts') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), gifts: this.giftsRecent, pins: this.giftPins });
     else send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
     this.overlaysChanged();
     return c;
@@ -158,6 +160,17 @@ export class Hub {
     this.giftsRecent = items.slice(-GIFTS_KEEP);
     for (const c of this.overlays) if (c.role === 'gifts') send(c.sock, { type: 'gifts_clear' });
     this.toAdmins({ type: 'gifts_clear' });
+  }
+
+  /** 挂上的记录变了：发给所有送礼名单和管理后台 */
+  setPins(items: GiftListItem[]): void {
+    this.giftPins = items;
+    for (const c of this.overlays) if (c.role === 'gifts') send(c.sock, { type: 'gift_pins', items });
+    this.toAdmins({ type: 'gift_pins', items });
+  }
+
+  pins(): GiftListItem[] {
+    return this.giftPins;
   }
 
   /** 本场的送礼名单（管理后台打开时用） */

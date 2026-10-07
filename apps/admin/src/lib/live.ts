@@ -6,13 +6,14 @@ import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refre
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
-  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[]; gifts?: GiftListItem[] }
+  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[]; gifts?: GiftListItem[]; pins?: GiftListItem[] }
   /** 弹幕列表：新的一条、换直播间清空 */
   | { type: 'chat'; item: ChatItem }
   | { type: 'chat_clear' }
   /** 送礼名单：新的一条、新开一场清空 */
   | { type: 'gift_item'; item: GiftListItem }
   | { type: 'gifts_clear' }
+  | { type: 'gift_pins'; items: GiftListItem[] }
   /** 服务端的后台重新构建了 */
   | { type: 'version'; build: string }
   | { type: 'room_info'; info: RoomInfo | null }
@@ -81,6 +82,7 @@ function handle(m: Msg): void {
       state.roomInfo = m.roomInfo;
       state.chat = m.chat ?? [];
       state.gifts = m.gifts ?? [];
+      state.giftPins = m.pins ?? [];
       // 重连：断开期间的事件和别处的修改都补回来
       if (hellos++ > 0) {
         void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs(), refreshQuick()]).catch(() => undefined);
@@ -130,6 +132,9 @@ function handle(m: Msg): void {
     case 'gifts_clear':
       state.gifts = [];
       for (const fn of giftListeners) fn(null);
+      break;
+    case 'gift_pins':
+      state.giftPins = m.items;
       break;
     case 'event':
       state.feed.unshift(m.event);

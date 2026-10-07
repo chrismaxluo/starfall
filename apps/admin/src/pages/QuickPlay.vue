@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// 素材快捷播放：点按钮或按快捷键，马上在直播画面上播放；编辑时可以添加、改名、排序、设快捷键、删除
+// 素材快捷播放：点按钮或按快捷键，马上在直播画面上播放；编辑时可以添加、改名、排序、设快捷键、删除。
+// 在电脑版窗口里还能设全局快捷键（带 Ctrl / Alt / Shift，在别的窗口里按也能播）
 import { computed, onBeforeUnmount, ref } from 'vue';
 import EffectPicker from '../components/EffectPicker.vue';
 import Icon from '../components/Icon.vue';
@@ -8,9 +9,13 @@ import { put } from '../lib/api.ts';
 import { keyOf, quickName, useQuickHotkeys } from '../lib/quick.ts';
 import { effectById, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
+import { QUICK_GLOBAL_RE } from '@starfall/shared';
 import type { QuickButton } from '../lib/types.ts';
 
 type Row = Omit<QuickButton, 'id'> & { key: number };
+/** 电脑版窗口才有：保存后重新注册全局快捷键，返回被别的软件占用的 */
+const desktop = (window as unknown as { starfallDesktop?: { reloadHotkeys?: () => Promise<{ failed: string[] }> } }).starfallDesktop;
+const canGlobal = Boolean(desktop?.reloadHotkeys);
 const MAX = 40;
 const editing = ref(false);
 const rows = ref<Row[]>([]);
@@ -62,12 +67,48 @@ function onKeyCapture(e: KeyboardEvent): void {
 }
 function listen(row: Row): void {
   if (listening.value === row.key) return stopListen();
+  stopListen();
   listening.value = row.key;
   addEventListener('keydown', onKeyCapture, true);
 }
+
+// 设全局快捷键：点一下后按组合键（Ctrl / Alt / Shift 加一个数字、字母或 F1–F12）；Backspace / Delete 清掉，Esc 取消
+const listeningG = ref<number | null>(null);
+function onGlobalCapture(e: KeyboardEvent): void {
+  const row = rows.value.find((r) => r.key === listeningG.value);
+  if (!row) return stopListen();
+  if (e.key === 'Tab') return stopListen();
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.key === 'Escape') return stopListen();
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    row.globalHotkey = null;
+    return stopListen();
+  }
+  // 只按了修饰键：等下一个键
+  if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+  const k = /^F([1-9]|1[0-2])$/.test(e.code) ? e.code : keyOf(e);
+  const acc = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', k].filter(Boolean).join('+');
+  if (!k || !QUICK_GLOBAL_RE.test(acc)) return toast('全局快捷键要按住 Ctrl、Alt 或 Shift，再按一个数字、字母或 F1–F12，例如 Ctrl+Alt+1', 'info');
+  const other = rows.value.find((r) => r !== row && r.globalHotkey === acc);
+  if (other) {
+    other.globalHotkey = null;
+    toast(`全局快捷键 ${acc} 原来是「${quickName(other)}」的，已经换过来`, 'info');
+  }
+  row.globalHotkey = acc;
+  stopListen();
+}
+function listenGlobal(row: Row): void {
+  if (listeningG.value === row.key) return stopListen();
+  stopListen();
+  listeningG.value = row.key;
+  addEventListener('keydown', onGlobalCapture, true);
+}
 function stopListen(): void {
   listening.value = null;
+  listeningG.value = null;
   removeEventListener('keydown', onKeyCapture, true);
+  removeEventListener('keydown', onGlobalCapture, true);
 }
 onBeforeUnmount(stopListen);
 
@@ -104,6 +145,10 @@ async function save(): Promise<void> {
   if (!res) return;
   state.quick = res.buttons;
   editing.value = false;
+  if (desktop?.reloadHotkeys) {
+    const r = await desktop.reloadHotkeys().catch(() => ({ failed: [] as string[] }));
+    if (r.failed.length) toast(`全局快捷键 ${r.failed.join('、')} 被别的软件占用了，换一个组合试试`, 'err');
+  }
 }
 function cancel(): void {
   stopListen();
@@ -159,6 +204,11 @@ function cancel(): void {
             <template v-else-if="r.hotkey">快捷键 <span class="kbd">{{ r.hotkey }}</span></template>
             <template v-else>设快捷键</template>
           </button>
+          <button v-if="canGlobal" type="button" class="btn qp-key" :class="{ on: listeningG === r.key }" :title="'在别的窗口（直播姬、游戏）里按也能播放'" :aria-label="`第 ${i + 1} 个按钮的全局快捷键：${r.globalHotkey ?? '没有'}，点一下后按组合键`" @click="listenGlobal(r)">
+            <template v-if="listeningG === r.key">按 Ctrl / Alt / Shift + 键…</template>
+            <template v-else-if="r.globalHotkey">全局 <span class="kbd">{{ r.globalHotkey }}</span></template>
+            <template v-else>设全局快捷键</template>
+          </button>
           <span class="qp-move">
             <button type="button" class="icon-btn" :disabled="i === 0" :aria-label="`把第 ${i + 1} 个按钮往前挪`" @click="move(i, -1)"><Icon name="i-up" /></button>
             <button type="button" class="icon-btn" :disabled="i === rows.length - 1" :aria-label="`把第 ${i + 1} 个按钮往后挪`" @click="move(i, 1)"><Icon name="i-up" style="transform: rotate(180deg)" /></button>
@@ -169,7 +219,7 @@ function cancel(): void {
       <p v-else class="qp-tip">还没有按钮，点下面「添加按钮」选一个素材。</p>
       <div class="qp-foot">
         <EffectPicker v-model="adding" add="添加按钮" @change="add" />
-        <span class="hint">已有 {{ rows.length }} 个，最多 {{ MAX }} 个。设快捷键时按 Backspace 清掉。</span>
+        <span class="hint">已有 {{ rows.length }} 个，最多 {{ MAX }} 个。设快捷键时按 Backspace 清掉。{{ canGlobal ? '全局快捷键在直播姬、游戏等别的窗口里按也能播放。' : '' }}</span>
       </div>
     </div>
   </section>

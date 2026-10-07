@@ -1,7 +1,7 @@
 // 星临电脑版：主进程。
 // 在独立进程里启动本机服务（和服务器版同一套代码），打开管理后台窗口；
 // 关闭窗口缩到托盘（特效照常播放），可选开机自动启动，有新版本时提示更新。
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell, Tray, utilityProcess } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeTheme, shell, Tray, utilityProcess } from 'electron';
 import type { MenuItemConstructorOptions, UtilityProcess } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import fs from 'node:fs';
@@ -103,6 +103,7 @@ async function start(): Promise<void> {
     return;
   }
   createWindow(!process.argv.includes(HIDDEN_ARG));
+  void registerHotkeys();
   if (app.isPackaged) setupUpdates();
 }
 
@@ -196,6 +197,41 @@ async function api<T>(url: string): Promise<T> {
   const res = await fetch(`${base()}${url}`, { signal: AbortSignal.timeout(3000) });
   if (!res.ok) throw new Error(`${url} ${res.status}`);
   return (await res.json()) as T;
+}
+
+// ---------- 素材快捷播放的全局快捷键 ----------
+// 在直播姬、游戏等别的窗口里按也能播放。启动时注册，后台保存按钮后重新注册（sf:reload-hotkeys）
+
+/** 重新注册：读快捷播放按钮，带全局快捷键的注册上；返回被别的软件占用、注册不上的 */
+async function registerHotkeys(): Promise<{ failed: string[] }> {
+  globalShortcut.unregisterAll();
+  let buttons: Array<{ id: number; globalHotkey: string | null }>;
+  try {
+    buttons = (await api<{ buttons: Array<{ id: number; globalHotkey: string | null }> }>('/api/quickplay/buttons')).buttons;
+  } catch (e) {
+    log('读取快捷播放按钮失败', e);
+    return { failed: [] };
+  }
+  const failed: string[] = [];
+  let n = 0;
+  for (const b of buttons) {
+    if (!b.globalHotkey) continue;
+    // 修改类接口只接受 JSON
+    const play = () =>
+      void fetch(`${base()}/api/quickplay/play/${b.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(3000) })
+        .then(async (r) => r.ok || log(`全局快捷键 ${b.globalHotkey} 没有播放：${r.status} ${await r.text()}`))
+        .catch((e: unknown) => log(`全局快捷键 ${b.globalHotkey} 没有播放`, e));
+    let ok = false;
+    try {
+      ok = globalShortcut.register(b.globalHotkey, play);
+    } catch (e) {
+      log(`全局快捷键 ${b.globalHotkey} 写法不对`, e);
+    }
+    if (ok) n++;
+    else failed.push(b.globalHotkey);
+  }
+  log(`全局快捷键：注册了 ${n} 个${failed.length ? `；被别的软件占用：${failed.join('、')}` : ''}`);
+  return { failed };
 }
 
 // ---------- 窗口 ----------
@@ -313,6 +349,7 @@ app.on('before-quit', () => {
 // 退出前先让服务收尾
 let stopped = false;
 app.on('will-quit', (e) => {
+  globalShortcut.unregisterAll();
   if (stopped || !server) return;
   e.preventDefault();
   void stopServer().then(() => {
@@ -412,6 +449,7 @@ function setupIpc(): void {
     return autoStart();
   });
   handle('sf:check-update', () => void checkUpdate(true));
+  handle('sf:reload-hotkeys', () => registerHotkeys());
   handle('sf:open-data', () => void shell.openPath(USER_DIR));
   handle('sf:open-logs', () => void shell.openPath(LOG_DIR));
 }

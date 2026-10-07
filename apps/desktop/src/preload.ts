@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('starfallDesktop', {
   checkUpdate: () => ipcRenderer.invoke('sf:check-update'),
   /** 素材快捷播放的按钮保存后，重新注册全局快捷键；返回被别的软件占用的 */
   reloadHotkeys: () => ipcRenderer.invoke('sf:reload-hotkeys'),
+  /** 编辑快捷播放按钮时先注销全局快捷键（录快捷键时不会被系统拦走） */
+  pauseHotkeys: () => ipcRenderer.invoke('sf:pause-hotkeys'),
   openDataDir: () => ipcRenderer.invoke('sf:open-data'),
   openLogs: () => ipcRenderer.invoke('sf:open-logs'),
 });

@@ -103,7 +103,8 @@ async function start(): Promise<void> {
     return;
   }
   createWindow(!process.argv.includes(HIDDEN_ARG));
-  void registerHotkeys();
+  void registerHotkeys(true);
+  setInterval(() => void registerHotkeys(), 30_000);
   if (app.isPackaged) setupUpdates();
 }
 
@@ -129,6 +130,8 @@ function startServer(): Promise<void> {
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     STARFALL_DESKTOP: '1',
+    // 打包后服务找不到 apps/server/package.json，版本号从这里告诉它（「关于」页显示）
+    STARFALL_VERSION: app.getVersion(),
     STARFALL_PORT: String(port),
     STARFALL_DATA: DATA_DIR,
     STARFALL_ADMIN_DIST: path.join(RES, 'admin'),
@@ -157,22 +160,36 @@ function startServer(): Promise<void> {
       log(`服务意外退出（${code}）`);
       const now = Date.now();
       crashes = [...crashes.filter((t) => now - t < 60_000), now];
-      if (crashes.length >= 3) {
-        void dialog
-          .showMessageBox({ type: 'error', title: NAME, message: '星临服务多次意外退出，已停止自动重启', detail: `请把日志发给开发者：${LOG_DIR}`, buttons: ['打开日志文件夹', '关闭'] })
-          .then((r) => {
-            if (r.response === 0) void shell.openPath(LOG_DIR);
-          });
-        return;
-      }
-      setTimeout(() => {
-        startServer().then(
-          () => win?.webContents.reload(),
-          (e: Error) => log('重启服务失败', e),
-        );
-      }, 1000);
+      if (crashes.length >= 3) return crashDialog();
+      restartLater(1000);
     });
   });
+}
+
+/** 服务意外退出后重新启动；重启本身也失败时（例如端口被占、数据库被锁）隔 5 秒再试，一分钟里失败 3 次就停下并弹窗 */
+function restartLater(ms: number): void {
+  setTimeout(() => {
+    startServer().then(
+      () => win?.webContents.reload(),
+      (e: Error) => {
+        log('重启服务失败', e);
+        if (quitting) return;
+        const now = Date.now();
+        crashes = [...crashes.filter((t) => now - t < 60_000), now];
+        if (crashes.length >= 3) crashDialog();
+        else restartLater(5000);
+      },
+    );
+  }, ms);
+}
+
+function crashDialog(): void {
+  tray?.setToolTip(`${NAME} · 服务已停止`);
+  void dialog
+    .showMessageBox({ type: 'error', title: NAME, message: '星临服务多次意外退出，已停止自动重启', detail: `直播画面上的特效和弹幕列表现在不会更新。可以退出星临再打开；还不行的话请把日志发给开发者：${LOG_DIR}`, buttons: ['打开日志文件夹', '关闭'] })
+    .then((r) => {
+      if (r.response === 0) void shell.openPath(LOG_DIR);
+    });
 }
 
 /** 让服务自己收尾（断开直播间、关数据库），5 秒还没退就强制结束 */
@@ -200,38 +217,56 @@ async function api<T>(url: string): Promise<T> {
 }
 
 // ---------- 素材快捷播放的全局快捷键 ----------
-// 在直播姬、游戏等别的窗口里按也能播放。启动时注册，后台保存按钮后重新注册（sf:reload-hotkeys）
+// 在直播姬、游戏等别的窗口里按也能播放。按快捷键找按钮播放（保存按钮后按钮编号会变，快捷键不会）。
+// 启动时注册；之后每 30 秒看一次按钮有没有变（在浏览器里改按钮、导入配置也能跟上），后台保存按钮后立即重新注册（sf:reload-hotkeys）。
+// 后台编辑快捷播放按钮时先全部注销（sf:pause-hotkeys），不然录快捷键时按下已有的组合会被系统先拦走、直接播出来
 
-/** 重新注册：读快捷播放按钮，带全局快捷键的注册上；返回被别的软件占用、注册不上的 */
-async function registerHotkeys(): Promise<{ failed: string[] }> {
-  globalShortcut.unregisterAll();
-  let buttons: Array<{ id: number; globalHotkey: string | null }>;
+let hotkeysPaused = false;
+/** 现在注册着的快捷键（排好序拼起来，用来判断按钮有没有变） */
+let hotkeysNow = '';
+
+async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
+  if (hotkeysPaused && !force) return { failed: [] };
+  hotkeysPaused = false;
+  clearTimeout(pauseTimer);
+  let keys: string[];
   try {
-    buttons = (await api<{ buttons: Array<{ id: number; globalHotkey: string | null }> }>('/api/quickplay/buttons')).buttons;
+    keys = (await api<{ buttons: Array<{ globalHotkey: string | null }> }>('/api/quickplay/buttons')).buttons.flatMap((b) => (b.globalHotkey ? [b.globalHotkey] : []));
   } catch (e) {
     log('读取快捷播放按钮失败', e);
     return { failed: [] };
   }
+  const sig = [...keys].sort().join(' ');
+  if (!force && sig === hotkeysNow) return { failed: [] };
+  globalShortcut.unregisterAll();
+  hotkeysNow = sig;
   const failed: string[] = [];
-  let n = 0;
-  for (const b of buttons) {
-    if (!b.globalHotkey) continue;
+  for (const hotkey of keys) {
     // 修改类接口只接受 JSON
     const play = () =>
-      void fetch(`${base()}/api/quickplay/play/${b.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(3000) })
-        .then(async (r) => r.ok || log(`全局快捷键 ${b.globalHotkey} 没有播放：${r.status} ${await r.text()}`))
-        .catch((e: unknown) => log(`全局快捷键 ${b.globalHotkey} 没有播放`, e));
+      void fetch(`${base()}/api/quickplay/play-global`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hotkey }), signal: AbortSignal.timeout(3000) })
+        .then(async (r) => r.ok || log(`全局快捷键 ${hotkey} 没有播放：${r.status} ${await r.text()}`))
+        .catch((e: unknown) => log(`全局快捷键 ${hotkey} 没有播放`, e));
     let ok = false;
     try {
-      ok = globalShortcut.register(b.globalHotkey, play);
+      ok = globalShortcut.register(hotkey, play);
     } catch (e) {
-      log(`全局快捷键 ${b.globalHotkey} 写法不对`, e);
+      log(`全局快捷键 ${hotkey} 写法不对`, e);
     }
-    if (ok) n++;
-    else failed.push(b.globalHotkey);
+    if (!ok) failed.push(hotkey);
   }
-  log(`全局快捷键：注册了 ${n} 个${failed.length ? `；被别的软件占用：${failed.join('、')}` : ''}`);
+  log(`全局快捷键：注册了 ${keys.length - failed.length} 个${failed.length ? `；被别的软件占用：${failed.join('、')}` : ''}`);
   return { failed };
+}
+
+let pauseTimer: ReturnType<typeof setTimeout> | undefined;
+function pauseHotkeys(): void {
+  hotkeysPaused = true;
+  hotkeysNow = '';
+  globalShortcut.unregisterAll();
+  // 编辑到一半关了窗口也不会一直停着：10 分钟后自己恢复
+  clearTimeout(pauseTimer);
+  pauseTimer = setTimeout(() => void registerHotkeys(true), 10 * 60_000);
 }
 
 // ---------- 窗口 ----------
@@ -371,6 +406,10 @@ function setAutoStart(on: boolean): void {
 // ---------- 检查更新（GitHub 发布页） ----------
 
 let updateBusy = false;
+/** 已经下载好、等重启安装的版本：后台定时检查时不再问 */
+let downloaded: string | null = null;
+/** 后台检查时问过、选了「以后再说」的版本：不再每 6 小时问一次（手动点「检查更新」时照样问） */
+let declined: string | null = null;
 
 function setupUpdates(): void {
   autoUpdater.autoDownload = false;
@@ -383,6 +422,7 @@ function setupUpdates(): void {
     tray?.setToolTip(`${NAME} · 正在下载新版本 ${Math.floor(p.percent)}%`);
   });
   autoUpdater.on('update-downloaded', (info) => {
+    downloaded = info.version;
     win?.setProgressBar(-1);
     tray?.setToolTip(NAME);
     void dialog
@@ -415,8 +455,15 @@ async function checkUpdate(manual: boolean): Promise<void> {
       if (manual) await dialog.showMessageBox({ type: 'info', title: NAME, message: '已经是最新版本', detail: `当前版本 ${app.getVersion()}` });
       return;
     }
+    if (next === downloaded) {
+      if (manual) await dialog.showMessageBox({ type: 'info', title: NAME, message: `新版本 ${next} 已经下载好了`, detail: '退出星临时会自动安装；也可以现在退出再打开。' });
+      return;
+    }
+    // 后台检查：问过、选了以后再说的同一个版本不再弹窗打扰
+    if (!manual && next === declined) return;
     const a = await dialog.showMessageBox({ type: 'info', title: NAME, message: `星临有新版本 ${next}`, detail: `当前版本 ${app.getVersion()}。现在下载吗？在后台下载，不影响直播。`, buttons: ['下载', '以后再说'], defaultId: 0, cancelId: 1 });
     if (a.response === 0) await autoUpdater.downloadUpdate();
+    else declined = next;
   } catch (e) {
     log('检查更新失败', e);
     win?.setProgressBar(-1);
@@ -449,7 +496,8 @@ function setupIpc(): void {
     return autoStart();
   });
   handle('sf:check-update', () => void checkUpdate(true));
-  handle('sf:reload-hotkeys', () => registerHotkeys());
+  handle('sf:reload-hotkeys', () => registerHotkeys(true));
+  handle('sf:pause-hotkeys', () => pauseHotkeys());
   handle('sf:open-data', () => void shell.openPath(USER_DIR));
   handle('sf:open-logs', () => void shell.openPath(LOG_DIR));
 }

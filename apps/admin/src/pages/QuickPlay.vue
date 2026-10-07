@@ -6,6 +6,7 @@ import EffectPicker from '../components/EffectPicker.vue';
 import Icon from '../components/Icon.vue';
 import QuickPad from '../components/QuickPad.vue';
 import { put } from '../lib/api.ts';
+import { desktop, reloadHotkeys } from '../lib/desktop.ts';
 import { keyOf, quickName, useQuickHotkeys } from '../lib/quick.ts';
 import { effectById, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
@@ -13,9 +14,8 @@ import { QUICK_GLOBAL_RE } from '@starfall/shared';
 import type { QuickButton } from '../lib/types.ts';
 
 type Row = Omit<QuickButton, 'id'> & { key: number };
-/** 电脑版窗口才有：保存后重新注册全局快捷键，返回被别的软件占用的 */
-const desktop = (window as unknown as { starfallDesktop?: { reloadHotkeys?: () => Promise<{ failed: string[] }> } }).starfallDesktop;
-const canGlobal = Boolean(desktop?.reloadHotkeys);
+/** 全局快捷键只有电脑版窗口能设 */
+const canGlobal = Boolean(desktop);
 const MAX = 40;
 const editing = ref(false);
 const rows = ref<Row[]>([]);
@@ -26,6 +26,8 @@ useQuickHotkeys(() => !editing.value);
 function startEdit(): void {
   rows.value = state.quick.map((b) => ({ key: ++seq, effectId: b.effectId, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }));
   editing.value = true;
+  // 编辑时先停掉全局快捷键：录快捷键时不会被系统拦走，也不会误播
+  void desktop?.pauseHotkeys().catch(() => undefined);
 }
 
 /** 下一个没用过的数字键（1–9、0） */
@@ -87,6 +89,8 @@ function onGlobalCapture(e: KeyboardEvent): void {
   }
   // 只按了修饰键：等下一个键
   if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+  // 小键盘的数字在系统里是另一个键，注册成全局快捷键按不出来
+  if (e.code.startsWith('Numpad')) return toast('全局快捷键请用主键盘上的数字', 'info');
   const k = /^F([1-9]|1[0-2])$/.test(e.code) ? e.code : keyOf(e);
   const acc = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', k].filter(Boolean).join('+');
   if (!k || !QUICK_GLOBAL_RE.test(acc)) return toast('全局快捷键要按住 Ctrl、Alt 或 Shift，再按一个数字、字母或 F1–F12，例如 Ctrl+Alt+1', 'info');
@@ -145,15 +149,18 @@ async function save(): Promise<void> {
   if (!res) return;
   state.quick = res.buttons;
   editing.value = false;
-  if (desktop?.reloadHotkeys) {
-    const r = await desktop.reloadHotkeys().catch(() => ({ failed: [] as string[] }));
-    if (r.failed.length) toast(`全局快捷键 ${r.failed.join('、')} 被别的软件占用了，换一个组合试试`, 'err');
-  }
+  const failed = await reloadHotkeys();
+  if (failed.length) toast(`全局快捷键 ${failed.join('、')} 被别的软件占用了，换一个组合试试`, 'err');
 }
 function cancel(): void {
   stopListen();
   editing.value = false;
+  void reloadHotkeys();
 }
+// 编辑到一半离开这一页：恢复全局快捷键
+onBeforeUnmount(() => {
+  if (editing.value) void reloadHotkeys();
+});
 </script>
 
 <template>

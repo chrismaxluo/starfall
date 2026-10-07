@@ -3,10 +3,9 @@ packages:
   - apps/*
   # 电脑版的打包工具（Electron 等）只在 GitHub 打包时安装，服务器装依赖时不碰
   - '!apps/desktop'
-# 电脑版分支：better-sqlite3 照旧允许安装时编译（打包时 electron-builder 会按 Electron 重新编译）；
-# 服务器版（dev）改成了不编译，直接用它自带的各平台文件
+# better-sqlite3 自带各平台编译好的文件，不用现场编译（和服务器版一样；电脑版的 apps/desktop 不在这里，用 npm 单独装）
 allowBuilds:
-  better-sqlite3: true
+  better-sqlite3: false
   esbuild: true
 minimumReleaseAgeExclude:
   - '@vitest/mocker@5.0.2'

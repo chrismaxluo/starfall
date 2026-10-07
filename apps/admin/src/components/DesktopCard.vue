@@ -1,24 +1,11 @@
 <script setup lang="ts">
 // 设置 → 电脑版：开机自动启动、检查更新、数据文件夹。这些功能由电脑版窗口提供（preload.ts），用浏览器打开后台时只显示说明
 import { onMounted, ref } from 'vue';
+import { desktop as bridge, type DesktopInfo } from '../lib/desktop.ts';
 import { toast } from '../lib/toast.ts';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
 
-interface DesktopInfo {
-  version: string;
-  autoStart: boolean;
-  canUpdate: boolean;
-  dataDir: string;
-}
-interface DesktopBridge {
-  info(): Promise<DesktopInfo>;
-  setAutoStart(on: boolean): Promise<boolean>;
-  checkUpdate(): Promise<void>;
-  openDataDir(): Promise<void>;
-  openLogs(): Promise<void>;
-}
-const bridge = (window as unknown as { starfallDesktop?: DesktopBridge }).starfallDesktop;
 const info = ref<DesktopInfo | null>(null);
 const autoStart = ref(false);
 

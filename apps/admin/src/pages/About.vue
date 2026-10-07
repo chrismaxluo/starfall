@@ -5,6 +5,7 @@ import Icon from '../components/Icon.vue';
 import Logo from '../components/Logo.vue';
 import { get } from '../lib/api.ts';
 import { CHANGELOG } from '../lib/changelog.ts';
+import { desktop as desktopBridge } from '../lib/desktop.ts';
 import { dateTime, duration, fileSize, when } from '../lib/format.ts';
 import { toast } from '../lib/toast.ts';
 
@@ -16,8 +17,6 @@ interface About {
   runtime: { startedAt: number; node: string; os: string; memoryMb: number; dataDir: string; dbBytes: number; assetBytes: number; backupBytes: number; port: number; timeZone: string };
 }
 
-/** 电脑版窗口才有：用安装包自己的更新程序检查更新 */
-const desktopBridge = (window as unknown as { starfallDesktop?: { checkUpdate(): Promise<void> } }).starfallDesktop;
 const AUTHOR = '吃喵放花椒的喵酱';
 const AUTHOR_URL = 'https://space.bilibili.com/402917316';
 const EMAIL = 'chrismaxluo@gmail.com';

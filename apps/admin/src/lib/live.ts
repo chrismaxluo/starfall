@@ -2,7 +2,7 @@
 import { setTimeZone } from './format.ts';
 import { CHAT_MAX_LIMIT, OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
 import type { ChatItem } from '@starfall/shared/overlay';
-import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
+import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshQuick, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
@@ -19,7 +19,7 @@ type Msg =
   | { type: 'event'; event: EventDto }
   | { type: 'event_status'; id: number; status: PlayStatus }
   /** 别的设备（或这台）改了规则、素材、设置、输出 */
-  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'all' };
+  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'quickplay' | 'all' };
 
 const eventListeners = new Set<(e: EventDto) => void>();
 const statusListeners = new Set<(id: number, s: PlayStatus) => void>();
@@ -72,12 +72,12 @@ function handle(m: Msg): void {
       state.chat = m.chat ?? [];
       // 重连：断开期间的事件和别处的修改都补回来
       if (hellos++ > 0) {
-        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs()]).catch(() => undefined);
+        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs(), refreshQuick()]).catch(() => undefined);
         for (const fn of resyncListeners) fn();
       }
       break;
     case 'changed': {
-      const jobs = { rules: [refreshRules], library: [refreshEffects, refreshRules], settings: [refreshSettings, refreshStatus], outputs: [refreshOutputs], all: [refreshRules, refreshEffects, refreshSettings, refreshOutputs] }[m.what] ?? [];
+      const jobs = { rules: [refreshRules], library: [refreshEffects, refreshRules, refreshQuick], settings: [refreshSettings, refreshStatus], outputs: [refreshOutputs], quickplay: [refreshQuick], all: [refreshRules, refreshEffects, refreshSettings, refreshOutputs, refreshQuick] }[m.what] ?? [];
       void Promise.all(jobs.map((f) => f())).catch(() => undefined);
       break;
     }

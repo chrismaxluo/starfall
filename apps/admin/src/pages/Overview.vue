@@ -7,6 +7,7 @@ import Icon from '../components/Icon.vue';
 import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import OvPanel from '../components/OvPanel.vue';
+import QuickPad from '../components/QuickPad.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
@@ -16,8 +17,11 @@ import { bigNum, clock, duration, hms, when } from '../lib/format.ts';
 import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
+import { useQuickHotkeys } from '../lib/quick.ts';
 import { effectById, state, ui } from '../lib/store.ts';
 import type { EventDto, StatsDto, TriggerKind, Viewer } from '../lib/types.ts';
+
+useQuickHotkeys();
 
 const stats = ref<StatsDto | null>(null);
 const menu = ref<{ viewer: Viewer; x: number; y: number } | null>(null);
@@ -180,6 +184,12 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
       <div><small>高能榜<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.rankCount) : '—' }}</span><div class="d">{{ live ? '现在在线、登录了的观众' : '开播后显示' }}</div></div>
       <div><small>点赞<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.likes) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
       <div><small>粉丝<span class="src">B站</span></small><span class="v num">{{ bigNum(info?.followers) }}</span><div class="d"><template v-if="info?.fansClub">粉丝团 <b class="num">{{ bigNum(info.fansClub) }}</b> 人</template><template v-else>&nbsp;</template></div></div>
+    </div>
+
+    <div class="card ov-quick">
+      <div class="card-h"><h2>素材快捷播放</h2><span class="aside"><template v-if="state.quick.some((b) => b.hotkey)">按钮上的键也能按</template><a class="linkish" href="#quickplay">{{ state.quick.length ? '管理 →' : '去添加 →' }}</a></span></div>
+      <QuickPad v-if="state.quick.length" />
+      <p v-else class="qp-tip">把常用的素材做成按钮，直播时点一下就能播，不用再发弹幕触发。</p>
     </div>
 
     <div class="bento">

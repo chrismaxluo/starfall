@@ -12,6 +12,7 @@ import QrLogin from './components/QrLogin.vue';
 import Wizard from './components/Wizard.vue';
 import Login from './pages/Login.vue';
 import Overview from './pages/Overview.vue';
+import QuickPlay from './pages/QuickPlay.vue';
 import Rules from './pages/Rules.vue';
 import Assets from './pages/Assets.vue';
 import Events from './pages/Events.vue';
@@ -29,6 +30,7 @@ import { attempt, runAction, toast, toasts } from './lib/toast.ts';
 
 const NAV: Array<{ page: Page; name: string; icon: string }> = [
   { page: 'overview', name: '总览', icon: 'i-grid' },
+  { page: 'quickplay', name: '素材快捷播放', icon: 'i-bolt' },
   { page: 'rules', name: '触发规则', icon: 'i-wand' },
   { page: 'assets', name: '素材库', icon: 'i-image' },
   { page: 'logs', name: '事件记录', icon: 'i-list' },
@@ -36,6 +38,8 @@ const NAV: Array<{ page: Page; name: string; icon: string }> = [
 ];
 /** 手机底部导航的短名称 */
 const SHORT: Partial<Record<Page, string>> = { overview: '总览', rules: '规则', assets: '素材', logs: '记录' };
+/** 手机底部导航直接放的几页，其他的在「更多」里 */
+const TABS = NAV.filter((n) => n.page in SHORT);
 const moreOpen = ref(false);
 // 换了页面（包括点底栏其他标签）就收起
 watch(() => route.value.page, () => (moreOpen.value = false));
@@ -287,6 +291,7 @@ function reloadPage(): void {
           <button class="btn primary" @click="togglePause">恢复播放</button>
         </div>
         <Overview v-if="route.page === 'overview'" />
+        <QuickPlay v-else-if="route.page === 'quickplay'" />
         <Rules v-else-if="route.page === 'rules'" />
         <Assets v-else-if="route.page === 'assets'" />
         <Events v-else-if="route.page === 'logs'" />
@@ -296,11 +301,12 @@ function reloadPage(): void {
     </div>
 
     <nav class="tabbar" aria-label="主导航（手机）">
-      <a v-for="n in NAV.slice(0, 4)" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ SHORT[n.page] }}</a>
-      <button :aria-current="route.page === 'obs' || route.page === 'settings' ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
+      <a v-for="n in TABS" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ SHORT[n.page] }}</a>
+      <button :aria-current="['quickplay', 'obs', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
     </nav>
     <div v-if="moreOpen" style="position: fixed; inset: 0; z-index: 44" @click="moreOpen = false" />
     <div v-if="moreOpen" class="sheet" @click="moreOpen = false">
+      <a href="#quickplay"><Icon name="i-bolt" />素材快捷播放</a>
       <a href="#obs" @click="go('obs')"><Icon name="i-screen" />直播软件输出</a>
       <a href="#settings"><Icon name="i-gear" />设置</a>
     </div>

@@ -133,3 +133,11 @@ describe('弹幕规则：谁发的才算', () => {
     expect(sampleFor({ ...none, fanMin: 30 }).medalLevel).toBe(30);
   });
 });
+
+describe('素材快捷播放的快捷键', () => {
+  it('数字键、小键盘数字、字母；其他键不算', async () => {
+    const { keyOf } = await import('./quick.ts');
+    expect(['Digit1', 'Numpad7', 'KeyQ', 'Digit0'].map((code) => keyOf({ code }))).toEqual(['1', '7', 'Q', '0']);
+    expect(['F5', 'Space', 'Enter', 'NumpadAdd', 'Backquote'].map((code) => keyOf({ code }))).toEqual([null, null, null, null, null]);
+  });
+});

@@ -147,9 +147,9 @@ EOF
   }
 
   check_live() {
-    local force=$1
+    local force=$1 what=${2:-更新}
     if [[ $force != 1 ]] && is_live; then
-      die "直播间正在直播。现在更新会让直播画面上的特效中断几秒。下播后再运行，或者加 --force 坚持继续"
+      die "直播间正在直播。现在${what}会让直播画面上的特效中断几秒。下播后再运行，或者加 --force 坚持继续"
     fi
   }
 
@@ -404,7 +404,7 @@ EOF
       ok "现在已经是 $FROM_LABEL"
       return 0
     fi
-    [[ $auto == 1 ]] || check_live "$force"
+    [[ $auto == 1 ]] || check_live "$force" 退回
     step "退回到 $FROM_LABEL（$TIME 更新前的版本）"
 
     local restore_db=0
@@ -434,7 +434,7 @@ EOF
     wait_healthy || die "退回后服务没有启动成功，查看日志：journalctl -u $SERVICE -n 100"
     build_pages || die "构建页面失败"
     rm -f "$STATE"
-    install_cli
+    # 不动 starfall 命令：旧版本里的脚本更旧（或者没有），换上去会把新修的问题带回来
     ok "已退回 $(current_label)"
   }
 

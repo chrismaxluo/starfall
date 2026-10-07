@@ -1,6 +1,6 @@
 {
   "name": "@starfall/overlay",
-  "version": "1.5.0-beta.1",
+  "version": "1.5.0-beta.2",
   "private": true,
   "description": "星临特效页（作为浏览器源放进 OBS / B站直播姬）",
   "license": "GPL-3.0-only",

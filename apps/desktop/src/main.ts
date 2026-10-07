@@ -426,7 +426,7 @@ function setupUpdates(): void {
     win?.setProgressBar(-1);
     tray?.setToolTip(NAME);
     void dialog
-      .showMessageBox({ type: 'info', title: NAME, message: `新版本 ${info.version} 已下载好`, detail: '现在重启就会安装（大约半分钟）。正在直播的话，建议下播后再装；选「以后」会在你退出星临时自动安装。', buttons: ['现在重启并安装', '以后'], defaultId: 0, cancelId: 1 })
+      .showMessageBox({ type: 'info', title: NAME, message: `新版本 ${info.version} 已下载好`, detail: '现在重启就会安装（大约半分钟），Windows 会问一次是否允许更改，点「是」。正在直播的话，建议下播后再装；选「以后」会在你退出星临时自动安装。', buttons: ['现在重启并安装', '以后'], defaultId: 0, cancelId: 1 })
       .then((r) => {
         if (r.response !== 0) return;
         quitting = true;
@@ -456,7 +456,7 @@ async function checkUpdate(manual: boolean): Promise<void> {
       return;
     }
     if (next === downloaded) {
-      if (manual) await dialog.showMessageBox({ type: 'info', title: NAME, message: `新版本 ${next} 已经下载好了`, detail: '退出星临时会自动安装；也可以现在退出再打开。' });
+      if (manual) await dialog.showMessageBox({ type: 'info', title: NAME, message: `新版本 ${next} 已经下载好了`, detail: '退出星临时会自动安装（Windows 会问一次是否允许更改，点「是」）；也可以现在退出再打开。' });
       return;
     }
     // 后台检查：问过、选了以后再说的同一个版本不再弹窗打扰

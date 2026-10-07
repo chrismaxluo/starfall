@@ -7,7 +7,7 @@ import type { AppContext } from '../context.ts';
 import { HttpError, parseBody } from '../http.ts';
 import { assetDto } from '../services/assets.ts';
 import { EffectPatchSchema, playDuration } from '../services/effects.ts';
-import type { TriggerEvent } from '../services/pipeline.ts';
+import type { TriggerEvent, Vars } from '../services/pipeline.ts';
 
 const SimViewerSchema = z
   .object({
@@ -68,7 +68,7 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     draft: EffectPatchSchema.omit({ name: true }).optional(),
     /** 欢迎语变量（弹幕内容、礼物和数量、上舰月数）；不填用示例 */
     vars: z
-      .object({ text: z.string().max(100), gift: z.string().max(40), count: z.number().int().min(1), valueGold: z.number().int().min(0), months: z.number().int().min(1).max(120), guardLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]), op: z.enum(['open', 'renew']) })
+      .object({ text: z.string().max(100), gift: z.string().max(40), giftId: z.number().int().positive(), count: z.number().int().min(1), valueGold: z.number().int().min(0), months: z.number().int().min(1).max(120), guardLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]), op: z.enum(['open', 'renew']) })
       .partial()
       .strict()
       .optional(),
@@ -89,20 +89,28 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     const { medalLevel: _m, ...rest } = v;
     return { effect, viewer: { ...rest, ...medal } };
   };
+  /** 礼物图：按礼物编号（没给时按名字）查礼物面板；查不到就不放图，不能拿示例里小花花的图顶替 */
+  const previewVars = (v: z.infer<typeof PreviewBody>['vars']): Vars | undefined => {
+    if (!v) return undefined;
+    const { giftId, ...rest } = v;
+    if (rest.gift === undefined) return rest;
+    const img = (giftId ? ctx.gifts.iconFor(giftId) : undefined) ?? ctx.gifts.iconByName(rest.gift);
+    return img ? { ...rest, giftImg: img } : rest;
+  };
 
   app.post('/api/playback/test', async (req) => {
     const b = parseBody(PreviewBody, req.body);
     // 只给了特效编号：和以前一样按已保存的样子、示例观众进场
     if (!b.draft && !b.viewer && !b.vars && b.kind === 'enter') return ctx.pipeline.test(b.effectId);
     const { effect, viewer } = previewInput(b);
-    return ctx.pipeline.test(effect, viewer, b.kind, b.vars);
+    return ctx.pipeline.test(effect, viewer, b.kind, previewVars(b.vars));
   });
 
   // 预览：返回播放内容（后台用真实的特效页在本地播放），不入队、不上直播
   app.post('/api/preview', async (req) => {
     const b = parseBody(PreviewBody, req.body);
     const { effect, viewer } = previewInput(b);
-    return ctx.pipeline.preview(effect, viewer, b.kind, b.vars);
+    return ctx.pipeline.preview(effect, viewer, b.kind, previewVars(b.vars));
   });
 
   // 今天（按主播时区）的统计

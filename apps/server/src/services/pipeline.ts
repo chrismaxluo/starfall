@@ -49,6 +49,13 @@ interface Judgement {
 }
 
 /** 测试播放、预览用的观众 */
+/** 没给的用示例补上；换了礼物却没有礼物图时，不能沿用示例（小花花）的图 */
+function withSample(kind: TriggerKind, vars?: Vars): Vars {
+  const v = { ...SAMPLE_VARS[kind], ...vars };
+  if (kind === 'gift' && vars?.gift !== undefined && vars.gift !== SAMPLE_VARS.gift.gift && !vars.giftImg) delete v.giftImg;
+  return v;
+}
+
 const SAMPLE_VIEWER: Viewer = { uid: 0, name: '测试观众', guard: 3, isMod: false, mystery: false, medal: { name: '星临', level: 21, anchorUid: 0 }, honor: 28 };
 
 const honorOf = (level: number, url: string | undefined) => ({ level, ...(url ? { url } : {}) });
@@ -598,7 +605,7 @@ export class Pipeline {
     if (this.d.hub.overlayCount() === 0) throw new HttpError(409, 'no_overlay', '特效页不在线：请先把特效页地址加到直播软件的浏览器源里');
     const e = typeof effect === 'number' ? this.d.effects.get(effect) : effect;
     const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
-    const item = this.playItem(e, v, kind, kind === 'enter' && !vars ? {} : { ...SAMPLE_VARS[kind], ...vars }, true);
+    const item = this.playItem(e, v, kind, kind === 'enter' && !vars ? {} : withSample(kind, vars), true);
     // 正在播的也是测试：直接换成新的，不用等它播完（真实观众的特效不打断）
     if (this.current?.q.payload.item.test) this.stopCurrent();
     this.enqueue(item, null, true, '测试播放');
@@ -631,7 +638,7 @@ export class Pipeline {
   /** 预览：生成播放内容但不入队（后台预览区用，只在本地播放） */
   preview(effect: EffectDto, viewer?: Partial<Viewer>, kind: TriggerKind = 'enter', vars?: Vars): PlayItem {
     const v: Viewer = { ...SAMPLE_VIEWER, ...viewer };
-    return this.playItem(effect, v, kind, { ...SAMPLE_VARS[kind], ...vars }, true);
+    return this.playItem(effect, v, kind, withSample(kind, vars), true);
   }
 
   snapshot(): QueueSnapshot {

@@ -43,6 +43,14 @@ export class GiftCatalog {
     return any;
   }
 
+  /** 按名字找礼物图（预览时后台只给了名字）：只查本直播间礼物面板的缓存 */
+  iconByName(name: string): string | undefined {
+    const room = this.room.get();
+    const c = this.cache;
+    if (!c || !room || c.roomId !== room.roomId) return undefined;
+    return c.gifts.find((g) => g.name === name && g.icon)?.icon;
+  }
+
   /** 读全站礼物列表（只留图）；失败时最多 10 分钟再试一次 */
   private loadAll(): void {
     const now = Date.now();

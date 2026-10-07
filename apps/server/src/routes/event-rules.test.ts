@@ -136,4 +136,22 @@ describe('模拟与预览', () => {
     expect((await pv({ effectId: t.effectId('门楼'), kind: 'guard', viewer: { name: '半糖' }, vars: { months: 12 } })).text).toBe('舰长·上舰 半糖');
     expect((await pv({ effectId: t.effectId('晶语'), kind: 'danmu', viewer: { name: '半糖' } })).text).toBe('半糖：主播晚上好！');
   });
+
+  it('预览礼物：用所选礼物自己的图（按编号，没有编号时按名字），查不到就不放图，不再一律显示小花花', async () => {
+    const t = await setup();
+    const list = [
+      { id: 31036, name: '小花花', price: 100, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/flower.png' },
+      { id: 31037, name: '告白花束', price: 22000, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/bouquet.png' },
+      { id: 32000, name: '星愿水晶球', price: 100000, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/ball.png' },
+    ];
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 0, data: { gift_config: { base_config: { list } } } }))));
+    await t.req({ method: 'GET', url: '/api/gifts' });
+    const gift = t.effectId('晶礼');
+    const img = (vars?: object) => t.req({ method: 'POST', url: '/api/preview', payload: { effectId: gift, kind: 'gift', ...(vars ? { vars } : {}) } }).then((r) => r.json().gift?.img);
+    expect(await img({ gift: '星愿水晶球', giftId: 32000, count: 1 })).toBe('https://i0.hdslb.com/ball.png');
+    expect(await img({ gift: '告白花束', count: 2 })).toBe('https://i0.hdslb.com/bouquet.png');
+    expect(await img({ gift: '面板里没有的礼物', count: 1 })).toBeUndefined();
+    // 没指定礼物：示例小花花和它的图
+    expect(await img()).toContain('hdslb.com');
+  });
 });

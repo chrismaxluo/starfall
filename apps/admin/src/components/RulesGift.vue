@@ -139,11 +139,23 @@ const bandMenu = (b: GiftBand): Array<MenuItem | null> => [
 const jumps = (gold: number) => gold >= JUMP_GOLD && state.settings?.queueJump;
 function previewSpec(giftId: number, name: string, effectId: number | null): void {
   const g = giftOf(giftId);
-  emit('preview', { effectId, viewer: SAMPLES.fan, label: `礼物「${name}」`, kind: 'gift', vars: { gift: name, count: 1, valueGold: g?.price ?? 0 } });
+  emit('preview', { effectId, viewer: SAMPLES.fan, label: `礼物「${name}」`, kind: 'gift', vars: { gift: name, giftId, count: 1, valueGold: g?.price ?? 0 } });
+}
+/** 价值分段预览用的礼物：礼物面板上落在这一段里最便宜的一个；没有时用比这一段便宜的最贵的一个，多送几个凑够 */
+function bandSample(from: number, to: number | undefined): { gift: string; giftId?: number; count: number; valueGold: number } {
+  const paid = catalog.value.filter((g) => g.paid && g.price > 0 && g.tab).sort((a, b) => a.price - b.price);
+  const inside = paid.find((g) => g.price >= from && (to === undefined || g.price < to));
+  if (inside) return { gift: inside.name, giftId: inside.id, count: 1, valueGold: inside.price };
+  const below = [...paid].reverse().find((g) => g.price < from);
+  if (below) {
+    const count = Math.ceil(from / below.price);
+    return { gift: below.name, giftId: below.id, count, valueGold: below.price * count };
+  }
+  return { gift: '礼物', count: 1, valueGold: from };
 }
 function previewBand(i: number): void {
   const b = bands.value[i]!;
-  emit('preview', { effectId: b.effectId, viewer: SAMPLES.fan, label: `礼物 ${bandLabel(i)}`, kind: 'gift', vars: { gift: '告白花束', count: Math.max(1, Math.ceil(b.fromGold / 22_000)), valueGold: b.fromGold } });
+  emit('preview', { effectId: b.effectId, viewer: SAMPLES.fan, label: `礼物 ${bandLabel(i)}`, kind: 'gift', vars: bandSample(b.fromGold, bandHi(i)) });
 }
 
 onMounted(async () => {

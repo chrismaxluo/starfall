@@ -1,7 +1,7 @@
 import type { GiftConfig } from '@starfall/bili';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DANMU_WHO_ALL } from '@starfall/shared';
-import type { EnterEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
+import type { EnterEvent, ScEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
 import { room } from '../db/schema.ts';
 import { testApp } from '../testing.ts';
 import { Hub, PLAY_ACK_MS } from './hub.ts';
@@ -680,5 +680,53 @@ describe('弹幕列表', () => {
     expect(t.hub.overlayList()).toMatchObject([{ role: 'chat' }]);
     t.hub.outputChanged({ ...o, chatSide: 'right' }, 'update');
     expect(chat.sent.at(-1)).toMatchObject({ type: 'config', config: { chatSide: 'right', chatEnabled: true } });
+  });
+});
+
+describe('送礼名单', () => {
+  const giftItems = (sock: ReturnType<typeof fakeSock>) => sock.sent.filter((m) => m.type === 'gift_item').map((m) => (m as Extract<ServerToOverlay, { type: 'gift_item' }>).item);
+  const sc = (p: Partial<ScEvent> = {}, vp: Partial<Viewer> = {}): ScEvent => ({ kind: 'sc', id: `s${++seq}`, ts: Date.now(), viewer: v(vp), text: '主播唱首歌吧', priceYuan: 30, scId: `sc${seq}`, ...p });
+
+  it('付费礼物（连击合成后的）、上舰、醒目留言推给送礼名单（不看规则）；免费礼物不推；特效页收不到', async () => {
+    const t = await setup();
+    const gifts = fakeSock();
+    t.hub.addOverlay(gifts, t.ctx.outputs.list()[0]!, [], Date.now(), 'gifts');
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(gf({ unitPrice: 100, count: 66 }, { guard: 3 }));
+    t.live.emit(gf({ giftId: 1, giftName: '辣条', unitPrice: 100, paid: false }));
+    t.live.emit(gd({ level: 2, months: 3, op: 'renew', priceGold: 1_998_000 }));
+    vi.advanceTimersByTime(3000);
+    t.live.emit(sc());
+    expect(giftItems(gifts)).toMatchObject([
+      { kind: 'gift', value: 6600, viewer: { name: '小星', guard: 3 }, gift: { id: 31036, name: '小花花', count: 66, img: 'https://i0.hdslb.com/gift/flower.webp' } },
+      { kind: 'guard', value: 1_998_000, guard: { level: 2, months: 3, op: 'renew' } },
+      { kind: 'sc', value: 30_000, sc: { text: '主播唱首歌吧', price: 30 } },
+    ]);
+    expect(t.sock.sent.some((m) => m.type === 'gift_item')).toBe(false);
+    expect(t.hub.recentGifts()).toHaveLength(3);
+  });
+
+  it('新开一场直播时清空（没开播时保留上一场的）；服务重启后从事件记录恢复本场的', async () => {
+    const t = await setup();
+    const gifts = fakeSock();
+    t.hub.addOverlay(gifts, t.ctx.outputs.list()[0]!, [], Date.now(), 'gifts');
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(gf({ unitPrice: 1000, count: 2 }));
+    t.live.emit(sc({ priceYuan: 50 }));
+    // 重启：新的调度从事件记录里恢复
+    const hub2 = new Hub();
+    const p2 = new Pipeline({ ...t.ctx, live: t.live, hub: hub2, gifts: { find: (id: number) => GIFTS[id] }, timeZone: 'Asia/Shanghai' });
+    p2.start();
+    cleanup.push(() => p2.stop());
+    expect(hub2.recentGifts()).toMatchObject([{ kind: 'gift', value: 2000, gift: { name: '小花花', count: 2 } }, { kind: 'sc', sc: { price: 50 } }]);
+    // 下播：保留
+    t.live.state.sessionId = null;
+    vi.advanceTimersByTime(500);
+    expect(t.hub.recentGifts()).toHaveLength(2);
+    // 新开一场：清空
+    t.live.state.sessionId = 2;
+    vi.advanceTimersByTime(500);
+    expect(t.hub.recentGifts()).toEqual([]);
+    expect(gifts.sent.some((m) => m.type === 'gifts_clear')).toBe(true);
   });
 });

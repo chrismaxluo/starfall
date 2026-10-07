@@ -2,7 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { DanmuWho, EffectTexts, FeatherMode, Position, SvgaRole, Tier } from '@starfall/shared';
+import type { DanmuWho, EffectTexts, FeatherMode, GiftsFilter, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
 
 const now = sql`(unixepoch() * 1000)`;
@@ -192,6 +192,12 @@ export const outputs = sqliteTable('outputs', {
   chatMedal: text('chat_medal', { enum: ['own', 'all'] }).notNull().default('own'),
   chatMax: integer('chat_max').notNull().default(8),
   chatFadeSec: integer('chat_fade_sec').notNull().default(0),
+  // 送礼名单（同一个输出的又一个浏览器源）；默认靠右，和靠左的弹幕列表错开
+  giftsEnabled: integer('gifts_enabled', { mode: 'boolean' }).notNull().default(true),
+  giftsSide: text('gifts_side', { enum: ['left', 'right'] }).notNull().default('right'),
+  giftsSize: text('gifts_size', { enum: ['normal', 'large'] }).notNull().default('normal'),
+  giftsMax: integer('gifts_max').notNull().default(6),
+  giftsFilter: text('gifts_filter', { mode: 'json' }).$type<GiftsFilter>().notNull().default({ mode: 'all', gifts: [], guard: true, sc: true }),
   key: text('key').notNull().unique(),
   createdAt: integer('created_at').notNull().default(now),
 });

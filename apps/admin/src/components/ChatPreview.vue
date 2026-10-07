@@ -22,10 +22,10 @@ function onMessage(e: MessageEvent): void {
   if (e.origin !== location.origin || e.source !== frame.value?.contentWindow) return;
   if ((e.data as { type?: string })?.type !== 'starfall-preview-ready') return;
   ready = true;
-  send({ type: 'hello', config: { ...props.config }, preload: [], build: null, chat: JSON.parse(JSON.stringify(state.chat)) });
+  send({ type: 'hello', config: JSON.parse(JSON.stringify(props.config)), preload: [], build: null, chat: JSON.parse(JSON.stringify(state.chat)) });
 }
 
-watch(() => props.config, (c) => send({ type: 'config', config: { ...c } }), { deep: true });
+watch(() => props.config, (c) => send({ type: 'config', config: JSON.parse(JSON.stringify(c)) }), { deep: true });
 const off = onChat((item) => send(item ? { type: 'chat', item: JSON.parse(JSON.stringify(item)) } : { type: 'chat_clear' }));
 
 onMounted(() => addEventListener('message', onMessage));

@@ -92,13 +92,13 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       socket.close(OVERLAY_CLOSE.badKey, 'bad key');
       return;
     }
-    // 弹幕列表和特效页用同一个连接地址，多一个 view=chat
+    // 弹幕列表、送礼名单和特效页用同一个连接地址，多一个 view=chat / view=gifts
     // 浏览器查看页多一个 view=1：照样收特效，但不算在线
-    const role = req.query.view === 'chat' ? 'chat' : 'fx';
+    const role = req.query.view === 'chat' ? 'chat' : req.query.view === 'gifts' ? 'gifts' : 'fx';
     const view = role === 'fx' && req.query.view === '1';
-    const what = role === 'chat' ? '弹幕列表' : view ? '特效页（浏览器查看）' : '特效页';
-    const client = ctx.hub.addOverlay(socket, output, role === 'chat' ? [] : preloadUrls(ctx), Date.now(), role, view);
-    const log = req.log.child({ output: output.id, ip: req.ip, ...(role === 'chat' ? { view: 'chat' } : view ? { view: 'browser' } : {}) });
+    const what = role === 'chat' ? '弹幕列表' : role === 'gifts' ? '送礼名单' : view ? '特效页（浏览器查看）' : '特效页';
+    const client = ctx.hub.addOverlay(socket, output, role === 'fx' ? preloadUrls(ctx) : [], Date.now(), role, view);
+    const log = req.log.child({ output: output.id, ip: req.ip, ...(role !== 'fx' ? { view: role } : view ? { view: 'browser' } : {}) });
     log.info(`${what}已连接`);
     // 记录断开原因，方便排查"特效页不显示"
     let reason: string | null = null;
@@ -157,7 +157,7 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       return;
     }
     ctx.hub.addAdmin(socket);
-    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat() }));
+    socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat(), gifts: ctx.hub.recentGifts() }));
     const stop = keepAlive(socket, () => ctx.hub.removeAdmin(socket));
     socket.on('close', () => {
       stop();

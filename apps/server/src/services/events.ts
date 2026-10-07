@@ -237,6 +237,28 @@ export class EventLog {
       .map((r) => r.uid);
   }
 
+  /** 最近几场直播（送礼名单挑记录用）：每场有几条礼物、上舰、醒目留言，最新的在前 */
+  sessionList(roomId: number, limit = 30): Array<{ id: number; startedAt: number; endedAt: number | null; gifts: number }> {
+    return this.db.$client
+      .prepare(
+        `select s.id, s.started_at as startedAt, s.ended_at as endedAt,
+           (select count(*) from events e where e.session_id = s.id and e.kind in ('gift', 'guard', 'sc')) as gifts
+         from live_sessions s where s.room_id = ? order by s.id desc limit ?`,
+      )
+      .all(roomId, limit) as Array<{ id: number; startedAt: number; endedAt: number | null; gifts: number }>;
+  }
+
+  /** 一条礼物、上舰、醒目留言的记录（挂到送礼名单用） */
+  giftEvent(id: number): { id: number; ts: number; kind: string; viewer: unknown; payload: unknown } | null {
+    return (
+      this.db
+        .select({ id: events.id, ts: events.ts, kind: events.kind, viewer: events.viewer, payload: events.payload })
+        .from(events)
+        .where(and(eq(events.id, id), inArray(events.kind, ['gift', 'guard', 'sc'])))
+        .get() ?? null
+    );
+  }
+
   /** 某一场的礼物、上舰、醒目留言（服务重启后恢复送礼名单用）：按时间先后，只取最近 limit 条 */
   giftListEvents(sessionId: number, limit: number): Array<{ id: number; ts: number; kind: string; viewer: unknown; payload: unknown }> {
     return this.db

@@ -193,8 +193,15 @@ async function block(e: EventDto): Promise<void> {
     toast(`已把 ${e.uname} 移出黑名单`);
   });
 }
+/** 付费礼物、上舰、醒目留言可以挂到送礼名单（免费礼物不行） */
+const pinnable = (e: EventDto) => e.kind === 'guard' || e.kind === 'sc' || (e.kind === 'gift' && (e.payload as { paid?: boolean } | null)?.paid !== false);
+async function pinGift(e: EventDto): Promise<void> {
+  const r = await attempt(() => post('/api/gift-list/pins', { eventId: e.id }));
+  if (r) toast(`已挂到送礼名单：${e.uname}（在「送礼名单」页可以撤下、调顺序）`);
+}
 const rowMenu = (e: EventDto): Array<MenuItem | null> => [
   ...(e.kind === 'enter' && e.uid > 0 ? [{ icon: 'i-user', label: isExcl(e.uid) ? '修改专属特效' : '设为专属', run: () => setExclusive(e) }] : []),
+  ...(pinnable(e) ? [{ icon: 'i-gift', label: '挂到送礼名单', run: () => void pinGift(e) }] : []),
   { icon: 'i-list', label: '只看 TA 的记录', run: () => (q.value = String(e.uid)) },
   { icon: 'i-copy', label: '复制 UID', run: () => void copyUid(e.uid) },
   null,

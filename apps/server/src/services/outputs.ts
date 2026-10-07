@@ -12,7 +12,7 @@ export type OutputRow = typeof outputs.$inferSelect;
 /** 送礼名单显示哪些：所有付费礼物 / 只显示勾选的礼物；上舰、醒目留言单独勾 */
 export const GiftsFilterSchema = z
   .object({
-    mode: z.enum(['all', 'only']),
+    mode: z.enum(['all', 'only', 'pinned']),
     gifts: z.array(z.object({ id: z.number().int().positive(), name: z.string().max(40) }).strict()).max(200),
     guard: z.boolean(),
     sc: z.boolean(),

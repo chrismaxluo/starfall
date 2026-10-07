@@ -12,6 +12,7 @@ import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
 import { backupRoutes } from './routes/backup.ts';
+import { giftListRoutes } from './routes/gift-list.ts';
 import { biliRoutes } from './routes/bili.ts';
 import { eventRuleRoutes } from './routes/event-rules.ts';
 import { eventRoutes } from './routes/events.ts';
@@ -146,6 +147,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   aboutRoutes(app, ctx);
   eventRoutes(app, ctx);
   backupRoutes(app, ctx);
+  giftListRoutes(app, ctx);
   await app.register(async (scope) => wsRoutes(scope, ctx));
   app.addHook('onClose', async () => ctx.hub.closeAll());
 

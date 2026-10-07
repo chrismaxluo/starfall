@@ -43,6 +43,7 @@ const cmds = computed<Cmd[]>(() => {
     ...state.quick.map((b): Cmd => ({ g: '直播中', icon: 'i-bolt', label: `快捷播放：${quickName(b)}`, kw: '素材 按钮 梗', ...(b.hotkey ? { kbd: b.hotkey } : {}), run: () => void playQuick(b) })),
     { g: '跳转', icon: 'i-grid', label: '总览', kw: '首页 实时动态', run: () => go('overview') },
     { g: '跳转', icon: 'i-bolt', label: '素材快捷播放', kw: '按钮 快捷键 梗', run: () => go('quickplay') },
+    { g: '跳转', icon: 'i-gift', label: '送礼名单', kw: '礼物 挂 轮播 滚动 名单', run: () => go('giftlist') },
     { g: '跳转', icon: 'i-wand', label: '进场规则', kw: '触发规则 身份 大航海 粉丝牌', run: () => go('rules', 'enter') },
     { g: '跳转', icon: 'i-user', label: '专属用户', kw: '触发规则 专属特效 专属素材', run: () => go('rules', 'exclusive') },
     { g: '跳转', icon: 'i-chat', label: '弹幕规则', kw: '触发规则 关键词', run: () => go('rules', 'danmu') },

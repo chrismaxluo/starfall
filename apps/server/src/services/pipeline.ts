@@ -740,7 +740,7 @@ export class Pipeline {
 }
 
 /** 事件记录里的一行变回礼物、上舰、醒目留言事件（恢复送礼名单用）；格式不对的跳过 */
-function eventFromLog(r: { id: number; ts: number; kind: string; viewer: unknown; payload: unknown }): GiftEvent | GuardEvent | ScEvent | null {
+export function eventFromLog(r: { id: number; ts: number; kind: string; viewer: unknown; payload: unknown }): GiftEvent | GuardEvent | ScEvent | null {
   const viewer = r.viewer as Viewer | null;
   const p = (r.payload ?? {}) as Record<string, unknown>;
   if (!viewer?.name) return null;

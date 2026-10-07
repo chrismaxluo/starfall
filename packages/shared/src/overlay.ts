@@ -61,11 +61,12 @@ export type GiftsSpeed = 'off' | 'slow' | 'normal' | 'fast';
 export const GIFTS_SPEED_PX: Record<GiftsSpeed, number> = { off: 0, slow: 20, normal: 32, fast: 50 };
 
 /**
- * 送礼名单显示哪些：all 为所有付费礼物；only 为只显示 gifts 里勾选的礼物（按礼物编号，名字只用来在后台显示）。
- * 上舰、醒目留言单独勾选，两种方式都看这两项
+ * 送礼名单显示哪些：all 为所有付费礼物；only 为只显示 gifts 里勾选的礼物（按礼物编号，名字只用来在后台显示）；
+ * pinned 为只显示后台挂上的记录（谁送的哪一次，可以是以前场次的），本场新收到的不进来。
+ * 上舰、醒目留言单独勾选，all、only 两种方式看这两项
  */
 export interface GiftsFilter {
-  mode: 'all' | 'only';
+  mode: 'all' | 'only' | 'pinned';
   gifts: Array<{ id: number; name: string }>;
   guard: boolean;
   sc: boolean;
@@ -96,8 +97,9 @@ export interface GiftListItem {
   sc?: { text: string; price: number };
 }
 
-/** 这一条在不在送礼名单里显示 */
+/** 这一条在不在送礼名单里显示（本场收到的；只显示挂上的记录时都不显示） */
 export function giftListShows(f: GiftsFilter, it: GiftListItem): boolean {
+  if (f.mode === 'pinned') return false;
   if (it.kind === 'guard') return f.guard;
   if (it.kind === 'sc') return f.sc;
   return f.mode === 'all' || f.gifts.some((g) => g.id === it.gift?.id);
@@ -211,7 +213,7 @@ export const OVERLAY_BUILD_RE = /index-[\w-]+\.js/;
 
 export type ServerToOverlay =
   /** build：服务端现在的特效页版本；和页面自己的不一样时，页面会在空闲时自动刷新 */
-  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null; chat?: ChatItem[]; gifts?: GiftListItem[] }
+  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null; chat?: ChatItem[]; gifts?: GiftListItem[]; pins?: GiftListItem[] }
   /** 特效页重新构建了（不用重启服务） */
   | { type: 'version'; build: string }
   | { type: 'config'; config: OverlayConfig }
@@ -226,6 +228,8 @@ export type ServerToOverlay =
   | { type: 'gift_item'; item: GiftListItem }
   /** 送礼名单：新开了一场直播或换了直播间，清空 */
   | { type: 'gifts_clear' }
+  /** 送礼名单：挂上的记录变了（整份发过来，按顺序） */
+  | { type: 'gift_pins'; items: GiftListItem[] }
   /** 心跳：特效页据此判断连接是否还活着（浏览器里收不到协议层的 ping） */
   | { type: 'ping' };
 

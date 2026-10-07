@@ -16,6 +16,7 @@ import QuickPlay from './pages/QuickPlay.vue';
 import Rules from './pages/Rules.vue';
 import Assets from './pages/Assets.vue';
 import Events from './pages/Events.vue';
+import GiftList from './pages/GiftList.vue';
 import Output from './pages/Output.vue';
 import SettingsPage from './pages/Settings.vue';
 import About from './pages/About.vue';
@@ -35,6 +36,7 @@ const NAV: Array<{ page: Page; name: string; icon: string }> = [
   { page: 'rules', name: '触发规则', icon: 'i-wand' },
   { page: 'assets', name: '素材库', icon: 'i-image' },
   { page: 'logs', name: '事件记录', icon: 'i-list' },
+  { page: 'giftlist', name: '送礼名单', icon: 'i-gift' },
   { page: 'obs', name: '直播软件输出', icon: 'i-screen' },
 ];
 /** 手机底部导航的短名称 */
@@ -297,6 +299,7 @@ function reloadPage(): void {
         <Rules v-else-if="route.page === 'rules'" />
         <Assets v-else-if="route.page === 'assets'" />
         <Events v-else-if="route.page === 'logs'" />
+        <GiftList v-else-if="route.page === 'giftlist'" />
         <Output v-else-if="route.page === 'obs'" />
         <SettingsPage v-else-if="route.page === 'settings'" />
         <About v-else-if="route.page === 'about'" />
@@ -305,11 +308,12 @@ function reloadPage(): void {
 
     <nav class="tabbar" aria-label="主导航（手机）">
       <a v-for="n in TABS" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ SHORT[n.page] }}</a>
-      <button :aria-current="['quickplay', 'obs', 'about', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
+      <button :aria-current="['quickplay', 'giftlist', 'obs', 'about', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
     </nav>
     <div v-if="moreOpen" style="position: fixed; inset: 0; z-index: 44" @click="moreOpen = false" />
     <div v-if="moreOpen" class="sheet" @click="moreOpen = false">
       <a href="#quickplay"><Icon name="i-bolt" />素材快捷播放</a>
+      <a href="#giftlist"><Icon name="i-gift" />送礼名单</a>
       <a href="#obs" @click="go('obs')"><Icon name="i-screen" />直播软件输出</a>
       <a href="#about"><Icon name="i-info" />关于</a>
       <a href="#settings"><Icon name="i-gear" />设置</a>

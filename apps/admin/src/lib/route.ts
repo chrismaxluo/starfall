@@ -1,7 +1,7 @@
 // 页面路由：用地址里的 # 区分页面（#overview、#rules…），刷新后停留在当前页
 import { ref } from 'vue';
 
-export const PAGES = ['overview', 'quickplay', 'rules', 'assets', 'logs', 'obs', 'about', 'settings'] as const;
+export const PAGES = ['overview', 'quickplay', 'rules', 'assets', 'logs', 'giftlist', 'obs', 'about', 'settings'] as const;
 export type Page = (typeof PAGES)[number];
 
 function parse(): { page: Page; sub: string } {

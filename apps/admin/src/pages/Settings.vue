@@ -100,7 +100,9 @@ onMounted(() => {
       <div><h1>设置</h1><p>账号、直播间、播放方式和数据。</p></div>
       <div class="actions"><button class="btn" @click="ui.wizard = true"><Icon name="i-star" />重新打开新手引导</button></div>
     </div>
-    <div class="set-grid">
+    <!-- 两列各自往下排（不按行对齐，右边不会空出一块）：左边账号、直播间、播放、后台密码；右边黑名单、素材显示、数据 -->
+    <div class="set-cols">
+      <div>
       <div class="card">
         <div class="card-h"><h2>B站账号</h2><span class="aside">用来读取直播间消息（昵称、UID）</span></div>
         <template v-if="acct?.loggedIn">
@@ -146,6 +148,17 @@ onMounted(() => {
       </div>
 
       <div class="card">
+        <div class="card-h"><h2>管理后台</h2></div>
+        <div class="field">
+          <label for="pw1">修改登录密码</label>
+          <div class="row2"><input id="pw1" v-model="pw.current" class="inp" type="password" placeholder="当前密码" autocomplete="current-password" /><input v-model="pw.next" class="inp" type="password" placeholder="新密码（至少 8 位）" autocomplete="new-password" /></div>
+          <div style="display: flex; justify-content: flex-end; margin-top: 4px"><button class="btn" :disabled="!pw.current || !pw.next" @click="changePw">保存密码</button></div>
+        </div>
+      </div>
+
+      </div>
+      <div>
+      <div class="card">
         <div class="card-h"><h2>黑名单</h2><span class="aside">这些人不会触发任何特效，事件照常记录</span></div>
         <template v-if="state.settings">
           <div class="toggle-line">主播本人不触发 <Switch v-model="state.settings.blockAnchor" label="主播本人不触发" @change="(v) => saveSetting({ blockAnchor: v }, v ? '主播本人不会触发特效' : '主播本人也会触发特效')" /></div>
@@ -163,16 +176,8 @@ onMounted(() => {
 
       <FeatherCard />
 
-      <div class="card">
-        <div class="card-h"><h2>管理后台</h2></div>
-        <div class="field">
-          <label for="pw1">修改登录密码</label>
-          <div class="row2"><input id="pw1" v-model="pw.current" class="inp" type="password" placeholder="当前密码" autocomplete="current-password" /><input v-model="pw.next" class="inp" type="password" placeholder="新密码（至少 8 位）" autocomplete="new-password" /></div>
-          <div style="display: flex; justify-content: flex-end; margin-top: 4px"><button class="btn" :disabled="!pw.current || !pw.next" @click="changePw">保存密码</button></div>
-        </div>
-      </div>
-
       <DataCard />
+      </div>
     </div>
     <QrLogin v-if="qr" @close="qr = false" />
   </section>

@@ -107,6 +107,8 @@ export type TierRule = z.infer<typeof TierRuleSchema>;
 /** 粉丝牌分档：只存起始等级，区间由相邻两档推出，所以不会重叠 */
 /** 粉丝牌等级上限（B 站现在最高 120 级）：进场分段、弹幕「谁发的才算」、模拟都用这个 */
 export const MEDAL_LEVEL_MAX = 120;
+/** 荣耀等级上限（B 站目前到 80 级） */
+export const HONOR_LEVEL_MAX = 80;
 export const MedalBandSchema = z.object({
   fromLevel: z.number().int().min(1).max(MEDAL_LEVEL_MAX),
   effectId: z.number().int().positive().nullable(),
@@ -114,6 +116,21 @@ export const MedalBandSchema = z.object({
   enabled: z.boolean(),
 });
 export type MedalBand = z.infer<typeof MedalBandSchema>;
+
+/** 进场荣耀等级分档：和粉丝牌一样只存起始等级；低于最低一档的人不算（按其他观众处理） */
+export const HonorBandSchema = z.object({
+  fromLevel: z.number().int().min(1).max(HONOR_LEVEL_MAX),
+  effectId: z.number().int().positive().nullable(),
+  cooldownMin,
+  enabled: z.boolean(),
+});
+export type HonorBand = z.infer<typeof HonorBandSchema>;
+/** 新装的和升级上来的默认分档（都先关着、没选特效） */
+export const HONOR_BANDS_DEFAULT: readonly HonorBand[] = [
+  { fromLevel: 50, effectId: null, cooldownMin: 10, enabled: false },
+  { fromLevel: 40, effectId: null, cooldownMin: 10, enabled: false },
+  { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false },
+];
 
 export const ExclusiveSchema = z.object({
   uid: z.number().int().positive(),
@@ -132,6 +149,8 @@ export const EnterRulesSchema = z
   .object({
     tiers: z.object({ gov: TierRuleSchema, adm: TierRuleSchema, cap: TierRuleSchema, mod: TierRuleSchema, nor: TierRuleSchema }),
     bands: z.array(MedalBandSchema).min(1).max(20),
+    /** 荣耀等级分档（排在粉丝牌后面、其他观众前面）；可以一档都没有 */
+    honorBands: z.array(HonorBandSchema).max(20),
     exclusives: z.array(ExclusiveSchema).max(2000),
     /** 冷却方式：按分钟，或每场直播每人只播一次 */
     cooldownMode: z.enum(['minutes', 'oncePerLive']),
@@ -139,6 +158,8 @@ export const EnterRulesSchema = z
   .superRefine((r, ctx) => {
     const levels = r.bands.map((b) => b.fromLevel);
     if (new Set(levels).size !== levels.length) ctx.addIssue({ code: 'custom', path: ['bands'], message: '粉丝牌分档的起始等级不能重复' });
+    const honors = r.honorBands.map((b) => b.fromLevel);
+    if (new Set(honors).size !== honors.length) ctx.addIssue({ code: 'custom', path: ['honorBands'], message: '荣耀等级分档的起始等级不能重复' });
     const uids = r.exclusives.map((x) => x.uid);
     if (new Set(uids).size !== uids.length) ctx.addIssue({ code: 'custom', path: ['exclusives'], message: '同一个 UID 只能设一条专属规则' });
   });
@@ -149,9 +170,6 @@ export type EnterRules = z.infer<typeof EnterRulesSchema>;
 /** 以前的发送人条件（单选）：导入旧版本的配置文件、升级旧数据时换成下面的多选 */
 export const DANMU_WHO_OLD = ['all', 'fan', 'fan10', 'guard', 'mod'] as const;
 
-/** 粉丝牌等级上限 */
-/** 荣耀等级上限（B 站目前到 80 级） */
-export const HONOR_LEVEL_MAX = 80;
 /** 一条规则最多指定多少位观众 */
 export const DANMU_UIDS_MAX = 100;
 

@@ -162,6 +162,27 @@ describe('导入配置', () => {
     expect(dst.ctx.quickPlay.list()).toMatchObject([{ label: '生日歌' }]);
   });
 
+  it('荣耀等级分档跟着导出、导入；以前导出的文件没有这一项时不动现有的分档', async () => {
+    const src = await setup();
+    const enter = (await src.req({ method: 'GET', url: '/api/rules/enter' })).json();
+    enter.honorBands = [{ fromLevel: 45, effectId: await src.effectId('门楼'), cooldownMin: 3, enabled: true }];
+    await src.req({ method: 'PUT', url: '/api/rules/enter', payload: enter });
+    const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
+    expect(f.rules.enter.honorBands).toEqual([{ fromLevel: 45, effect: '门楼', cooldownMin: 3, enabled: true }]);
+
+    const dst = await setup();
+    const a = (await importFile(dst, 'new.json', JSON.stringify(f))).json();
+    expect(a.plan.sections.find((x: { key: string }) => x.key === 'enter').details).toContain('荣耀等级分档：3 档 → 1 档');
+    await dst.req({ method: 'POST', url: `/api/backup/import/${a.token}` });
+    expect(dst.ctx.enterRules.base().honorBands).toEqual([{ fromLevel: 45, effectId: await dst.effectId('门楼'), cooldownMin: 3, enabled: true }]);
+
+    delete f.rules.enter.honorBands;
+    const old = await setup();
+    const b = (await importFile(old, 'old.json', JSON.stringify(f))).json();
+    await old.req({ method: 'POST', url: `/api/backup/import/${b.token}` });
+    expect(old.ctx.enterRules.base().honorBands.map((x) => x.fromLevel)).toEqual([50, 40, 30]);
+  });
+
   it('旧版本导出的文件：弹幕规则的发送人是单选，导入后换成多选', async () => {
     const src = await setup();
     await populate(src);

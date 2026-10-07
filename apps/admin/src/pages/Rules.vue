@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 触发规则：进场 / 专属用户 / 弹幕 / 礼物 / 上舰分标签设置；每条规则一行，开关、条件、特效、冷却各占一列对齐
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { MEDAL_LEVEL_MAX } from '@starfall/shared';
+import { HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX } from '@starfall/shared';
 import Avatar from '../components/Avatar.vue';
 import CdPick from '../components/CdPick.vue';
 import EffectPicker from '../components/EffectPicker.vue';
@@ -25,7 +25,7 @@ import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { go, route } from '../lib/route.ts';
 import { effectById, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { attempt, toast, undoable } from '../lib/toast.ts';
-import type { EnterBase, ExclusiveDto, MedalBand, Tier, TierRule, Viewer } from '../lib/types.ts';
+import type { EnterBase, ExclusiveDto, HonorBand, MedalBand, Tier, TierRule, Viewer } from '../lib/types.ts';
 import { pushEsc } from '../lib/esc.ts';
 
 type Ev = 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard';
@@ -44,6 +44,14 @@ function bandLabel(i: number): string {
   const b = bands.value[i]!;
   if (i === 0) return `${b.fromLevel} 级及以上`;
   const to = bands.value[i - 1]!.fromLevel - 1;
+  return to === b.fromLevel ? `${b.fromLevel} 级` : `${b.fromLevel} – ${to} 级`;
+}
+
+const honorBands = computed(() => [...(rules.value?.honorBands ?? [])].sort((a, b) => b.fromLevel - a.fromLevel));
+function honorLabel(i: number): string {
+  const b = honorBands.value[i]!;
+  if (i === 0) return `${b.fromLevel} 级及以上`;
+  const to = honorBands.value[i - 1]!.fromLevel - 1;
   return to === b.fromLevel ? `${b.fromLevel} 级` : `${b.fromLevel} – ${to} 级`;
 }
 
@@ -96,10 +104,10 @@ function onTierEffect(t: Tier, r: TierRule, label: string): void {
 /** 冷却改了之后的提示 */
 const cdMsg = (label: string, v: number) => (v === 0 ? `${label}：每次进场都播放` : `${label}：同一个人 ${v >= 60 && v % 60 === 0 ? `${v / 60} 小时` : `${v} 分钟`}内只播一次`);
 const TIER_OFF: Record<string, string> = {
-  gov: '已关闭：总督会按房管、粉丝牌或其他观众处理',
-  adm: '已关闭：提督会按房管、粉丝牌或其他观众处理',
-  cap: '已关闭：舰长会按房管、粉丝牌或其他观众处理',
-  mod: '已关闭：房管会按粉丝牌或其他观众处理',
+  gov: '已关闭：总督会按房管、粉丝牌、荣耀等级或其他观众处理',
+  adm: '已关闭：提督会按房管、粉丝牌、荣耀等级或其他观众处理',
+  cap: '已关闭：舰长会按房管、粉丝牌、荣耀等级或其他观众处理',
+  mod: '已关闭：房管会按粉丝牌、荣耀等级或其他观众处理',
   nor: '已关闭：普通观众进场不播放特效。直播间人多时建议保持关闭，免得刷屏',
 };
 
@@ -107,8 +115,8 @@ const TIER_OFF: Record<string, string> = {
 const counts = computed<Record<Ev, string>>(() => {
   const r = rules.value;
   const tiers = r ? Object.values(r.tiers) : [];
-  const enterAll = tiers.length + (r?.bands.length ?? 0);
-  const enterOn = tiers.filter((t) => t.enabled).length + (r?.bands.filter((b) => b.enabled).length ?? 0);
+  const enterAll = tiers.length + (r?.bands.length ?? 0) + (r?.honorBands.length ?? 0);
+  const enterOn = tiers.filter((t) => t.enabled).length + (r?.bands.filter((b) => b.enabled).length ?? 0) + (r?.honorBands.filter((b) => b.enabled && b.effectId).length ?? 0);
   const g = state.gift;
   const giftAll = (g?.specific.length ?? 0) + (g?.bands.length ?? 0);
   const giftOn = (g?.specific.filter((x) => x.enabled).length ?? 0) + (g?.bands.filter((x) => x.enabled).length ?? 0);
@@ -162,6 +170,54 @@ function removeBand(b: MedalBand, i: number): void {
     rules.value.bands = before;
     await save(`已恢复 ${label}这一段`);
   });
+}
+
+// ---------- 荣耀等级分档 ----------
+const honorAddLevel = ref<number | null>(null);
+const honorAdding = ref(false);
+const HONOR_ADD_HINT = '新的一段先沿用相邻一段的特效';
+const honorAddMsg = ref<{ text: string; err: boolean }>({ text: HONOR_ADD_HINT, err: false });
+function addHonorBand(): void {
+  const v = Number(honorAddLevel.value);
+  if (!rules.value) return;
+  if (!(v >= 1 && v <= HONOR_LEVEL_MAX) || !Number.isInteger(v)) return void (honorAddMsg.value = { text: `请输入 1 – ${HONOR_LEVEL_MAX} 之间的等级`, err: true });
+  if (rules.value.honorBands.some((b) => b.fromLevel === v)) return void (honorAddMsg.value = { text: `已经在 ${v} 级处分过段了`, err: true });
+  // 沿用它所在的那一段；比最低一段还低时沿用最低一段；一段都没有时先关着
+  const near = honorBands.value.find((b) => b.fromLevel < v) ?? honorBands.value[honorBands.value.length - 1];
+  rules.value.honorBands.push(near ? { fromLevel: v, effectId: near.effectId, cooldownMin: near.cooldownMin, enabled: near.enabled } : { fromLevel: v, effectId: null, cooldownMin: 10, enabled: false });
+  honorAddLevel.value = null;
+  honorAdding.value = false;
+  honorAddMsg.value = { text: HONOR_ADD_HINT, err: false };
+  flash(`honor${v}`);
+  void save(`已在荣耀等级 ${v} 级处分出一段`);
+}
+function removeHonorBand(b: HonorBand, i: number): void {
+  if (!rules.value) return;
+  const label = honorLabel(i);
+  const lowest = i === honorBands.value.length - 1;
+  const before = rules.value.honorBands.map((x) => ({ ...x }));
+  rules.value.honorBands = rules.value.honorBands.filter((x) => x.fromLevel !== b.fromLevel);
+  void save(`已删除荣耀等级 ${label}这一段，${lowest ? '这些观众按其他观众处理' : '这些等级并入下面一段'}`, async () => {
+    if (!rules.value) return;
+    rules.value.honorBands = before;
+    await save(`已恢复荣耀等级 ${label}这一段`);
+  });
+}
+/** 没选特效时不能打开 */
+function toggleHonor(b: HonorBand, i: number, on: boolean): void {
+  if (on && !b.effectId) {
+    b.enabled = false;
+    return toast('先给这一段选一个特效，再打开', 'info');
+  }
+  void save(on ? `已打开荣耀等级 ${honorLabel(i)}` : `已关闭荣耀等级 ${honorLabel(i)}，这些观众按其他观众处理`);
+}
+/** 第一次给关着的一段选特效时顺手打开 */
+function setHonorEffect(b: HonorBand, i: number, id: number | null): void {
+  const first = b.effectId === null && !b.enabled && id !== null;
+  b.effectId = id;
+  if (first) b.enabled = true;
+  flash(`honor${b.fromLevel}`);
+  void save(`荣耀等级 ${honorLabel(i)}改为播放「${effectById(id)?.name ?? ''}」${first ? '，已打开' : ''}`);
 }
 
 // ---------- 专属用户 ----------
@@ -337,8 +393,9 @@ onMounted(() => void refreshRules());
         <span class="set">不重复播放<Seg :model-value="rules.cooldownMode" label="不重复播放的方式" :options="[{ value: 'minutes', label: '按时间' }, { value: 'oncePerLive', label: '每场只播一次' }]" @change="setMode" /></span>
       </div>
       <div v-if="help" class="rhelp">
-        判断顺序：<span class="flow"><span>专属用户</span>→<span>大航海</span>→<span>房管</span>→<span>粉丝牌</span>→<span>其他观众</span></span>，用第一个符合的。<br />
-        一个人同时是舰长和房管，按<b>舰长</b>算；粉丝牌只算<b>本直播间</b>的牌子。关掉某一条，这些人会往下按后面的规则处理。<br />
+        判断顺序：<span class="flow"><span>专属用户</span>→<span>大航海</span>→<span>房管</span>→<span>粉丝牌</span>→<span>荣耀等级</span>→<span>其他观众</span></span>，用第一个符合的。<br />
+        一个人同时是舰长和房管，按<b>舰长</b>算；粉丝牌只算<b>本直播间</b>的牌子，戴着本直播间粉丝牌的人按粉丝牌算，不看荣耀等级。关掉某一条，这些人会往下按后面的规则处理。<br />
+        <b>荣耀等级</b>是 B站账号自己的等级（在 B站花得越多越高），和在不在你的直播间消费无关。低于最低一段的人按其他观众处理。<br />
         <b>不重复播放</b>：「按时间」时每条规则自己设多久内只播一次；「每场只播一次」时同一个人一场直播只播一次，下一场重新算。
       </div>
 
@@ -348,7 +405,7 @@ onMounted(() => void refreshRules());
 
         <div class="rt-g"><b>大航海</b><span>本直播间的总督、提督、舰长</span></div>
         <div v-for="g in GUARDS" :key="g.tier" class="rt-r" :class="{ off: !rules.tiers[g.tier].enabled, flash: flashKey === g.tier }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="rules.tiers[g.tier].enabled ? undefined : TIER_OFF[g.tier]">
-          <div class="c-sw"><Switch v-model="rules.tiers[g.tier].enabled" :label="`${g.cond}进场特效`" @change="(v) => save(v ? `已打开${g.cond}进场特效` : `已关闭${g.cond}进场特效，TA 们会按房管、粉丝牌或其他观众处理`)" /></div>
+          <div class="c-sw"><Switch v-model="rules.tiers[g.tier].enabled" :label="`${g.cond}进场特效`" @change="(v) => save(v ? `已打开${g.cond}进场特效` : `已关闭${g.cond}进场特效，TA 们会按房管、粉丝牌、荣耀等级或其他观众处理`)" /></div>
           <div class="c-who"><IdTag :identity="g.tier" /></div>
           <div class="c-eff"><EffectPicker v-model="rules.tiers[g.tier].effectId" @change="onTierEffect(g.tier, rules.tiers[g.tier], g.cond)" /></div>
           <div class="c-cd"><CdPick v-if="!once" v-model="rules.tiers[g.tier].cooldownMin" @change="(v) => save(cdMsg(g.cond, v))" /><template v-else>每场只播一次</template></div>
@@ -357,7 +414,7 @@ onMounted(() => void refreshRules());
 
         <div class="rt-g"><b>房管</b><span>本直播间的房管</span></div>
         <div class="rt-r" :class="{ off: !rules.tiers.mod.enabled, flash: flashKey === 'mod' }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="rules.tiers.mod.enabled ? undefined : TIER_OFF.mod">
-          <div class="c-sw"><Switch v-model="rules.tiers.mod.enabled" label="房管进场特效" @change="(v) => save(v ? '已打开房管进场特效' : '已关闭房管进场特效，房管会按粉丝牌或其他观众处理')" /></div>
+          <div class="c-sw"><Switch v-model="rules.tiers.mod.enabled" label="房管进场特效" @change="(v) => save(v ? '已打开房管进场特效' : '已关闭房管进场特效，房管会按粉丝牌、荣耀等级或其他观众处理')" /></div>
           <div class="c-who"><IdTag identity="mod" /></div>
           <div class="c-eff"><EffectPicker v-model="rules.tiers.mod.effectId" @change="onTierEffect('mod', rules.tiers.mod, '房管')" /></div>
           <div class="c-cd"><CdPick v-if="!once" v-model="rules.tiers.mod.cooldownMin" @change="(v) => save(cdMsg('房管', v))" /><template v-else>每场只播一次</template></div>
@@ -371,14 +428,33 @@ onMounted(() => void refreshRules());
             <button v-else class="linkish" @click="adding = true"><Icon name="i-plus" style="width: 12px; height: 12px; vertical-align: -1px" /> 加一段</button>
           </span>
         </div>
-        <div v-for="(b, i) in bands" :id="`band${b.fromLevel}`" :key="b.fromLevel" class="rt-r" :class="{ off: !b.enabled, flash: flashKey === `band${b.fromLevel}` }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="b.enabled ? undefined : '已关闭：这些观众按其他观众处理'">
-          <div class="c-sw"><Switch v-model="b.enabled" :label="`粉丝牌 ${bandLabel(i)}进场特效`" @change="(v) => save(v ? `已打开粉丝牌 ${bandLabel(i)}` : `已关闭粉丝牌 ${bandLabel(i)}，这些观众按其他观众处理`)" /></div>
+        <div v-for="(b, i) in bands" :id="`band${b.fromLevel}`" :key="b.fromLevel" class="rt-r" :class="{ off: !b.enabled, flash: flashKey === `band${b.fromLevel}` }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="b.enabled ? undefined : '已关闭：这些观众按荣耀等级或其他观众处理'">
+          <div class="c-sw"><Switch v-model="b.enabled" :label="`粉丝牌 ${bandLabel(i)}进场特效`" @change="(v) => save(v ? `已打开粉丝牌 ${bandLabel(i)}` : `已关闭粉丝牌 ${bandLabel(i)}，这些观众按荣耀等级或其他观众处理`)" /></div>
           <div class="c-who"><Medal :level="b.fromLevel" /><span class="sub">{{ bandLabel(i) }}</span></div>
           <div class="c-eff"><EffectPicker v-model="b.effectId" @change="(flash(`band${b.fromLevel}`), save(`粉丝牌 ${bandLabel(i)}改为播放「${effectById(b.effectId)?.name ?? ''}」`))" /></div>
           <div class="c-cd"><CdPick v-if="!once" v-model="b.cooldownMin" @change="(v) => save(cdMsg(`粉丝牌 ${bandLabel(i)}`, v))" /><template v-else>每场只播一次</template></div>
           <div class="c-act">
             <button class="icon-btn play" :aria-label="`预览粉丝牌 ${bandLabel(i)}进场`" :title="`预览粉丝牌 ${bandLabel(i)}进场`" @click="preview(b.effectId, { ...SAMPLES.fan, medalLevel: b.fromLevel }, `粉丝牌 ${bandLabel(i)}进场`)"><svg><use href="#i-play" /></svg></button>
             <RowMenu :items="[...tierMenu(b.effectId), null, { icon: 'i-trash', label: '删掉这一段（并入相邻的一段）', danger: true, disabled: bands.length <= 1, run: () => removeBand(b, i) }]" :label="`粉丝牌 ${bandLabel(i)}：更多操作`" />
+          </div>
+        </div>
+
+        <div class="rt-g">
+          <b>荣耀等级</b><span>没戴本直播间粉丝牌的人，按 B站荣耀等级分段</span>
+          <span class="r">
+            <span v-if="honorAdding" class="lvadd">在 <input v-model.number="honorAddLevel" class="inp num" type="number" min="1" :max="HONOR_LEVEL_MAX" placeholder="45" aria-label="荣耀等级从几级开始分一段" @keydown.enter="addHonorBand" @keydown.esc="honorAdding = false" /> 级处再分一段 <button class="btn" @click="addHonorBand">分段</button><button class="linkish" style="color: var(--t3)" @click="honorAdding = false">取消</button><span class="hint" :style="{ color: honorAddMsg.err ? '#D64545' : '' }">{{ honorAddMsg.text }}</span></span>
+            <button v-else class="linkish" @click="honorAdding = true"><Icon name="i-plus" style="width: 12px; height: 12px; vertical-align: -1px" /> 加一段</button>
+          </span>
+        </div>
+        <div v-if="!honorBands.length" class="rt-empty" style="padding: 14px 16px">还没有分段，荣耀等级高的观众按其他观众处理。点右边「加一段」添加。</div>
+        <div v-for="(b, i) in honorBands" :id="`honor${b.fromLevel}`" :key="b.fromLevel" class="rt-r" :class="{ off: !b.enabled || !b.effectId, flash: flashKey === `honor${b.fromLevel}` }" :style="{ gridTemplateColumns: ENTER_COLS }" :title="!b.effectId ? '还没选特效：选好后自动打开' : b.enabled ? undefined : '已关闭：这些观众按其他观众处理'">
+          <div class="c-sw"><Switch v-model="b.enabled" :label="`荣耀等级 ${honorLabel(i)}进场特效`" @change="(v) => toggleHonor(b, i, v)" /></div>
+          <div class="c-who"><HonorMedal :level="b.fromLevel" /><span class="sub">{{ honorLabel(i) }}</span></div>
+          <div class="c-eff"><EffectPicker :model-value="b.effectId" @update:model-value="(id) => setHonorEffect(b, i, id)" /></div>
+          <div class="c-cd"><CdPick v-if="!once" v-model="b.cooldownMin" @change="(v) => save(cdMsg(`荣耀等级 ${honorLabel(i)}`, v))" /><template v-else>每场只播一次</template></div>
+          <div class="c-act">
+            <button class="icon-btn play" :aria-label="`预览荣耀等级 ${honorLabel(i)}进场`" :title="`预览荣耀等级 ${honorLabel(i)}进场`" @click="preview(b.effectId, { ...SAMPLES.nor, honor: b.fromLevel }, `荣耀等级 ${honorLabel(i)}进场`)"><svg><use href="#i-play" /></svg></button>
+            <RowMenu :items="[...tierMenu(b.effectId), null, { icon: 'i-trash', label: i === honorBands.length - 1 ? '删掉这一段（这些人按其他观众处理）' : '删掉这一段（并入下面一段）', danger: true, run: () => removeHonorBand(b, i) }]" :label="`荣耀等级 ${honorLabel(i)}：更多操作`" />
           </div>
         </div>
 

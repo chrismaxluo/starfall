@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -115,7 +115,9 @@ const TierPart = z.object({ effect: effectRef, cooldownMin, enabled: z.boolean()
 const RulesPart = z.object({
   enter: z.object({
     tiers: z.object({ gov: TierPart, adm: TierPart, cap: TierPart, mod: TierPart, nor: TierPart }),
-    bands: z.array(z.object({ fromLevel: z.number().int().min(1).max(60), effect: effectRef, cooldownMin, enabled: z.boolean() })).min(1).max(20),
+    bands: z.array(z.object({ fromLevel: z.number().int().min(1).max(MEDAL_LEVEL_MAX), effect: effectRef, cooldownMin, enabled: z.boolean() })).min(1).max(20),
+    /** 旧版本导出的没有这一项：导入时不改动现有的荣耀等级分档 */
+    honorBands: z.array(z.object({ fromLevel: z.number().int().min(1).max(HONOR_LEVEL_MAX), effect: effectRef, cooldownMin, enabled: z.boolean() })).max(20).optional(),
   }),
   exclusives: z
     .array(z.object({ uid: z.number().int().positive(), name: z.string().max(60).default(''), effect: effectRef, cooldownMin, until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), enabled: z.boolean() }))
@@ -290,6 +292,7 @@ export class ConfigIO {
         enter: {
           tiers: Object.fromEntries(TIERS.map((t) => [t, { effect: ref(base.tiers[t].effectId), cooldownMin: base.tiers[t].cooldownMin, enabled: base.tiers[t].enabled }])) as ConfigFile['rules']['enter']['tiers'],
           bands: base.bands.map((b) => ({ fromLevel: b.fromLevel, effect: ref(b.effectId), cooldownMin: b.cooldownMin, enabled: b.enabled })),
+          honorBands: base.honorBands.map((b) => ({ fromLevel: b.fromLevel, effect: ref(b.effectId), cooldownMin: b.cooldownMin, enabled: b.enabled })),
         },
         exclusives: exclusives.map((x) => ({ uid: x.uid, name: x.name ?? '', effect: ref(x.effectId), cooldownMin: x.cooldownMin, until: x.until, enabled: x.enabled })),
         danmu: this.d.danmuRules.list().map((r) => ({ keywords: r.keywords, mode: r.mode, who: r.who, effect: ref(r.effectId), globalCdSec: r.globalCdSec, userCdMin: r.userCdMin, enabled: r.enabled })),
@@ -388,9 +391,12 @@ export class ConfigIO {
       const r = file.rules.enter;
       for (const t of TIERS) refOk(r.tiers[t].effect);
       for (const b of r.bands) refOk(b.effect);
+      for (const b of r.honorBands ?? []) refOk(b.effect);
       const details: string[] = [];
       for (const t of TIERS) if (!same(cur.rules.enter.tiers[t], r.tiers[t])) details.push(`${TIER_LABEL[t]}：${describeTier(cur.rules.enter.tiers[t])} → ${describeTier(r.tiers[t])}`);
       if (!same(cur.rules.enter.bands, r.bands)) details.push(`粉丝牌分档：${cur.rules.enter.bands.length} 档 → ${r.bands.length} 档`);
+      const curHonor = cur.rules.enter.honorBands ?? [];
+      if (r.honorBands && !same(curHonor, r.honorBands)) details.push(`荣耀等级分档：${curHonor.length} 档 → ${r.honorBands.length} 档`);
       sections.push({ key: 'enter', label: '进场规则', summary: details.length ? `修改 ${details.length} 处` : '没有变化', changed: details.length > 0, details });
     }
 
@@ -550,6 +556,7 @@ export class ConfigIO {
       this.d.enterRules.setBase({
         tiers: Object.fromEntries(TIERS.map((t) => [t, { effectId: ref(r.enter.tiers[t].effect), cooldownMin: r.enter.tiers[t].cooldownMin, enabled: r.enter.tiers[t].enabled }])) as Record<Tier, { effectId: number | null; cooldownMin: number; enabled: boolean }>,
         bands: r.enter.bands.map((b) => ({ fromLevel: b.fromLevel, effectId: ref(b.effect), cooldownMin: b.cooldownMin, enabled: b.enabled })),
+        honorBands: r.enter.honorBands ? r.enter.honorBands.map((b) => ({ fromLevel: b.fromLevel, effectId: ref(b.effect), cooldownMin: b.cooldownMin, enabled: b.enabled })) : this.d.enterRules.base().honorBands,
         cooldownMode: file.settings.cooldownMode ?? this.d.settings.get('cooldownMode'),
       });
 

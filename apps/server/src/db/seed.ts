@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type { EffectTexts, Position } from '@starfall/shared';
 import type { Db } from './index.ts';
-import { effects, outputs, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, settings } from './schema.ts';
+import { effects, outputs, ruleDanmu, ruleEnterBands, ruleEnterHonorBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGiftSpecific, ruleGuard, settings } from './schema.ts';
 
 interface BuiltinEffect {
   name: string;
@@ -91,7 +91,7 @@ export function seed(db: Db): void {
       tx.update(effects).set({ style: toStyle }).where(and(eq(effects.style, r.style), eq(effects.builtin, false))).run();
       const old = tx.select({ id: effects.id }).from(effects).where(and(eq(effects.name, r.name), eq(effects.builtin, true))).get();
       if (!old) continue;
-      for (const [table, col] of [[ruleEnterTiers, ruleEnterTiers.effectId], [ruleEnterBands, ruleEnterBands.effectId], [ruleExclusive, ruleExclusive.effectId], [ruleDanmu, ruleDanmu.effectId], [ruleGiftBands, ruleGiftBands.effectId], [ruleGiftSpecific, ruleGiftSpecific.effectId]] as const) {
+      for (const [table, col] of [[ruleEnterTiers, ruleEnterTiers.effectId], [ruleEnterBands, ruleEnterBands.effectId], [ruleEnterHonorBands, ruleEnterHonorBands.effectId], [ruleExclusive, ruleExclusive.effectId], [ruleDanmu, ruleDanmu.effectId], [ruleGiftBands, ruleGiftBands.effectId], [ruleGiftSpecific, ruleGiftSpecific.effectId]] as const) {
         tx.update(table).set({ effectId: to }).where(eq(col, old.id)).run();
       }
       tx.update(ruleGuard).set({ openEffectId: to }).where(eq(ruleGuard.openEffectId, old.id)).run();

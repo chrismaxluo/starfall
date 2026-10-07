@@ -24,6 +24,7 @@ export function preloadUrls(ctx: AppContext): string[] {
   const ids = new Set<number>();
   for (const t of Object.values(rules.tiers)) if (t.enabled && t.effectId) ids.add(t.effectId);
   for (const b of rules.bands) if (b.enabled && b.effectId) ids.add(b.effectId);
+  for (const b of rules.honorBands) if (b.enabled && b.effectId) ids.add(b.effectId);
   for (const x of rules.exclusives) if (x.enabled) ids.add(x.effectId);
   const urls = new Set<string>();
   for (const e of ctx.effects.list()) {

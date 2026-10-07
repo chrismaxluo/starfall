@@ -99,7 +99,19 @@ let lastT = 0;
 
 const zoomK = () => (config.giftsSize === 'large' ? 1.25 : 1);
 /** 能显示的高度（放大前） */
-const viewH = () => root.clientHeight / zoomK() - 40;
+/** 一条（含间距）多高（放大前）：按画出来的第一条量，还没画时按标准尺寸算 */
+const rowH = () => ((list.firstElementChild as HTMLElement | null)?.offsetHeight ?? 86) + GAP;
+/**
+ * 能显示的高度（放大前）：浏览器源的高度和「一屏几条」取小的那个。
+ * 浏览器源比设置的条数高时，把名单的窗口缩到那么高（上下淡出也跟着走），多出来的部分空着
+ */
+function viewH(): number {
+  const want = config.giftsMax * rowH();
+  const k = zoomK();
+  const fits = want + 40 < innerHeight / k;
+  root.style.height = fits ? `${Math.ceil((want + 40) * k)}px` : '';
+  return (fits ? want + 40 : innerHeight / k) - 40;
+}
 const rows = () => [...list.children] as HTMLElement[];
 
 /** 不滚动时：放不下就从最上面（最旧的）开始去掉，只留最新的几条 */

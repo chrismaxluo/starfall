@@ -305,27 +305,34 @@ export class Pipeline {
     });
   }
 
-  /** 新开了一场直播：清空送礼名单（没开播时保留上一场的） */
+  /**
+   * 换了场次：按事件记录装这一场的送礼名单。新开的一场记录是空的，等于清空；
+   * 服务在直播中重启后接上的还是同一场（启动时还不知道场次，先装了上一场），这时把本场已有的装回来。没开播时保留上一场的
+   */
   private syncGiftsSession(): void {
     const sid = this.d.live.status().sessionId;
     if (sid === null || sid === this.giftsSession) return;
     this.giftsSession = sid;
-    this.d.hub.resetGifts();
+    this.d.hub.resetGifts(this.sessionGifts(sid));
   }
 
-  /** 服务启动时：从事件记录恢复本场（没开播时是上一场）的送礼名单 */
+  /** 服务启动时：先装上一场的（直播中重启时，接上本场后 syncGiftsSession 会换成本场的） */
   private restoreGifts(): void {
     const room = this.d.room.get();
     const sid = this.d.live.status().sessionId ?? (room ? (this.d.live.lastSession?.(room.roomId)?.id ?? null) : null);
     this.giftsSession = sid;
-    if (sid === null) return this.d.hub.resetGifts();
+    this.d.hub.resetGifts(sid === null ? [] : this.sessionGifts(sid));
+  }
+
+  /** 某一场事件记录里的礼物、上舰、醒目留言，变成送礼名单的条目 */
+  private sessionGifts(sid: number): GiftListItem[] {
     const items: GiftListItem[] = [];
     for (const r of this.d.log.giftListEvents(sid, GIFTS_KEEP)) {
       const ev = eventFromLog(r);
       const item = ev ? this.giftListItem(ev) : null;
       if (item) items.push(item);
     }
-    this.d.hub.resetGifts(items);
+    return items;
   }
 
   chatItem(ev: DanmuEvent): ChatItem {
@@ -707,7 +714,11 @@ export class Pipeline {
     if (cur) {
       this.stopCurrent();
       const it = cur.q.payload.item;
-      if (!it.test && !it.quick) this.queue.front(cur.q);
+      if (!it.test && !it.quick) {
+        // 重播时换一个播放编号：特效页回的「开始播放」和第一次的分得开
+        const id = `p${this.now()}-${++this.seq}`;
+        this.queue.front({ ...cur.q, id, payload: { ...cur.q.payload, item: { ...it, id } } });
+      }
     }
     this.play({ id: item.id, kind: item.kind, enqueuedAt: this.now(), payload: { item, eventId: null, detail: '素材快捷播放' } });
     this.emitQueue();

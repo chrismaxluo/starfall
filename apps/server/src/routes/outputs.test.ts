@@ -41,6 +41,10 @@ describe('直播软件输出', () => {
     const giftsFilter = { mode: 'only', gifts: [{ id: 32251, name: '心动盲盒' }], guard: true, sc: false };
     expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsFilter, giftsMax: 10, giftsSide: 'left' } })).json()).toMatchObject({ giftsFilter, giftsMax: 10, giftsSide: 'left' });
     expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsFilter: { ...giftsFilter, mode: 'some' } } })).statusCode).toBe(400);
+    // 最低金额（金瓜子）
+    const withMin = { ...giftsFilter, mode: 'all', minGold: 1000 };
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsFilter: withMin } })).json()).toMatchObject({ giftsFilter: withMin });
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsFilter: { ...withMin, minGold: -1 } } })).statusCode).toBe(400);
     for (const giftsMax of [0, 21]) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsMax } })).statusCode).toBe(400);
     // 滚动：不滚动 / 慢 / 中 / 快
     for (const giftsSpeed of ['off', 'slow', 'fast']) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsSpeed } })).json()).toMatchObject({ giftsSpeed });

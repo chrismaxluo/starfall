@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { chatHeight, goldToYuan } from './index.ts';
+import { chatHeight, giftListShows, goldToYuan } from './index.ts';
+import type { GiftListItem, GiftsFilter } from './index.ts';
 
 describe('goldToYuan', () => {
   it('按 1 元 = 1000 金瓜子换算', () => {
@@ -16,5 +17,22 @@ describe('弹幕列表建议高度', () => {
     expect(chatHeight(20, 'normal')).toBe(2250);
     expect(chatHeight(1, 'normal')).toBe(300);
     for (let n = 1; n < 20; n++) expect(chatHeight(n + 1, 'normal')).toBeGreaterThan(chatHeight(n, 'normal') - 1);
+  });
+});
+
+describe('送礼名单显示哪些', () => {
+  const gift = (value: number, id = 1): GiftListItem => ({ id: `g${value}`, ts: 0, kind: 'gift', viewer: { name: 'a', guard: 0 }, value, gift: { id, name: '礼物', count: 1 } });
+  const guard: GiftListItem = { id: 'u', ts: 0, kind: 'guard', viewer: { name: 'a', guard: 3 }, value: 138_000, guard: { level: 3, months: 1, op: 'open' } };
+  const base: GiftsFilter = { mode: 'all', gifts: [], guard: true, sc: true };
+  it('全部礼物：最低金额按总价值算，不管上舰', () => {
+    expect(giftListShows(base, gift(100))).toBe(true);
+    const min1 = { ...base, minGold: 1000 };
+    expect(giftListShows(min1, gift(100))).toBe(false);
+    expect(giftListShows(min1, gift(1000))).toBe(true);
+    expect(giftListShows({ ...min1, minGold: 200_000 }, guard)).toBe(true);
+  });
+  it('只要这几种：不看最低金额', () => {
+    expect(giftListShows({ ...base, mode: 'only', gifts: [{ id: 1, name: '礼物' }], minGold: 1000 }, gift(100))).toBe(true);
+    expect(giftListShows({ ...base, mode: 'only', gifts: [{ id: 2, name: '别的' }] }, gift(100))).toBe(false);
   });
 });

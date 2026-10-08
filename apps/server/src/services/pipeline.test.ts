@@ -63,7 +63,7 @@ describe('进场 → 播放', () => {
     const { live, plays, events } = await setup();
     live.emit(enter({ guard: 3, medal: medal(12), face: 'https://i0.hdslb.com/f.jpg' }), { cmd: 'INTERACT_WORD_V2' });
     const [item] = plays();
-    expect(item).toMatchObject({ kind: 'enter', text: '恭迎舰长 小星', effect: { name: '门楼', visual: { type: 'builtin_style', style: 'royal-cap' }, showText: true }, viewer: { name: '小星', guard: 3, face: 'https://i0.hdslb.com/f.jpg', medal: { level: 12 } } });
+    expect(item).toMatchObject({ kind: 'enter', text: '恭迎舰长 小星', effect: { name: '宫·舰长', visual: { type: 'builtin_style', style: 'royal-cap' }, showText: true }, viewer: { name: '小星', guard: 3, face: 'https://i0.hdslb.com/f.jpg', medal: { level: 12 } } });
     expect(events()).toMatchObject([{ kind: 'enter', uid: 10001, rule: '进场 · 舰长', status: 'played' }]);
     expect(events()[0]!.viewer).toMatchObject({ guard: 3 });
   });
@@ -192,7 +192,7 @@ describe('进场 → 播放', () => {
 
   it('专属用户：有效期内优先；过期后按身份档位（按主播时区算今天）', async () => {
     const t = await setup();
-    const special = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
+    const special = t.ctx.effects.list().find((e) => e.name === '晶·大礼物')!.id;
     // 北京时间 2026-09-25 12:00，UTC 同一天；把时间调到北京时间 26 日 01:00（UTC 还是 25 日）
     vi.setSystemTime(new Date('2026-09-26T01:00:00+08:00'));
     t.ctx.enterRules.addExclusive({ uid: 10001, effectId: special, cooldownMin: 0, until: '2026-09-25', enabled: true });
@@ -210,7 +210,7 @@ describe('播放队列', () => {
     t.live.emit(enter({ uid: 2, guard: 3 }));
     expect(t.plays()).toHaveLength(1);
     expect(t.statuses()).toEqual(['played', 'queued']);
-    expect(t.p.snapshot()).toMatchObject({ playing: { effectName: '门楼' }, items: [{ viewerName: '小星' }] });
+    expect(t.p.snapshot()).toMatchObject({ playing: { effectName: '宫·舰长' }, items: [{ viewerName: '小星' }] });
     vi.advanceTimersByTime(4000 + 299);
     expect(t.plays()).toHaveLength(1);
     vi.advanceTimersByTime(1);
@@ -290,13 +290,13 @@ describe('播放队列', () => {
 
   it('测试播放插到队首，不写事件记录；特效页不在线、已暂停时拒绝', async () => {
     const t = await setup();
-    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
+    const star = t.ctx.effects.list().find((e) => e.name === '晶·大礼物')!.id;
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 3 }));
     t.p.test(star);
     expect(t.p.snapshot().items.map((i) => i.test)).toEqual([true, false]);
     vi.advanceTimersByTime(4500);
-    expect(t.plays().at(-1)).toMatchObject({ test: true, text: '测试观众 来了', effect: { name: '晶耀' } });
+    expect(t.plays().at(-1)).toMatchObject({ test: true, text: '测试观众 来了', effect: { name: '晶·大礼物' } });
     expect(t.events()).toHaveLength(2);
     t.p.pause();
     expect(() => t.p.test(star)).toThrow('已暂停');
@@ -320,13 +320,13 @@ describe('播放队列', () => {
 
   it('快捷播放：马上打断正在播的观众特效，被打断的放回最前面、播完接着从头播；不显示欢迎语、不写事件记录', async () => {
     const t = await setup();
-    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!;
+    const star = t.ctx.effects.list().find((e) => e.name === '晶·大礼物')!;
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 2 }));
     expect(t.p.snapshot().playing).toMatchObject({ viewerGuard: 3 });
     vi.advanceTimersByTime(1000);
     t.p.quick(star.id);
-    expect(t.sock.sent.slice(-2)).toMatchObject([{ type: 'stop' }, { type: 'play', item: { quick: true, effect: { name: '晶耀', showText: false, guardFrame: false, honorBadge: false }, viewer: { name: '主播', guard: 0 } } }]);
+    expect(t.sock.sent.slice(-2)).toMatchObject([{ type: 'stop' }, { type: 'play', item: { quick: true, effect: { name: '晶·大礼物', showText: false, guardFrame: false, honorBadge: false }, viewer: { name: '主播', guard: 0 } } }]);
     // 被打断的舰长排在最前面，提督在后面
     expect(t.p.snapshot()).toMatchObject({ playing: { quick: true, detail: '素材快捷播放', viewerName: '主播' }, items: [{ viewerGuard: 3 }, { viewerGuard: 2 }] });
     vi.advanceTimersByTime(30_000);
@@ -362,7 +362,7 @@ describe('播放队列', () => {
     const snap = t.p.snapshot();
     expect(snap.playing).toMatchObject({ viewerFace: 'https://i0.hdslb.com/a.jpg', viewerGuard: 3, detail: '舰长进场', durationMs: 4000 });
     expect(snap.items.map((i) => i.detail)).toEqual(['小花花 ×2', '提督进场']);
-    expect(snap.items[1]).toMatchObject({ viewerFace: null, effectName: '亭阁', durationMs: 6000 });
+    expect(snap.items[1]).toMatchObject({ viewerFace: null, effectName: '宫·提督', durationMs: 6000 });
     // 移出排队的：这次不播，事件记录为已清空
     expect(t.p.remove(snap.items[1]!.id)).toBe(true);
     expect(t.p.remove('nope')).toBe(false);
@@ -379,7 +379,7 @@ describe('播放队列', () => {
 
   it('上传的素材：推送文件地址、音效；播放用入队时的快照', async () => {
     const t = await setup();
-    const e = t.ctx.effects.list().find((x) => x.name === '门楼')!;
+    const e = t.ctx.effects.list().find((x) => x.name === '宫·舰长')!;
     const copy = t.ctx.effects.copy(e.id, { replaceRefs: true });
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 3 }));
@@ -399,7 +399,7 @@ describe('其他', () => {
 
   it('模拟：返回命中规则和结果，不入队、不记录、不影响冷却', async () => {
     const t = await setup();
-    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toEqual({ rule: '进场 · 总督', effect: { id: expect.any(Number), name: '金銮' }, status: 'played', notes: [] });
+    expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toEqual({ rule: '进场 · 总督', effect: { id: expect.any(Number), name: '宫·总督' }, status: 'played', notes: [] });
     expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ guard: 1 }) })).toMatchObject({ status: 'played' });
     expect(t.p.simulate({ kind: 'enter', id: 's', ts: 0, source: 'interact', viewer: v({ uid: 5 }) })).toEqual({ rule: null, effect: null, status: 'no_rule', notes: [] });
     expect(t.events()).toHaveLength(0);
@@ -446,9 +446,9 @@ const eff = (t: Awaited<ReturnType<typeof setup>>, name: string) => t.ctx.effect
 describe('弹幕', () => {
   it('命中关键词：播放素材，欢迎语里有弹幕内容；全局冷却内其他人不重复播，每人冷却内同一人不重复播', async () => {
     const t = await setup();
-    t.ctx.danmuRules.create({ keywords: ['生日快乐'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '晶语'), globalCdSec: 30, userCdMin: 10, enabled: true });
+    t.ctx.danmuRules.create({ keywords: ['生日快乐'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '晶·弹幕'), globalCdSec: 30, userCdMin: 10, enabled: true });
     t.live.emit(dm('主播生日快乐！'));
-    expect(t.plays()[0]).toMatchObject({ kind: 'danmu', text: '小星：主播生日快乐！', effect: { name: '晶语' } });
+    expect(t.plays()[0]).toMatchObject({ kind: 'danmu', text: '小星：主播生日快乐！', effect: { name: '晶·弹幕' } });
     vi.advanceTimersByTime(5000);
     t.live.emit(dm('生日快乐呀', { uid: 2, name: '小月' }));
     vi.advanceTimersByTime(30_000);
@@ -464,8 +464,8 @@ describe('弹幕', () => {
 
   it('发送人条件、从上到下命中第一条、调整顺序', async () => {
     const t = await setup();
-    const a = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'exact', who: { ...DANMU_WHO_ALL, all: false, guards: [1, 2, 3] }, effectId: eff(t, '门楼'), globalCdSec: 0, userCdMin: 0, enabled: true });
-    const b = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '一行字'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    const a = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'exact', who: { ...DANMU_WHO_ALL, all: false, guards: [1, 2, 3] }, effectId: eff(t, '宫·舰长'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    const b = t.ctx.danmuRules.create({ keywords: ['上船'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '字·一行'), globalCdSec: 0, userCdMin: 0, enabled: true });
     t.live.emit(dm('上船', { guard: 3 }));
     vi.advanceTimersByTime(5000);
     t.live.emit(dm('上船', { uid: 3 }));
@@ -478,8 +478,8 @@ describe('弹幕', () => {
   it('主播本人默认不触发；规则里勾了「主播」、或者指定了 UID 的照样触发；手动拉黑的一律不触发', async () => {
     const t = await setup();
     const none = { ...DANMU_WHO_ALL, all: false };
-    t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '一行字'), globalCdSec: 0, userCdMin: 0, enabled: true });
-    const named = t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: { ...none, anchor: true, uids: [555] }, effectId: eff(t, '晶语'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '字·一行'), globalCdSec: 0, userCdMin: 0, enabled: true });
+    const named = t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: { ...none, anchor: true, uids: [555] }, effectId: eff(t, '晶·弹幕'), globalCdSec: 0, userCdMin: 0, enabled: true });
     // 主播发的：跳过「所有人」那条（主播本人不触发），命中点了名的那条
     t.live.emit(dm('开播啦', { uid: ANCHOR, name: '主播' }));
     vi.advanceTimersByTime(5000);
@@ -492,8 +492,8 @@ describe('弹幕', () => {
     t.live.emit(dm('开播啦', { uid: 555, name: '拉黑的' }));
     expect(t.events().map((e) => [e.uid, e.status, e.effectId])).toEqual([
       [ANCHOR, 'played', named.effectId],
-      [ANCHOR, 'played', eff(t, '一行字')],
-      [555, 'blacklist', eff(t, '一行字')],
+      [ANCHOR, 'played', eff(t, '字·一行')],
+      [555, 'blacklist', eff(t, '字·一行')],
     ]);
   });
 });
@@ -501,7 +501,7 @@ describe('弹幕', () => {
 describe('礼物', () => {
   it('连击合并成一次：数量相加，窗口结束后才判断；欢迎语显示礼物和数量', async () => {
     const t = await setup();
-    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), bands: [{ fromGold: 1000, effectId: eff(t, '晶礼'), enabled: true }] });
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), bands: [{ fromGold: 1000, effectId: eff(t, '晶·礼物'), enabled: true }] });
     for (let i = 0; i < 5; i++) {
       t.live.emit(gf({ count: 2 }));
       vi.advanceTimersByTime(1000);
@@ -514,7 +514,7 @@ describe('礼物', () => {
 
   it('指定礼物优先；按价值分档；低于最低档、免费礼物不播', async () => {
     const t = await setup();
-    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false, specific: [{ giftId: 25, giftName: '小电视飞船', effectId: eff(t, '亭阁'), enabled: true }] });
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false, specific: [{ giftId: 25, giftName: '小电视飞船', effectId: eff(t, '宫·提督'), enabled: true }] });
     t.live.emit(gf({ giftId: 25, giftName: '小电视飞船', unitPrice: 1_245_000 }, { uid: 1 }));
     t.live.emit(gf({ unitPrice: 1000, count: 20 }, { uid: 2 }));
     t.live.emit(gf({ unitPrice: 100, count: 5 }, { uid: 3 }));
@@ -531,7 +531,7 @@ describe('礼物', () => {
     const t = await setup();
     t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
     t.live.emit(gf({ unitPrice: 5000, count: 3 }));
-    expect(t.plays()[0]).toMatchObject({ kind: 'gift', effect: { name: 'B站动画', visual: { style: 'glass-gift' } }, text: '小星 送出 小花花', gift: { name: '小花花', count: 3, img: 'https://i0.hdslb.com/gift/flower.webp', value: 15_000 } });
+    expect(t.plays()[0]).toMatchObject({ kind: 'gift', effect: { name: 'B站·礼物动画', visual: { style: 'glass-gift' } }, text: '小星 送出 小花花', gift: { name: '小花花', count: 3, img: 'https://i0.hdslb.com/gift/flower.webp', value: 15_000 } });
     vi.advanceTimersByTime(10_000);
     t.live.emit(gf({ giftId: 1, giftName: '别的礼物', unitPrice: 20_000 }, { uid: 5 }));
     vi.advanceTimersByTime(10);
@@ -550,9 +550,9 @@ describe('礼物', () => {
     expect(t.plays().at(-1)!.gift?.img).toBe('https://i0.hdslb.com/gift/flower.png');
   });
 
-  it('「B站动画」：有官方全屏动画的礼物按动画长度播；没有动画时 100 元以上显示晶耀、以下显示晶礼', async () => {
+  it('「B站·礼物动画」：有官方全屏动画的礼物按动画长度播；没有动画时 100 元以上显示晶·大礼物、以下显示晶·礼物', async () => {
     const t = await setup();
-    const bili = t.ctx.effects.list().find((e) => e.name === 'B站动画')!.id;
+    const bili = t.ctx.effects.list().find((e) => e.name === 'B站·礼物动画')!.id;
     const g = t.ctx.giftRules.get();
     t.ctx.giftRules.set({ ...g, comboEnabled: false, bands: g.bands.map((b) => ({ ...b, effectId: bili, enabled: true })) });
     t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
@@ -576,14 +576,14 @@ describe('礼物', () => {
     t.live.emit(gf({ unitPrice: 20_000 }, { uid: 3 }));
     t.live.emit(gf({ unitPrice: 200_000 }, { uid: 4 }));
     expect(t.p.snapshot().items.map((i) => [i.kind, i.viewerName])).toEqual([['gift', '小星'], ['gift', '小星'], ['enter', '小星']]);
-    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['B站动画', 'B站动画', '门楼']);
+    expect(t.p.snapshot().items.map((i) => i.effectName)).toEqual(['B站·礼物动画', 'B站·礼物动画', '宫·舰长']);
   });
 });
 
 describe('上舰', () => {
   it('同一次上舰的三条消息只播一次；开通 / 续费用不同素材；欢迎语显示月数；插队', async () => {
     const t = await setup();
-    t.ctx.guardRules.set({ ...t.ctx.guardRules.get(), cap: { ...t.ctx.guardRules.get().cap, renewEffectId: t.ctx.effects.list().find((x) => x.name === '晶礼')!.id } });
+    t.ctx.guardRules.set({ ...t.ctx.guardRules.get(), cap: { ...t.ctx.guardRules.get().cap, renewEffectId: t.ctx.effects.list().find((x) => x.name === '晶·礼物')!.id } });
     t.live.emit(enter({ uid: 1, guard: 3 }));
     t.live.emit(enter({ uid: 2, guard: 3 }));
     t.live.emit(gd({ dedupeKey: 'p1' }, { uid: 5 }));
@@ -594,7 +594,7 @@ describe('上舰', () => {
     const guards = t.events().filter((e) => e.kind === 'guard');
     expect(guards.map((e) => [e.uid, e.rule])).toEqual([[5, '上舰 · 开通舰长'], [6, '上舰 · 续费舰长']]);
     // 两次上舰都插到进场前面，按先后顺序：先开通（门楼），再续费（晶礼）
-    expect(t.p.snapshot().items.map((i) => [i.kind, i.effectName])).toEqual([['guard', '门楼'], ['guard', '晶礼'], ['enter', '门楼']]);
+    expect(t.p.snapshot().items.map((i) => [i.kind, i.effectName])).toEqual([['guard', '宫·舰长'], ['guard', '晶·礼物'], ['enter', '宫·舰长']]);
     vi.advanceTimersByTime(1000);
     expect(t.plays().at(-1)).toMatchObject({ kind: 'guard', guardOp: 'open', text: '舰长·上舰 小星' });
     vi.advanceTimersByTime(5000);
@@ -621,13 +621,13 @@ describe('播放确认', () => {
     live.emit(enter({ guard: 3 }));
     const [item] = plays();
     const r = hub.playStarted(client, item!.id, Date.now() + 120);
-    expect(r).toEqual({ label: '门楼 · 小星', ms: 120 });
+    expect(r).toEqual({ label: '宫·舰长 · 小星', ms: 120 });
     expect(hub.playStarted(client, item!.id)).toBeNull();
 
     vi.advanceTimersByTime(10_000);
     live.emit(enter({ uid: 10002, name: '小月', guard: 2 }));
     expect(hub.playTimeouts(client)).toEqual([]);
-    expect(hub.playTimeouts(client, Date.now() + PLAY_ACK_MS)).toEqual(['亭阁 · 小月']);
+    expect(hub.playTimeouts(client, Date.now() + PLAY_ACK_MS)).toEqual(['宫·提督 · 小月']);
     expect(hub.playTimeouts(client, Date.now() + PLAY_ACK_MS)).toEqual([]);
   });
 });

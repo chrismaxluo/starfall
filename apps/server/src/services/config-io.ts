@@ -13,6 +13,7 @@ import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
 import { assets, effects, ruleDanmu, ruleExclusive } from '../db/schema.ts';
+import { RENAMED_EFFECTS } from '../db/seed.ts';
 import type { Settings } from '../db/seed.ts';
 import { HttpError } from '../http.ts';
 import { issueText } from '../zod-text.ts';
@@ -215,7 +216,18 @@ export function parseConfigFile(text: string): ConfigFile {
     const i = r.error.issues[0]!;
     throw new HttpError(400, 'invalid_config', `配置文件内容有误：${issueText(i)}（位置 ${i.path.join('.') || '最外层'}）`);
   }
-  return r.data;
+  return renameOldBuiltins(r.data);
+}
+
+/** 以前导出的文件里，改过名的内置素材还是旧名字：换成新名字（素材列表和所有引用素材的地方） */
+function renameOldBuiltins(f: ConfigFile): ConfigFile {
+  const alias = new Map(f.effects.filter((e) => e.builtin && RENAMED_EFFECTS[e.name] && !f.effects.some((x) => x.name === RENAMED_EFFECTS[e.name])).map((e) => [e.name, RENAMED_EFFECTS[e.name]!]));
+  if (!alias.size) return f;
+  const REF_KEYS = new Set(['effect', 'open', 'renew']);
+  const walk = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(walk) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, REF_KEYS.has(k) && typeof x === 'string' ? (alias.get(x) ?? x) : walk(x)])) : v;
+  const { effects: list, ...rest } = f;
+  return { ...(walk(rest) as Omit<ConfigFile, 'effects'>), effects: list.map((e) => (alias.has(e.name) ? { ...e, name: alias.get(e.name)! } : e)) };
 }
 
 interface Deps {

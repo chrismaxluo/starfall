@@ -51,7 +51,7 @@ describe('荣耀等级勋章', () => {
   it('播放内容带上荣耀等级和勋章图；素材可以打开「荣耀等级勋章」', async () => {
     const t = await setup();
     await t.ctx.honor.refresh(true);
-    const builtin = (await t.req({ method: 'GET', url: '/api/effects' })).json().effects.find((e: { name: string }) => e.name === '霜玻');
+    const builtin = (await t.req({ method: 'GET', url: '/api/effects' })).json().effects.find((e: { name: string }) => e.name === '霜·粉丝进场');
     expect(builtin.honorBadge).toBe(false);
     const frost = (await t.req({ method: 'POST', url: `/api/effects/${builtin.id}/copy` })).json();
     const upd = await t.req({ method: 'PUT', url: `/api/effects/${frost.id}`, payload: { honorBadge: true } });

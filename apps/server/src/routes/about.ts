@@ -16,7 +16,7 @@ const LATEST_TTL_MS = 3600_000;
 const SERVER_DIR = path.resolve(import.meta.dirname, '../..');
 
 function readVersion(): string {
-  // 电脑版打包后找不到 apps/server/package.json，由电脑版启动服务时告诉版本号
+  // 桌面版打包后找不到 apps/server/package.json，由桌面版启动服务时告诉版本号
   if (process.env.STARFALL_VERSION) return process.env.STARFALL_VERSION;
   try {
     return (JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'package.json'), 'utf8')) as { version?: string }).version ?? '未知';
@@ -118,7 +118,7 @@ export function aboutRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/about', async (req) => {
     const { check } = parseBody(z.object({ check: z.enum(['0', '1']).optional() }).passthrough(), req.query);
     const p = paths(ctx.config.dataDir);
-    // 电脑版的更新由安装包自己的更新程序检查（测试版只收测试版），这里不查 GitHub
+    // 桌面版的更新由安装包自己的更新程序检查（测试版只收测试版），这里不查 GitHub
     const desktop = ctx.config.desktop;
     const [git, upd] = await Promise.all([describe, desktop ? { value: null, error: null, checkedAt: Date.now() } : checkLatest(check === '1')]);
     const mem = process.memoryUsage();

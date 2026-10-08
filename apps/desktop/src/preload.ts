@@ -1,4 +1,4 @@
-// 给星临后台页面开放的电脑版功能（设置页的「电脑版」卡片、快捷播放页、关于页用）。只开放这几个，页面拿不到其他系统能力
+// 给星临后台页面开放的桌面版功能（设置页的「桌面版」卡片、快捷播放页、关于页用）。只开放这几个，页面拿不到其他系统能力
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('starfallDesktop', {

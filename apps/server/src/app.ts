@@ -78,7 +78,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
     return sendError(reply, new HttpError(500, 'internal', '服务出错了，请查看日志'));
   });
 
-  // 电脑版后台没有密码，再加两道：只认本机地址（防止别的网站用自己的域名指向 127.0.0.1 冒充本机），
+  // 桌面版后台没有密码，再加两道：只认本机地址（防止别的网站用自己的域名指向 127.0.0.1 冒充本机），
   // 接口和后台连接只接受同源页面（防止浏览器里打开的其他网站偷偷调用本机的星临）
   if (ctx.config.desktop) {
     app.addHook('onRequest', async (req) => {

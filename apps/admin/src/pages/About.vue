@@ -45,7 +45,7 @@ async function load(check = false): Promise<void> {
 }
 onMounted(() => void load());
 
-const EDITION = { server: '服务器版', desktop: '电脑版' } as const;
+const EDITION = { server: '服务器版', desktop: '桌面版' } as const;
 const published = (iso: string | null) => (iso ? `${iso.slice(0, 10)} 发布` : '');
 /** 复制给作者的完整运行信息（一行一项） */
 const rows = computed(() => {
@@ -113,7 +113,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
         </div>
         <div v-if="info && info.edition === 'desktop'" class="upd">
           <Icon name="i-update" />
-          <span>电脑版打开后会自动检查更新（之后每 6 小时一次），有新版本会弹窗问你要不要下载，下载好后重启就装上。{{ info.version.includes('-') ? '现在是测试版，会收到测试版的更新。' : '' }}</span>
+          <span>桌面版打开后会自动检查更新（之后每 6 小时一次），有新版本会弹窗问你要不要下载，下载好后重启就装上。{{ info.version.includes('-') ? '现在是测试版，会收到测试版的更新。' : '' }}</span>
           <button v-if="desktopBridge" class="btn" @click="desktopBridge.checkUpdate()">检查更新</button>
         </div>
         <div v-else-if="info" class="upd" :class="{ newer: info.update.newer, err: info.update.error }">

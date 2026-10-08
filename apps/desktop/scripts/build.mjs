@@ -28,7 +28,7 @@ const common = {
   target: 'node22',
   // 原生模块和更新模块装在 stage/node_modules 里，不打进文件
   external: ['electron', 'electron-updater', 'better-sqlite3'],
-  // 服务端代码用 import.meta.dirname 算默认路径（电脑版都用环境变量覆盖，这里只是不让它报错）
+  // 服务端代码用 import.meta.dirname 算默认路径（桌面版都用环境变量覆盖，这里只是不让它报错）
   define: { 'import.meta.dirname': '__dirname' },
   sourcemap: false,
   legalComments: 'none',

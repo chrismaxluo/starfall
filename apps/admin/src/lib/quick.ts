@@ -1,5 +1,5 @@
 // 素材快捷播放：点按钮或按快捷键，马上在直播画面上播放。
-// 网页里的快捷键只在「总览」「素材快捷播放」页面是当前窗口时有用；在游戏、直播软件里按要用电脑版的全局快捷键。
+// 网页里的快捷键只在「总览」「素材快捷播放」页面是当前窗口时有用；在游戏、直播软件里按要用桌面版的全局快捷键。
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { errMsg, post } from './api.ts';
 import { effectById, state } from './store.ts';

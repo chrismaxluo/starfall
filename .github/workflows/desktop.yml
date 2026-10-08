@@ -1,13 +1,13 @@
-# 打包电脑版：在 GitHub 的 Windows 电脑上打出安装包，不占服务器。
+# 打包桌面版：在 GitHub 的 Windows 电脑上打出安装包，不占服务器。
 #   推送 v 开头的版本标签（例如 v1.4.0-beta.1）→ 打包并上传到 GitHub 发布页（带 - 的是测试版，标成「预发布」）
 #   在 Actions 页面手动运行 → 只打包，安装包在这次运行的页面下载（试打包用）
 # 命名规则见 docs/desktop.md
-name: 打包电脑版
+name: 打包桌面版
 
 on:
   push:
     tags: ['v*']
-    # 开发电脑版期间：推送这个分支就试打包一次（合并前删掉）
+    # 开发桌面版期间：推送这个分支就试打包一次（合并前删掉）
     branches: [feat/desktop]
   workflow_dispatch:
 
@@ -38,7 +38,7 @@ jobs:
         run: |
           v=$(node -p "require('./package.json').version")
           d=$(node -p "require('./apps/desktop/package.json').version")
-          [ "v$v" = "$GITHUB_REF_NAME" ] && [ "$d" = "$v" ] || { echo "::error::标签 $GITHUB_REF_NAME、版本号 $v、电脑版版本号 $d 不一致"; exit 1; }
+          [ "v$v" = "$GITHUB_REF_NAME" ] && [ "$d" = "$v" ] || { echo "::error::标签 $GITHUB_REF_NAME、版本号 $v、桌面版版本号 $d 不一致"; exit 1; }
 
       - name: 构建管理后台和特效页
         run: pnpm build
@@ -50,7 +50,7 @@ jobs:
           # electron-builder 会自己下载需要的 Electron，这里不用
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
-      - name: 检查电脑版代码
+      - name: 检查桌面版代码
         working-directory: apps/desktop
         run: npm run typecheck
 

@@ -253,7 +253,7 @@ describe('自动备份', () => {
     expect((await t.req({ method: 'GET', url: '/api/backup/files/starfall-20000101-0000.json' })).statusCode).toBe(404);
     // 备份出来的数据库是完整的
     const dir = path.join(t.dataDir, 'backups');
-    // Windows 没有这种权限位（电脑版的数据在用户自己的文件夹里，别的账号本来就读不到）
+    // Windows 没有这种权限位（桌面版的数据在用户自己的文件夹里，别的账号本来就读不到）
     if (process.platform !== 'win32') {
       expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
       expect(fs.statSync(path.join(dir, `starfall-${item.stamp}.db`)).mode & 0o777).toBe(0o600);

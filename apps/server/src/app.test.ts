@@ -75,7 +75,7 @@ describe('后台登录（F-UI-10）', () => {
   });
 });
 
-describe('电脑版（STARFALL_DESKTOP=1）', () => {
+describe('桌面版（STARFALL_DESKTOP=1）', () => {
   const desktop = async () => {
     const t = await testApp({}, { STARFALL_DESKTOP: '1', STARFALL_HOST: '0.0.0.0', STARFALL_TRUST_PROXY: '127.0.0.1' });
     close.push(() => t.app.close());
@@ -122,7 +122,7 @@ describe('电脑版（STARFALL_DESKTOP=1）', () => {
     expect((await app.inject({ method: 'GET', url: '/api/outputs', headers: { host } })).statusCode).toBe(200);
   });
 
-  it('服务器版照旧：要登录，/api/auth/me 标明不是电脑版', async () => {
+  it('服务器版照旧：要登录，/api/auth/me 标明不是桌面版', async () => {
     const { app, login } = await setup();
     expect((await app.inject({ method: 'GET', url: '/api/outputs', headers: { host: 'evil.example' } })).statusCode).toBe(401);
     const req = await login();

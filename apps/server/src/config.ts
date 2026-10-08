@@ -16,7 +16,7 @@ export interface Config {
   timeZone: string;
   /** 放在反向代理后面时填代理的地址（例如 127.0.0.1），按 X-Forwarded-For / X-Forwarded-Proto 识别真实来源和 HTTPS */
   trustProxy: string | false;
-  /** 电脑版：只允许本机访问，后台不用密码（由 apps/desktop 启动时设置 STARFALL_DESKTOP=1） */
+  /** 桌面版：只允许本机访问，后台不用密码（由 apps/desktop 启动时设置 STARFALL_DESKTOP=1） */
   desktop: boolean;
 }
 
@@ -25,7 +25,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const desktop = env.STARFALL_DESKTOP === '1';
   return {
     port: Number(env.STARFALL_PORT) || DEFAULT_PORT,
-    // 电脑版后台没有密码，只能听本机地址
+    // 桌面版后台没有密码，只能听本机地址
     host: desktop ? '127.0.0.1' : env.STARFALL_HOST || '0.0.0.0',
     dataDir,
     adminDist: path.resolve(env.STARFALL_ADMIN_DIST || path.join(REPO_ROOT, 'apps/admin/dist')),

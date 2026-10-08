@@ -50,7 +50,7 @@
 | 粒子效果 | PixiJS | 8.21 | GPU 渲染，粒子多时也流畅 | Canvas 手写：工作量大 |
 | SVGA | **svgaplayerweb**（复制到项目中固定版本） | 2.3.2 | P0 实测：按显示尺寸绘制，放大后清晰；解析快；不依赖 Worker 等新能力。已停止维护，用自己的接口包一层，便于以后更换 | svga（Lite）：按素材原始尺寸绘制后拉伸，铺满竖屏时明显模糊，且无法配置 |
 | 二维码 | qrcode | 1.5 | 生成扫码登录的二维码 | — |
-| 素材识别 | 自己解析文件结构（`services/media-info.ts`） | — | 读取时长、尺寸、**是否带透明通道**；不依赖外部程序，电脑版不用再带 ffprobe（安装包少约 40 MB）。v1.4 之前用 ffprobe | ffprobe：准确但要另外安装，Windows 版要多带 100 多 MB；浏览器端读取：读不出 WebM 的透明通道 |
+| 素材识别 | 自己解析文件结构（`services/media-info.ts`） | — | 读取时长、尺寸、**是否带透明通道**；不依赖外部程序，桌面版不用再带 ffprobe（安装包少约 40 MB）。v1.4 之前用 ffprobe | ffprobe：准确但要另外安装，Windows 版要多带 100 多 MB；浏览器端读取：读不出 WebM 的透明通道 |
 | 测试 | Vitest + Playwright | 5.0 / 1.63 | Vitest 测逻辑；Playwright 测后台和特效页的真实渲染（服务器上已装无头 Chromium） | Jest：和 Vite 配合不如 Vitest |
 | 代码规范 | ESLint + Prettier | 最新版 | 统一格式，减少低级错误 | Biome：可行，但 Vue 支持尚不完整 |
 | 运行守护 | systemd（服务器） | 系统自带 | 崩溃重启、开机自启、日志（journald） | 原计划 PM2；服务器上改用系统自带的 systemd，少装一个依赖。Windows 版由 Electron 管理进程，不需要 PM2 |

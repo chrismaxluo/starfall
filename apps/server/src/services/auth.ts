@@ -26,7 +26,7 @@ export class AdminAuth {
   private readonly settings: SettingsStore;
   private readonly secret: Secret;
   private readonly initialPasswordFile: string;
-  /** 电脑版：不用密码，所有请求都算已登录（服务只听本机地址，另有同源检查） */
+  /** 桌面版：不用密码，所有请求都算已登录（服务只听本机地址，另有同源检查） */
   readonly open: boolean;
 
   constructor(settings: SettingsStore, secret: Secret, dataDir: string, open = false) {
@@ -36,7 +36,7 @@ export class AdminAuth {
     this.open = open;
   }
 
-  /** 没有密码时生成初始密码，写入 data/initial-password.txt 并返回；已有密码（或电脑版）返回 null */
+  /** 没有密码时生成初始密码，写入 data/initial-password.txt 并返回；已有密码（或桌面版）返回 null */
   ensurePassword(): string | null {
     if (this.open || this.settings.getRaw<PasswordRecord>(KEY)) return null;
     return this.generate(1);

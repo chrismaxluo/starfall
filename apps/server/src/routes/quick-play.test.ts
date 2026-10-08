@@ -88,7 +88,7 @@ describe('素材快捷播放', () => {
     expect((await play(b!.id)).json().error.message).toContain('已暂停');
   });
 
-  it('电脑版全局快捷键按快捷键找按钮播放：重新保存按钮（编号变了）后照样能播', async () => {
+  it('桌面版全局快捷键按快捷键找按钮播放：重新保存按钮（编号变了）后照样能播', async () => {
     const t = await setup();
     t.ctx.hub.addOverlay({ send: () => undefined, close: () => undefined }, t.ctx.outputs.list()[0]!, []);
     await t.save([{ ...btn(t.effectId('晶语')), globalHotkey: 'Ctrl+Alt+1' }]);

@@ -1,4 +1,4 @@
-// 电脑版窗口给后台页面开放的功能（apps/desktop/src/preload.ts）。用浏览器打开后台时是 undefined
+// 桌面版窗口给后台页面开放的功能（apps/desktop/src/preload.ts）。用浏览器打开后台时是 undefined
 export interface DesktopInfo {
   version: string;
   autoStart: boolean;

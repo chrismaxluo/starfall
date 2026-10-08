@@ -1,4 +1,4 @@
-// 星临电脑版：主进程。
+// 星临桌面版：主进程。
 // 在独立进程里启动本机服务（和服务器版同一套代码），打开管理后台窗口；
 // 关闭窗口缩到托盘（特效照常播放），可选开机自动启动，有新版本时提示更新。
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeTheme, shell, Tray, utilityProcess } from 'electron';
@@ -209,7 +209,7 @@ function stopServer(): Promise<void> {
   });
 }
 
-/** 调本机服务的接口（主进程没有 Origin，电脑版不用登录） */
+/** 调本机服务的接口（主进程没有 Origin，桌面版不用登录） */
 async function api<T>(url: string): Promise<T> {
   const res = await fetch(`${base()}${url}`, { signal: AbortSignal.timeout(3000) });
   if (!res.ok) throw new Error(`${url} ${res.status}`);
@@ -474,7 +474,7 @@ async function checkUpdate(manual: boolean): Promise<void> {
   }
 }
 
-// ---------- 给后台页面用的功能（设置页的「电脑版」卡片） ----------
+// ---------- 给后台页面用的功能（设置页的「桌面版」卡片） ----------
 
 function setupIpc(): void {
   // 只回应星临自己的后台页面

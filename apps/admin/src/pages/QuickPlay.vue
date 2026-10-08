@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 素材快捷播放：点按钮或按快捷键，马上在直播画面上播放；编辑时可以添加、改名、排序、设快捷键、删除。
-// 在电脑版窗口里还能设全局快捷键（带 Ctrl / Alt / Shift，在别的窗口里按也能播）
+// 在桌面版窗口里还能设全局快捷键（带 Ctrl / Alt / Shift，在别的窗口里按也能播）
 import { computed, onBeforeUnmount, ref } from 'vue';
 import EffectPicker from '../components/EffectPicker.vue';
 import Icon from '../components/Icon.vue';
@@ -14,7 +14,7 @@ import { QUICK_GLOBAL_RE } from '@starfall/shared';
 import type { QuickButton } from '../lib/types.ts';
 
 type Row = Omit<QuickButton, 'id'> & { key: number };
-/** 全局快捷键只有电脑版窗口能设 */
+/** 全局快捷键只有桌面版窗口能设 */
 const canGlobal = Boolean(desktop);
 const MAX = 40;
 const editing = ref(false);

@@ -40,7 +40,7 @@ const TEMPLATES = [
   { name: '主播好', keywords: ['主播好', '晚上好'] },
 ];
 const unusedTemplates = computed(() => TEMPLATES.filter((t) => !state.danmu.some((r) => r.keywords.includes(t.keywords[0]!))));
-const defaultEffect = () => state.effects.find((e) => e.name === '晶语')?.id ?? state.effects[0]?.id ?? null;
+const defaultEffect = () => state.effects.find((e) => e.builtin && e.visual.type === 'builtin_style' && e.visual.style === 'glass-dm')?.id ?? state.effects[0]?.id ?? null;
 /** 一条规则最多几个关键词（和服务端一致） */
 const KEYWORD_MAX = 20;
 /** 一次输入或粘贴多个词：逗号、顿号、分号、空格都当分隔 */

@@ -9,7 +9,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { openDb } from './index.ts';
 import { effects, outputs, ruleDanmu, ruleEnterBands, ruleEnterTiers, ruleExclusive, ruleGiftBands, ruleGuard, settings } from './schema.ts';
-import { BUILTIN_EFFECTS, RETIRED_EFFECTS, seed } from './seed.ts';
+import { BUILTIN_EFFECTS, RENAMED_EFFECTS, RETIRED_EFFECTS, seed } from './seed.ts';
 
 /** 只迁移到 before 这一步之前（模拟旧版本的数据库）：返回数据库文件和打开的旧库，用完整迁移再打开就是升级 */
 function oldDb(before: string): { dir: string; file: string; old: Database.Database } {
@@ -66,11 +66,23 @@ describe('数据库', () => {
   it('内置素材的文案升级后同步成新版本（内置素材在后台只读）；复制出来的素材不受影响', () => {
     const db = openDb(':memory:');
     seed(db);
-    db.update(effects).set({ texts: { enter: ['旧文案'] } }).where(eq(effects.name, '晶耀')).run();
+    db.update(effects).set({ texts: { enter: ['旧文案'] } }).where(eq(effects.name, '晶·大礼物')).run();
     db.insert(effects).values({ name: '我的星冕', builtin: false, style: 'glass-big', texts: { enter: ['我自己的'] } }).run();
     seed(db);
-    expect(db.select().from(effects).where(eq(effects.name, '晶耀')).get()?.texts).toEqual(BUILTIN_EFFECTS.find((e) => e.name === '晶耀')!.texts);
+    expect(db.select().from(effects).where(eq(effects.name, '晶·大礼物')).get()?.texts).toEqual(BUILTIN_EFFECTS.find((e) => e.name === '晶·大礼物')!.texts);
     expect(db.select().from(effects).where(eq(effects.name, '我的星冕')).get()?.texts).toEqual({ enter: ['我自己的'] });
+  });
+
+  it('升级：改过名的内置素材换成新名字，编号不变（规则照常）；新名字被自己的素材占了时那个改叫「…（我的）」', () => {
+    const db = openDb(':memory:');
+    seed(db);
+    const ids = new Map(db.select().from(effects).all().map((e) => [e.name, e.id]));
+    for (const [from, to] of Object.entries(RENAMED_EFFECTS)) db.update(effects).set({ name: from }).where(eq(effects.name, to)).run();
+    db.insert(effects).values({ name: '宫·总督', builtin: false, style: 'royal-gov', texts: { enter: ['我的'] } }).run();
+    seed(db);
+    for (const to of Object.values(RENAMED_EFFECTS)) expect(db.select().from(effects).where(eq(effects.name, to)).get()).toMatchObject({ id: ids.get(to), builtin: true });
+    expect(db.select().from(effects).where(eq(effects.name, '宫·总督（我的）')).get()).toMatchObject({ builtin: false });
+    expect(db.select().from(effects).where(eq(effects.builtin, true)).all()).toHaveLength(BUILTIN_EFFECTS.length);
   });
 
   it('升级：下线的内置素材在规则里换成替代素材后删除；以前复制的副本保留、换成替代样式', () => {
@@ -87,9 +99,9 @@ describe('数据库', () => {
     const byName = (n: string) => db.select().from(effects).where(eq(effects.name, n)).get();
     expect(byName('星冕')).toBeUndefined();
     expect(byName('巡场')).toBeUndefined();
-    expect(db.select().from(ruleGiftBands).where(eq(ruleGiftBands.fromGold, 100_000)).get()?.effectId).toBe(byName('晶耀')!.id);
-    expect(db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'mod')).get()?.effectId).toBe(byName('晶巡')!.id);
-    expect(db.select().from(ruleGuard).where(eq(ruleGuard.tier, 'gov')).get()?.renewEffectId).toBe(byName('晶耀')!.id);
+    expect(db.select().from(ruleGiftBands).where(eq(ruleGiftBands.fromGold, 100_000)).get()?.effectId).toBe(byName('晶·大礼物')!.id);
+    expect(db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'mod')).get()?.effectId).toBe(byName('晶·房管进场')!.id);
+    expect(db.select().from(ruleGuard).where(eq(ruleGuard.tier, 'gov')).get()?.renewEffectId).toBe(byName('晶·大礼物')!.id);
     expect(byName('我的星冕')).toMatchObject({ builtin: false, style: 'glass-big', texts: { enter: ['我的'] } });
     // 替代素材都是现有的内置素材
     for (const r of RETIRED_EFFECTS) expect(BUILTIN_EFFECTS.some((e) => e.name === r.replacedBy)).toBe(true);
@@ -127,7 +139,7 @@ describe('数据库', () => {
     expect(db.select().from(effects).where(eq(effects.id, 1)).get()).toMatchObject({ name: '胡迪', position: 'bl', fadeIn: true, fadeOut: true, fadeInMs: 1000, fadeOutMs: 1600, durationCustom: false, offsetX: 0, offsetY: 0, sizePct: 100, feather: 'global', guardFrame: false, honorBadge: false });
     // 星冕下线：舰长进场换成晶耀
     const tier = db.select().from(ruleEnterTiers).where(eq(ruleEnterTiers.tier, 'cap')).get()!;
-    expect(db.select().from(effects).where(eq(effects.id, tier.effectId!)).get()?.name).toBe('晶耀');
+    expect(db.select().from(effects).where(eq(effects.id, tier.effectId!)).get()?.name).toBe('晶·大礼物');
     // 弹幕规则的发送人：单选换成多选，以前的「戴本房间粉丝牌」也算上大航海和房管
     expect(db.select().from(ruleDanmu).orderBy(ruleDanmu.sort).all().map((r) => r.who)).toEqual([danmuWhoFromOld('fan'), DANMU_WHO_ALL]);
     expect(db.select().from(effects).where(eq(effects.name, '星冕')).get()).toBeUndefined();
@@ -138,7 +150,7 @@ describe('数据库', () => {
   it('被规则引用的素材不能删除（F-AS-14）', () => {
     const db = openDb(':memory:');
     seed(db);
-    const used = db.select().from(effects).where(eq(effects.name, 'B站动画')).get()!;
+    const used = db.select().from(effects).where(eq(effects.name, 'B站·礼物动画')).get()!;
     expect(() => db.delete(effects).where(eq(effects.id, used.id)).run()).toThrow(/FOREIGN KEY/);
   });
 

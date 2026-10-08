@@ -93,7 +93,7 @@ async function save(msg?: string, undo?: () => Promise<unknown>): Promise<void> 
 
 function addSpecific(g: GiftConfig): void {
   if (!rules.value) return;
-  const eff = state.effects.find((e) => e.name === '晶礼')?.id ?? null;
+  const eff = state.effects.find((e) => e.builtin && e.visual.type === 'builtin_style' && e.visual.style === 'glass-gift')?.id ?? null;
   rules.value.specific.push({ giftId: g.id, giftName: g.name, effectId: eff, enabled: true });
   // 选完不收起，可以接着选别的礼物；选过的会从列表里消失
   void save(`已添加指定礼物：${g.name}`);

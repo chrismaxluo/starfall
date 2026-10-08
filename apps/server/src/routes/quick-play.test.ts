@@ -26,15 +26,15 @@ describe('素材快捷播放', () => {
     expect(await t.list()).toEqual([]);
     t.ctx.settings.setRaw('quickPlaySeeded', false);
     const rule = (name: string) => t.ctx.danmuRules.create({ keywords: [name], mode: 'contains', who: DANMU_WHO_ALL, effectId: t.effectId(name), globalCdSec: 0, userCdMin: 0, enabled: true });
-    rule('门楼');
-    rule('晶语');
-    rule('门楼');
+    rule('宫·舰长');
+    rule('晶·弹幕');
+    rule('宫·舰长');
     t.ctx.danmuRules.create({ keywords: ['空'], mode: 'contains', who: DANMU_WHO_ALL, effectId: null, globalCdSec: 0, userCdMin: 0, enabled: true });
     const store = new QuickPlayStore(t.ctx.db, t.ctx.settings);
     store.seedOnce();
     expect(store.list()).toMatchObject([
-      { effectId: t.effectId('门楼'), label: '', hotkey: '1' },
-      { effectId: t.effectId('晶语'), label: '', hotkey: '2' },
+      { effectId: t.effectId('宫·舰长'), label: '', hotkey: '1' },
+      { effectId: t.effectId('晶·弹幕'), label: '', hotkey: '2' },
     ]);
     store.save([]);
     store.seedOnce();
@@ -43,8 +43,8 @@ describe('素材快捷播放', () => {
 
   it('整体保存：顺序、名字、快捷键；快捷键不能重复、格式要对，素材要存在', async () => {
     const t = await setup();
-    const a = t.effectId('门楼');
-    const b = t.effectId('晶语');
+    const a = t.effectId('宫·舰长');
+    const b = t.effectId('晶·弹幕');
     const r = await t.save([btn(b, { label: ' 晚安 ', hotkey: 'Q', globalHotkey: 'Ctrl+Alt+1' }), btn(a, { hotkey: '1' })]);
     expect(r.statusCode).toBe(200);
     expect(await t.list()).toMatchObject([
@@ -65,16 +65,16 @@ describe('素材快捷播放', () => {
 
   it('素材删掉后按钮一起删掉；复制素材并替换用到它的地方时，按钮换成副本', async () => {
     const t = await setup();
-    const copy = t.ctx.effects.copy(t.effectId('门楼'), {});
-    await t.save([btn(copy.id), btn(t.effectId('晶语'))]);
-    const copy2 = t.ctx.effects.copy(t.effectId('晶语'), { replaceRefs: true });
+    const copy = t.ctx.effects.copy(t.effectId('宫·舰长'), {});
+    await t.save([btn(copy.id), btn(t.effectId('晶·弹幕'))]);
+    const copy2 = t.ctx.effects.copy(t.effectId('晶·弹幕'), { replaceRefs: true });
     t.ctx.effects.remove(copy.id);
     expect((await t.list()).map((x) => x.effectId)).toEqual([copy2.id]);
   });
 
   it('点按钮播放：特效页不在线、已暂停时说明原因；按钮不存在时 404', async () => {
     const t = await setup();
-    await t.save([btn(t.effectId('晶语'))]);
+    await t.save([btn(t.effectId('晶·弹幕'))]);
     const [b] = await t.list();
     const play = (id: number) => t.req({ method: 'POST', url: `/api/quickplay/play/${id}`, payload: {} });
     expect((await play(b!.id)).json().error.message).toContain('特效页不在线');
@@ -82,7 +82,7 @@ describe('素材快捷播放', () => {
     t.ctx.hub.addOverlay({ send: (d: string) => void sent.push(JSON.parse(d)), close: () => undefined }, t.ctx.outputs.list()[0]!, []);
     const r = await play(b!.id);
     expect(r.statusCode).toBe(200);
-    expect(sent.find((m) => m.type === 'play')).toMatchObject({ item: { quick: true, viewer: { name: '星临主播' }, effect: { name: '晶语', showText: false } } });
+    expect(sent.find((m) => m.type === 'play')).toMatchObject({ item: { quick: true, viewer: { name: '星临主播' }, effect: { name: '晶·弹幕', showText: false } } });
     expect((await play(9999)).statusCode).toBe(404);
     t.ctx.pipeline.pause();
     expect((await play(b!.id)).json().error.message).toContain('已暂停');
@@ -91,8 +91,8 @@ describe('素材快捷播放', () => {
   it('电脑版全局快捷键按快捷键找按钮播放：重新保存按钮（编号变了）后照样能播', async () => {
     const t = await setup();
     t.ctx.hub.addOverlay({ send: () => undefined, close: () => undefined }, t.ctx.outputs.list()[0]!, []);
-    await t.save([{ ...btn(t.effectId('晶语')), globalHotkey: 'Ctrl+Alt+1' }]);
-    await t.save([{ ...btn(t.effectId('晶语')), globalHotkey: 'Ctrl+Alt+1' }]);
+    await t.save([{ ...btn(t.effectId('晶·弹幕')), globalHotkey: 'Ctrl+Alt+1' }]);
+    await t.save([{ ...btn(t.effectId('晶·弹幕')), globalHotkey: 'Ctrl+Alt+1' }]);
     const play = (hotkey: string) => t.req({ method: 'POST', url: '/api/quickplay/play-global', payload: { hotkey } });
     expect((await play('Ctrl+Alt+1')).statusCode).toBe(200);
     expect((await play('Ctrl+Alt+2')).statusCode).toBe(404);

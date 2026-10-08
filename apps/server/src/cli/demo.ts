@@ -94,9 +94,9 @@ for (const p of P) db.insert(viewers).values({ uid: p.uid, name: p.name, face: '
 
 const effects = ctx.effects.list();
 const eff = (name: string) => effects.find((e) => e.name === name)!.id;
-db.insert(ruleExclusive).values([{ uid: 101, effectId: eff('金銮'), cooldownMin: 30, until: null, enabled: true }, { uid: 103, effectId: eff('晶耀'), cooldownMin: 60, until: null, enabled: true }]).run();
-ctx.danmuRules.create({ keywords: ['晚安', '好梦'], mode: 'contains', who: { all: false, anchor: true, mod: true, guards: [1, 2, 3], fanMin: 20, honorMin: null, uids: [] }, effectId: eff('晶语'), globalCdSec: 10, userCdMin: 10, enabled: true });
-ctx.danmuRules.create({ keywords: ['打卡'], mode: 'exact', who: { all: false, anchor: false, mod: false, guards: [], fanMin: null, honorMin: 30, uids: [] }, effectId: eff('晶语'), globalCdSec: 30, userCdMin: 60, enabled: true });
+db.insert(ruleExclusive).values([{ uid: 101, effectId: eff('宫·总督'), cooldownMin: 30, until: null, enabled: true }, { uid: 103, effectId: eff('晶·大礼物'), cooldownMin: 60, until: null, enabled: true }]).run();
+ctx.danmuRules.create({ keywords: ['晚安', '好梦'], mode: 'contains', who: { all: false, anchor: true, mod: true, guards: [1, 2, 3], fanMin: 20, honorMin: null, uids: [] }, effectId: eff('晶·弹幕'), globalCdSec: 10, userCdMin: 10, enabled: true });
+ctx.danmuRules.create({ keywords: ['打卡'], mode: 'exact', who: { all: false, anchor: false, mod: false, guards: [], fanMin: null, honorMin: 30, uids: [] }, effectId: eff('晶·弹幕'), globalCdSec: 30, userCdMin: 60, enabled: true });
 
 type Ev = Exclude<StdEvent, { kind: 'live' }>;
 const log = (ev: Ev, status: 'played' | 'no_rule' | 'cooldown', rule: string | null = null, effect: string | null = null) =>
@@ -113,26 +113,26 @@ const danmu = (n: string, text: string, sec = 25) => {
 const gift = (n: string, giftName: string, unitPrice: number, count: number, e: string | null, sec = 30) =>
   log({ kind: 'gift', id: `g${t}`, ts: at(sec), viewer: viewer(by(n)), giftId: 1, giftName, unitPrice, count, paid: true }, e ? 'played' : 'no_rule', e ? '礼物 · 单次 10 – 100 元' : null, e);
 
-enter('星河漫步', 'played', '进场 · 舰长', '门楼');
-enter('半糖主义', 'played', '进场 · 舰长', '门楼');
+enter('星河漫步', 'played', '进场 · 舰长', '宫·舰长');
+enter('半糖主义', 'played', '进场 · 舰长', '宫·舰长');
 danmu('晚风与你', '晚上好呀');
 enter('南山有鹿', 'no_rule', null, null);
-gift('半糖主义', '告白花束', 22000, 1, '晶礼');
-enter('月下独酌', 'played', '进场 · 提督', '亭阁');
+gift('半糖主义', '告白花束', 22000, 1, '晶·礼物');
+enter('月下独酌', 'played', '进场 · 提督', '宫·提督');
 danmu('月下独酌', '来了来了');
-gift('白开水不加糖', '天空之翼', 1_314_000, 1, '晶耀');
-enter('听雨的鲸', 'played', '进场 · 舰长', '门楼');
-log({ kind: 'guard', id: 'u1', ts: at(20), viewer: viewer(by('听雨的鲸')), level: 3, months: 1, op: 'renew', source: 'toast', priceGold: 138_000 }, 'played', '上舰 · 续费舰长', '门楼');
+gift('白开水不加糖', '天空之翼', 1_314_000, 1, '晶·大礼物');
+enter('听雨的鲸', 'played', '进场 · 舰长', '宫·舰长');
+log({ kind: 'guard', id: 'u1', ts: at(20), viewer: viewer(by('听雨的鲸')), level: 3, months: 1, op: 'renew', source: 'toast', priceGold: 138_000 }, 'played', '上舰 · 续费舰长', '宫·舰长');
 danmu('今天也要早睡', '打卡');
 gift('月下独酌', '小花花', 100, 66, null);
 log({ kind: 'sc', id: 's1', ts: at(30), viewer: viewer(by('白开水不加糖')), text: '生日快乐！今天也要开心', priceYuan: 50, scId: 'demo-1' }, 'no_rule');
 enter('路过的猫', 'no_rule', null, null);
 danmu('青柠汽水', '欢迎新来的朋友～');
-gift('长夜未央', '星愿水晶球', 100_000, 1, '晶礼');
-enter('晚风与你', 'played', '进场 · 粉丝牌 21 级及以上', '霜玻');
+gift('长夜未央', '星愿水晶球', 100_000, 1, '晶·礼物');
+enter('晚风与你', 'played', '进场 · 粉丝牌 21 级及以上', '霜·粉丝进场');
 danmu('南山有鹿', '这首歌好好听');
 enter('一颗柠檬糖', 'no_rule', null, null, 20);
-enter('长夜未央', 'played', '进场 · 专属 长夜未央', '金銮', 15);
+enter('长夜未央', 'played', '进场 · 专属 长夜未央', '宫·总督', 15);
 
 // ---- 启动 ----
 const app = await buildApp(ctx, { logger: false });

@@ -159,14 +159,14 @@ describe('播放控制接口', () => {
     await o.waitFor('hello');
     expect((await t.req({ method: 'POST', url: '/api/playback/pause' })).json()).toEqual({ paused: true });
     expect((await t.req({ method: 'GET', url: '/api/status' })).json()).toMatchObject({ paused: true, overlays: 1, queue: { playing: false, size: 0 } });
-    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
+    const star = t.ctx.effects.list().find((e) => e.name === '晶·大礼物')!.id;
     const refused = await t.req({ method: 'POST', url: '/api/playback/test', payload: { effectId: star } });
     expect(refused.statusCode).toBe(409);
     expect(refused.json().error.message).toContain('暂停');
     await t.req({ method: 'POST', url: '/api/playback/resume' });
     const ok = await t.req({ method: 'POST', url: '/api/playback/test', payload: { effectId: star } });
     expect(ok.statusCode).toBe(200);
-    expect(await o.waitFor('play')).toMatchObject({ item: { test: true, effect: { name: '晶耀' } } });
+    expect(await o.waitFor('play')).toMatchObject({ item: { test: true, effect: { name: '晶·大礼物' } } });
     expect((await t.req({ method: 'POST', url: '/api/playback/clear' })).json()).toEqual({ cleared: 0 });
     expect((await t.req({ method: 'POST', url: '/api/playback/test', payload: { effectId: 9999 } })).statusCode).toBe(404);
   });
@@ -174,13 +174,13 @@ describe('播放控制接口', () => {
   it('模拟：返回命中规则和不播放的原因；没开播、暂停、特效页不在线时也能模拟，只给提醒', async () => {
     const t = await setup();
     const sim = (viewer: object) => t.req({ method: 'POST', url: '/api/simulate', payload: { viewer } }).then((r) => r.json());
-    expect(await sim({ guard: 3 })).toMatchObject({ rule: '进场 · 舰长', effect: { name: '门楼' }, status: 'played', notes: ['现在没开播，开播后才会真的播放', '特效页现在不在线，直播画面里看不到'] });
+    expect(await sim({ guard: 3 })).toMatchObject({ rule: '进场 · 舰长', effect: { name: '宫·舰长' }, status: 'played', notes: ['现在没开播，开播后才会真的播放', '特效页现在不在线，直播画面里看不到'] });
     t.ctx.settings.set('paused', true);
     expect((await sim({ guard: 3 })).notes[0]).toBe('现在是暂停状态，恢复播放后才会真的播放');
     t.ctx.settings.set('paused', false);
     t.ctx.settings.set('offlinePolicy', 'play');
     expect(await sim({ guard: 3 })).toMatchObject({ status: 'played', notes: ['特效页现在不在线，直播画面里看不到'] });
-    expect(await sim({ medal: { level: 25 } })).toMatchObject({ rule: '进场 · 粉丝牌 21 级及以上', effect: { name: '霜玻' } });
+    expect(await sim({ medal: { level: 25 } })).toMatchObject({ rule: '进场 · 粉丝牌 21 级及以上', effect: { name: '霜·粉丝进场' } });
     expect(await sim({ medal: { level: 25, own: false } })).toMatchObject({ rule: null, status: 'no_rule' });
     expect(await sim({ uid: 20000, isMod: true })).toMatchObject({ status: 'blacklist', notes: [] });
     expect((await t.req({ method: 'POST', url: '/api/simulate', payload: { viewer: { guard: 5 } } })).statusCode).toBe(400);
@@ -211,9 +211,9 @@ describe('播放控制接口', () => {
 describe('预览与统计', () => {
   it('预览：返回播放内容，不入队、不写记录', async () => {
     const t = await setup();
-    const star = t.ctx.effects.list().find((e) => e.name === '晶耀')!.id;
+    const star = t.ctx.effects.list().find((e) => e.name === '晶·大礼物')!.id;
     const r = (await t.req({ method: 'POST', url: '/api/preview', payload: { effectId: star, viewer: { name: '长夜未央', guard: 1, medalLevel: null } } })).json();
-    expect(r).toMatchObject({ test: true, text: '长夜未央 来了', effect: { name: '晶耀' }, viewer: { name: '长夜未央', guard: 1 } });
+    expect(r).toMatchObject({ test: true, text: '长夜未央 来了', effect: { name: '晶·大礼物' }, viewer: { name: '长夜未央', guard: 1 } });
     expect(r.viewer.medal).toBeUndefined();
     expect(t.ctx.pipeline.snapshot().items).toHaveLength(0);
     expect(t.ctx.log.query({}).events).toHaveLength(0);

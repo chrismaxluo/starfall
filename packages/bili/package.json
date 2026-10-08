@@ -1,6 +1,6 @@
 {
   "name": "@starfall/bili",
-  "version": "1.5.0-beta.2",
+  "version": "1.5.0",
   "private": true,
   "description": "B 站协议：登录、房间、WebSocket、消息解析",
   "license": "GPL-3.0-only",

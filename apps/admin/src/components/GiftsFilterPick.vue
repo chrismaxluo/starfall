@@ -1,25 +1,20 @@
 <script setup lang="ts">
 // 送礼名单「只要这几种礼物」：从直播间礼物面板里点选礼物种类（按礼物编号，名字只用来显示）
 import { computed, onMounted, ref } from 'vue';
-import { get } from '../lib/api.ts';
+import { useGiftCatalog } from '../lib/gift-catalog.ts';
 import { battery } from '../lib/preview.ts';
 import type { GiftConfig } from '../lib/types.ts';
+import GiftCatalogError from './GiftCatalogError.vue';
 import Icon from './Icon.vue';
 
 const props = defineProps<{ modelValue: Array<{ id: number; name: string }> }>();
 const emit = defineEmits<{ change: [gifts: Array<{ id: number; name: string }>, msg: string] }>();
 
-const catalog = ref<GiftConfig[]>([]);
-const catalogErr = ref('');
+const { catalog, error: catalogErr, noRoom, loading: catalogLoading, load: loadCatalog } = useGiftCatalog();
 const picking = ref(false);
 const q = ref('');
-onMounted(async () => {
-  try {
-    catalog.value = (await get<{ gifts: GiftConfig[] }>('/api/gifts')).gifts;
-  } catch (e) {
-    catalogErr.value = e instanceof Error ? e.message : String(e);
-  }
-  // 还一种都没选时直接打开选择面板
+// 还一种都没选时直接打开选择面板（读不到礼物面板时不打开，先显示原因）
+onMounted(() => {
   if (!props.modelValue.length) picking.value = true;
 });
 
@@ -46,9 +41,10 @@ function toggle(g: { id: number; name: string }): void {
   <div class="gfp">
     <div class="gfp-chips">
       <span v-for="g in modelValue" :key="g.id" class="gfp-chip"><img v-if="iconOf(g.id)" :src="iconOf(g.id)" alt="" referrerpolicy="no-referrer" />{{ g.name }}<button type="button" :aria-label="`不显示「${g.name}」`" @click="toggle(g)"><Icon name="i-x" /></button></span>
-      <button class="btn" type="button" :disabled="!!catalogErr" :aria-expanded="picking" @click="picking = !picking"><Icon :name="picking ? 'i-chev' : 'i-plus'" />{{ catalogErr ? '读取礼物面板失败' : picking ? '收起' : modelValue.length ? '再选几种' : '选礼物' }}</button>
+      <GiftCatalogError v-if="catalogErr" :error="catalogErr" :no-room="noRoom" :loading="catalogLoading" @retry="loadCatalog" />
+      <button v-else class="btn" type="button" :aria-expanded="picking" @click="picking = !picking"><Icon :name="picking ? 'i-chev' : 'i-plus'" />{{ picking ? '收起' : modelValue.length ? '再选几种' : '选礼物' }}</button>
     </div>
-    <div v-if="picking" class="rl-gpick">
+    <div v-if="picking && !catalogErr" class="rl-gpick">
       <div class="h"><input v-model.trim="q" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板；点一下选上，再点一下取消</span></div>
       <div class="grid">
         <template v-for="grp in groups" :key="grp.title">

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // 礼物规则（F-GF-01 ~ 05）：指定礼物（按礼物 ID，从本直播间礼物面板选）→ 按单次价值分档；免费礼物不触发；连击合并
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { JUMP_GOLD } from '@starfall/shared/labels';
 import { get, put } from '../lib/api.ts';
+import { useGiftCatalog } from '../lib/gift-catalog.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import { battery, batteryYuan, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
@@ -11,6 +12,7 @@ import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { GiftBand, GiftConfig, GiftRules } from '../lib/types.ts';
 import CdPick from './CdPick.vue';
 import EffectPicker from './EffectPicker.vue';
+import GiftCatalogError from './GiftCatalogError.vue';
 import Icon from './Icon.vue';
 import RowMenu from './RowMenu.vue';
 import type { MenuItem } from './RowMenu.vue';
@@ -27,8 +29,7 @@ function editEffect(id: number | null): void {
   if (!id) return toast('这条规则还没有选特效', 'info');
   ui.editorId = id;
 }
-const catalog = ref<GiftConfig[]>([]);
-const catalogErr = ref('');
+const { catalog, error: catalogErr, noRoom, loading: catalogLoading, load: loadCatalog } = useGiftCatalog();
 const picking = ref(false);
 const giftQ = ref('');
 const addBattery = ref<number | null>(null);
@@ -162,14 +163,6 @@ function previewBand(i: number): void {
   const b = bands.value[i]!;
   emit('preview', { effectId: b.effectId, viewer: SAMPLES.fan, label: `礼物 ${bandLabel(i)}`, kind: 'gift', vars: bandSample(b.fromGold, bandHi(i)) });
 }
-
-onMounted(async () => {
-  try {
-    catalog.value = (await get<{ gifts: GiftConfig[] }>('/api/gifts')).gifts;
-  } catch (e) {
-    catalogErr.value = e instanceof Error ? e.message : String(e);
-  }
-});
 </script>
 
 <template>
@@ -202,7 +195,8 @@ onMounted(async () => {
         <div class="c-act"><button class="icon-btn play" :aria-label="`预览送出 ${s.giftName}`" :title="`预览送出 ${s.giftName}`" @click="previewSpec(s.giftId, s.giftName, s.effectId)"><svg><use href="#i-play" /></svg></button><RowMenu :items="specMenu(s.giftId, s.effectId)" :label="`指定礼物 ${s.giftName}：更多操作`" /></div>
       </div>
       <div class="rt-foot">
-        <button class="btn" :disabled="!!catalogErr" :aria-expanded="picking" @click="picking = !picking"><Icon name="i-plus" />{{ catalogErr ? '读取礼物面板失败' : '从礼物列表里选' }}</button>
+        <GiftCatalogError v-if="catalogErr" :error="catalogErr" :no-room="noRoom" :loading="catalogLoading" @retry="loadCatalog" />
+        <button v-else class="btn" :aria-expanded="picking" @click="picking = !picking"><Icon name="i-plus" />从礼物列表里选</button>
         <span v-if="!rules.specific.length">还没有指定礼物：所有礼物都按下面的价值分段处理</span>
       </div>
     </div>

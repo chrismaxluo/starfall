@@ -411,6 +411,32 @@ let downloaded: string | null = null;
 /** 后台检查时问过、选了「以后再说」的版本：不再每 6 小时问一次（手动点「检查更新」时照样问） */
 let declined: string | null = null;
 
+/** 下载新版本的进度：推给后台页面，在窗口顶部显示（任务栏图标和托盘提示也会显示） */
+interface UpdateState {
+  phase: 'idle' | 'downloading' | 'downloaded' | 'error';
+  version: string | null;
+  percent: number;
+  transferred: number;
+  total: number;
+  /** 每秒下载多少字节 */
+  speed: number;
+  error: string | null;
+}
+let updateState: UpdateState = { phase: 'idle', version: null, percent: 0, transferred: 0, total: 0, speed: 0, error: null };
+function setUpdateState(patch: Partial<UpdateState>): void {
+  updateState = { ...updateState, ...patch };
+  win?.webContents.send('sf:update-state', updateState);
+}
+
+/** 先让服务收尾，再交给安装程序 */
+function installNow(): void {
+  quitting = true;
+  void stopServer().then(() => {
+    stopped = true;
+    autoUpdater.quitAndInstall(false, true);
+  });
+}
+
 function setupUpdates(): void {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -418,23 +444,19 @@ function setupUpdates(): void {
   autoUpdater.allowPrerelease = app.getVersion().includes('-');
   autoUpdater.logger = { info: (m: unknown) => log('[更新]', m), warn: (m: unknown) => log('[更新]', m), error: (m: unknown) => log('[更新]', m), debug: () => undefined };
   autoUpdater.on('download-progress', (p) => {
+    setUpdateState({ phase: 'downloading', percent: p.percent, transferred: p.transferred, total: p.total, speed: p.bytesPerSecond });
     win?.setProgressBar(p.percent / 100);
     tray?.setToolTip(`${NAME} · 正在下载新版本 ${Math.floor(p.percent)}%`);
   });
   autoUpdater.on('update-downloaded', (info) => {
     downloaded = info.version;
+    setUpdateState({ phase: 'downloaded', version: info.version, percent: 100 });
     win?.setProgressBar(-1);
     tray?.setToolTip(NAME);
     void dialog
       .showMessageBox({ type: 'info', title: NAME, message: `新版本 ${info.version} 已下载好`, detail: '现在重启就会安装（大约半分钟），Windows 会问一次是否允许更改，点「是」。正在直播的话，建议下播后再装；选「以后」会在你退出星临时自动安装。', buttons: ['现在重启并安装', '以后'], defaultId: 0, cancelId: 1 })
       .then((r) => {
-        if (r.response !== 0) return;
-        quitting = true;
-        // 先让服务收尾，再交给安装程序
-        void stopServer().then(() => {
-          stopped = true;
-          autoUpdater.quitAndInstall(false, true);
-        });
+        if (r.response === 0) installNow();
       });
   });
   setTimeout(() => void checkUpdate(false), 10_000);
@@ -462,8 +484,15 @@ async function checkUpdate(manual: boolean): Promise<void> {
     // 后台检查：问过、选了以后再说的同一个版本不再弹窗打扰
     if (!manual && next === declined) return;
     const a = await dialog.showMessageBox({ type: 'info', title: NAME, message: `星临有新版本 ${next}`, detail: `当前版本 ${app.getVersion()}。现在下载吗？在后台下载，不影响直播。`, buttons: ['下载', '以后再说'], defaultId: 0, cancelId: 1 });
-    if (a.response === 0) await autoUpdater.downloadUpdate();
-    else declined = next;
+    if (a.response === 0) {
+      setUpdateState({ phase: 'downloading', version: next, percent: 0, transferred: 0, total: r?.updateInfo.files[0]?.size ?? 0, speed: 0, error: null });
+      try {
+        await autoUpdater.downloadUpdate();
+      } catch (e) {
+        setUpdateState({ phase: 'error', error: (e as Error).message });
+        throw e;
+      }
+    } else declined = next;
   } catch (e) {
     log('检查更新失败', e);
     win?.setProgressBar(-1);
@@ -496,6 +525,10 @@ function setupIpc(): void {
     return autoStart();
   });
   handle('sf:check-update', () => void checkUpdate(true));
+  handle('sf:update-state', () => updateState);
+  handle('sf:install-update', () => {
+    if (updateState.phase === 'downloaded') installNow();
+  });
   handle('sf:reload-hotkeys', () => registerHotkeys(true));
   handle('sf:pause-hotkeys', () => pauseHotkeys());
   handle('sf:open-data', () => void shell.openPath(USER_DIR));

@@ -2,6 +2,7 @@
 // 关于：版本和更新、运行信息、更新记录、作者
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from '../components/Icon.vue';
+import DesktopUpdateBar from '../components/DesktopUpdateBar.vue';
 import Logo from '../components/Logo.vue';
 import { get } from '../lib/api.ts';
 import { CHANGELOG } from '../lib/changelog.ts';
@@ -116,6 +117,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
           <span>桌面版打开后会自动检查更新（之后每 6 小时一次），有新版本会弹窗问你要不要下载，下载好后重启就装上。{{ info.version.includes('-') ? '现在是测试版，会收到测试版的更新。' : '' }}</span>
           <button v-if="desktopBridge" class="btn" @click="desktopBridge.checkUpdate()">检查更新</button>
         </div>
+        <DesktopUpdateBar v-if="info && info.edition === 'desktop'" inline />
         <div v-else-if="info" class="upd" :class="{ newer: info.update.newer, err: info.update.error }">
           <Icon :name="info.update.newer ? 'i-update' : info.update.error ? 'i-info' : 'i-check'" />
           <span v-if="info.update.newer"><b>有新版本 v{{ info.update.latest!.version }}</b>{{ info.update.latest!.publishedAt ? `（${published(info.update.latest!.publishedAt)}）` : '' }}。在服务器上运行 <code>starfall update</code> 就能更新，更新前会自动备份。</span>

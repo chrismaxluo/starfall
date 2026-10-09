@@ -94,9 +94,19 @@ for (const p of P) db.insert(viewers).values({ uid: p.uid, name: p.name, face: '
 
 const effects = ctx.effects.list();
 const eff = (name: string) => effects.find((e) => e.name === name)!.id;
+// 新安装时礼物规则默认关着；演示里打开 10 元以上两段
+db.$client.prepare('update rule_gift_bands set enabled = 1 where from_gold >= 10000').run();
 db.insert(ruleExclusive).values([{ uid: 101, effectId: eff('宫·总督'), cooldownMin: 30, until: null, enabled: true }, { uid: 103, effectId: eff('晶·大礼物'), cooldownMin: 60, until: null, enabled: true }]).run();
 ctx.danmuRules.create({ keywords: ['晚安', '好梦'], mode: 'contains', who: { all: false, anchor: true, mod: true, guards: [1, 2, 3], fanMin: 20, honorMin: null, uids: [] }, effectId: eff('晶·弹幕'), globalCdSec: 10, userCdMin: 10, enabled: true });
 ctx.danmuRules.create({ keywords: ['打卡'], mode: 'exact', who: { all: false, anchor: false, mod: false, guards: [], fanMin: null, honorMin: 30, uids: [] }, effectId: eff('晶·弹幕'), globalCdSec: 30, userCdMin: 60, enabled: true });
+
+// 素材快捷播放：几个常用按钮
+ctx.quickPlay.save([
+  { effectId: eff('宫·总督'), label: '欢迎总督', hotkey: '1', globalHotkey: null },
+  { effectId: eff('晶·大礼物'), label: '感谢大礼物', hotkey: '2', globalHotkey: null },
+  { effectId: eff('晶·弹幕'), label: '晚安', hotkey: '3', globalHotkey: null },
+  { effectId: eff('字·一行'), label: '', hotkey: '4', globalHotkey: null },
+]);
 
 type Ev = Exclude<StdEvent, { kind: 'live' }>;
 const log = (ev: Ev, status: 'played' | 'no_rule' | 'cooldown', rule: string | null = null, effect: string | null = null) =>

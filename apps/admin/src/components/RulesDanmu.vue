@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 弹幕规则（F-DM-01 ~ 04）：关键词、匹配方式、发送人条件、素材、所有人 / 每人多久内只播一次；从上到下匹配，可调整顺序
 import { computed, nextTick, ref } from 'vue';
-import { DANMU_WHO_ALL } from '@starfall/shared';
+import { DANMU_WHO_DEFAULT } from '@starfall/shared';
 import { shadowedKeywords } from '@starfall/core/danmu';
 import { del, post, put } from '../lib/api.ts';
 import { sampleFor } from '../lib/danmu-who.ts';
@@ -46,12 +46,12 @@ const KEYWORD_MAX = 20;
 /** 一次输入或粘贴多个词：逗号、顿号、分号、空格都当分隔 */
 const splitWords = (v: string) => [...new Set(v.split(/[,，、;；\s]+/).map((x) => x.trim().slice(0, 30)).filter(Boolean))];
 async function add(keywords: string[]): Promise<boolean> {
-  const r = await attempt(() => post<DanmuRuleDto>('/api/rules/danmu', { keywords, mode: 'contains', who: DANMU_WHO_ALL, effectId: defaultEffect(), globalCdSec: 10, userCdMin: 10, enabled: true }));
+  const r = await attempt(() => post<DanmuRuleDto>('/api/rules/danmu', { keywords, mode: 'contains', who: DANMU_WHO_DEFAULT, effectId: defaultEffect(), globalCdSec: 10, userCdMin: 10, enabled: true }));
   if (!r) return false;
   state.danmu.push(r);
   flash.value = r.id;
   void refreshEffects();
-  toast(`已添加：弹幕里有「${keywords.join('」或「')}」时播放`, 'ok');
+  toast(`已添加：主播、房管或大航海发的弹幕里有「${keywords.join('」或「')}」时播放（谁发的才算可以改）`, 'ok');
   return true;
 }
 // 新建规则先是一张草稿卡：填了关键词才真正保存，免得没填完的规则在直播里起作用

@@ -188,6 +188,8 @@ export const DanmuWhoSchema = z
 export type DanmuWho = z.infer<typeof DanmuWhoSchema>;
 
 export const DANMU_WHO_ALL: DanmuWho = { all: true, anchor: false, mod: false, guards: [], fanMin: null, honorMin: null, uids: [] };
+/** 新建弹幕规则时默认谁发的才算：主播、房管、大航海（总督 / 提督 / 舰长），路过的观众不触发 */
+export const DANMU_WHO_DEFAULT: DanmuWho = { ...DANMU_WHO_ALL, all: false, anchor: true, mod: true, guards: [1, 2, 3] };
 
 /** 以前的单选换成多选（「戴本房间粉丝牌」以前也算上大航海和房管） */
 export function danmuWhoFromOld(w: (typeof DANMU_WHO_OLD)[number]): DanmuWho {

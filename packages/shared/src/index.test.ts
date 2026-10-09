@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatHeight, giftListShows, goldToYuan } from './index.ts';
+import { chatHeight, DANMU_WHO_DEFAULT, DanmuWhoSchema, giftListShows, goldToYuan } from './index.ts';
 import type { GiftListItem, GiftsFilter } from './index.ts';
 
 describe('goldToYuan', () => {
@@ -34,5 +34,12 @@ describe('送礼名单显示哪些', () => {
   it('只要这几种：不看最低金额', () => {
     expect(giftListShows({ ...base, mode: 'only', gifts: [{ id: 1, name: '礼物' }], minGold: 1000 }, gift(100))).toBe(true);
     expect(giftListShows({ ...base, mode: 'only', gifts: [{ id: 2, name: '别的' }] }, gift(100))).toBe(false);
+  });
+});
+
+describe('新建弹幕规则的默认发送人', () => {
+  it('只算主播、房管和大航海，且能通过校验', () => {
+    expect(DANMU_WHO_DEFAULT).toMatchObject({ all: false, mod: true, guards: [1, 2, 3], anchor: true, fanMin: null, honorMin: null, uids: [] });
+    expect(DanmuWhoSchema.safeParse(DANMU_WHO_DEFAULT).success).toBe(true);
   });
 });

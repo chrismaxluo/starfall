@@ -182,6 +182,9 @@ describe('播放控制接口', () => {
     expect(await sim({ guard: 3 })).toMatchObject({ status: 'played', notes: ['特效页现在不在线，直播画面里看不到'] });
     expect(await sim({ medal: { level: 25 } })).toMatchObject({ rule: '进场 · 粉丝牌 21 级及以上', effect: { name: '霜·粉丝进场' } });
     expect(await sim({ medal: { level: 25, own: false } })).toMatchObject({ rule: null, status: 'no_rule' });
+    // 主播本人：默认照常触发；打开「主播本人不触发」后按黑名单处理
+    expect(await sim({ uid: 20000, isMod: true })).toMatchObject({ status: 'played' });
+    t.ctx.settings.set('blockAnchor', true);
     expect(await sim({ uid: 20000, isMod: true })).toMatchObject({ status: 'blacklist', notes: [] });
     expect((await t.req({ method: 'POST', url: '/api/simulate', payload: { viewer: { guard: 5 } } })).statusCode).toBe(400);
   });

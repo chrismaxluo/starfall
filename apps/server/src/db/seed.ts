@@ -77,10 +77,10 @@ export const DEFAULT_SETTINGS = {
   queueJump: true,
   /** 礼物特效里的礼物图用动图（B站的动态礼物图）；关掉用静态图 */
   giftAnimImg: true,
-  /** 主播本人不触发特效（F-PL-08） */
-  blockAnchor: true,
-  /** 用来连接直播间的账号不触发特效（F-PL-08，通常是小号） */
-  blockAccount: true,
+  /** 主播本人不触发特效（F-PL-08）；默认关，主播自己发的也算 */
+  blockAnchor: false,
+  /** 用来连接直播间的账号不触发特效（F-PL-08，通常是小号）；默认关 */
+  blockAccount: false,
   /** 事件记录保留天数，0 为永久（F-DA-02） */
   retentionDays: 90,
   /** 礼物连击合并（F-GF-04） */

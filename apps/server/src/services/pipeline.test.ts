@@ -171,8 +171,14 @@ describe('进场 → 播放', () => {
     expect(t.statuses()).toEqual(['no_overlay']);
   });
 
-  it('黑名单：名单里的人、主播本人不触发；关闭"屏蔽主播本人"后主播进场照常播', async () => {
+  it('「主播本人不触发」「登录的账号不触发」默认都关着', async () => {
     const t = await setup();
+    expect([t.ctx.settings.get('blockAnchor'), t.ctx.settings.get('blockAccount')]).toEqual([false, false]);
+  });
+
+  it('黑名单：名单里的人、主播本人（开着「主播本人不触发」时）不触发；关掉后主播进场照常播', async () => {
+    const t = await setup();
+    t.ctx.settings.set('blockAnchor', true);
     t.ctx.blacklist.add({ uid: 10001 });
     t.live.emit(enter({ guard: 3 }));
     t.live.emit(enter({ uid: ANCHOR, guard: 0, isMod: true }));
@@ -475,8 +481,9 @@ describe('弹幕', () => {
     expect(t.events().map((e) => e.effectId)).toEqual([a.effectId, b.effectId, b.effectId]);
   });
 
-  it('主播本人默认不触发；规则里勾了「主播」、或者指定了 UID 的照样触发；手动拉黑的一律不触发', async () => {
+  it('开着「主播本人不触发」时主播不触发；规则里勾了「主播」、或者指定了 UID 的照样触发；手动拉黑的一律不触发', async () => {
     const t = await setup();
+    t.ctx.settings.set('blockAnchor', true);
     const none = { ...DANMU_WHO_ALL, all: false };
     t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: DANMU_WHO_ALL, effectId: eff(t, '字·一行'), globalCdSec: 0, userCdMin: 0, enabled: true });
     const named = t.ctx.danmuRules.create({ keywords: ['开播'], mode: 'contains', who: { ...none, anchor: true, uids: [555] }, effectId: eff(t, '晶·弹幕'), globalCdSec: 0, userCdMin: 0, enabled: true });

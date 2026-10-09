@@ -1,0 +1,55 @@
+# 打包设置（electron-builder）：在 GitHub 的 Windows 电脑上运行，见 .github/workflows/desktop.yml
+# 命名规则见 docs/desktop.md：安装包 Starfall-<版本>-win-x64-setup.exe，主程序 Starfall.exe，显示名「星临」
+appId: io.github.chrismaxluo.starfall
+productName: Starfall
+copyright: Copyright © 2026 chrismaxluo · GPL-3.0
+directories:
+  app: stage
+  output: release
+  buildResources: resources
+extraResources:
+  - from: stage-res
+    to: .
+asar: true
+# 不设 compression：为了让自动更新只下载变化的部分，electron-builder 已经用最高压缩级别加 1 MB 字典打包，
+# 设成 maximum 也不会更小（实测 2026-10-01）；加大字典会让每次更新都要下载整个安装包
+# better-sqlite3 自带 Windows 的预编译版本（N-API，Electron 里直接能用），不用重新编译
+npmRebuild: false
+# 只留中文和英文的界面资源（Electron 默认带几十种语言）
+electronLanguages: [zh-CN, en-US]
+files:
+  - '**/*'
+  # better-sqlite3 的源代码和其他系统的版本用不上
+  - '!node_modules/better-sqlite3/{deps,src,build,docs,benchmark}/**'
+  - '!node_modules/better-sqlite3/prebuilds/!(win32-x64.node)'
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+  executableName: Starfall
+  artifactName: Starfall-${version}-win-x64-setup.${ext}
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: false
+  # 装到 C:\Program Files\Starfall（安装时可以改成别的盘），不放在用户目录（AppData）里。
+  # 安装和自动更新时 Windows 会问一次管理员权限；数据仍在 %APPDATA%\Starfall，和安装位置无关
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: 星临
+  uninstallDisplayName: 星临
+  deleteAppDataOnUninstall: false
+  installerLanguages: [zh_CN]
+  language: '2052'
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+# 安装包程序用新版 NSIS（3.12）：自带的简体中文是 2020 年的新译本（「卸载」而不是旧版的「解除安装」），界面文字不另外改
+toolsets:
+  nsis: '1.2.1'
+# 生成 app-update.yml，让程序到 GitHub 发布页检查更新（上传由打包流程自己做）
+publish:
+  provider: github
+  owner: chrismaxluo
+  repo: starfall

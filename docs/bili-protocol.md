@@ -365,7 +365,7 @@ GET https://api.live.bilibili.com/xlive/general-interface/v1/content/get?key=wea
 | 按 UID 设置的专属特效 | ✗ 没有 UID；要改成按 `open_id` 或昵称，已有规则无法直接迁移 |
 | 弹幕关键词、礼物、上舰、醒目留言、点赞 | ✓ |
 
-另外，`access_key_secret` 不能直接放进分发给别人的电脑版安装包（会被拆出来），通常要由开发者自己的服务器代为签名，这会给电脑版增加一个在线依赖。
+另外，`access_key_secret` 不能直接放进分发给别人的桌面版安装包（会被拆出来），通常要由开发者自己的服务器代为签名，这会给桌面版增加一个在线依赖。
 
 ### 8.5 结论
 

@@ -21,7 +21,7 @@ export function quickPlayRoutes(app: FastifyInstance, ctx: AppContext): void {
     return ctx.pipeline.quick(b.effectId);
   });
 
-  // 电脑版的全局快捷键：按快捷键找按钮播放（保存按钮后按钮编号会变，快捷键不会）
+  // 桌面版的全局快捷键：按快捷键找按钮播放（保存按钮后按钮编号会变，快捷键不会）
   app.post('/api/quickplay/play-global', async (req) => {
     const { hotkey } = parseBody(z.object({ hotkey: z.string().regex(QUICK_GLOBAL_RE) }).strict(), req.body);
     const b = ctx.quickPlay.list().find((x) => x.globalHotkey === hotkey);

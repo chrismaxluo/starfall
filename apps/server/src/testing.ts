@@ -9,9 +9,9 @@ import { createContext } from './context.ts';
 
 export const FIXTURES = path.resolve(import.meta.dirname, '../../../fixtures');
 
-export async function testApp(opts: Omit<NonNullable<Parameters<typeof createContext>[1]>, 'dbFile'> = {}) {
+export async function testApp(opts: Omit<NonNullable<Parameters<typeof createContext>[1]>, 'dbFile'> = {}, env: NodeJS.ProcessEnv = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starfall-test-'));
-  const ctx = createContext(loadConfig({ STARFALL_DATA: dataDir }), { dbFile: ':memory:', ...opts });
+  const ctx = createContext(loadConfig({ ...env, STARFALL_DATA: dataDir }), { dbFile: ':memory:', ...opts });
   const app = await buildApp(ctx);
   app.addHook('onClose', async () => fs.rmSync(dataDir, { recursive: true, force: true }));
   const password = ctx.initialPassword!;

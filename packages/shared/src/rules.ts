@@ -274,7 +274,7 @@ export type GuardRules = z.infer<typeof GuardRulesSchema>;
 export const QUICK_MAX = 40;
 /** 后台页面里的快捷键：单个数字或字母（不带 Ctrl 等，小键盘数字也算） */
 export const QUICK_KEY_RE = /^[0-9A-Z]$/;
-/** 电脑版的全局快捷键（在游戏、直播软件里也能按）：至少一个 Ctrl / Alt / Shift 加数字、字母或 F1–F12，例如 Ctrl+Alt+1 */
+/** 桌面版的全局快捷键（在游戏、直播软件里也能按）：至少一个 Ctrl / Alt / Shift 加数字、字母或 F1–F12，例如 Ctrl+Alt+1 */
 export const QUICK_GLOBAL_RE = /^(?:(?:Ctrl|Alt|Shift)\+){1,3}(?:[0-9A-Z]|F[1-9]|F1[0-2])$/;
 
 export const QuickButtonSchema = z.object({

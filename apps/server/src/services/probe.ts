@@ -1,12 +1,9 @@
 // 识别上传文件：按文件头判断真实类型，读取尺寸、时长、是否透明（需求 F-AS-02 ~ 04）。
-import { execFile } from 'node:child_process';
 import fs from 'node:fs';
-import { promisify } from 'node:util';
 import zlib from 'node:zlib';
 import protobuf from 'protobufjs';
 import yauzl from 'yauzl';
-
-const run = promisify(execFile);
+import { mediaInfo } from './media-info.ts';
 
 export type AssetKind = 'video' | 'image' | 'fx' | 'audio';
 
@@ -82,51 +79,6 @@ export interface ProbeResult {
 }
 
 const EMPTY: ProbeResult = { width: null, height: null, durationMs: null, hasAlpha: false };
-
-let ffprobeOk: boolean | null = null;
-async function hasFfprobe(): Promise<boolean> {
-  if (ffprobeOk === null) ffprobeOk = await run('ffprobe', ['-version']).then(() => true, () => false);
-  return ffprobeOk;
-}
-
-/**
- * 按扩展名指定 ffprobe 的格式（不让它按内容猜：否则一个 .mp3 文件可以被当成播放列表去读别的文件），
- * 并且只允许读本地文件。APNG 有可能其实是普通 PNG，失败时按 PNG 再试一次
- */
-const FFPROBE_FORMAT: Record<string, string[]> = {
-  webm: ['matroska'],
-  mp4: ['mov'],
-  gif: ['gif'],
-  png: ['png_pipe'],
-  apng: ['apng', 'png_pipe'],
-  webp: ['webp_pipe'],
-  jpg: ['jpeg_pipe'],
-  jpeg: ['jpeg_pipe'],
-  mp3: ['mp3'],
-  wav: ['wav'],
-  ogg: ['ogg'],
-};
-
-async function ffprobe(file: string, ext: string): Promise<ProbeResult> {
-  if (!(await hasFfprobe())) return EMPTY;
-  const formats = FFPROBE_FORMAT[ext];
-  if (!formats) throw new Error(`不支持的文件类型：${ext}`);
-  let stdout = '';
-  for (const [i, f] of formats.entries()) {
-    try {
-      ({ stdout } = await run('ffprobe', ['-v', 'error', '-protocol_whitelist', 'file', '-f', f, '-show_entries', 'stream=codec_type,width,height,pix_fmt,duration:stream_tags=alpha_mode:format=duration', '-of', 'json', file], { timeout: 20_000 }));
-      break;
-    } catch (e) {
-      if (i === formats.length - 1) throw e;
-    }
-  }
-  const j = JSON.parse(stdout) as { streams?: Array<{ codec_type: string; width?: number; height?: number; pix_fmt?: string; duration?: string; tags?: { alpha_mode?: string; ALPHA_MODE?: string } }>; format?: { duration?: string } };
-  const v = j.streams?.find((x) => x.codec_type === 'video');
-  // WebM 的时长只在容器上（流上是 N/A）
-  const secs = [v?.duration, j.format?.duration].map(Number).find((x) => Number.isFinite(x) && x > 0);
-  const alpha = v?.tags?.alpha_mode === '1' || v?.tags?.ALPHA_MODE === '1' || /^(yuva|rgba|bgra|argb|abgr|ya|gbrap|pal8)/.test(v?.pix_fmt ?? '');
-  return { width: v?.width ?? null, height: v?.height ?? null, durationMs: secs ? Math.round(secs * 1000) : null, hasAlpha: Boolean(v) && alpha };
-}
 
 const svgaRoot = protobuf.Root.fromJSON({
   nested: {
@@ -241,7 +193,7 @@ function probeLottie(file: string): ProbeResult {
 export async function probe(file: string, type: FileType): Promise<ProbeResult> {
   if (type.ext === 'svga') return probeSvga(file);
   if (type.ext === 'json') return probeLottie(file);
-  const r = await ffprobe(file, type.ext);
+  const r = mediaInfo(file, type.ext);
   if (type.kind === 'audio') return { ...r, width: null, height: null, hasAlpha: false };
   if (type.ext === 'jpg') return { ...r, durationMs: null, hasAlpha: false };
   if (type.ext === 'mp4') return { ...r, hasAlpha: false };

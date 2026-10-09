@@ -9,7 +9,8 @@ import * as schema from './schema.ts';
 
 export type Db = BetterSQLite3Database<typeof schema> & { $client: Database.Database };
 
-const MIGRATIONS = path.resolve(import.meta.dirname, '../../drizzle');
+// 桌面版把服务打包成一个文件，迁移文件另外放，用环境变量指过去
+const MIGRATIONS = process.env.STARFALL_MIGRATIONS || path.resolve(import.meta.dirname, '../../drizzle');
 
 /** file 传 ':memory:' 时使用内存数据库（测试用） */
 export function openDb(file: string): Db {

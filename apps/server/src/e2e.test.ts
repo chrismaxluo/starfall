@@ -109,7 +109,8 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
   await vi.waitFor(() => expect(bili.auths).toHaveLength(1), { timeout: 5000 });
   expect(bili.auths[0]).toMatchObject({ uid: 10099, roomid: 30000, protover: 3, buvid: 'B3', key: 'test-token' });
   await vi.waitFor(() => expect(ctx.live.status().connection).toBe('connected'));
-  expect(bili.heartbeats()).toBeGreaterThanOrEqual(1);
+  // 连上后马上发心跳；慢的电脑上可能稍晚才到
+  await vi.waitFor(() => expect(bili.heartbeats()).toBeGreaterThanOrEqual(1));
 
   // 同一次进场的两条消息（ENTRY_EFFECT 先到）+ 一条弹幕
   bili.push(fixture('entry_effect.guard.json'));

@@ -2,20 +2,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { execFileSync } from 'node:child_process';
 import protobuf from 'protobufjs';
 import { afterAll, describe, expect, it } from 'vitest';
 import { FIXTURES } from '../testing.ts';
 import { ALLOWED, probe, sniff } from './probe.ts';
 
-const hasFfprobe = (() => {
-  try {
-    execFileSync('ffprobe', ['-version']);
-    return true;
-  } catch {
-    return false;
-  }
-})();
 const file = (n: string) => path.join(FIXTURES, 'media', n);
 const head = (n: string) => fs.readFileSync(file(n)).subarray(0, 64);
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sf-probe-'));
@@ -50,18 +41,51 @@ describe('按文件头识别真实类型', () => {
   });
 });
 
-describe.skipIf(!hasFfprobe)('用 ffprobe 读取尺寸、时长、透明通道', () => {
-  it('透明 WebM：时长取容器上的值，识别 alpha_mode', async () => {
-    expect(await probe(file('alpha.webm'), ALLOWED.webm!)).toEqual({ width: 64, height: 96, durationMs: 1200, hasAlpha: true });
+describe('读取视频、图片、音频的尺寸、时长、透明通道', () => {
+  const info = (n: string) => probe(file(n), ALLOWED[path.extname(n).slice(1)]!);
+  it('WebM：时长取容器上的值，识别 alpha_mode；边录边写（没写时长）的按最后一帧算', async () => {
+    expect(await info('alpha.webm')).toEqual({ width: 64, height: 96, durationMs: 1200, hasAlpha: true });
+    expect(await info('live.webm')).toEqual({ width: 48, height: 32, durationMs: 500, hasAlpha: true });
   });
-  it('MP4 没有透明通道', async () => {
-    expect(await probe(file('opaque.mp4'), ALLOWED.mp4!)).toEqual({ width: 64, height: 96, durationMs: 1000, hasAlpha: false });
+  it('MP4 没有透明通道；分片的 MP4（例如 OBS 的分片录像）把每段加起来', async () => {
+    expect(await info('opaque.mp4')).toEqual({ width: 64, height: 96, durationMs: 1000, hasAlpha: false });
+    expect(await info('frag.mp4')).toEqual({ width: 48, height: 32, durationMs: 500, hasAlpha: false });
   });
-  it('静态 PNG 没有时长；带 alpha 的像素格式算透明', async () => {
-    expect(await probe(file('still.png'), ALLOWED.png!)).toEqual({ width: 40, height: 30, durationMs: null, hasAlpha: true });
+  it('图片：静态的没有时长，动图把每帧的间隔加起来', async () => {
+    expect(await info('still.png')).toEqual({ width: 40, height: 30, durationMs: null, hasAlpha: true });
+    expect(await info('still.jpg')).toEqual({ width: 48, height: 32, durationMs: null, hasAlpha: false });
+    expect(await info('alpha.webp')).toEqual({ width: 48, height: 32, durationMs: null, hasAlpha: true });
+    expect(await info('anim.gif')).toEqual({ width: 48, height: 32, durationMs: 300, hasAlpha: true });
+    expect(await info('anim.apng')).toEqual({ width: 48, height: 32, durationMs: 300, hasAlpha: true });
+    expect(await info('anim.webp')).toEqual({ width: 48, height: 32, durationMs: 300, hasAlpha: false });
   });
-  it('音频只有时长', async () => {
-    expect(await probe(file('beep.wav'), ALLOWED.wav!)).toEqual({ width: null, height: null, durationMs: 300, hasAlpha: false });
+  it('PNG：有 tRNS 块才算透明；GIF 小于 0.02 秒的间隔按 0.1 秒算', async () => {
+    const chunk = (type: string, data: Buffer) => Buffer.concat([Buffer.from([0, 0, 0, data.length]), Buffer.from(type, 'latin1'), data, Buffer.alloc(4)]);
+    const png = (colorType: number, trns: boolean) => {
+      const ihdr = Buffer.alloc(13);
+      ihdr.writeUInt32BE(7, 0);
+      ihdr.writeUInt32BE(5, 4);
+      ihdr[8] = 8;
+      ihdr[9] = colorType;
+      return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), trns ? chunk('tRNS', Buffer.alloc(6)) : Buffer.alloc(0), chunk('IEND', Buffer.alloc(0))]);
+    };
+    expect((await probe(tmp('rgb.png', png(2, false)), ALLOWED.png!)).hasAlpha).toBe(false);
+    expect((await probe(tmp('rgb-trns.png', png(2, true)), ALLOWED.png!)).hasAlpha).toBe(true);
+    expect((await probe(tmp('pal.png', png(3, false)), ALLOWED.png!)).hasAlpha).toBe(false);
+    const frame = Buffer.from([0x21, 0xf9, 4, 0, 0, 0, 0, 0, 0x2c, 0, 0, 0, 0, 7, 0, 5, 0, 0, 2, 0]);
+    const gif = Buffer.concat([Buffer.from('GIF89a', 'latin1'), Buffer.from([7, 0, 5, 0, 0, 0, 0]), frame, frame, Buffer.from([0x3b])]);
+    expect(await probe(tmp('fast.gif', gif), ALLOWED.gif!)).toEqual({ width: 7, height: 5, durationMs: 200, hasAlpha: true });
+  });
+  it('音频只有时长：MP3 没有 Xing 标签时一帧一帧数；Opus 去掉开头的预留采样', async () => {
+    expect(await info('beep.wav')).toEqual({ width: null, height: null, durationMs: 300, hasAlpha: false });
+    expect(await info('tone.mp3')).toEqual({ width: null, height: null, durationMs: 627, hasAlpha: false });
+    expect(await info('tone.ogg')).toEqual({ width: null, height: null, durationMs: 600, hasAlpha: false });
+  });
+  it('结构不对的文件直接拒绝', async () => {
+    await expect(probe(tmp('no-moov.mp4', fs.readFileSync(file('opaque.mp4')).subarray(0, 40)), ALLOWED.mp4!)).rejects.toThrow();
+    await expect(probe(tmp('cut.webm', fs.readFileSync(file('alpha.webm')).subarray(0, 30)), ALLOWED.webm!)).rejects.toThrow();
+    await expect(probe(tmp('cut.gif', Buffer.from('GIF89a\x07\0\x05\0\0\0\0\x2c', 'latin1')), ALLOWED.gif!)).rejects.toThrow();
+    await expect(probe(tmp('noise.jpg', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 2, 0x12, 0x34])), ALLOWED.jpg!)).rejects.toThrow();
   });
 });
 
@@ -93,7 +117,7 @@ describe('SVGA、Lottie 读取自身的元数据', () => {
     await expect(probe(tmp('bomb.svga', bomb), ALLOWED.svga!)).rejects.toThrow('太大');
   });
 
-  it('ffprobe 按扩展名指定格式：内容是播放列表的 .mp3 不会被当成播放列表去读别的文件', async () => {
+  it('内容不是 MP3 的 .mp3（例如播放列表）直接拒绝', async () => {
     const fake = Buffer.concat([Buffer.from('ID3\x03\x00\x00\x00\x00\x00\x00', 'latin1'), Buffer.from('#EXTM3U\n#EXTINF:1,\n/etc/hostname\n')]);
     await expect(probe(tmp('list.mp3', fake), ALLOWED.mp3!)).rejects.toThrow();
   });

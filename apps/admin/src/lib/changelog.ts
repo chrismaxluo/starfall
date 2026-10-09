@@ -1,4 +1,4 @@
-// 更新记录：构建后台时把仓库里的 CHANGELOG.md 打包进来（电脑版、服务器版都能看），按「## 版本」分段，转成简单的 HTML
+// 更新记录：构建后台时把仓库里的 CHANGELOG.md 打包进来（桌面版、服务器版都能看），按「## 版本」分段，转成简单的 HTML
 import raw from '../../../../CHANGELOG.md?raw';
 
 export interface ChangelogSection {

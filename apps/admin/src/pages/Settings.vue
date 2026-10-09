@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import DataCard from '../components/DataCard.vue';
+import DesktopCard from '../components/DesktopCard.vue';
 import FeatherCard from '../components/FeatherCard.vue';
 import Icon from '../components/Icon.vue';
 import QrLogin from '../components/QrLogin.vue';
@@ -147,7 +148,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="card">
+      <DesktopCard v-if="state.desktop" />
+      <div v-else class="card">
         <div class="card-h"><h2>管理后台</h2></div>
         <div class="field">
           <label for="pw1">修改登录密码</label>

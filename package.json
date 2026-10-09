@@ -1,6 +1,6 @@
 {
   "name": "starfall",
-  "version": "1.5.0",
+  "version": "1.6.0-beta.1",
   "private": true,
   "description": "星临 Starfall：B 站直播间互动特效工具",
   "license": "GPL-3.0-only",

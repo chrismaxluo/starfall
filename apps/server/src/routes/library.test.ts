@@ -21,21 +21,21 @@ describe('素材列表', () => {
   it('内置 11 个素材，带"用于哪些规则"', async () => {
     const { effects, byName } = await setup();
     const list = await effects();
-    expect(list.map((e) => e.name)).toEqual(['霜玻', '一行字', '霜玻·简', '金銮', '亭阁', '门楼', '晶礼', '晶耀', 'B站动画', '晶巡', '晶语']);
+    expect(list.map((e) => e.name)).toEqual(['霜·粉丝进场', '字·一行', '霜·普通进场', '宫·总督', '宫·提督', '宫·舰长', '晶·礼物', '晶·大礼物', 'B站·礼物动画', '晶·房管进场', '晶·弹幕']);
     expect(list.every((e) => e.builtin)).toBe(true);
-    expect((await byName('金銮')).usedBy).toEqual([
+    expect((await byName('宫·总督')).usedBy).toEqual([
       { page: 'enter', label: '进场 · 总督' },
       { page: 'guard', label: '上舰 · 开通总督' },
       { page: 'guard', label: '上舰 · 续费总督' },
     ]);
-    expect((await byName('B站动画')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 1000电池' }, { page: 'gift', label: '礼物 · 单次 100 – 1000电池' }]);
-    expect((await byName('晶耀')).usedBy).toEqual([]);
-    expect((await byName('晶巡')).usedBy).toEqual([{ page: 'enter', label: '进场 · 房管' }]);
-    expect((await byName('霜玻')).usedBy.map((u) => u.label)).toEqual(['进场 · 粉丝牌 21 级及以上', '进场 · 粉丝牌 1 – 20 级']);
-    // 普通观众档默认关闭，但仍然引用了"一行字"
-    expect((await byName('一行字')).usedBy.map((u) => u.label)).toEqual(['礼物 · 单次 10 – 100电池']);
+    expect((await byName('B站·礼物动画')).usedBy).toEqual([{ page: 'gift', label: '礼物 · 单次 ≥ 1000电池' }, { page: 'gift', label: '礼物 · 单次 100 – 1000电池' }]);
+    expect((await byName('晶·大礼物')).usedBy).toEqual([]);
+    expect((await byName('晶·房管进场')).usedBy).toEqual([{ page: 'enter', label: '进场 · 房管' }]);
+    expect((await byName('霜·粉丝进场')).usedBy.map((u) => u.label)).toEqual(['进场 · 粉丝牌 21 级及以上', '进场 · 粉丝牌 1 – 20 级']);
+    // 普通观众档默认关闭，但仍然引用了"字·一行"
+    expect((await byName('字·一行')).usedBy.map((u) => u.label)).toEqual(['礼物 · 单次 10 – 100电池']);
     // 普通观众默认用霜玻的简短版（默认关闭）
-    expect((await byName('霜玻·简'))).toMatchObject({ durationMs: 2400, visual: { type: 'builtin_style', style: 'frost' }, usedBy: [{ page: 'enter', label: '进场 · 其他观众' }] });
+    expect((await byName('霜·普通进场'))).toMatchObject({ durationMs: 2400, visual: { type: 'builtin_style', style: 'frost' }, usedBy: [{ page: 'enter', label: '进场 · 其他观众' }] });
   });
 
   it('未登录不能访问', async () => {
@@ -116,7 +116,7 @@ describe('上传即素材', () => {
 describe('修改素材', () => {
   it('内置素材只读', async () => {
     const { req, byName } = await setup();
-    const star = await byName('晶耀');
+    const star = await byName('晶·大礼物');
     const res = await req({ method: 'PUT', url: `/api/effects/${star.id}`, payload: { volume: 10 } });
     expect(res.statusCode).toBe(403);
     expect(res.json().error.message).toContain('复制');
@@ -129,7 +129,7 @@ describe('修改素材', () => {
     const ok = await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 4000 } });
     // 视频有自己的时长：按素材时长播放，设置的时长不起作用
     expect(ok.json()).toMatchObject({ name: '生日', showText: true, texts: { enter: ['{name} 生日快乐'], gift: ['谢谢 {name}'] }, position: 'top', durationMs: 1200 });
-    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '晶耀' } })).statusCode).toBe(409);
+    expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { name: '晶·大礼物' } })).statusCode).toBe(409);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { builtin: true } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: `/api/effects/${effect.id}`, payload: { durationMs: 100 } })).statusCode).toBe(400);
     expect((await req({ method: 'PUT', url: '/api/effects/9999', payload: { volume: 1 } })).statusCode).toBe(404);
@@ -204,7 +204,9 @@ describe('修改素材', () => {
     const alpha = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json().effect;
     expect(opaque).toMatchObject({ feather: 'global', featherPct: 10 });
     const pct = async (id: number, draft?: object) => (await req({ method: 'POST', url: '/api/preview', payload: { effectId: id, ...(draft ? { draft } : {}) } })).json().effect.featherPct;
-    // 全局默认关闭
+    // 全局默认打开、10%；关掉后不羽化
+    expect(await pct(opaque.id)).toBe(10);
+    await req({ method: 'PUT', url: '/api/settings', payload: { featherOn: false } });
     expect(await pct(opaque.id)).toBe(0);
     expect((await req({ method: 'PUT', url: '/api/settings', payload: { featherOn: true, featherPct: 15 } })).json()).toMatchObject({ featherOn: true, featherPct: 15 });
     expect(await pct(opaque.id)).toBe(15);
@@ -286,14 +288,14 @@ describe('修改素材', () => {
 describe('复制与删除', () => {
   it('复制内置素材得到可编辑的副本；勾选替换时，原来用它的规则换成副本', async () => {
     const { req, byName } = await setup();
-    const star = await byName('B站动画');
+    const star = await byName('B站·礼物动画');
     const a = (await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: {} })).json();
-    expect(a).toMatchObject({ name: 'B站动画 副本', builtin: false, visual: { type: 'builtin_style', style: 'bili-gift' }, usedBy: [] });
+    expect(a).toMatchObject({ name: 'B站·礼物动画 副本', builtin: false, visual: { type: 'builtin_style', style: 'bili-gift' }, usedBy: [] });
     const b = (await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { replaceRefs: true } })).json();
-    expect(b).toMatchObject({ name: 'B站动画 副本 2' });
+    expect(b).toMatchObject({ name: 'B站·礼物动画 副本 2' });
     expect(b.usedBy.map((u: { label: string }) => u.label)).toEqual(['礼物 · 单次 ≥ 1000电池', '礼物 · 单次 100 – 1000电池']);
     expect((await req({ method: 'PUT', url: `/api/effects/${b.id}`, payload: { volume: 20 } })).statusCode).toBe(200);
-    expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '亭阁' } })).statusCode).toBe(409);
+    expect((await req({ method: 'POST', url: `/api/effects/${star.id}/copy`, payload: { name: '宫·提督' } })).statusCode).toBe(409);
   });
 
   it('被规则使用的素材不能删除，并返回使用位置；删除没人用的素材时文件一并删除', async () => {

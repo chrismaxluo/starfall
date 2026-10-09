@@ -1,6 +1,6 @@
 {
   "name": "starfall",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "星临 Starfall：B 站直播间互动特效工具",
   "license": "GPL-3.0-only",
@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @starfall/server dev",
-    "build": "pnpm -r --filter './apps/*' build",
+    "build": "pnpm -r --filter \"./apps/*\" build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck",

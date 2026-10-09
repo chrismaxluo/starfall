@@ -17,7 +17,7 @@ describe('进场规则', () => {
   it('默认规则：5 个身份档位，粉丝牌分档从高到低，普通观众默认关闭', async () => {
     const { req, effectId } = await setup();
     const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();
-    expect(r.tiers.gov).toEqual({ effectId: await effectId('金銮'), cooldownMin: 5, enabled: true });
+    expect(r.tiers.gov).toEqual({ effectId: await effectId('宫·总督'), cooldownMin: 5, enabled: true });
     expect(r.tiers.nor.enabled).toBe(false);
     expect(r.bands.map((b: { fromLevel: number }) => b.fromLevel)).toEqual([21, 1]);
     expect(r.cooldownMode).toBe('minutes');
@@ -26,8 +26,8 @@ describe('进场规则', () => {
   it('保存档位、分档、冷却方式', async () => {
     const { req, ctx, effectId } = await setup();
     const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();
-    r.tiers.nor = { effectId: await effectId('一行字'), cooldownMin: 60, enabled: true };
-    r.bands = [{ fromLevel: 1, effectId: null, cooldownMin: 15, enabled: true }, { fromLevel: 30, effectId: await effectId('门楼'), cooldownMin: 5, enabled: true }, { fromLevel: 10, effectId: await effectId('霜玻'), cooldownMin: 10, enabled: false }];
+    r.tiers.nor = { effectId: await effectId('字·一行'), cooldownMin: 60, enabled: true };
+    r.bands = [{ fromLevel: 1, effectId: null, cooldownMin: 15, enabled: true }, { fromLevel: 30, effectId: await effectId('宫·舰长'), cooldownMin: 5, enabled: true }, { fromLevel: 10, effectId: await effectId('霜·粉丝进场'), cooldownMin: 10, enabled: false }];
     r.cooldownMode = 'oncePerLive';
     const saved = (await req({ method: 'PUT', url: '/api/rules/enter', payload: r })).json();
     expect(saved.bands.map((b: { fromLevel: number }) => b.fromLevel)).toEqual([30, 10, 1]);
@@ -40,12 +40,12 @@ describe('进场规则', () => {
     const { req, ctx, effectId } = await setup();
     const r = (await req({ method: 'GET', url: '/api/rules/enter' })).json();
     expect(r.honorBands).toEqual([{ fromLevel: 50, effectId: null, cooldownMin: 10, enabled: false }]);
-    r.honorBands = [{ fromLevel: 35, effectId: await effectId('霜玻'), cooldownMin: 0, enabled: true }, { fromLevel: 60, effectId: await effectId('门楼'), cooldownMin: 5, enabled: true }];
+    r.honorBands = [{ fromLevel: 35, effectId: await effectId('霜·粉丝进场'), cooldownMin: 0, enabled: true }, { fromLevel: 60, effectId: await effectId('宫·舰长'), cooldownMin: 5, enabled: true }];
     const saved = (await req({ method: 'PUT', url: '/api/rules/enter', payload: r })).json();
     expect(saved.honorBands.map((b: { fromLevel: number }) => b.fromLevel)).toEqual([60, 35]);
     expect(ctx.enterRules.full().honorBands).toHaveLength(2);
     // 用着的素材记在「被哪些规则使用」里
-    const usedBy = (await req({ method: 'GET', url: '/api/effects' })).json().effects.find((e: { name: string }) => e.name === '门楼').usedBy as Array<{ label: string }>;
+    const usedBy = (await req({ method: 'GET', url: '/api/effects' })).json().effects.find((e: { name: string }) => e.name === '宫·舰长').usedBy as Array<{ label: string }>;
     expect(usedBy.map((u) => u.label)).toContain('进场 · 荣耀等级 60 级及以上');
     expect((await req({ method: 'PUT', url: '/api/rules/enter', payload: { ...r, honorBands: [] } })).json().honorBands).toEqual([]);
     const dup = { ...r, honorBands: [r.honorBands[0], { ...r.honorBands[0] }] };
@@ -76,7 +76,7 @@ describe('专属用户', () => {
     const { req, effectId } = await setup();
     const fetchMock = vi.fn(async () => card(10001, '小星'));
     vi.stubGlobal('fetch', fetchMock);
-    const star = await effectId('晶耀');
+    const star = await effectId('晶·大礼物');
     const x = { uid: 10001, effectId: star, cooldownMin: 0, until: '2026-10-01', enabled: true };
     const added = await req({ method: 'POST', url: '/api/rules/exclusive', payload: x });
     expect(added.statusCode).toBe(200);
@@ -104,7 +104,7 @@ describe('专属用户', () => {
     ctx.db.insert(room).values({ id: 1, roomId: 30000, anchorUid: 20000, anchorName: '主播' }).run();
     // 直播时收到消息：在 30000 是舰长
     ctx.viewers.remember({ uid: 10001, name: '小星', face: '' }, { level: 3, roomId: 30000 });
-    await req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10001, effectId: await effectId('晶耀'), cooldownMin: 0, until: null, enabled: true } });
+    await req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10001, effectId: await effectId('晶·大礼物'), cooldownMin: 0, until: null, enabled: true } });
     expect((await req({ method: 'GET', url: '/api/rules/exclusive' })).json().exclusives[0]).toMatchObject({ uid: 10001, guard: 3 });
     expect((await req({ method: 'GET', url: '/api/viewers/10001' })).json()).toMatchObject({ guard: 3 });
     // 只更新昵称头像（按 UID 查询）不会清掉等级
@@ -118,7 +118,7 @@ describe('专属用户', () => {
   it('查不到昵称也能添加', async () => {
     const { req, effectId } = await setup();
     vi.stubGlobal('fetch', async () => { throw new Error('network down'); });
-    const res = await req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10003, effectId: await effectId('亭阁'), cooldownMin: 5, until: null, enabled: true } });
+    const res = await req({ method: 'POST', url: '/api/rules/exclusive', payload: { uid: 10003, effectId: await effectId('宫·提督'), cooldownMin: 5, until: null, enabled: true } });
     expect(res.json()).toMatchObject({ uid: 10003, name: null });
   });
 });

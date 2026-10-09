@@ -63,14 +63,18 @@ export const GIFTS_SPEED_PX: Record<GiftsSpeed, number> = { off: 0, slow: 20, no
 /**
  * 送礼名单显示哪些：all 为所有付费礼物；only 为只显示 gifts 里勾选的礼物（按礼物编号，名字只用来在后台显示）；
  * pinned 为只显示后台挂上的记录（谁送的哪一次，可以是以前场次的），本场新收到的不进来。
- * 上舰、醒目留言单独勾选，all、only 两种方式看这两项
+ * 上舰、醒目留言单独勾选，all、only 两种方式看这两项。
+ * minGold：all 方式下礼物的最低金额（金瓜子，按连击合起来的总价值算；没有或 0 为不限），只管礼物，不管上舰、醒目留言
  */
 export interface GiftsFilter {
   mode: 'all' | 'only' | 'pinned';
   gifts: Array<{ id: number; name: string }>;
   guard: boolean;
   sc: boolean;
+  minGold?: number;
 }
+/** 送礼名单最低金额的选项（金瓜子，1 元 = 1000）：不限、1、5、10、50、100 元 */
+export const GIFTS_MIN_OPTIONS = [0, 1000, 5000, 10_000, 50_000, 100_000];
 export const GIFTS_FILTER_DEFAULT: GiftsFilter = { mode: 'all', gifts: [], guard: true, sc: true };
 /** 送礼名单一屏显示几条：默认 6 条，最多 GIFTS_MAX_LIMIT 条；本场最近 GIFTS_KEEP 条都在循环滚动里（服务端也记这么多） */
 export const GIFTS_MAX_DEFAULT = 6;
@@ -102,7 +106,8 @@ export function giftListShows(f: GiftsFilter, it: GiftListItem): boolean {
   if (f.mode === 'pinned') return false;
   if (it.kind === 'guard') return f.guard;
   if (it.kind === 'sc') return f.sc;
-  return f.mode === 'all' || f.gifts.some((g) => g.id === it.gift?.id);
+  if (f.mode === 'all') return it.value >= (f.minGold ?? 0);
+  return f.gifts.some((g) => g.id === it.gift?.id);
 }
 
 /** 弹幕列表条数：默认 8 条，最多能设 CHAT_MAX_LIMIT 条（服务端也最多记住这么多条） */

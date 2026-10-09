@@ -9,3 +9,7 @@
 *.mp3 binary
 *.wav binary
 *.svga binary
+*.webp binary
+*.jpg binary
+*.ico binary
+*.ogg binary

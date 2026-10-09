@@ -50,7 +50,7 @@ describe('导出配置', () => {
     expect(f).toMatchObject({ format: 'starfall-config', version: 2 });
     expect(f.rules.danmu).toEqual([{ keywords: ['生日快乐', '生快'], mode: 'contains', who: DANMU_WHO_ALL, effect: '生日', globalCdSec: 10, userCdMin: 5, enabled: true }]);
     expect(f.rules.exclusives[0]).toMatchObject({ uid: 10001, effect: '生日', until: '2026-12-31' });
-    expect(f.rules.enter.tiers.gov.effect).toBe('金銮');
+    expect(f.rules.enter.tiers.gov.effect).toBe('宫·总督');
     expect(f.settings).toMatchObject({ queueMax: 15, cooldownMode: 'oncePerLive' });
     expect(f.settings).not.toHaveProperty('paused');
     expect(f.assets.map((a: { kind: string }) => a.kind).sort()).toEqual(['audio', 'video']);
@@ -73,6 +73,23 @@ describe('导出配置', () => {
 });
 
 describe('导入配置', () => {
+  it('以前导出的文件里内置素材还是旧名字（金銮、亭阁……）：导入时认成新名字', async () => {
+    const src = await setup();
+    let text = (await src.req({ method: 'GET', url: '/api/backup/export' })).body;
+    const old: Record<string, string> = { '宫·总督': '金銮', '宫·提督': '亭阁', '晶·弹幕': '晶语' };
+    for (const [now, was] of Object.entries(old)) text = text.replaceAll(`"${now}"`, `"${was}"`);
+    const f = JSON.parse(text);
+    f.rules.enter.tiers.gov.effect = '亭阁';
+    const dst = await setup();
+    const pre = await importFile(dst, 'old.json', JSON.stringify(f));
+    expect(pre.statusCode).toBe(200);
+    expect(pre.json().plan.warnings).toEqual([]);
+    expect((await dst.req({ method: 'POST', url: `/api/backup/import/${pre.json().token}` })).json()).toMatchObject({ ok: true });
+    const enter = (await dst.req({ method: 'GET', url: '/api/rules/enter' })).json();
+    expect(enter.tiers.gov.effectId).toBe(await dst.effectId('宫·提督'));
+    expect(await dst.effectId('亭阁')).toBeUndefined();
+  });
+
   it('先预览、确认后才生效；zip 带文件时上传的素材一起恢复', async () => {
     const src = await setup();
     await populate(src);
@@ -165,16 +182,16 @@ describe('导入配置', () => {
   it('荣耀等级分档跟着导出、导入；以前导出的文件没有这一项时不动现有的分档', async () => {
     const src = await setup();
     const enter = (await src.req({ method: 'GET', url: '/api/rules/enter' })).json();
-    enter.honorBands = [{ fromLevel: 45, effectId: await src.effectId('门楼'), cooldownMin: 3, enabled: true }, { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false }];
+    enter.honorBands = [{ fromLevel: 45, effectId: await src.effectId('宫·舰长'), cooldownMin: 3, enabled: true }, { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false }];
     await src.req({ method: 'PUT', url: '/api/rules/enter', payload: enter });
     const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
-    expect(f.rules.enter.honorBands).toEqual([{ fromLevel: 45, effect: '门楼', cooldownMin: 3, enabled: true }, { fromLevel: 30, effect: null, cooldownMin: 10, enabled: false }]);
+    expect(f.rules.enter.honorBands).toEqual([{ fromLevel: 45, effect: '宫·舰长', cooldownMin: 3, enabled: true }, { fromLevel: 30, effect: null, cooldownMin: 10, enabled: false }]);
 
     const dst = await setup();
     const a = (await importFile(dst, 'new.json', JSON.stringify(f))).json();
     expect(a.plan.sections.find((x: { key: string }) => x.key === 'enter').details).toContain('荣耀等级分档：1 档 → 2 档');
     await dst.req({ method: 'POST', url: `/api/backup/import/${a.token}` });
-    expect(dst.ctx.enterRules.base().honorBands).toEqual([{ fromLevel: 45, effectId: await dst.effectId('门楼'), cooldownMin: 3, enabled: true }, { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false }]);
+    expect(dst.ctx.enterRules.base().honorBands).toEqual([{ fromLevel: 45, effectId: await dst.effectId('宫·舰长'), cooldownMin: 3, enabled: true }, { fromLevel: 30, effectId: null, cooldownMin: 10, enabled: false }]);
 
     delete f.rules.enter.honorBands;
     const old = await setup();
@@ -253,8 +270,11 @@ describe('自动备份', () => {
     expect((await t.req({ method: 'GET', url: '/api/backup/files/starfall-20000101-0000.json' })).statusCode).toBe(404);
     // 备份出来的数据库是完整的
     const dir = path.join(t.dataDir, 'backups');
-    expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
-    expect(fs.statSync(path.join(dir, `starfall-${item.stamp}.db`)).mode & 0o777).toBe(0o600);
+    // Windows 没有这种权限位（桌面版的数据在用户自己的文件夹里，别的账号本来就读不到）
+    if (process.platform !== 'win32') {
+      expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
+      expect(fs.statSync(path.join(dir, `starfall-${item.stamp}.db`)).mode & 0o777).toBe(0o600);
+    }
   });
 
   it('每天凌晨 4 点后备份一次，只保留最近 7 份；关闭后不备份', async () => {

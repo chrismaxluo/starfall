@@ -12,6 +12,8 @@ export const FEED_KEEP = 150;
 export const state = reactive({
   /** null：还没检查 */
   authed: null as boolean | null,
+  /** 桌面版（服务只在本机运行，后台不用密码） */
+  desktop: false,
   status: null as StatusSnapshot | null,
   /** 直播间信息：标题、分区、封面、主播、直播时的实时数字 */
   roomInfo: null as RoomInfo | null,

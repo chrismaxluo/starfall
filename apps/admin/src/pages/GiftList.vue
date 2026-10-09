@@ -3,7 +3,7 @@
 // 右边是预览和外观（滚动、对齐、字号、条数）；选了手动时左边接着出现送礼记录（按场次）和名单里的记录。
 // 开关、复制地址也在这里，不用跳到「直播软件输出」页
 import { computed, onMounted, ref, watch } from 'vue';
-import { GIFTS_MAX_LIMIT, GIFTS_WIDTH, giftListShows, giftsHeight } from '@starfall/shared/overlay';
+import { GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_WIDTH, giftListShows, giftsHeight } from '@starfall/shared/overlay';
 import type { GiftListItem, GiftsFilter } from '@starfall/shared/overlay';
 import Avatar from '../components/Avatar.vue';
 import GiftsFilterPick from '../components/GiftsFilterPick.vue';
@@ -46,6 +46,12 @@ async function copyUrl(): Promise<void> {
 const f = computed(() => o.value!.giftsFilter);
 const manual = computed(() => f.value.mode === 'pinned');
 const setFilter = (patch: Partial<GiftsFilter>, msg: string) => void save({ giftsFilter: { ...f.value, ...patch } }, msg);
+/** 全部礼物时的最低金额（金瓜子；0 为不限） */
+const listMin = computed(() => f.value.minGold ?? 0);
+const yuanOf = (gold: number) => `${gold / 1000} 元`;
+function setMin(gold: number): void {
+  setFilter({ minGold: gold }, gold ? `名单只显示 ${yuanOf(gold)}以上的礼物（连击合起来算）` : '名单显示所有付费礼物，金额不限');
+}
 function pickAuto(): void {
   if (!manual.value) return;
   // 回到自动：选过礼物种类就接着用，没选过就是全部礼物
@@ -61,7 +67,7 @@ const summary = computed<{ text: string; bad: boolean }>(() => {
   if (!x.giftsEnabled) return { text: '送礼名单关着，直播画面上不显示。打开右上角的开关。', bad: true };
   if (manual.value) return pins.value.length ? { text: `你挑的 ${pins.value.length} 条记录，按下面「名单里的记录」的顺序`, bad: false } : { text: '名单是空的：在下面的送礼记录里点「加入名单」', bad: true };
   const parts: string[] = [];
-  if (f.value.mode === 'all') parts.push('所有付费礼物');
+  if (f.value.mode === 'all') parts.push(listMin.value ? `${yuanOf(listMin.value)}以上的礼物` : '所有付费礼物');
   else if (f.value.gifts.length) parts.push(f.value.gifts.map((g) => `「${g.name}」`).join('、'));
   if (f.value.guard) parts.push('上舰');
   if (f.value.sc) parts.push('醒目留言');
@@ -216,7 +222,8 @@ async function move(i: number, d: -1 | 1): Promise<void> {
                     <button :aria-pressed="f.mode === 'all'" @click="setFilter({ mode: 'all' }, '名单显示本场所有付费礼物')">全部礼物</button>
                     <button :aria-pressed="f.mode === 'only'" @click="setFilter({ mode: 'only' }, '名单只显示选中的几种礼物')">只要这几种</button>
                   </span>
-                  <span class="hint">{{ f.mode === 'all' ? '所有付费礼物都显示（免费礼物不显示）' : '只显示下面选中的礼物，谁送的都算' }}</span>
+                  <select v-if="f.mode === 'all'" class="sel" aria-label="最低金额" :value="listMin" @change="setMin(Number(($event.target as HTMLSelectElement).value))"><option v-for="v in GIFTS_MIN_OPTIONS" :key="v" :value="v">{{ v ? `${yuanOf(v)}以上` : '金额不限' }}</option></select>
+                  <span class="hint">{{ f.mode === 'all' ? (listMin ? `一次送出（连击合起来算）满 ${yuanOf(listMin)}才显示，小礼物不进名单` : '所有付费礼物都显示（免费礼物不显示）') : '只显示下面选中的礼物，谁送的都算' }}</span>
                 </div>
                 <GiftsFilterPick v-if="f.mode === 'only'" :model-value="f.gifts" @change="(gifts, msg) => setFilter({ gifts }, msg)" />
               </div>

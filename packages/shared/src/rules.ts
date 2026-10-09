@@ -188,6 +188,8 @@ export const DanmuWhoSchema = z
 export type DanmuWho = z.infer<typeof DanmuWhoSchema>;
 
 export const DANMU_WHO_ALL: DanmuWho = { all: true, anchor: false, mod: false, guards: [], fanMin: null, honorMin: null, uids: [] };
+/** 新建弹幕规则时默认谁发的才算：主播、房管、大航海（总督 / 提督 / 舰长），路过的观众不触发 */
+export const DANMU_WHO_DEFAULT: DanmuWho = { ...DANMU_WHO_ALL, all: false, anchor: true, mod: true, guards: [1, 2, 3] };
 
 /** 以前的单选换成多选（「戴本房间粉丝牌」以前也算上大航海和房管） */
 export function danmuWhoFromOld(w: (typeof DANMU_WHO_OLD)[number]): DanmuWho {
@@ -274,7 +276,7 @@ export type GuardRules = z.infer<typeof GuardRulesSchema>;
 export const QUICK_MAX = 40;
 /** 后台页面里的快捷键：单个数字或字母（不带 Ctrl 等，小键盘数字也算） */
 export const QUICK_KEY_RE = /^[0-9A-Z]$/;
-/** 电脑版的全局快捷键（在游戏、直播软件里也能按）：至少一个 Ctrl / Alt / Shift 加数字、字母或 F1–F12，例如 Ctrl+Alt+1 */
+/** 桌面版的全局快捷键（在游戏、直播软件里也能按）：至少一个 Ctrl / Alt / Shift 加数字、字母或 F1–F12，例如 Ctrl+Alt+1 */
 export const QUICK_GLOBAL_RE = /^(?:(?:Ctrl|Alt|Shift)\+){1,3}(?:[0-9A-Z]|F[1-9]|F1[0-2])$/;
 
 export const QuickButtonSchema = z.object({

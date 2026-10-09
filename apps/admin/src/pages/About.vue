@@ -2,9 +2,11 @@
 // 关于：版本和更新、运行信息、更新记录、作者
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from '../components/Icon.vue';
+import DesktopUpdateBar from '../components/DesktopUpdateBar.vue';
 import Logo from '../components/Logo.vue';
 import { get } from '../lib/api.ts';
 import { CHANGELOG } from '../lib/changelog.ts';
+import { desktop as desktopBridge } from '../lib/desktop.ts';
 import { dateTime, duration, fileSize, when } from '../lib/format.ts';
 import { toast } from '../lib/toast.ts';
 
@@ -44,7 +46,7 @@ async function load(check = false): Promise<void> {
 }
 onMounted(() => void load());
 
-const EDITION = { server: '服务器版', desktop: '电脑版' } as const;
+const EDITION = { server: '服务器版', desktop: '桌面版' } as const;
 const published = (iso: string | null) => (iso ? `${iso.slice(0, 10)} 发布` : '');
 /** 复制给作者的完整运行信息（一行一项） */
 const rows = computed(() => {
@@ -84,10 +86,19 @@ async function copyInfo(): Promise<void> {
     toast('浏览器不允许自动复制，请手动选中下面的内容复制', 'info');
   }
 }
-/** 更新记录：默认只展开最上面一段 */
+/**
+ * 更新记录：只显示最近两个版本，更早的到 GitHub 发布页看。正式版不显示测试版那几段；
+ * 运行的是开发中的代码时，最上面多一段「未发布」。默认只展开最上面一段
+ */
+const RECENT = 2;
+const RELEASES_URL = 'https://github.com/chrismaxluo/starfall/releases';
 const open = ref(new Set([0]));
-const showAll = ref(false);
-const sections = computed(() => (showAll.value ? CHANGELOG : CHANGELOG.slice(0, 4)));
+const sections = computed(() => {
+  const beta = info.value?.version.includes('-') ?? false;
+  const unreleased = info.value?.build ? CHANGELOG.filter((s) => s.title === '未发布') : [];
+  const versions = CHANGELOG.filter((s) => s.title !== '未发布' && (beta || !s.title.includes('测试版')));
+  return [...unreleased, ...versions.slice(0, RECENT)];
+});
 function toggle(i: number): void {
   const s = new Set(open.value);
   if (s.has(i)) s.delete(i);
@@ -110,7 +121,13 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
             <span class="av"><template v-if="info">v{{ info.version }}<span v-if="info.build" class="tag nor num" :title="`现在运行的是开发中的代码（提交 ${info.build}），比 v${info.version} 新，还没有正式发布`">开发版 {{ info.build }}</span><span class="tag excl">{{ EDITION[info.edition] }}</span></template><template v-else>读取中…</template></span>
           </div>
         </div>
-        <div v-if="info" class="upd" :class="{ newer: info.update.newer, err: info.update.error }">
+        <div v-if="info && info.edition === 'desktop'" class="upd">
+          <Icon name="i-update" />
+          <span>桌面版打开后会自动检查更新（之后每 6 小时一次），有新版本会弹窗问你要不要下载，下载好后重启就装上。{{ info.version.includes('-') ? '现在是测试版，会收到测试版的更新。' : '' }}</span>
+          <button v-if="desktopBridge" class="btn" @click="desktopBridge.checkUpdate()">检查更新</button>
+        </div>
+        <DesktopUpdateBar v-if="info && info.edition === 'desktop'" inline />
+        <div v-else-if="info" class="upd" :class="{ newer: info.update.newer, err: info.update.error }">
           <Icon :name="info.update.newer ? 'i-update' : info.update.error ? 'i-info' : 'i-check'" />
           <span v-if="info.update.newer"><b>有新版本 v{{ info.update.latest!.version }}</b>{{ info.update.latest!.publishedAt ? `（${published(info.update.latest!.publishedAt)}）` : '' }}。在服务器上运行 <code>starfall update</code> 就能更新，更新前会自动备份。</span>
           <span v-else-if="info.update.error">{{ info.update.error }}</span>
@@ -118,7 +135,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
           <span v-else>还没有查到正式版本</span>
           <button class="btn" :disabled="checking" @click="load(true)"><span v-if="checking" class="spin" />{{ checking ? '检查中' : '检查更新' }}</button>
         </div>
-        <div v-if="info" class="upd-at">{{ when(info.update.checkedAt) }} 检查过</div>
+        <div v-if="info && info.edition !== 'desktop'" class="upd-at">{{ when(info.update.checkedAt) }} 检查过</div>
         <dl class="about-meta">
           <dt>B站作者</dt><dd><a class="linkish author" :href="AUTHOR_URL" target="_blank" rel="noopener noreferrer" title="打开作者的 B站主页">{{ AUTHOR }}<Icon name="i-ext" /></a></dd>
           <dt>联系邮箱</dt><dd><a class="linkish" :href="`mailto:${EMAIL}`">{{ EMAIL }}</a></dd>
@@ -136,14 +153,14 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
     </div>
 
     <div class="card cl">
-      <div class="card-h"><h2>更新记录</h2><span class="aside">每个版本改了什么</span></div>
+      <div class="card-h"><h2>更新记录</h2><span class="aside">最近两个版本改了什么</span></div>
       <div v-for="(s, i) in sections" :key="s.title" class="cl-sec" :class="{ open: open.has(i) }">
         <button type="button" class="cl-h" :aria-expanded="open.has(i)" @click="toggle(i)"><Icon name="i-chev" />{{ titleOf(s.title) }}</button>
         <!-- 内容来自打包进来的 CHANGELOG.md，已经转义过 -->
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div v-if="open.has(i)" class="cl-b" v-html="s.html" />
       </div>
-      <button v-if="!showAll && CHANGELOG.length > 4" type="button" class="linkish" style="margin-top: 10px" @click="showAll = true">显示更早的 {{ CHANGELOG.length - 4 }} 个版本</button>
+      <a class="linkish" :href="RELEASES_URL" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 4px; margin-top: 10px">更早的版本到 GitHub 发布页查看<Icon name="i-ext" /></a>
     </div>
   </section>
 </template>

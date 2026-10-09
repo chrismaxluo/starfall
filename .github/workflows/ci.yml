@@ -1,0 +1,44 @@
+# 自动检查：每次推送代码，在 GitHub 的电脑上跑类型检查、代码规范、全部测试和构建，不占服务器。
+# Windows 上再跑一遍测试，提前发现只在 Windows 上才有的问题（桌面版用）。
+name: 检查
+
+on:
+  push:
+    branches: [main, dev, 'feat/**', 'fix/**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: 检查和测试（Linux）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+
+  windows:
+    name: 测试（Windows）
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test

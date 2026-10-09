@@ -24,7 +24,8 @@ describe('加密', () => {
   it('密钥文件首次生成（权限 600），之后读取同一把', () => {
     const f = path.join(tmp(), 'secret.key');
     const s1 = Secret.load(f);
-    expect(fs.statSync(f).mode & 0o777).toBe(0o600);
+    // Windows 没有这种权限位
+    if (process.platform !== 'win32') expect(fs.statSync(f).mode & 0o777).toBe(0o600);
     expect(Secret.load(f).decrypt(s1.encrypt('x'))).toBe('x');
   });
 });

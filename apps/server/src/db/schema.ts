@@ -254,7 +254,7 @@ export const quickPlay = sqliteTable('quick_play', {
   label: text('label').notNull().default(''),
   /** 后台页面里的快捷键（单个数字或字母） */
   hotkey: text('hotkey'),
-  /** 电脑版的全局快捷键，例如 Ctrl+Alt+1 */
+  /** 桌面版的全局快捷键，例如 Ctrl+Alt+1 */
   globalHotkey: text('global_hotkey'),
 });
 

@@ -16,6 +16,7 @@ export const GiftsFilterSchema = z
     gifts: z.array(z.object({ id: z.number().int().positive(), name: z.string().max(40) }).strict()).max(200),
     guard: z.boolean(),
     sc: z.boolean(),
+    minGold: z.number().int().min(0).max(10_000_000).optional(),
   })
   .strict();
 

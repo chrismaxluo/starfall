@@ -50,7 +50,7 @@
 | 粒子效果 | PixiJS | 8.21 | GPU 渲染，粒子多时也流畅 | Canvas 手写：工作量大 |
 | SVGA | **svgaplayerweb**（复制到项目中固定版本） | 2.3.2 | P0 实测：按显示尺寸绘制，放大后清晰；解析快；不依赖 Worker 等新能力。已停止维护，用自己的接口包一层，便于以后更换 | svga（Lite）：按素材原始尺寸绘制后拉伸，铺满竖屏时明显模糊，且无法配置 |
 | 二维码 | qrcode | 1.5 | 生成扫码登录的二维码 | — |
-| 素材识别 | ffmpeg（ffprobe） | 5.1（Debian 官方源） | 准确读取时长、尺寸、**是否带透明通道** | 浏览器端读取：读不出 WebM 的透明通道 |
+| 素材识别 | 自己解析文件结构（`services/media-info.ts`） | — | 读取时长、尺寸、**是否带透明通道**；不依赖外部程序，桌面版不用再带 ffprobe（安装包少约 40 MB）。v1.4 之前用 ffprobe | ffprobe：准确但要另外安装，Windows 版要多带 100 多 MB；浏览器端读取：读不出 WebM 的透明通道 |
 | 测试 | Vitest + Playwright | 5.0 / 1.63 | Vitest 测逻辑；Playwright 测后台和特效页的真实渲染（服务器上已装无头 Chromium） | Jest：和 Vite 配合不如 Vitest |
 | 代码规范 | ESLint + Prettier | 最新版 | 统一格式，减少低级错误 | Biome：可行，但 Vue 支持尚不完整 |
 | 运行守护 | systemd（服务器） | 系统自带 | 崩溃重启、开机自启、日志（journald） | 原计划 PM2；服务器上改用系统自带的 systemd，少装一个依赖。Windows 版由 Electron 管理进程，不需要 PM2 |
@@ -68,10 +68,7 @@
 | 软件 | 用途 | 安装方式 |
 |---|---|---|
 | pnpm 12 | 包管理 | Node 自带的 corepack 启用 |
-| ffmpeg 5.1 | 读取素材信息 | ✅ 已安装（`apt install ffmpeg`） |
 | Chromium（已装） | 自动化测试 | Playwright 已安装 |
-
-Windows 版会内嵌 ffprobe 程序。ffmpeg 的 GPL 版本与本项目的 GPL-3.0 协议兼容。
 
 ---
 
@@ -396,7 +393,7 @@ data/
 | 环节 | 做法 |
 |---|---|
 | 上传 | 流式写入临时文件，**单个文件上限 100 MB**；按文件头识别真实类型，不只看扩展名 |
-| 识别 | 用 ffprobe 读取时长、尺寸、是否带透明通道（WebM 的 alpha 标记）；GIF、PNG 读取尺寸；SVGA、Lottie 解析自身的元数据 |
+| 识别 | 只读文件头和必要的结构，不解码画面：WebM（含 alpha 标记、没写时长的边录边写文件）、MP4（含分片 MP4）、GIF / APNG / WebP 动图（每帧间隔相加）、PNG / JPEG、MP3 / WAV / Ogg 的时长、尺寸、是否透明；SVGA、Lottie 解析自身的元数据。结构不对的文件拒绝上传 |
 | 存储 | 计算 SHA-256，按哈希命名存入 `data/assets/`；相同文件只存一份 |
 | 生成素材 | 动画类文件上传后自动创建一条 `effects`：名称取文件名（重名自动加序号）、默认居中、默认不叠加文字（F-AS-02、F-AS-08） |
 | 替换文件 | 素材指向新的文件；旧文件没有其他引用时删除（F-AS-07） |

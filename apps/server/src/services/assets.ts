@@ -88,7 +88,8 @@ export class AssetStore {
     for (const f of fs.readdirSync(this.tmpDir)) {
       const p = path.join(this.tmpDir, f);
       try {
-        if (now - fs.statSync(p).mtimeMs >= maxAgeMs) {
+        // 传 0 全部清掉（Windows 上刚写的文件修改时间可能比现在还晚一点点，不能只靠比较时间）
+        if (maxAgeMs <= 0 || now - fs.statSync(p).mtimeMs >= maxAgeMs) {
           fs.rmSync(p, { recursive: true, force: true });
           n++;
         }

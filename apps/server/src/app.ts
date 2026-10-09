@@ -36,6 +36,24 @@ const PUBLIC = new Set(['/api/health', '/api/auth/login']);
 /** 管理后台根目录下可以直接访问的文件类型 */
 const TOP_TYPES: Record<string, string> = { html: 'text/html; charset=utf-8', svg: 'image/svg+xml', ico: 'image/x-icon', png: 'image/png', webmanifest: 'application/manifest+json', txt: 'text/plain; charset=utf-8' };
 
+/** 请求里的 Host 是不是本机地址（端口不限） */
+function isLocalHost(host: string | undefined): boolean {
+  if (!host) return false;
+  try {
+    return ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(`http://${host}`).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function sameHost(origin: string, host: string | undefined): boolean {
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   const app = Fastify({
     trustProxy: ctx.config.trustProxy,
@@ -59,6 +77,19 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
     app.log.error(err);
     return sendError(reply, new HttpError(500, 'internal', '服务出错了，请查看日志'));
   });
+
+  // 桌面版后台没有密码，再加两道：只认本机地址（防止别的网站用自己的域名指向 127.0.0.1 冒充本机），
+  // 接口和后台连接只接受同源页面（防止浏览器里打开的其他网站偷偷调用本机的星临）
+  if (ctx.config.desktop) {
+    app.addHook('onRequest', async (req) => {
+      if (!isLocalHost(req.headers.host)) throw new HttpError(403, 'forbidden', '只能用本机地址访问');
+      const p = req.url.toLowerCase();
+      if (!p.startsWith('/api') && !p.startsWith('/%') && !p.startsWith('/ws/')) return;
+      const origin = req.headers.origin;
+      const site = req.headers['sec-fetch-site'];
+      if ((origin && !sameHost(origin, req.headers.host)) || (site && site !== 'same-origin' && site !== 'none')) throw new HttpError(403, 'forbidden', '不接受其他网站的请求');
+    });
+  }
 
   // 修改类接口只接受 JSON（配合 SameSite=Strict 防止跨站请求伪造）；除登录和健康检查外都需要登录。
   // 判断用路由匹配到的路径模板：Fastify 匹配前会解码 %xx，原始地址 /%61pi/... 也会匹配到 /api/... 的路由；

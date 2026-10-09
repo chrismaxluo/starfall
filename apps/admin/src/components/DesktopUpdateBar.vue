@@ -26,6 +26,7 @@ onBeforeUnmount(() => off?.());
   <div v-if="s?.phase === 'downloading'" class="verbar updbar" :class="{ inline }" role="status">
     <Icon name="i-update" /><b>正在下载新版本 {{ s.version }}</b>
     <span class="updbar-n">{{ Math.floor(s.percent) }}%<template v-if="s.total"> · {{ fileSize(s.transferred) }} / {{ fileSize(s.total) }}</template><template v-if="s.speed"> · {{ fileSize(s.speed) }}/秒</template></span>
+    <span v-if="s.note || s.source">{{ s.note ?? `来源：${s.source}` }}</span>
     <span>在后台下载，不影响直播</span>
     <div class="updbar-track" role="progressbar" aria-label="下载进度" :aria-valuenow="Math.floor(s.percent)" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: `${s.percent}%` }" /></div>
   </div>
@@ -35,7 +36,7 @@ onBeforeUnmount(() => off?.());
     <button class="btn primary" @click="desktop?.installUpdate()">现在重启并安装</button>
   </div>
   <div v-else-if="s?.phase === 'error' && !hideError" class="verbar updbar-err" :class="{ inline }" role="alert">
-    <Icon name="i-info" /><b>下载新版本失败</b><span>网络不稳或连不上 GitHub 时会这样，可以重试，或到 GitHub 发布页手动下载安装包（{{ s.error }}）</span>
+    <Icon name="i-info" /><b>下载新版本失败</b><span>GitHub 直连和几个备用地址都没下载成功，可以稍后重试，或到 GitHub 发布页手动下载安装包（{{ s.error }}）</span>
     <div class="updbar-act"><button class="btn" @click="hideError = true">关闭</button><button class="btn primary" @click="desktop?.checkUpdate()">重试</button></div>
   </div>
 </template>

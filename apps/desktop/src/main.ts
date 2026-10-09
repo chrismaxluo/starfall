@@ -3,10 +3,14 @@
 // 关闭窗口缩到托盘（特效照常播放），可选开机自动启动，有新版本时提示更新。
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeTheme, shell, Tray, utilityProcess } from 'electron';
 import type { MenuItemConstructorOptions, UtilityProcess } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import { autoUpdater, CancellationToken } from 'electron-updater';
+import type { ProgressInfo } from 'electron-updater';
+import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider.js';
+import type { ResolvedUpdateFileInfo } from 'electron-updater/out/types.js';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { downloadSources, normalizeMirror, sourceName, SpeedWatch, viaMirror } from './sources.ts';
 
 const NAME = '星临';
 const DEFAULT_PORT = 17520;
@@ -45,11 +49,13 @@ function log(...parts: unknown[]): void {
 process.on('uncaughtException', (e) => log('未处理的异常', e));
 process.on('unhandledRejection', (e) => log('未处理的异步错误', e));
 
-// ---------- 小设置（端口、是否提示过缩到托盘） ----------
+// ---------- 小设置（端口、是否提示过缩到托盘、自己填的备用下载地址） ----------
 
 interface DesktopState {
   port?: number;
   trayTipShown?: boolean;
+  /** 下载新版本时，GitHub 直连不行先试这个地址（加速站），再试内置的 */
+  updateMirror?: string | null;
 }
 function readState(): DesktopState {
   try {
@@ -405,6 +411,23 @@ function setAutoStart(on: boolean): void {
 
 // ---------- 检查更新（GitHub 发布页） ----------
 
+/** 这次下载用的加速站（null 为 GitHub 直连） */
+let mirror: string | null = null;
+/**
+ * 和自带的 GitHub 来源一样（有没有新版本、latest.yml 里的校验值都直接问 GitHub），
+ * 只是下载安装包和 blockmap 时可以在地址前面加上加速站。electron-updater 版本是锁定的（package.json），升级时确认 resolveFiles 还是这样用
+ */
+type GitHubArgs = ConstructorParameters<typeof GitHubProvider>;
+class MirrorProvider extends GitHubProvider {
+  // setFeedURL 的设置原样传进来（provider 是 custom），按 GitHub 来源处理
+  constructor(options: Record<string, unknown>, updater: GitHubArgs[1], runtime: GitHubArgs[2]) {
+    super({ ...options, provider: 'github' } as GitHubArgs[0], updater, runtime);
+  }
+  override resolveFiles(info: Parameters<GitHubProvider['resolveFiles']>[0]): ResolvedUpdateFileInfo[] {
+    return super.resolveFiles(info).map((f) => ({ ...f, url: new URL(viaMirror(f.url.href, mirror)) }));
+  }
+}
+
 let updateBusy = false;
 /** 已经下载好、等重启安装的版本：后台定时检查时不再问 */
 let downloaded: string | null = null;
@@ -421,8 +444,12 @@ interface UpdateState {
   /** 每秒下载多少字节 */
   speed: number;
   error: string | null;
+  /** 正在从哪里下载（GitHub 直连 / 备用地址 xxx） */
+  source: string | null;
+  /** 换过下载地址时说明原因，例如「GitHub 直连太慢，已改用备用地址 gh-proxy.com」 */
+  note: string | null;
 }
-let updateState: UpdateState = { phase: 'idle', version: null, percent: 0, transferred: 0, total: 0, speed: 0, error: null };
+let updateState: UpdateState = { phase: 'idle', version: null, percent: 0, transferred: 0, total: 0, speed: 0, error: null, source: null, note: null };
 function setUpdateState(patch: Partial<UpdateState>): void {
   updateState = { ...updateState, ...patch };
   win?.webContents.send('sf:update-state', updateState);
@@ -438,6 +465,7 @@ function installNow(): void {
 }
 
 function setupUpdates(): void {
+  autoUpdater.setFeedURL({ provider: 'custom', updateProvider: MirrorProvider, owner: 'chrismaxluo', repo: 'starfall' });
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
   // 测试版也收到测试版更新；正式版只收正式版
@@ -485,9 +513,9 @@ async function checkUpdate(manual: boolean): Promise<void> {
     if (!manual && next === declined) return;
     const a = await dialog.showMessageBox({ type: 'info', title: NAME, message: `星临有新版本 ${next}`, detail: `当前版本 ${app.getVersion()}。现在下载吗？在后台下载，不影响直播。`, buttons: ['下载', '以后再说'], defaultId: 0, cancelId: 1 });
     if (a.response === 0) {
-      setUpdateState({ phase: 'downloading', version: next, percent: 0, transferred: 0, total: r?.updateInfo.files[0]?.size ?? 0, speed: 0, error: null });
+      setUpdateState({ phase: 'downloading', version: next, percent: 0, transferred: 0, total: r?.updateInfo.files[0]?.size ?? 0, speed: 0, error: null, source: null, note: null });
       try {
-        await autoUpdater.downloadUpdate();
+        await downloadWithFallback();
       } catch (e) {
         setUpdateState({ phase: 'error', error: (e as Error).message });
         throw e;
@@ -501,6 +529,49 @@ async function checkUpdate(manual: boolean): Promise<void> {
   } finally {
     updateBusy = false;
   }
+}
+
+/**
+ * 下载新版本：先直连 GitHub；连不上、断了、或者太慢（sources.ts）就换下一个加速站。
+ * 最后一个地址不再因为慢而换掉，慢也下完；全都失败时报最后一个错误
+ */
+async function downloadWithFallback(): Promise<void> {
+  const sources = downloadSources(readState().updateMirror);
+  let note: string | null = null;
+  let lastError: unknown = null;
+  for (const [i, src] of sources.entries()) {
+    mirror = src;
+    const name = sourceName(src);
+    const last = i === sources.length - 1;
+    setUpdateState({ percent: 0, transferred: 0, speed: 0, source: name, note });
+    log('[更新]', `从${name}下载`);
+    const token = new CancellationToken();
+    const watch = new SpeedWatch(Date.now());
+    const onProgress = (p: ProgressInfo) => watch.progress(p.transferred, Date.now());
+    autoUpdater.on('download-progress', onProgress);
+    let slow = false;
+    const timer = last
+      ? null
+      : setInterval(() => {
+          if (!watch.tooSlow(Date.now())) return;
+          slow = true;
+          token.cancel();
+        }, 1000);
+    try {
+      await autoUpdater.downloadUpdate(token);
+      return;
+    } catch (e) {
+      lastError = e;
+      log('[更新]', slow ? `${name}太慢，换下一个地址` : `${name}下载失败`, e);
+      const next = sources[i + 1];
+      if (next !== undefined) note = `${name}${slow ? '太慢' : '下载失败'}，已改用${sourceName(next)}`;
+    } finally {
+      if (timer) clearInterval(timer);
+      autoUpdater.off('download-progress', onProgress);
+      mirror = null;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 // ---------- 给后台页面用的功能（设置页的「桌面版」卡片） ----------
@@ -519,7 +590,15 @@ function setupIpc(): void {
       if (!ours(e)) throw new Error('不允许');
       return (fn as (...a: unknown[]) => unknown)(...args);
     });
-  handle('sf:info', () => ({ version: app.getVersion(), autoStart: autoStart(), canUpdate: app.isPackaged, dataDir: USER_DIR }));
+  handle('sf:info', () => ({ version: app.getVersion(), autoStart: autoStart(), canUpdate: app.isPackaged, dataDir: USER_DIR, updateMirror: readState().updateMirror ?? null }));
+  // 自己填的备用下载地址：格式不对返回 false；空的为不用
+  handle('sf:set-update-mirror', (v: string) => {
+    const m = normalizeMirror(String(v ?? ''));
+    if (m === undefined) return false;
+    writeState({ updateMirror: m });
+    log('备用下载地址', m ?? '（不用）');
+    return true;
+  });
   handle('sf:set-auto-start', (on: boolean) => {
     setAutoStart(Boolean(on));
     return autoStart();

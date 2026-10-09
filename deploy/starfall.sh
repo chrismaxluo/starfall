@@ -3,6 +3,8 @@
 #
 # 安装（Debian / Ubuntu，用 root 运行）：
 #   curl -fsSL https://raw.githubusercontent.com/chrismaxluo/starfall/main/deploy/starfall.sh | bash -s install
+# 国内服务器连不上 GitHub 时，在网址前面加上加速站：
+#   curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/chrismaxluo/starfall/main/deploy/starfall.sh | bash -s install
 # 装好后用 starfall 命令管理：
 #   starfall update      更新到最新正式版
 #   starfall rollback    退回更新前的版本
@@ -25,7 +27,14 @@ starfall_main() {
   local KEEP_BACKUPS=3
 
   # 安装时可以用参数改，之后保存在配置文件里
-  local DIR=/opt/starfall PORT=17520 DOMAIN='' TZ_NAME=Asia/Shanghai REGISTRY=''
+  local DIR=/opt/starfall PORT=17520 DOMAIN='' TZ_NAME=Asia/Shanghai REGISTRY='' MIRROR=''
+  # GitHub 公共加速站：直连 GitHub 连不上或太慢时依次试（自己填的 MIRROR 排在最前面）。
+  # 都是别人免费提供的，随时可能停用；桌面版 apps/desktop/src/sources.ts 里有同样的一份，改的时候两边一起改
+  local GH_MIRRORS=(https://gh-proxy.com/ https://ghfast.top/ https://gh.llkk.cc/ https://ghproxy.net/)
+  # 太慢的标准（和桌面版一样）：连续 15 秒平均每秒不到 200KB
+  local SLOW_BPS=204800 SLOW_SEC=15
+  # 这次的代码是从哪个加速站拉的（空为直连）；--no-verify 时不和 GitHub 核对
+  local FETCHED_VIA='' NO_VERIFY=0 AUTO_REGISTRY=''
 
   # ---------- 输出 ----------
   if [[ -t 1 ]]; then
@@ -60,6 +69,7 @@ PORT=$(printf '%q' "$PORT")
 DOMAIN=$(printf '%q' "$DOMAIN")
 TZ_NAME=$(printf '%q' "$TZ_NAME")
 REGISTRY=$(printf '%q' "$REGISTRY")
+MIRROR=$(printf '%q' "$MIRROR")
 EOF
   }
 
@@ -84,16 +94,90 @@ EOF
     printf '%s' "$want"
   }
 
+  # 加速站地址：必须是 http(s) 网址，末尾补上 /
+  normalize_mirror() {
+    local m=$1
+    [[ -z $m ]] && return 0
+    [[ $m =~ ^https?://[^[:space:]?#]+$ ]] || die "加速站地址不对：$m（例如 https://ghfast.top/）"
+    [[ $m == */ ]] || m=$m/
+    printf '%s' "$m"
+  }
+
+  # 拉代码：先直连 GitHub；连不上或太慢时依次换加速站（最后一个不限速，慢也拉完）。
+  # 用了加速站时记在 FETCHED_VIA，装之前要和 GitHub 核对版本（verify_target）。quiet：不打印换地址的提示
+  fetch_code() {
+    local quiet=${1:-} src n=0
+    local -a srcs=('')
+    if [[ $REPO_URL == https://github.com/* ]]; then
+      [[ -n $MIRROR ]] && srcs+=("$MIRROR")
+      for src in "${GH_MIRRORS[@]}"; do [[ $src != "$MIRROR" ]] && srcs+=("$src"); done
+    fi
+    for src in "${srcs[@]}"; do
+      n=$((n + 1))
+      local -a limit=(-c "http.lowSpeedLimit=$SLOW_BPS" -c "http.lowSpeedTime=$SLOW_SEC")
+      ((n == ${#srcs[@]})) && limit=()
+      if git_in "${limit[@]}" fetch -q --tags --force "$src$REPO_URL" '+refs/heads/*:refs/remotes/origin/*'; then
+        FETCHED_VIA=$src
+        [[ -n $src && -z $quiet ]] && warn "GitHub 直连连不上或太慢，这次代码从加速站 $src 下载"
+        return 0
+      fi
+      [[ -z $quiet ]] && warn "从${src:-GitHub 直连}下载代码失败或太慢，换下一个"
+    done
+    return 1
+  }
+
+  # 从加速站拉的代码：要装的版本必须和 GitHub 上的一致（先用 git 问，再问 GitHub 的接口），核对不了就不装
+  verify_target() {
+    local target=$1 ref have want repo
+    [[ -z $FETCHED_VIA || $NO_VERIFY == 1 ]] && return 0
+    if [[ $target == origin/* ]]; then
+      ref=refs/heads/${target#origin/}
+    elif git_in show-ref --verify -q "refs/tags/$target"; then
+      ref=refs/tags/$target
+    elif [[ $target =~ ^[0-9a-f]{40}$ ]]; then
+      return 0 # 完整的提交编号本身就能核对内容
+    else
+      die "从加速站下载代码时，只能装版本号（例如 v1.5.0）、dev、main 或完整的提交编号"
+    fi
+    have=$(git_in rev-parse "$ref")
+    want=$(timeout 30 git ls-remote "$REPO_URL" "$ref" 2>/dev/null | awk -v r="$ref" '$2 == r { print $1 }') || true
+    if [[ -z $want ]]; then
+      repo=${REPO_URL#https://github.com/}
+      want=$(curl -fsS -m 15 "https://api.github.com/repos/${repo%.git}/git/ref/${ref#refs/}" 2>/dev/null | grep -o '"sha": *"[0-9a-f]\{40\}"' | grep -o '[0-9a-f]\{40\}' | head -n1) || true
+    fi
+    [[ -n $want ]] || die "连不上 GitHub 核对版本，为了安全没有继续。确认信任加速站 $FETCHED_VIA 的话，加 --no-verify 再运行"
+    [[ $want == "$have" ]] || die "加速站 $FETCHED_VIA 下载的 $target 和 GitHub 上的不一致，为了安全没有继续。可以稍后再试，或用 --mirror 换一个加速站"
+    ok "已和 GitHub 核对：$target 一致"
+  }
+
+  # 没指定依赖镜像时，先测一下 npm 官方源：15 秒内平均每秒不到 200KB 或连不上，这次改用国内镜像 npmmirror
+  # （依赖文件都带校验值，换镜像不影响安全）
+  pick_registry() {
+    [[ -n $REGISTRY || -n $AUTO_REGISTRY ]] && return 0
+    local speed
+    speed=$(curl -sS -o /dev/null -m "$SLOW_SEC" -w '%{speed_download}' https://registry.npmjs.org/typescript/-/typescript-5.4.5.tgz 2>/dev/null) || true
+    speed=${speed%%.*}
+    if ((${speed:-0} < SLOW_BPS)); then
+      AUTO_REGISTRY=https://registry.npmmirror.com
+      warn "npm 官方源连不上或太慢，这次改用国内镜像 $AUTO_REGISTRY"
+    else
+      AUTO_REGISTRY=-
+    fi
+  }
+
   pnpm_run() {
     (
       cd "$DIR"
       export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=1
-      if [[ -n $REGISTRY ]]; then export npm_config_registry=$REGISTRY COREPACK_NPM_REGISTRY=$REGISTRY; fi
+      local reg=$REGISTRY
+      [[ -z $reg && $AUTO_REGISTRY != - ]] && reg=$AUTO_REGISTRY
+      if [[ -n $reg ]]; then export npm_config_registry=$reg COREPACK_NPM_REGISTRY=$reg; fi
       pnpm "$@" </dev/null
     )
   }
 
   install_deps() {
+    pick_registry
     step "安装依赖（pnpm install）"
     pnpm_run install --frozen-lockfile || return 1
   }
@@ -205,6 +289,8 @@ EOF
         --domain) DOMAIN=$2; shift 2 ;;
         --tz) TZ_NAME=$2; shift 2 ;;
         --registry) REGISTRY=$2; shift 2 ;;
+        --mirror) MIRROR=$(normalize_mirror "$2"); shift 2 ;;
+        --no-verify) NO_VERIFY=1; shift ;;
         *) die "不认识的参数：$1（starfall help 查看用法）" ;;
       esac
     done
@@ -248,9 +334,13 @@ EOF
     fi
 
     step "下载星临到 $DIR"
-    git clone -q "$REPO_URL" "$DIR"
+    mkdir -p "$DIR"
+    git -c init.defaultBranch=main init -q "$DIR"
+    git_in remote add origin "$REPO_URL"
+    fetch_code || die "下载代码失败：GitHub 直连和几个加速站都不行。可以稍后重试，或用 --mirror 指定一个能用的加速站（先删掉 $DIR）"
     local target
     target=$(resolve_target "$version")
+    verify_target "$target"
     git_in -c advice.detachedHead=false checkout -q --detach "$target"
     ok "版本 $(current_label)"
 
@@ -324,21 +414,28 @@ EOF
 
   # ---------- update ----------
   cmd_update() {
-    local version='' force=0
+    local version='' force=0 mirror_arg=-
     while [[ $# -gt 0 ]]; do
       case $1 in
         --version) version=$2; shift 2 ;;
         --force) force=1; shift ;;
+        --mirror) mirror_arg=$2; shift 2 ;;
+        --no-verify) NO_VERIFY=1; shift ;;
         -*) die "不认识的参数：$1" ;;
         *) version=$1; shift ;;
       esac
     done
     need_root
     load_conf
+    # 指定的加速站记进配置文件，以后更新也先试它（--mirror '' 清空）
+    if [[ $mirror_arg != - ]]; then
+      MIRROR=$(normalize_mirror "$mirror_arg")
+      save_conf
+    fi
     [[ -z $(git_in status --porcelain --untracked-files=no) ]] || die "$DIR 里有改动过的文件，先处理掉（git -C $DIR status 查看）"
 
     step "检查新版本"
-    git_in fetch -q --tags --force origin
+    fetch_code || die "下载代码失败：GitHub 直连和几个加速站都不行。可以稍后重试，或用 --mirror 指定一个能用的加速站"
     local target from from_label to_label
     target=$(resolve_target "$version")
     from=$(git_in rev-parse HEAD)
@@ -351,6 +448,7 @@ EOF
     to_label=$target
     [[ $to_label == origin/* ]] && to_label="${target#origin/}（$(git_in rev-parse --short "$target")）"
     echo "$from_label → $to_label"
+    verify_target "$target"
     check_live "$force"
 
     step "备份数据库"
@@ -472,7 +570,7 @@ EOF
     if systemctl is-active -q "$SERVICE"; then ok "服务运行中"; else warn "服务没有运行（systemctl status $SERVICE）"; fi
     if curl -fsS -m 2 "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then ok "能正常响应"; else warn "没有响应"; fi
     if is_live; then echo "直播间：正在直播"; else echo "直播间：没有在直播（或查不到）"; fi
-    git_in fetch -q --tags origin 2>/dev/null || true
+    fetch_code quiet 2>/dev/null || true
     local latest
     latest=$(latest_release)
     if [[ -n $latest && $(git_in rev-parse "$latest^{commit}") != $(git_in rev-parse HEAD) ]] && git_in merge-base --is-ancestor HEAD "$latest" 2>/dev/null; then
@@ -488,7 +586,7 @@ EOF
 
   cmd_versions() {
     load_conf
-    git_in fetch -q --tags origin 2>/dev/null || true
+    fetch_code quiet 2>/dev/null || true
     echo "正式版（最新的在前）："
     git_in tag -l 'v*' --sort=-v:refname | grep -v -- '-' | head -n 10 | sed 's/^/  /'
     echo "现在：$(current_label)"
@@ -533,9 +631,13 @@ EOF
       --port 17520              端口
       --domain 域名              用 Caddy 自动配置 HTTPS（域名要先解析到这台服务器）
       --tz Asia/Shanghai        主播所在时区
-      --registry 地址            下载依赖用的镜像，例如 https://registry.npmmirror.com
+      --registry 地址            下载依赖用的镜像，例如 https://registry.npmmirror.com（不填时官方源太慢会自动用它）
+      --mirror 地址              GitHub 直连不行时先试这个加速站，例如 https://ghfast.top/（不填时用内置的几个）
+      --no-verify               从加速站下载代码后，连不上 GitHub 核对版本也继续（不建议）
   starfall adopt            以前按部署指南手动装的，改用本命令管理
   starfall update [版本]     更新到最新正式版，或指定版本；正在直播时会拒绝，加 --force 坚持
+      --mirror 地址              同上，并记下来，以后更新也先试它（--mirror '' 清空）
+      --no-verify               同上
   starfall rollback         退回上一次更新前的版本
   starfall status           运行状态、版本、有没有新版本
   starfall versions         可以安装的版本

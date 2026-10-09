@@ -4,6 +4,8 @@ export interface DesktopInfo {
   autoStart: boolean;
   canUpdate: boolean;
   dataDir: string;
+  /** 自己填的备用下载地址（加速站），没填为 null */
+  updateMirror: string | null;
 }
 /** 下载新版本的进度（apps/desktop/src/main.ts 的 UpdateState） */
 export interface UpdateState {
@@ -15,11 +17,17 @@ export interface UpdateState {
   /** 每秒下载多少字节 */
   speed: number;
   error: string | null;
+  /** 正在从哪里下载（GitHub 直连 / 备用地址 xxx） */
+  source: string | null;
+  /** 换过下载地址时说明原因 */
+  note: string | null;
 }
 export interface DesktopBridge {
   info(): Promise<DesktopInfo>;
   setAutoStart(on: boolean): Promise<boolean>;
   checkUpdate(): Promise<void>;
+  /** 保存备用下载地址（空的为不用）；格式不对返回 false */
+  setUpdateMirror(v: string): Promise<boolean>;
   updateState(): Promise<UpdateState>;
   /** 进度有变化时回调；返回取消监听的函数 */
   onUpdateState(cb: (s: UpdateState) => void): () => void;

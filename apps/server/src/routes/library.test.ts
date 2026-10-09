@@ -204,7 +204,9 @@ describe('修改素材', () => {
     const alpha = (await upload('/api/assets', 'a.webm', media('alpha.webm'))).json().effect;
     expect(opaque).toMatchObject({ feather: 'global', featherPct: 10 });
     const pct = async (id: number, draft?: object) => (await req({ method: 'POST', url: '/api/preview', payload: { effectId: id, ...(draft ? { draft } : {}) } })).json().effect.featherPct;
-    // 全局默认关闭
+    // 全局默认打开、10%；关掉后不羽化
+    expect(await pct(opaque.id)).toBe(10);
+    await req({ method: 'PUT', url: '/api/settings', payload: { featherOn: false } });
     expect(await pct(opaque.id)).toBe(0);
     expect((await req({ method: 'PUT', url: '/api/settings', payload: { featherOn: true, featherPct: 15 } })).json()).toMatchObject({ featherOn: true, featherPct: 15 });
     expect(await pct(opaque.id)).toBe(15);

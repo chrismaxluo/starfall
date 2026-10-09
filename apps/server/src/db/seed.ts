@@ -88,8 +88,8 @@ export const DEFAULT_SETTINGS = {
   giftComboSec: 3,
   /** 每天自动备份数据库和配置（F-DA-03） */
   autoBackup: true,
-  /** 素材上下羽化（全局）：只对没有透明通道的素材生效，素材里可以单独设置 */
-  featherOn: false,
+  /** 素材上下羽化（全局）：只对没有透明通道的素材生效，素材里可以单独设置；默认开 */
+  featherOn: true,
   featherPct: 10,
   /** 新手引导已完成或跳过（F-UI-06） */
   onboarded: false,

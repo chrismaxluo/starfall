@@ -45,11 +45,11 @@ describe('弹幕规则接口', () => {
 });
 
 describe('礼物规则接口', () => {
-  it('默认：≥ 100 元星冕、10 ~ 100 元礼物感谢、1 ~ 10 元字·一行（关闭）；连击 3 秒', async () => {
+  it('默认：≥ 100 元、10 ~ 100 元 B站·礼物动画，1 ~ 10 元字·一行，三段都关着；连击 3 秒', async () => {
     const t = await setup();
     const g = (await t.req({ method: 'GET', url: '/api/rules/gift' })).json();
     expect(g).toMatchObject({ specific: [], comboEnabled: true, comboSec: 3 });
-    expect(g.bands.map((b: { fromGold: number; enabled: boolean }) => [b.fromGold, b.enabled])).toEqual([[100_000, true], [10_000, true], [1000, false]]);
+    expect(g.bands.map((b: { fromGold: number; enabled: boolean }) => [b.fromGold, b.enabled])).toEqual([[100_000, false], [10_000, false], [1000, false]]);
   });
 
   it('保存指定礼物、分档、连击；校验重复和素材', async () => {
@@ -114,6 +114,7 @@ describe('模拟与预览', () => {
   it('模拟弹幕、礼物、上舰', async () => {
     const t = await setup();
     await t.req({ method: 'POST', url: '/api/rules/danmu', payload: dmRule(t.effectId('晶·弹幕')) });
+    t.ctx.db.$client.prepare('update rule_gift_bands set enabled = 1 where from_gold >= 10000').run();
     t.ctx.settings.set('offlinePolicy', 'play');
     const sim = (payload: object) => t.req({ method: 'POST', url: '/api/simulate', payload }).then((r) => r.json());
     expect(await sim({ kind: 'danmu', viewer: {}, text: '生日快乐' })).toMatchObject({ rule: '弹幕 · 「生日快乐」', effect: { name: '晶·弹幕' }, status: 'played', notes: ['特效页现在不在线，直播画面里看不到'] });

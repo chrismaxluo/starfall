@@ -143,11 +143,11 @@ export function seed(db: Db): void {
         { fromLevel: 1, effectId: id('霜·粉丝进场'), cooldownMin: 15, enabled: true },
       ]).run();
     }
-    // 礼物：≥ 10 元播 B站动画（没有动画的礼物按价值显示晶耀、晶礼）、1 ~ 10 元一行字（默认关闭）；低于 1 元不播
+    // 礼物：≥ 10 元播 B站动画（没有动画的礼物按价值显示晶耀、晶礼）、1 ~ 10 元一行字；低于 1 元不播。三段默认都关着，主播自己打开
     if (!tx.select().from(ruleGiftBands).limit(1).get()) {
       tx.insert(ruleGiftBands).values([
-        { fromGold: 100_000, effectId: id('B站·礼物动画'), enabled: true },
-        { fromGold: 10_000, effectId: id('B站·礼物动画'), enabled: true },
+        { fromGold: 100_000, effectId: id('B站·礼物动画'), enabled: false },
+        { fromGold: 10_000, effectId: id('B站·礼物动画'), enabled: false },
         { fromGold: 1000, effectId: id('字·一行'), enabled: false },
       ]).run();
     }

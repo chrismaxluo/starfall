@@ -45,6 +45,8 @@ async function setup(opts: { overlay?: boolean } = {}) {
   cleanup.push(() => t.app.close());
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'], now: new Date('2026-09-25T12:00:00+08:00') });
   t.ctx.db.insert(room).values({ id: 1, roomId: 30000, anchorUid: ANCHOR, anchorName: '主播' }).run();
+  // 礼物规则新安装默认关着；这里按主播打开 10 元以上两段后的样子测
+  t.ctx.db.$client.prepare('update rule_gift_bands set enabled = 1 where from_gold >= 10000').run();
   const live = fakeLive();
   const hub = new Hub();
   const p = new Pipeline({ ...t.ctx, live, hub, gifts: { find: (id: number) => GIFTS[id] }, giftFx: { forGift: (g) => (g?.effectId === 699 ? { fx: CAR_FX, durationMs: 5700 } : undefined) }, timeZone: 'Asia/Shanghai', rng: () => 0 });

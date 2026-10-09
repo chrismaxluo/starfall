@@ -8,7 +8,7 @@
 
 识别每一位进场的观众，在弹幕、礼物、上舰的时刻，于直播画面上播放专属的动画、欢迎语与音效。
 
-[![Version](https://img.shields.io/badge/version-1.5.0-5451D6?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-5451D6?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-2F6FEB?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24-3C873A?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -228,6 +228,7 @@ pnpm --filter @starfall/server start
 - [x] **v1.3.0**：弹幕列表（所有人的弹幕排成一列显示在直播画面上）；直播软件输出页改版
 - [x] **v1.4.0**：管理后台体验全面改进（运行状态提醒、真实画面预览、撤销、事件原因与处理入口、备份恢复）；弹幕列表条数设置与自动消失
 - [x] **v1.5.0**：礼物特效改版（播 B站官方全屏动画；动图礼物图；按价值和大航海身份配色）；送礼名单（本场收到的自动显示，或手动挑记录一直挂着；循环滚动）；荣耀等级进场；素材快捷播放；服务器版一条命令安装、更新、退回；触发规则、事件记录等页面改版
+- [x] **v1.6.0**：国内下载更新更容易（GitHub 连不上或太慢时自动换加速站）；送礼名单最低金额；内置素材统一命名；新安装的默认设置调整；桌面版卸载时可以选择是否删除数据
 - [x] Windows 桌面版（v1.5.0 起为正式版）：在主播电脑上直接运行，界面与服务器版一致（[说明](docs/desktop.md)）
 - [ ] 第二期：醒目留言、关注、点赞触发；直播数据统计；观众档案
 

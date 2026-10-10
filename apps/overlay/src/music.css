@@ -144,16 +144,7 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .st-glass .mu-eq i { box-shadow: 0 0 10px rgba(var(--tint2), .7); }
 .st-glass .mu-prog { margin-top: 10px; }
 .st-glass .mu-fill { background: linear-gradient(90deg, rgba(var(--tint), .9), rgb(var(--tint2)) 70%, #fff); box-shadow: 0 0 12px rgba(var(--tint2), .7); }
-/* 歌词、接下来、提示、空闲提示：直播软件里模糊不到下面的画面，磨砂感做在自己身上（更实的底色 + 封面色 + 细颗粒） */
-.st-glass .ly-box, .st-glass .mu-queue, .st-glass .mu-idle, .st-glass .mu-toast {
-  background:
-    var(--grain),
-    linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 45%, rgba(255,255,255,.06)),
-    radial-gradient(110% 160% at 0% 0%, rgba(var(--tint), .26), transparent 60%),
-    radial-gradient(110% 160% at 100% 100%, rgba(var(--tint2), .2), transparent 60%),
-    rgba(24,24,38,.8);
-  background-blend-mode: soft-light, normal, normal, normal, normal; }
-.st-glass .ly-box { width: 100%; padding: 12px 22px 14px; border-radius: 22px; }
+.st-glass .ly-box { width: 100%; padding: 12px 22px 14px; border-radius: 22px; background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(12,14,26,.36); -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%); }
 .st-glass .ly-cur { filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)) drop-shadow(0 0 16px rgba(var(--tint2), .55)); }
 .st-glass .mu-head { animation: gPulse 1.8s ease-in-out infinite; }
 @keyframes gPulse { 50% { box-shadow: 0 0 0 5px rgba(var(--tint2), .2), 0 0 18px rgba(var(--tint2), 1); } }
@@ -253,39 +244,39 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
    换歌、有人点歌时胶囊放大，提示写在里面；歌词、接下来、提示用同款玻璃
    =================================================================== */
 .st-minimal .mu-card { width: auto; max-width: 100%; }
-/* 直播软件里，窗口模糊不到下面的游戏、摄像头画面（backdrop-filter 只对网页自己的内容有效），
-   所以磨砂感做在胶囊自己身上：更实的底色 + 一点封面色 + 细颗粒 + 内发光；叠在什么画面上看起来都是毛玻璃 */
-.st-minimal .mu-body, .st-minimal .ly-box, .st-minimal .mu-queue, .st-minimal .mu-idle, .st-minimal .mu-toast { position: relative; isolation: isolate; color: #fff;
+/* 清透玻璃：直播软件里，窗口模糊不到下面的游戏、摄像头画面（backdrop-filter 只对网页自己的内容有效），
+   所以不靠模糊，靠通透的底 + 四周亮边 + 上沿高光 + 一道定时扫过的反光体现玻璃感；边缘稍压暗、字加阴影，花哨的画面上也看得清 */
+.st-minimal .mu-body, .st-minimal .ly-box, .st-minimal .mu-queue, .st-minimal .mu-idle, .st-minimal .mu-toast { position: relative; isolation: isolate; color: #fff; overflow: hidden;
   background:
-    var(--grain),
-    linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05) 50%, rgba(255,255,255,.09)),
-    radial-gradient(120% 160% at 0% 0%, rgba(var(--tint), .3), transparent 62%),
-    radial-gradient(120% 160% at 100% 100%, rgba(var(--tint2), .2), transparent 62%),
-    rgba(32,32,44,.82);
-  background-blend-mode: soft-light, normal, normal, normal, normal;
+    linear-gradient(115deg, transparent 28%, rgba(255,255,255,.16) 40%, rgba(255,255,255,.04) 48%, transparent 56%),
+    radial-gradient(150% 130% at 50% 45%, rgba(8,8,18,.04) 35%, rgba(8,8,18,.4) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.26), rgba(255,255,255,.05) 45%, rgba(255,255,255,.14)),
+    rgba(18,18,30,.2);
   -webkit-backdrop-filter: blur(24px) saturate(190%); backdrop-filter: blur(24px) saturate(190%);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 1px rgba(255,255,255,.12), inset 0 0 14px rgba(255,255,255,.06), 0 14px 32px -12px rgba(0,0,0,.5); }
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.8), inset 0 -1px 0 rgba(255,255,255,.35), inset 1px 0 0 rgba(255,255,255,.3), inset -1px 0 0 rgba(255,255,255,.22), inset 0 0 22px rgba(255,255,255,.14), 0 12px 28px -12px rgba(0,0,0,.45); }
 /* 一圈渐变的亮边（左上、右下亮） */
-.st-minimal .mu-body::before, .st-minimal .ly-box::before, .st-minimal .mu-queue::before, .st-minimal .mu-idle::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.2px; pointer-events: none;
-  background: linear-gradient(135deg, rgba(255,255,255,.8), rgba(255,255,255,.12) 32%, rgba(255,255,255,.04) 62%, rgba(255,255,255,.5));
+.st-minimal .mu-body::before, .st-minimal .ly-box::before, .st-minimal .mu-queue::before, .st-minimal .mu-idle::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.22) 30%, rgba(255,255,255,.08) 62%, rgba(255,255,255,.8));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-/* 上沿的一道高光 */
-.st-minimal .mu-body::after, .st-minimal .mu-idle::after { content: ""; position: absolute; left: 14%; right: 14%; top: 1px; height: 14px; border-radius: 999px; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0)); }
+/* 一道反光，每隔几秒从左到右扫过 */
+.st-minimal .mu-body::after, .st-minimal .mu-idle::after { content: ""; position: absolute; left: -45%; top: 0; width: 40%; height: 100%; pointer-events: none; transform: skewX(-18deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent); animation: iSheen 6s ease-in-out infinite; }
+@keyframes iSheen { 0%, 55% { left: -45%; } 100% { left: 130%; } }
+.st-minimal .mu-title, .st-minimal .mu-artist, .st-minimal .i-note, .st-minimal .mu-queue, .st-minimal .mu-idle, .st-minimal .mu-toast { text-shadow: 0 1px 2px rgba(0,0,0,.65), 0 0 12px rgba(0,0,0,.35); }
 .lite.st-minimal .mu-body, .lite.st-minimal .ly-box, .lite.st-minimal .mu-queue, .lite.st-minimal .mu-idle, .lite.st-minimal .mu-toast { -webkit-backdrop-filter: none; backdrop-filter: none; }
 .st-minimal .mu-body { display: grid; grid-template-columns: 48px minmax(0, auto) auto; align-items: center; gap: 14px; max-width: 540px; padding: 9px 20px 9px 9px; border-radius: 999px; overflow: hidden;
   animation: iGlow 3.6s ease-in-out infinite; transition: padding .5s cubic-bezier(.3,1.5,.5,1), transform .5s cubic-bezier(.3,1.5,.5,1); }
 /* 外圈封面色的呼吸光（叠在玻璃本身的阴影上） */
 @keyframes iGlow {
-  0%, 100% { box-shadow: inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 1px rgba(255,255,255,.12), inset 0 0 14px rgba(255,255,255,.06), 0 0 18px -2px rgba(var(--tint), .45), 0 14px 32px -12px rgba(0,0,0,.5); }
-  50% { box-shadow: inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 1px rgba(255,255,255,.12), inset 0 0 14px rgba(255,255,255,.06), 0 0 30px 2px rgba(var(--tint2), .55), 0 14px 32px -12px rgba(0,0,0,.5); } }
+  0%, 100% { box-shadow: inset 0 1.5px 0 rgba(255,255,255,.8), inset 0 -1px 0 rgba(255,255,255,.35), inset 1px 0 0 rgba(255,255,255,.3), inset -1px 0 0 rgba(255,255,255,.22), inset 0 0 22px rgba(255,255,255,.14), 0 0 20px -4px rgba(var(--tint), .5), 0 12px 28px -12px rgba(0,0,0,.45); }
+  50% { box-shadow: inset 0 1.5px 0 rgba(255,255,255,.8), inset 0 -1px 0 rgba(255,255,255,.35), inset 1px 0 0 rgba(255,255,255,.3), inset -1px 0 0 rgba(255,255,255,.22), inset 0 0 22px rgba(255,255,255,.14), 0 0 28px 0 rgba(var(--tint2), .55), 0 12px 28px -12px rgba(0,0,0,.45); } }
 .st-minimal .paused .mu-body { animation: none; }
 .st-minimal .mu-art { width: 48px; height: 48px; transition: opacity .25s .12s; }
 .noting .mu-art, .noting .mu-meta, .noting .i-wave, .noting .i-prog { transition: opacity .15s; }
 .st-minimal .mu-disc { border-radius: 50%; animation: muSpin 12s linear infinite; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .st-minimal .paused .mu-disc { animation-play-state: paused; }
 .st-minimal .mu-meta { gap: 2px; transition: opacity .25s .12s; }
-.st-minimal .mu-title { font-size: 19px; font-weight: 600; letter-spacing: -.005em; text-shadow: 0 1px 4px rgba(0,0,0,.45); }
-.st-minimal .mu-artist { font-size: 13px; color: rgba(255,255,255,.72); text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.st-minimal .mu-title { font-size: 19px; font-weight: 600; letter-spacing: -.005em; }
+.st-minimal .mu-artist { font-size: 13px; color: rgba(255,255,255,.78); }
 .st-minimal .mu-disc { box-shadow: 0 0 0 1.5px rgba(255,255,255,.35), 0 2px 8px rgba(0,0,0,.35); }
 .i-wave { position: relative; height: 22px; gap: 3px; margin-left: 6px; transition: opacity .25s; }
 /* 暂停时音柱换成暂停符号 */
@@ -309,7 +300,7 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .noting .mu-art, .noting .mu-meta, .noting .i-wave, .noting .i-prog { opacity: 0; }
 .st-minimal .mu-lyric { margin-top: -4px; }
 .st-minimal .ly-box { padding: 8px 18px 9px; border-radius: 18px; }
-.st-minimal .ly-cur { font-size: 23px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+.st-minimal .ly-cur { font-size: 23px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)) drop-shadow(0 0 10px rgba(0,0,0,.35)); }
 .st-minimal .ly-sub { display: none; }
 .st-minimal .mu-queue { width: min(440px, 100%); padding: 10px 16px 12px; border-radius: 20px; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
 .st-minimal .mu-qt span, .st-minimal .mu-qb, .st-minimal .mu-qh, .st-minimal .mu-qmore { opacity: .8; }
@@ -324,5 +315,5 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mu-eq i, .mu-disc, .g-bg, .g-sheen, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
+  .mu-eq i, .mu-disc, .g-bg, .g-sheen, .st-minimal .mu-body::after, .st-minimal .mu-idle::after, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
 }

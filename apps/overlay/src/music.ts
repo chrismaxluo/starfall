@@ -212,21 +212,78 @@ function renderCard(s: MusicState): void {
     if (photo) photo.animate([{ opacity: 0, transform: 'translate(-10px, -26px) rotate(-14deg) scale(1.08)' }, { opacity: 1, transform: 'rotate(-4deg)' }], { duration: 700, delay: 120, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'backwards' });
     else if (art) art.animate([{ opacity: 0, transform: 'scale(.7) rotate(-8deg)' }, { opacity: 1, transform: 'none' }], { duration: 720, delay: 100, easing: 'cubic-bezier(.3,1.5,.5,1)', fill: 'backwards' });
   }
-  // 灵动岛：换了歌先展开，写一下现在放的是什么
-  if (s.display.style === 'minimal') island([h('i', { class: 'i-dot play' }), h('span', {}, '正在播放'), h('b', {}, `《${song.name}》`), h('span', {}, `${n.item.by.name} 点的`)], 3200);
+  // 灵动岛：从一个小胶囊弹开到正常大小，再展开写一下现在放的是什么
+  if (s.display.style === 'minimal') {
+    const b = built.el;
+    requestAnimationFrame(() => {
+      measureIsland(b);
+      if (!reduced()) {
+        b.style.transition = 'none';
+        b.style.width = '120px';
+        b.style.height = '36px';
+        void b.offsetWidth;
+        b.style.transition = '';
+      }
+      requestAnimationFrame(() => sizeIsland(b, null));
+    });
+    // 字体加载完后歌名的宽度会变：重新量一次
+    void document.fonts?.ready.then(() => {
+      if (built?.el !== b || card.classList.contains('noting')) return;
+      measureIsland(b);
+      sizeIsland(b, null);
+    });
+    const name = song.name;
+    const by = n.item.by.name;
+    setTimeout(() => built?.el === b && island([h('i', { class: 'i-dot play' }), h('span', {}, '正在播放'), h('b', {}, `《${name}》`), h('span', { class: 'i-dim' }, `${by} 点的`)], 3200), reduced() ? 0 : 650);
+  }
   lastLine = -2;
+}
+
+/** 量灵动岛平时（收起时）的宽高：先临时取消固定的宽高量自然大小，再放回去（不触发动画） */
+function measureIsland(b: HTMLElement): void {
+  const w = b.style.width;
+  const hh = b.style.height;
+  b.style.transition = 'none';
+  b.style.width = '';
+  b.style.height = '';
+  b.dataset.cw = String(Math.ceil(b.offsetWidth));
+  b.dataset.ch = String(Math.ceil(b.offsetHeight));
+  b.style.width = w;
+  b.style.height = hh;
+  void b.offsetWidth;
+  b.style.transition = '';
+}
+
+/** 灵动岛的宽高（带弹性的过渡）：note 为展开时里面提示的宽度，null 为收起 */
+function sizeIsland(b: HTMLElement, note: number | null): void {
+  if (!b.dataset.cw) measureIsland(b);
+  const cw = Number(b.dataset.cw);
+  const ch = Number(b.dataset.ch);
+  if (note === null) {
+    b.style.width = `${cw}px`;
+    b.style.height = `${ch}px`;
+  } else {
+    b.style.width = `${Math.min(580, Math.max(cw + 30, note + 60))}px`;
+    b.style.height = `${ch + 18}px`;
+  }
 }
 
 let noteTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** 灵动岛展开一会儿，显示 nodes，再收回去 */
+/** 灵动岛展开一会儿，显示 nodes，再收回去：胶囊按提示的长度弹性变宽变高，原来的内容先淡出，提示从模糊变清楚 */
 function island(nodes: Node[], ms: number): boolean {
-  const note = built?.el.querySelector<HTMLElement>('.i-note');
-  if (!note) return false;
-  note.replaceChildren(...nodes);
+  const b = built?.el;
+  const note = b?.querySelector<HTMLElement>('.i-note');
+  if (!b || !note) return false;
+  const inner = h('span', { class: 'i-nin' }, ...nodes);
+  note.replaceChildren(inner);
   card.classList.add('noting');
+  sizeIsland(b, inner.offsetWidth);
   if (noteTimer) clearTimeout(noteTimer);
-  noteTimer = setTimeout(() => card.classList.remove('noting'), ms);
+  noteTimer = setTimeout(() => {
+    card.classList.remove('noting');
+    if (built?.el === b) sizeIsland(b, null);
+  }, ms);
   return true;
 }
 

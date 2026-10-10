@@ -16,6 +16,10 @@ const OverlayMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ended'), id: z.string().max(64) }),
   z.object({ type: z.literal('error'), id: z.string().max(64).optional(), message: z.string().max(500) }),
   z.object({ type: z.literal('alive') }),
+  z.object({ type: z.literal('music_started'), id: z.number().int(), load: z.number().int() }),
+  z.object({ type: z.literal('music_pos'), id: z.number().int(), pos: z.number().min(0).max(1e8) }),
+  z.object({ type: z.literal('music_ended'), id: z.number().int() }),
+  z.object({ type: z.literal('music_error'), id: z.number().int(), load: z.number().int(), message: z.string().max(500) }),
 ]);
 
 /** 本输出可能用到的文件：进场、礼物规则里引用的素材的画面和音效。
@@ -89,11 +93,12 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
     // 弹幕列表、送礼名单和特效页用同一个连接地址，多一个 view=chat / view=gifts
     // 浏览器查看页多一个 view=1：照样收特效，但不算在线
-    const role = req.query.view === 'chat' ? 'chat' : req.query.view === 'gifts' ? 'gifts' : 'fx';
-    const view = role === 'fx' && req.query.view === '1';
-    const what = role === 'chat' ? '弹幕列表' : role === 'gifts' ? '送礼名单' : view ? '特效页（浏览器查看）' : '特效页';
+    // 点歌窗口多一个 view=music（在浏览器里查看的是 view=music-view：只显示，不出声）
+    const role = req.query.view === 'chat' ? 'chat' : req.query.view === 'gifts' ? 'gifts' : req.query.view === 'music' || req.query.view === 'music-view' ? 'music' : 'fx';
+    const view = (role === 'fx' && req.query.view === '1') || req.query.view === 'music-view';
+    const what = role === 'chat' ? '弹幕列表' : role === 'gifts' ? '送礼名单' : role === 'music' ? (view ? '点歌窗口（浏览器查看）' : '点歌窗口') : view ? '特效页（浏览器查看）' : '特效页';
     const client = ctx.hub.addOverlay(socket, output, role === 'fx' ? preloadUrls(ctx) : [], Date.now(), role, view);
-    const log = req.log.child({ output: output.id, ip: req.ip, ...(role !== 'fx' ? { view: role } : view ? { view: 'browser' } : {}) });
+    const log = req.log.child({ output: output.id, ip: req.ip, ...(role !== 'fx' ? { view: view ? `${role}-browser` : role } : view ? { view: 'browser' } : {}) });
     log.info(`${what}已连接`);
     // 记录断开原因，方便排查"特效页不显示"
     let reason: string | null = null;
@@ -124,6 +129,10 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
         if (r) log.info(`特效页已播放：${r.label}（${r.ms} ms）`);
       }
       else if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
+      else if (msg.type === 'music_started') ctx.music.playerStarted(client, msg.id, msg.load);
+      else if (msg.type === 'music_pos') ctx.music.playerPos(client, msg.id, msg.pos);
+      else if (msg.type === 'music_ended') ctx.music.playerEnded(client, msg.id);
+      else if (msg.type === 'music_error') ctx.music.playerError(client, msg.id, msg.load, msg.message);
       else if (msg.type === 'error') {
         ctx.hub.report(client, { lastError: msg.message });
         log.warn({ id: msg.id }, `${what}报错：${msg.message}`);

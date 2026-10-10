@@ -26,6 +26,10 @@ import { AudienceService } from './services/audience.ts';
 import type { AudienceDeps } from './services/audience.ts';
 import { Hub } from './services/hub.ts';
 import { LiveService } from './services/live.ts';
+import { MusicService } from './services/music.ts';
+import { MusicAccount } from './services/music-account.ts';
+import type { NeteaseOptions } from '@starfall/music';
+import { MusicLibrary } from './services/music-library.ts';
 import type { LiveDeps } from './services/live.ts';
 import { RoomInfoService } from './services/room-info.ts';
 import type { RoomInfoDeps } from './services/room-info.ts';
@@ -68,13 +72,17 @@ export interface AppContext {
   overlayBuild: BuildVersion;
   adminBuild: BuildVersion;
   pipeline: Pipeline;
+  /** 弹幕点歌 */
+  music: MusicService;
+  musicAccount: MusicAccount;
+  musicLibrary: MusicLibrary;
   io: ConfigIO;
   backups: BackupService;
   /** 首次启动生成的初始密码（只在首次启动时有值，用于打印到日志） */
   initialPassword: string | null;
 }
 
-export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts; fetchHonor?: typeof getHonorMedals; audience?: Partial<Pick<AudienceDeps, 'fetchOnline' | 'fetchGuards' | 'sleep'>> } = {}): AppContext {
+export function createContext(config: Config, opts: { dbFile?: string; liveDeps?: LiveDeps; roomInfoDeps?: RoomInfoDeps; maxUpload?: number; fetchGifts?: typeof getRoomGifts; fetchHonor?: typeof getHonorMedals; audience?: Partial<Pick<AudienceDeps, 'fetchOnline' | 'fetchGuards' | 'sleep'>>; netease?: NeteaseOptions } = {}): AppContext {
   const p = paths(config.dataDir);
   const db = openDb(opts.dbFile ?? p.db);
   seed(db);
@@ -108,8 +116,11 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const pipeline = new Pipeline({ live, gifts, giftFx, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
   const giftPins = new GiftPinStore(db);
   hub.setPins(giftPins.items());
+  const musicAccount = new MusicAccount(settings, secret, opts.netease);
+  const musicLibrary = new MusicLibrary({ db, dir: p.music, tmpDir: p.tmp, maxBytes: assets.maxBytes, secret });
+  const music = new MusicService({ db, settings, account: musicAccount, library: musicLibrary, hub, live, room, viewers, fx: pipeline });
 
-  const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, quickPlay, blacklist, outputs });
+  const io = new ConfigIO({ db, settings, assets, enterRules, danmuRules, giftRules, guardRules, quickPlay, blacklist, outputs, music });
   const backups = new BackupService({ db, settings, io, dir: p.backups, timeZone: config.timeZone });
 
   // 把变化推给在线的特效页和管理后台
@@ -122,8 +133,10 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
     hub.toAdmins({ type: 'overlays', overlays: hub.overlayList() });
   });
   roomInfo.onChange((info) => hub.toAdmins({ type: 'room_info', info }));
+  musicAccount.onChange(() => hub.toAdmins({ type: 'music_account', account: musicAccount.status() }));
+  musicLibrary.onChange(() => hub.toAdmins({ type: 'changed', what: 'music_library' }));
 
-  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, quickPlay, gifts, giftFx, giftPins, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, io, backups, initialPassword };
+  return { config, db, secret, settings, auth, account, room, live, roomInfo, assets, effects, viewers, enterRules, danmuRules, giftRules, guardRules, quickPlay, gifts, giftFx, giftPins, honor, audience, outputs, blacklist, log, hub, overlayBuild, adminBuild, pipeline, music, musicAccount, musicLibrary, io, backups, initialPassword };
 }
 
 const PRUNE_MS = 6 * 3600_000;
@@ -135,6 +148,7 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
       const days = ctx.settings.get('retentionDays');
       ctx.log.prune(Date.now(), days);
       ctx.viewers.prune(days);
+      ctx.music.prune(days);
       // 导入包等待确认最多 30 分钟，超过 1 小时的临时文件都没用了
       ctx.assets.cleanTmp(3600_000);
     } catch (e) {
@@ -160,6 +174,8 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   ctx.giftFx.start(() => ctx.gifts.list());
   ctx.honor.start();
   ctx.pipeline.start();
+  ctx.music.start();
+  ctx.musicAccount.start();
   ctx.backups.start((e) => console.error('自动备份失败', e));
   // 重新构建了特效页：告诉在线的页面，旧页面会在空闲时自动刷新
   const stopBuild = ctx.overlayBuild.watch((build) => ctx.hub.toOverlays({ type: 'version', build }));
@@ -174,6 +190,8 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
     ctx.roomInfo.stop();
     ctx.backups.stop();
     ctx.honor.stop();
+    ctx.music.stop();
+    ctx.musicAccount.stop();
     ctx.pipeline.stop();
     ctx.live.stop();
   };

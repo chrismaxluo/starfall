@@ -1,8 +1,8 @@
 // 数据库表结构（方案设计第 6 节）。时间一律存毫秒时间戳；金额存金瓜子（整数）。
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
-import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, Position, SvgaRole, Tier } from '@starfall/shared';
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, MusicSource, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
 
 const now = sql`(unixepoch() * 1000)`;
@@ -270,3 +270,58 @@ export const viewers = sqliteTable('viewers', {
   honor: integer('honor').notNull().default(0),
   updatedAt: integer('updated_at').notNull().default(now),
 });
+
+/**
+ * 点歌记录：列表里的歌（queued、playing）和放过的（历史）。
+ * status：queued 排队中、playing 正在放、played 放完了、skipped 切掉了、cancelled 观众取消或后台删掉、failed 放不了
+ */
+export const musicRequests = sqliteTable(
+  'music_requests',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    roomId: integer('room_id'),
+    source: text('source').$type<MusicSource>().notNull(),
+    songId: text('song_id').notNull(),
+    name: text('name').notNull(),
+    artists: text('artists').notNull().default(''),
+    album: text('album').notNull().default(''),
+    cover: text('cover').notNull().default(''),
+    durationMs: integer('duration_ms').notNull().default(0),
+    uid: integer('uid').notNull(),
+    uname: text('uname').notNull(),
+    face: text('face').notNull().default(''),
+    guard: integer('guard').notNull().default(0),
+    status: text('status').$type<'queued' | 'playing' | 'played' | 'skipped' | 'cancelled' | 'failed'>().notNull(),
+    /** 列表里的顺序（小的在前） */
+    sort: integer('sort').notNull().default(0),
+    /** 说明：放不了的原因、谁切的 */
+    note: text('note'),
+    createdAt: integer('created_at').notNull().default(now),
+    startedAt: integer('started_at'),
+    endedAt: integer('ended_at'),
+  },
+  (t) => [index('music_requests_status').on(t.status, t.sort), index('music_requests_created').on(t.createdAt)],
+);
+
+/** 本地歌库：上传的文件按内容哈希存在 data/music 里（sha256）；桌面版选的文件夹里的文件记完整路径（path） */
+export const musicLocal = sqliteTable(
+  'music_local',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sha256: text('sha256'),
+    path: text('path'),
+    ext: text('ext').notNull(),
+    filename: text('filename').notNull(),
+    size: integer('size').notNull(),
+    title: text('title').notNull(),
+    artist: text('artist').notNull().default(''),
+    album: text('album').notNull().default(''),
+    durationMs: integer('duration_ms').notNull().default(0),
+    /** 封面文件名（data/music 里），没有封面时为空 */
+    cover: text('cover'),
+    /** 歌词（LRC），文件自带的或另外上传的 .lrc */
+    lyric: text('lyric'),
+    createdAt: integer('created_at').notNull().default(now),
+  },
+  (t) => [uniqueIndex('music_local_sha256').on(t.sha256), uniqueIndex('music_local_path').on(t.path)],
+);

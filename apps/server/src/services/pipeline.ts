@@ -731,6 +731,11 @@ export class Pipeline {
     return this.playItem(effect, v, kind, withSample(kind, vars), true);
   }
 
+  /** 正在播的特效（点歌按它判断要不要把音乐调小） */
+  playingItem(): PlayItem | null {
+    return this.current?.q.payload.item ?? null;
+  }
+
   snapshot(): QueueSnapshot {
     const brief = (q: QueueItem<Queued>): QueueBrief => {
       const it = q.payload.item;

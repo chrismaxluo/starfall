@@ -1,6 +1,6 @@
 // 弹幕点歌的设置：Zod 定义，接口校验和类型共用。
 import { z } from 'zod';
-import { DANMU_WHO_ALL, DanmuWhoSchema } from './rules.ts';
+import { DANMU_WHO_ALL, DanmuWhoSchema, QUICK_GLOBAL_RE } from './rules.ts';
 
 /** 指令：1 – 8 个字，不能有空格（观众发「点歌 歌名」，指令后面是歌名） */
 const Cmd = z
@@ -21,6 +21,8 @@ export const MusicSettingsSchema = z
     cmdRequest: Cmd,
     cmdSkip: Cmd,
     cmdCancel: Cmd,
+    /** 观众查自己点的歌排第几、还要等多久 */
+    cmdMine: Cmd,
     /** 谁能点歌（和弹幕规则同样的选法） */
     who: DanmuWhoSchema,
     /** 每人同时最多排几首 */
@@ -31,6 +33,8 @@ export const MusicSettingsSchema = z
     queueMax: z.number().int().min(1).max(100),
     /** 歌最长几秒，超过的不收 */
     maxDurationSec: z.number().int().min(60).max(3600),
+    /** 同一首歌放过之后多少分钟内不能再点（0 为不限） */
+    repeatMin: z.number().int().min(0).max(1440),
     /** 大航海点的歌排在普通观众前面 */
     guardFirst: z.boolean(),
     /** 谁能切歌：点这首歌的人、房管（主播一直能切） */
@@ -59,6 +63,9 @@ export const MusicSettingsSchema = z
     blockWords: z.array(z.string().trim().min(1).max(30)).max(MUSIC_WORDS_MAX),
     /** 不让点歌的观众 */
     bannedUids: z.array(z.number().int().positive()).max(MUSIC_BANNED_MAX),
+    /** 桌面版的全局快捷键：切歌、暂停 / 继续（例如 Ctrl+Alt+N），不用时为 null */
+    hotkeySkip: z.string().regex(QUICK_GLOBAL_RE, '快捷键要按住 Ctrl、Alt 或 Shift 再按一个数字、字母或 F1–F12').nullable(),
+    hotkeyPause: z.string().regex(QUICK_GLOBAL_RE, '快捷键要按住 Ctrl、Alt 或 Shift 再按一个数字、字母或 F1–F12').nullable(),
   })
   .strict();
 export type MusicSettings = z.infer<typeof MusicSettingsSchema>;
@@ -69,11 +76,13 @@ export const MUSIC_DEFAULTS: MusicSettings = {
   cmdRequest: '点歌',
   cmdSkip: '切歌',
   cmdCancel: '取消点歌',
+  cmdMine: '我的歌',
   who: DANMU_WHO_ALL,
   perUser: 1,
   userCdSec: 30,
   queueMax: 20,
   maxDurationSec: 420,
+  repeatMin: 30,
   guardFirst: true,
   skipByRequester: true,
   skipByMod: true,
@@ -92,4 +101,6 @@ export const MUSIC_DEFAULTS: MusicSettings = {
   lyricsTrans: true,
   blockWords: [],
   bannedUids: [],
+  hotkeySkip: null,
+  hotkeyPause: null,
 };

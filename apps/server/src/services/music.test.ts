@@ -113,7 +113,8 @@ describe('弹幕点歌', () => {
     await t.say('点歌 起风了');
     await t.say('点歌 孤勇者', { uid: 2, name: '阿二' });
     await t.say('点歌 平凡之路', { uid: 3, name: '阿三' });
-    expect(t.notices().slice(1)).toEqual(['✓ 阿二：点了《孤勇者》，排在第 2 首', '✓ 阿三：点了《平凡之路》，排在第 3 首']);
+    // 位置后面带大概要等多久（前面几首的时长加起来）
+    expect(t.notices().slice(1)).toEqual(['✓ 阿二：点了《孤勇者》，排在第 2 首，大约 3 分钟后', '✓ 阿三：点了《平凡之路》，排在第 3 首，大约 7 分钟后']);
     const id = t.last().state.now!.item.id;
     t.m.playerStarted(t.client(), id, 1);
     vi.advanceTimersByTime(3000);
@@ -269,6 +270,72 @@ describe('弹幕点歌', () => {
     expect(effectHasSound({ effect: { volume: 50, sound: null, visual: { type: 'asset', kind: 'image' } } } as unknown as PlayItem)).toBe(false);
   });
 
+  it('指令后面的冒号、书名号去掉；不放的时候如实说，不说「马上播放」', async () => {
+    const t = await setup({ player: false });
+    await t.say('点歌：起风了');
+    await t.say('点歌《孤勇者》', { uid: 2, name: '阿二' });
+    expect(t.notices()).toEqual(['✓ 小星：点了《起风了》，排在第 1 首（主播还没打开点歌窗口）', '✓ 阿二：点了《孤勇者》，排在第 2 首（主播还没打开点歌窗口）']);
+    t.m.setPaused(true);
+    await t.say('点歌 平凡之路', { uid: 3, name: '阿三' });
+    expect(t.notices().at(-1)).toBe('✓ 阿三：点了《平凡之路》，排在第 3 首（主播暂时停了点歌）');
+  });
+
+  it('「我的歌」：正在放、排第几、还要等多久；15 秒内只回一次；没点过时教怎么点', async () => {
+    const t = await setup({ settings: { perUser: 3 } });
+    await t.say('点歌 起风了');
+    await t.say('点歌 孤勇者', { uid: 2, name: '阿二' });
+    await t.say('点歌 平凡之路');
+    await t.say('我的歌');
+    expect(t.notices().at(-1)).toBe('✓ 小星：你点的《起风了》正在放；《平凡之路》排在第 3 首，大约 7 分钟后');
+    await t.say('我的歌');
+    expect(t.notices().filter((x) => x.includes('你点的'))).toHaveLength(1);
+    await t.say('我的歌', { uid: 9, name: '路人' });
+    expect(t.notices().at(-1)).toBe('✓ 路人：还没有点歌，发送「点歌 歌名」点一首');
+  });
+
+  it('刚放过的歌一段时间内不能再点（主播不受限制）', async () => {
+    const t = await setup({ settings: { repeatMin: 30 } });
+    await t.say('点歌 起风了');
+    const id = t.m.state().now!.item.id;
+    t.m.playerStarted(t.client(), id, 1);
+    t.m.playerEnded(t.client(), id);
+    vi.advanceTimersByTime(10 * 60_000);
+    await t.say('点歌 起风了', { uid: 2, name: '阿二' });
+    expect(t.notices().at(-1)).toBe('✗ 阿二：《起风了》刚放过，20 分钟后再点');
+    await t.say('点歌 起风了', { uid: ANCHOR, name: '主播' });
+    expect(t.notices().at(-1)).toMatch(/^✓ 主播：点了《起风了》/);
+  });
+
+  it('失败提示不刷屏：「点得太快」、同一个人一分钟内又失败的，只在后台显示', async () => {
+    const t = await setup({ settings: { userCdSec: 60, perUser: 3 } });
+    await t.say('点歌 起风了');
+    await t.say('点歌 孤勇者');
+    await t.say('点歌 不存在的歌', { uid: 2, name: '阿二' });
+    await t.say('点歌 也不存在', { uid: 2, name: '阿二' });
+    const shown = t.sock.sent.filter((x) => x.type === 'music_notice').map((x) => (x as { notice: { text: string } }).notice.text);
+    expect(shown).toEqual(['点了《起风了》，马上播放', '没有找到「不存在的歌」']);
+    expect(t.m.snapshot().notices.filter((n) => n.quiet).map((n) => n.text)).toEqual(['没有找到「也不存在」', '点得太快了，60 秒后再点']);
+  });
+
+  it('撤销：刚删掉、清空的歌放回列表，顺序不变', async () => {
+    const t = await setup({ player: false, settings: { perUser: 3 } });
+    await t.say('点歌 起风了');
+    await t.say('点歌 孤勇者');
+    await t.say('点歌 平凡之路');
+    const [a, b] = t.m.snapshot().queue;
+    t.m.remove(b!.id);
+    expect(t.m.restore([b!.id])).toBe(1);
+    expect(t.queue()).toEqual(['起风了', '孤勇者', '平凡之路']);
+    const ids = t.m.clear();
+    expect(t.queue()).toEqual([]);
+    expect(t.m.restore(ids)).toBe(3);
+    expect(t.queue()).toEqual(['起风了', '孤勇者', '平凡之路']);
+    // 太久以前删的不能撤销
+    t.m.remove(a!.id);
+    vi.advanceTimersByTime(6 * 60_000);
+    expect(t.m.restore([a!.id])).toBe(0);
+  });
+
   it('以前选的样子后来去掉了：换成流光，改别的设置也不报错', async () => {
     const t = await setup({ player: false });
     t.ctx.settings.setRaw('music', { ...t.m.cfg(), style: 'vinyl' });
@@ -290,7 +357,7 @@ describe('弹幕点歌', () => {
     again.start();
     cleanup.push(() => again.stop());
     expect(again.snapshot().queue.map((i) => i.song.name)).toEqual(['平凡之路', '孤勇者']);
-    expect(again.clear()).toBe(2);
+    expect(again.clear()).toHaveLength(2);
     expect(again.snapshot().queue).toEqual([]);
   });
 });

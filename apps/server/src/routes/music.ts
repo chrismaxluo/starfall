@@ -33,7 +33,21 @@ export function musicRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/music', async () => ({ settings: music.cfg(), ...music.snapshot(), account: account.status(), library: { count: library.count() }, desktop: ctx.config.desktop }));
 
-  app.put('/api/music/settings', async (req) => ({ settings: music.updateSettings(parseBody(MusicSettingsPatchSchema, req.body)) }));
+  app.put('/api/music/settings', async (req) => {
+    const patch = parseBody(MusicSettingsPatchSchema, req.body);
+    // 全局快捷键不能和快捷播放按钮、彼此重复
+    const next = { ...music.cfg(), ...patch };
+    const used = new Map(ctx.quickPlay.list().flatMap((b) => (b.globalHotkey ? [[b.globalHotkey, b.label || '快捷播放按钮'] as const] : [])));
+    for (const k of ['hotkeySkip', 'hotkeyPause'] as const) {
+      const key = patch[k];
+      if (!key) continue;
+      if (used.has(key)) throw new HttpError(409, 'hotkey_used', `快捷键 ${key} 已经给快捷播放的「${used.get(key)}」用了`);
+    }
+    if (next.hotkeySkip && next.hotkeySkip === next.hotkeyPause) throw new HttpError(409, 'hotkey_used', '切歌和暂停不能用同一个快捷键');
+    return { settings: music.updateSettings(patch) };
+  });
+
+  app.post('/api/music/toggle-pause', async () => ({ paused: music.togglePause() }));
 
   app.post('/api/music/pause', async (req) => {
     const { paused } = parseBody(z.object({ paused: z.boolean() }).strict(), req.body);
@@ -63,7 +77,16 @@ export function musicRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { ok: true };
   });
 
-  app.post('/api/music/queue/clear', async () => ({ cleared: music.clear() }));
+  app.post('/api/music/queue/clear', async () => {
+    const ids = music.clear();
+    return { cleared: ids.length, ids };
+  });
+
+  // 撤销刚删掉、清空的歌
+  app.post('/api/music/queue/restore', async (req) => {
+    const { ids } = parseBody(z.object({ ids: z.array(z.number().int().positive()).min(1).max(200) }).strict(), req.body);
+    return { restored: music.restore(ids) };
+  });
 
   app.get('/api/music/search', async (req) => {
     const { q } = parseBody(z.object({ q: z.string().trim().min(1, '写一下歌名').max(60) }), req.query);

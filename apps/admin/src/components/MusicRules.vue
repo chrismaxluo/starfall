@@ -19,9 +19,9 @@ const s = computed(() => music.settings!);
 const qr = ref(false);
 
 // ---------- 指令 ----------
-const cmds = ref({ cmdRequest: '', cmdSkip: '', cmdCancel: '' });
-watch(() => music.settings, (v) => v && (cmds.value = { cmdRequest: v.cmdRequest, cmdSkip: v.cmdSkip, cmdCancel: v.cmdCancel }), { immediate: true });
-const CMD_NAMES = { cmdRequest: '点歌', cmdSkip: '切歌', cmdCancel: '取消点歌' } as const;
+const cmds = ref({ cmdRequest: '', cmdSkip: '', cmdCancel: '', cmdMine: '' });
+watch(() => music.settings, (v) => v && (cmds.value = { cmdRequest: v.cmdRequest, cmdSkip: v.cmdSkip, cmdCancel: v.cmdCancel, cmdMine: v.cmdMine }), { immediate: true });
+const CMD_NAMES = { cmdRequest: '点歌', cmdSkip: '切歌', cmdCancel: '取消点歌', cmdMine: '查我点的歌' } as const;
 async function saveCmd(k: keyof typeof CMD_NAMES): Promise<void> {
   const v = cmds.value[k].trim();
   if (v === s.value[k]) return;
@@ -32,7 +32,7 @@ async function saveCmd(k: keyof typeof CMD_NAMES): Promise<void> {
   const others = (Object.keys(CMD_NAMES) as Array<keyof typeof CMD_NAMES>).filter((x) => x !== k).map((x) => s.value[x]);
   if (others.includes(v)) {
     cmds.value[k] = s.value[k];
-    return toast('三个指令不能一样', 'info');
+    return toast('几个指令不能一样', 'info');
   }
   if (!(await saveMusic({ [k]: v }, `${CMD_NAMES[k]}指令改成「${v}」`))) cmds.value[k] = s.value[k];
 }
@@ -55,6 +55,8 @@ function setNum(k: 'perUser' | 'queueMax', v: number, min: number, max: number, 
 }
 const CD_OPTIONS = [0, 10, 30, 60, 120, 300, 600];
 const LEN_OPTIONS = [180, 240, 300, 360, 420, 480, 600, 900];
+const REPEAT_OPTIONS = [0, 10, 30, 60, 120, 240];
+const repeatText = (v: number) => (v === 0 ? '不限' : v < 60 ? `${v} 分钟` : `${v / 60} 小时`);
 const cdText = (v: number) => (v === 0 ? '不限' : v < 60 ? `${v} 秒` : `${v / 60} 分钟`);
 
 // ---------- 网易云账号 ----------
@@ -99,7 +101,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
         </div>
         <p class="inline-hint mr-ex">
           观众发「<b>{{ s.cmdRequest }} 晴天</b>」或「<b>{{ s.cmdRequest }} 晴天 周杰伦</b>」点歌，写上歌手更准；
-          「<b>{{ s.cmdSkip }}</b>」切掉正在放的；「<b>{{ s.cmdCancel }}</b>」撤掉自己点的、还没放的那首。
+          「<b>{{ s.cmdSkip }}</b>」切掉正在放的；「<b>{{ s.cmdCancel }}</b>」撤掉自己点的、还没放的那首；「<b>{{ s.cmdMine }}</b>」看自己点的歌排第几、还要等多久。
         </p>
       </div>
 
@@ -144,6 +146,13 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
             <div class="ctl"><div class="line">
               <select class="sel" aria-label="歌最长多久" :value="s.maxDurationSec" @change="set({ maxDurationSec: Number(($event.target as HTMLSelectElement).value) }, '已保存')"><option v-for="v in LEN_OPTIONS" :key="v" :value="v">{{ v / 60 }} 分钟</option></select>
               <span class="hint">更长的不收（后台加歌不受限制）</span>
+            </div></div>
+          </div>
+          <div class="srow">
+            <span class="lb">同一首歌</span>
+            <div class="ctl"><div class="line">
+              <select class="sel" aria-label="同一首歌放过之后多久才能再点" :value="s.repeatMin" @change="set({ repeatMin: Number(($event.target as HTMLSelectElement).value) }, '已保存')"><option v-for="v in REPEAT_OPTIONS" :key="v" :value="v">{{ repeatText(v) }}</option></select>
+              <span class="hint">放过之后隔多久才能再点（防止同一首被反复点；主播不受限制）</span>
             </div></div>
           </div>
           <div class="srow">
@@ -244,7 +253,8 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
 .mr-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .mr-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @media (max-width: 1100px) { .mr-grid { grid-template-columns: 1fr; } }
-.mr-cmds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.mr-cmds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1300px) { .mr-cmds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .mr-ex { margin: 12px 0 0; line-height: 1.7; }
 .mr-ex b { color: var(--t1); font-weight: 600; }
 .srow .line .gap { width: 12px; }

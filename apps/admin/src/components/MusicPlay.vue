@@ -5,9 +5,14 @@ import type { MusicItem, MusicSong } from '@starfall/shared/overlay';
 import Avatar from './Avatar.vue';
 import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
-import { del, get, post, put } from '../lib/api.ts';
+import RowMenu from './RowMenu.vue';
+import type { MenuItem } from './RowMenu.vue';
+import { get, post, put } from '../lib/api.ts';
+import { desktop, reloadHotkeys } from '../lib/desktop.ts';
 import { clock } from '../lib/format.ts';
-import { mmss, music, saveMusic } from '../lib/music.ts';
+import { banRequester, blockSong, clearQueue, mmss, music, removeSong, saveMusic } from '../lib/music.ts';
+import { keyOf } from '../lib/quick.ts';
+import { QUICK_GLOBAL_RE } from '@starfall/shared';
 import type { SearchHit } from '../lib/music.ts';
 import { attempt, toast } from '../lib/toast.ts';
 
@@ -47,18 +52,62 @@ const queue = computed(() => music.queue);
 async function order(ids: number[]): Promise<void> {
   await attempt(() => put('/api/music/queue/order', { ids }));
 }
-async function remove(it: MusicItem): Promise<void> {
-  await attempt(() => del(`/api/music/queue/${it.id}`), `已从列表删掉《${it.song.name}》`);
+function rowMenu(it: MusicItem): Array<MenuItem | null> {
+  return [
+    { icon: 'i-ban', label: `不让 ${it.by.name} 点歌`, run: () => void banRequester(it) },
+    { icon: 'i-x', label: '这首歌以后不收', run: () => void blockSong(it) },
+    null,
+    { icon: 'i-trash', label: '从列表删掉', danger: true, run: () => void removeSong(it) },
+  ];
 }
 function toTop(i: number): void {
   const ids = queue.value.map((x) => x.id);
   const [id] = ids.splice(i, 1);
   void order([id!, ...ids]);
 }
-async function clear(): Promise<void> {
-  const r = await attempt(() => post<{ cleared: number }>('/api/music/queue/clear'));
-  if (r) toast(`已清空 ${r.cleared} 首（正在放的这首放完）`);
+// ---------- 桌面版：切歌、暂停的全局快捷键（在游戏、直播姬里按也行） ----------
+const canGlobal = Boolean(desktop);
+const listening = ref<'hotkeySkip' | 'hotkeyPause' | null>(null);
+const HK_NAMES = { hotkeySkip: '切歌', hotkeyPause: '暂停 / 继续' } as const;
+async function setHotkey(k: 'hotkeySkip' | 'hotkeyPause', v: string | null): Promise<void> {
+  if (!(await saveMusic({ [k]: v }, v ? `${HK_NAMES[k]}的快捷键设成 ${v}` : `${HK_NAMES[k]}不用快捷键了`))) return;
+  const failed = await reloadHotkeys();
+  if (v && failed.includes(v)) toast(`快捷键 ${v} 被别的软件占用了，换一个组合试试`, 'err');
 }
+function onHotkey(e: KeyboardEvent): void {
+  const k = listening.value;
+  if (!k) return stopListen();
+  if (e.key === 'Tab') return stopListen();
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.key === 'Escape') return stopListen();
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    stopListen();
+    return void setHotkey(k, null);
+  }
+  if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+  if (e.code.startsWith('Numpad')) return toast('全局快捷键请用主键盘上的数字', 'info');
+  const key = /^F([1-9]|1[0-2])$/.test(e.code) ? e.code : keyOf(e);
+  const acc = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', key].filter(Boolean).join('+');
+  if (!key || !QUICK_GLOBAL_RE.test(acc)) return toast('要按住 Ctrl、Alt 或 Shift，再按一个数字、字母或 F1–F12，例如 Ctrl+Alt+N', 'info');
+  stopListen();
+  void setHotkey(k, acc);
+}
+function listen(k: 'hotkeySkip' | 'hotkeyPause'): void {
+  if (listening.value === k) return stopListen();
+  stopListen();
+  listening.value = k;
+  // 录快捷键时先停掉已经注册的，不然按下会被系统拦走
+  void desktop?.pauseHotkeys().catch(() => undefined);
+  addEventListener('keydown', onHotkey, true);
+}
+function stopListen(): void {
+  const was = listening.value;
+  listening.value = null;
+  removeEventListener('keydown', onHotkey, true);
+  if (was) void reloadHotkeys();
+}
+onBeforeUnmount(stopListen);
 const dragFrom = ref<number | null>(null);
 const dragOver = ref<number | null>(null);
 function onDragStart(e: DragEvent, i: number): void {
@@ -132,6 +181,14 @@ async function simulate(): Promise<void> {
           <label class="mp-vol"><span>音量</span><input type="range" min="0" max="100" step="5" :value="volShown" aria-label="音量" @input="(e) => (vol = Number((e.target as HTMLInputElement).value))" @change="saveVol" /><span class="num">{{ volShown }}</span></label>
         </div>
         <p class="inline-hint mp-tip">直播软件的混音器里也能单独调点歌窗口的音量。</p>
+        <div v-if="canGlobal" class="mp-hk">
+          <span class="mp-hkl">全局快捷键</span>
+          <button v-for="(name, k) in HK_NAMES" :key="k" type="button" class="btn sm" :class="{ on: listening === k }" :title="'在直播姬、游戏等别的窗口里按也能用；按 Backspace 清掉'" @click="listen(k)">
+            <template v-if="listening === k">按 Ctrl / Alt / Shift + 键…</template>
+            <template v-else-if="music.settings?.[k]">{{ name }} <span class="kbd">{{ music.settings[k] }}</span></template>
+            <template v-else>设{{ name }}快捷键</template>
+          </button>
+        </div>
       </div>
 
       <div class="card">
@@ -139,7 +196,7 @@ async function simulate(): Promise<void> {
           <h2>列表 {{ queue.length }} 首</h2>
           <span class="aside">
             拖动左边的序号调整顺序
-            <ConfirmButton v-if="queue.length" label="清空" confirm-label="确认清空？" cls="btn" @confirm="clear" />
+            <ConfirmButton v-if="queue.length" label="清空" confirm-label="确认清空？" cls="btn" @confirm="clearQueue" />
           </span>
         </div>
         <div v-if="!queue.length" class="inline-hint">列表是空的。</div>
@@ -161,7 +218,8 @@ async function simulate(): Promise<void> {
             <span class="mp-d num">{{ mmss(it.song.durationMs) }}</span>
             <span class="mp-acts">
               <button class="icon-btn" type="button" :disabled="i === 0" :aria-label="`把《${it.song.name}》排到下一首`" title="排到下一首" @click="toTop(i)"><Icon name="i-up" /></button>
-              <button class="icon-btn" type="button" :aria-label="`删掉《${it.song.name}》`" title="从列表删掉" @click="remove(it)"><Icon name="i-x" /></button>
+              <button class="icon-btn" type="button" :aria-label="`删掉《${it.song.name}》`" title="从列表删掉（可以撤销）" @click="removeSong(it)"><Icon name="i-x" /></button>
+              <RowMenu :items="rowMenu(it)" :label="`《${it.song.name}》：更多操作`" />
             </span>
           </div>
         </div>
@@ -216,7 +274,7 @@ async function simulate(): Promise<void> {
         <div v-if="!music.notices.length" class="inline-hint">还没有。</div>
         <div v-else class="mp-notes">
           <div v-for="n in music.notices" :key="n.id" class="mp-note" :class="{ bad: !n.ok }">
-            <span class="t num">{{ clock(n.ts) }}</span><Icon :name="n.ok ? 'i-check' : 'i-x'" /><span><b>{{ n.who }}</b> {{ n.text }}</span>
+            <span class="t num">{{ clock(n.ts) }}</span><Icon :name="n.ok ? 'i-check' : 'i-x'" /><span><b>{{ n.who }}</b> {{ n.text }}<em v-if="n.quiet" class="mp-quiet" title="同一个人反复失败、点得太快这类，不在直播画面上提示，免得刷屏">只在后台</em></span>
           </div>
         </div>
       </div>
@@ -252,7 +310,7 @@ async function simulate(): Promise<void> {
 
 .mp-list { display: flex; flex-direction: column; margin: 0 -6px; max-height: 620px; overflow: auto; }
 .mp-row, .mp-hit { display: grid; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; font-size: 13px; }
-.mp-row { grid-template-columns: 44px 36px minmax(0, 1fr) minmax(0, 9em) 40px 64px; }
+.mp-row { grid-template-columns: 44px 36px minmax(0, 1fr) minmax(0, 9em) 40px 96px; }
 .mp-row + .mp-row, .mp-hit + .mp-hit { border-top: 1px solid var(--line); }
 .mp-row:hover, .mp-hit:hover { background: var(--hover); }
 .mp-row.dragging { opacity: .4; }
@@ -288,4 +346,9 @@ async function simulate(): Promise<void> {
 .mp-note svg { width: 14px; height: 14px; flex: none; color: var(--ok); }
 .mp-note.bad svg { color: var(--gov); }
 .mp-note b { color: var(--t1); font-weight: 600; }
+.mp-quiet { margin-left: 6px; padding: 0 6px; border-radius: 5px; font-style: normal; font-size: 11px; color: var(--t3); background: var(--hover); }
+.mp-hk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.mp-hkl { font-size: 12.5px; color: var(--t2); margin-right: 4px; }
+.mp-hk .btn.sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.mp-hk .btn.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 </style>

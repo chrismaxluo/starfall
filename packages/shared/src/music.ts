@@ -95,6 +95,8 @@ export interface MusicNotice {
   who: string;
   text: string;
   ts: number;
+  /** 只在后台显示，不上直播画面（「点得太快了」这类、同一个人连着失败的） */
+  quiet?: boolean;
 }
 
 /** 点歌窗口最多收几首后面的歌 */

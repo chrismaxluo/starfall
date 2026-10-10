@@ -1,9 +1,10 @@
 // 点歌窗口：正在放的歌（封面、歌名、歌手、谁点的、进度）、滚动歌词、后面几首、点歌结果的提示。
 // 地址形如 /overlay/?output=1&key=...&music=1，在直播软件里单独加一个浏览器源（建议 640×560），拖到画面一侧。
 // 同时加了好几个时只有一个出声音（服务端指定，消息里 player 为 true），别的只显示；在浏览器里查看（&view=1）时只显示不出声。
-// 三种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
+// 六种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
 //   glass 流光：封面的模糊色铺满卡片；journal 手帐（日系）：方格纸、和纸胶带、拍立得封面、荧光笔划线、手写体；
-//   minimal 灵动岛：玻璃小胶囊，换歌、有人点歌时展开显示提示。
+//   minimal 灵动岛：玻璃小胶囊，换歌、有人点歌时展开显示提示；
+//   最早的三种：card 玻璃卡片（封面颜色的柔光）、vinyl 黑胶唱片（唱片转动、唱臂落下）、capsule 细长胶囊（一行，占地方最少）。
 import './music.css';
 import { lyricIndex } from '@starfall/shared/overlay';
 import type { LyricLine, MusicDisplay, MusicItem, MusicNotice, MusicNow, MusicSong, MusicState, ServerToOverlay } from '@starfall/shared/overlay';
@@ -116,7 +117,21 @@ function prog(n: MusicNow, cls = 'mu-prog'): { el: HTMLElement; fill: HTMLElemen
   return { el, fill, tCur };
 }
 
-// ---------- 三种样子的「正在放」 ----------
+// ---------- 「正在放」 ----------
+
+/** 最早的三种样子共用：封面（带柔光）、跳动的音柱 + 歌名、歌手、谁点的、进度 */
+function classic(n: MusicNow): Built {
+  const s = n.item.song;
+  const p = prog(n);
+  const el = h(
+    'div',
+    { class: 'mu-body' },
+    h('div', { class: 'mu-gl' }),
+    h('div', { class: 'mu-art' }, s.cover ? img('mu-glow', s.cover) : null, h('div', { class: 'mu-disc' }, cover(s)), h('div', { class: 'mu-arm' })),
+    h('div', { class: 'mu-meta' }, h('div', { class: 'mu-t1' }, eq(), title(s.name)), h('div', { class: 'mu-artist' }, s.artists || '未知歌手'), h('div', { class: 'mu-row' }, byChip(n.item, 30)), p.el),
+  );
+  return { el, fill: p.fill, tCur: p.tCur };
+}
 
 const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
   // 流光：封面放大、模糊后铺满整张卡片做底色，上面一层暗色玻璃；封面上一道光定时扫过
@@ -165,6 +180,11 @@ const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
     el.style.setProperty('--j3', `${((seed >> 2) % 5) * 5 - 10}deg`);
     return { el, fill, tCur };
   },
+
+  // 最早的三种（玻璃卡片、黑胶唱片、细长胶囊）：同一套结构，样子在 CSS 里分开（唱臂只在黑胶里显示）
+  card: classic,
+  vinyl: classic,
+  capsule: classic,
 
   // 灵动岛：玻璃胶囊，左边转动的小封面，右边跳动的音柱；换歌、有人点歌时胶囊展开显示提示，再收回去
   minimal(n) {

@@ -1,6 +1,6 @@
 /* 点歌窗口：尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍。
    --tint、--tint2 是从封面取的主色、辅色（r, g, b），各个样子拿来做柔光、描边、渐变、歌词填色。
-   三种样子各自一段：st-glass 流光、st-journal 手帐（日系）、st-minimal 灵动岛。
+   六种样子各自一段：st-glass 流光、st-journal 手帐（日系）、st-minimal 灵动岛；最早的三种 st-card 玻璃卡片、st-vinyl 黑胶唱片、st-capsule 细长胶囊。
    每段都包括：正在放（.mu-body）、歌词（.ly-box）、接下来（.mu-queue）、空闲提示（.mu-idle）、点歌提示（.mu-toast）。 */
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -319,9 +319,103 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .st-minimal .mu-note { width: 20px; height: 20px; color: rgba(255,255,255,.9); }
 .st-minimal .mu-toast { border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
 
+/* ===================================================================
+   最早的三种：玻璃卡片（st-card）、黑胶唱片（st-vinyl）、细长胶囊（st-capsule）。和第一版一样，只是挪进了现在的结构
+   =================================================================== */
+:is(.st-card, .st-vinyl, .st-capsule) :is(.mu-body, .mu-queue, .mu-idle, .mu-toast, .ly-box) { color: #fff;
+  background: linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,.05) 42%, rgba(255,255,255,.02)), rgba(16,18,30,.52);
+  -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.18), 0 26px 60px -22px rgba(0,0,0,.65), 0 6px 16px -6px rgba(0,0,0,.35); }
+:is(.st-card, .st-vinyl, .st-capsule) :is(.mu-body, .mu-queue, .mu-idle)::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.6px; pointer-events: none;
+  background: linear-gradient(140deg, rgba(255,255,255,.8), rgba(255,255,255,.14) 28%, rgba(255,255,255,.04) 60%, rgba(var(--tint), .8));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.lite:is(.st-card, .st-vinyl, .st-capsule) :is(.mu-body, .mu-queue, .mu-idle, .mu-toast) { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 45%), rgba(16,18,28,.88); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-body { display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 20px; padding: 18px 24px 18px 18px; border-radius: 30px; overflow: hidden; }
+/* 封面颜色的柔光：左边一团，慢慢呼吸 */
+.mu-gl { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.mu-gl::before { content: ""; position: absolute; left: -18%; top: -70%; width: 70%; height: 240%; background: radial-gradient(closest-side, rgba(var(--tint), .55), transparent); animation: muBreath 6s ease-in-out infinite; }
+.mu-gl::after { content: ""; position: absolute; right: -30%; bottom: -120%; width: 80%; height: 220%; background: radial-gradient(closest-side, rgba(var(--tint), .22), transparent); }
+@keyframes muBreath { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: .85; transform: scale(1.08); } }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-art { width: 132px; height: 132px; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-glow { position: absolute; inset: 6%; width: 88%; height: 88%; object-fit: cover; border-radius: 24px; filter: blur(22px) saturate(1.7); opacity: .75; transform: translateY(10px) scale(1.05); z-index: -1; }
+.lite:is(.st-card, .st-vinyl, .st-capsule) .mu-glow { display: none; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-disc { border-radius: 22px; box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 14px 30px -10px rgba(0,0,0,.7); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-disc::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(155deg, rgba(255,255,255,.32), transparent 38%); pointer-events: none; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-cover.blank { background: linear-gradient(135deg, rgba(var(--tint), .9), rgba(var(--tint), .35)); }
+.mu-arm { display: none; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-title { font-size: 31px; line-height: 1.2; font-weight: 700; letter-spacing: -.01em; text-shadow: 0 2px 14px rgba(0,0,0,.3); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-artist { font-size: 19px; color: rgba(255,255,255,.72); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-row { margin-top: 4px; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-eq i { background: linear-gradient(rgb(var(--tint)), rgba(var(--tint), .55)); box-shadow: 0 0 10px rgba(var(--tint), .6); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-prog { margin-top: 8px; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-track { height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-fill { background: linear-gradient(90deg, rgba(var(--tint), .9), #fff); box-shadow: 0 0 12px rgba(var(--tint), .8); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-head { display: none; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-time { font-size: 14px; opacity: .58; letter-spacing: .02em; }
+:is(.st-card, .st-vinyl, .st-capsule) .ly-box { padding: 10px 20px 12px; border-radius: 20px; background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(12,14,26,.34); -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 12px 30px -18px rgba(0,0,0,.55); }
+.lite:is(.st-card, .st-vinyl, .st-capsule) .ly-box { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(12,14,26,.62); }
+:is(.st-card, .st-vinyl, .st-capsule) .ly-in { background: linear-gradient(90deg, #fff, rgb(var(--tint)) 140%) 0 0 / var(--p) 100% no-repeat, rgba(255,255,255,.5); -webkit-background-clip: text; background-clip: text; }
+:is(.st-card, .st-vinyl, .st-capsule) .ly-cur { filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 14px rgba(var(--tint), .35)); }
+:is(.st-card, .st-vinyl, .st-capsule) .ly-sub { color: rgba(255,255,255,.66); opacity: 1; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-queue { border-radius: 22px; }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-qc { box-shadow: 0 0 0 1px rgba(255,255,255,.2); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-idle { border-radius: 999px; color: rgba(255,255,255,.86); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-idle b { color: #fff; background: rgba(var(--tint), .32); box-shadow: inset 0 0 0 1px rgba(var(--tint), .7); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-note { color: rgb(var(--tint)); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-idle .mu-note { filter: drop-shadow(0 0 8px rgba(var(--tint), .7)); }
+:is(.st-card, .st-vinyl, .st-capsule) .mu-toast { border-radius: 999px; }
+
+/* 黑胶唱片 */
+.st-vinyl .mu-body { grid-template-columns: 156px minmax(0, 1fr); padding: 16px 24px 16px 16px; }
+.st-vinyl .mu-art { width: 156px; height: 156px; }
+.st-vinyl .mu-glow { inset: 18%; width: 64%; height: 64%; border-radius: 50%; filter: blur(26px) saturate(1.8); }
+.st-vinyl .mu-disc { border-radius: 50%; display: grid; place-items: center; overflow: visible;
+  background:
+    conic-gradient(from 20deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,.16) 30deg, rgba(255,255,255,0) 70deg, rgba(255,255,255,0) 180deg, rgba(255,255,255,.12) 215deg, rgba(255,255,255,0) 250deg),
+    repeating-radial-gradient(circle, #0d0d10 0 1.6px, #1c1c22 1.6px 3px),
+    #111;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.08), 0 16px 34px -10px rgba(0,0,0,.8);
+  animation: muSpin 9s linear infinite; }
+.st-vinyl .mu-disc::after { background: none; }
+.st-vinyl .mu-disc .mu-cover { width: 50%; height: 50%; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,.55), 0 0 0 4px rgba(var(--tint), .5); }
+.st-vinyl .mu-disc::before { content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #0b0b0d; box-shadow: 0 0 0 2px rgba(255,255,255,.35); z-index: 1; }
+.st-vinyl .paused .mu-disc { animation-play-state: paused; }
+/* 唱臂：放的时候落在唱片上，暂停时抬起来 */
+.st-vinyl .mu-arm { display: block; position: absolute; right: -10px; top: -14px; width: 10px; height: 104px; border-radius: 5px; transform-origin: 50% 8px; transform: rotate(24deg); transition: transform .7s cubic-bezier(.3,.7,.2,1);
+  background: linear-gradient(90deg, #9a9aa4, #f4f4f8 45%, #8a8a94); box-shadow: 0 6px 12px -4px rgba(0,0,0,.6); z-index: 2; }
+.st-vinyl .mu-arm::before { content: ""; position: absolute; left: 50%; top: -4px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #9a9aa4 60%, #5a5a64); box-shadow: 0 3px 8px rgba(0,0,0,.5); }
+.st-vinyl .mu-arm::after { content: ""; position: absolute; left: -5px; bottom: -6px; width: 20px; height: 14px; border-radius: 4px; background: linear-gradient(#e8e8ee, #7a7a84); transform: rotate(-24deg); }
+.st-vinyl .paused .mu-arm { transform: rotate(4deg); }
+
+/* 细长胶囊 */
+.st-capsule .mu-card { width: auto; max-width: 100%; }
+.st-capsule .mu-body { grid-template-columns: 60px minmax(0, 1fr); gap: 14px; padding: 8px 26px 8px 8px; border-radius: 999px; }
+.st-capsule .mu-art { width: 60px; height: 60px; }
+.st-capsule .mu-glow { display: none; }
+.st-capsule .mu-disc { border-radius: 50%; animation: muSpin 14s linear infinite; }
+.st-capsule .paused .mu-disc { animation-play-state: paused; }
+.st-capsule .mu-meta { display: grid; grid-template-columns: minmax(0, auto) auto; grid-template-areas: "t1 row" "ar row"; column-gap: 16px; row-gap: 2px; align-items: center; }
+.st-capsule .mu-t1 { grid-area: t1; gap: 9px; }
+.st-capsule .mu-title { font-size: 23px; }
+.st-capsule .mu-eq { height: 16px; }
+.st-capsule .mu-eq i { width: 3px; }
+.st-capsule .mu-artist { grid-area: ar; font-size: 15px; }
+.st-capsule .mu-row { grid-area: row; margin: 0; }
+.st-capsule .mu-by { height: 30px; padding-right: 10px; }
+.st-capsule .mu-by .av { width: 24px; height: 24px; }
+.st-capsule .mu-byn { font-size: 15px; max-width: 6em; }
+.st-capsule .mu-byt { display: none; }
+.st-capsule .mu-prog { position: absolute; left: 80px; right: 30px; bottom: 5px; margin: 0; }
+.st-capsule .mu-track { height: 3px; }
+.st-capsule .mu-time { display: none; }
+.st-capsule .ly-cur { font-size: 25px; }
+.st-capsule .ly-sub { display: none; }
+.st-capsule .mu-queue { width: min(460px, 100%); padding: 10px 14px; border-radius: 18px; }
+.st-capsule .mu-qi { font-size: 16px; min-height: 28px; }
+
 .notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; }
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mu-eq i, .mu-disc, .g-bg, .g-sheen, .st-minimal .mu-body::after, .st-minimal .mu-idle::after, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
+  .mu-eq i, .mu-disc, .mu-gl::before, .g-bg, .g-sheen, .st-minimal .mu-body::after, .st-minimal .mu-idle::after, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
 }

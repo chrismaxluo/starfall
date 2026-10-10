@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import type { InjectOptions } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { room } from '../db/schema.ts';
 import { formFile, media, testApp } from '../testing.ts';
@@ -125,6 +129,30 @@ describe('点歌接口', () => {
     expect(t.ctx.music.state().hold).toBe('manual');
     // 本地歌库里没有的歌不能加
     expect((await t.req({ method: 'POST', url: '/api/music/queue', payload: { song: { source: 'local', id: '99', name: 'x', artists: '', durationMs: 1 } } })).statusCode).toBe(404);
+  });
+
+  it('电脑版：用一个文件夹里的歌（子文件夹也算，旁边同名的 .lrc 配上），重新扫描时去掉不在了的', async () => {
+    const t = await testApp({}, { STARFALL_DESKTOP: '1' });
+    close.push(() => t.app.close());
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starfall-music-'));
+    close.push(async () => fs.rmSync(dir, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(dir, '子文件夹'));
+    fs.writeFileSync(path.join(dir, '歌手乙 - 第一首.mp3'), media('tone.mp3'));
+    fs.writeFileSync(path.join(dir, '歌手乙 - 第一首.lrc'), '[00:00.10]歌词');
+    fs.writeFileSync(path.join(dir, '子文件夹', '第二首.ogg'), media('tone.ogg'));
+    fs.writeFileSync(path.join(dir, '不是音乐.txt'), 'x');
+    const req = (o: InjectOptions) => t.app.inject(o);
+    const r = await req({ method: 'PUT', url: '/api/music/local/folder', payload: { dir } });
+    expect(r.json()).toMatchObject({ total: 2, added: 2 });
+    const list = (await req({ method: 'GET', url: '/api/music/local' })).json();
+    expect(list.folder).toBe(dir);
+    expect(list.songs.map((x: { title: string; artist: string; hasLyric: boolean; folder: boolean }) => `${x.title}|${x.artist}|${x.hasLyric}|${x.folder}`).sort()).toEqual(['第一首|歌手乙|true|true', '第二首||false|true']);
+    // 文件夹里的歌不能在后台删
+    expect((await req({ method: 'DELETE', url: `/api/music/local/${list.songs[0].id}` })).statusCode).toBe(409);
+    fs.rmSync(path.join(dir, '子文件夹'), { recursive: true });
+    expect((await req({ method: 'POST', url: '/api/music/local/rescan' })).json()).toMatchObject({ total: 1, removed: 1 });
+    expect((await req({ method: 'PUT', url: '/api/music/local/folder', payload: { dir: null } })).json()).toMatchObject({ total: 0 });
+    expect((await req({ method: 'GET', url: '/api/music/local' })).json()).toEqual({ songs: [], folder: null });
   });
 
   it('要登录才能用', async () => {

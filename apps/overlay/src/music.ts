@@ -2,7 +2,7 @@
 // 地址形如 /overlay/?output=1&key=...&music=1，在直播软件里单独加一个浏览器源（建议 640×560），拖到画面一侧。
 // 同时加了好几个时只有一个出声音（服务端指定，消息里 player 为 true），别的只显示；在浏览器里查看（&view=1）时只显示不出声。
 // 四种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
-//   glass 流光：封面的模糊色铺满卡片；cyber 赛博朋克：切角面板、酸性黄 + 青 + 洋红、信号故障似的错位；
+//   glass 流光：封面的模糊色铺满卡片；crayon 蜡笔：小朋友蜡笔涂鸦的画风，彩色手写字、抖动的蜡笔线；
 //   journal 手帐（日系）：方格纸、和纸胶带、拍立得封面、荧光笔划线、手写体；minimal 灵动岛：黑色小胶囊，有人点歌时展开显示提示。
 import './music.css';
 import { lyricIndex } from '@starfall/shared/overlay';
@@ -26,6 +26,15 @@ const env = detect();
 document.getElementById('stage')?.remove();
 document.documentElement.classList.add('mu-page');
 if (browse) document.documentElement.classList.add('mu-view');
+
+// 蜡笔线条的抖动：三个不同种子的扭曲滤镜，CSS 里轮流切换，线条就像手绘动画一样轻轻抖
+const filters = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+filters.setAttribute('width', '0');
+filters.setAttribute('height', '0');
+filters.setAttribute('aria-hidden', 'true');
+filters.style.position = 'absolute';
+filters.innerHTML = [1, 2, 3].map((i) => `<filter id="mu-wob${i}"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="${i * 7}"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter>`).join('');
+document.body.append(filters);
 
 const root = h('div', { class: 'mu-root' });
 const toasts = h('div', { class: 'mu-toasts' });
@@ -134,43 +143,33 @@ const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
     return { el, fill: p.fill, tCur: p.tCur };
   },
 
-  // 赛博朋克：切角面板、酸性黄 + 青 + 洋红；顶部一行系统信息和条形码，左边黄黑警示条，网格底纹；
-  // 封面带扫描线、偶尔信号故障似的错位；歌名时不时青红错位闪一下；进度是一格一格的分段条，带百分比读数
-  cyber(n) {
+  // 蜡笔：小朋友蜡笔涂鸦的画风。白画纸，歪歪扭扭、还会轻轻抖动的蜡笔边框；歌名每个字一种蜡笔颜色、东倒西歪；
+  // 角上画着太阳、白云、小草和星星；封面套一个手画的圆圈；进度是一道粗蜡笔线，头上一颗小星星
+  crayon(n) {
     const s = n.item.song;
-    const fill = h('div', { class: 'mu-fill' });
+    const fill = h('div', { class: 'mu-fill' }, h('i', { class: 'k-star-head' }));
     const tCur = h('span', {}, '0:00');
-    const pct = h('b', { class: 'y-pct' }, '0%');
-    const t = title(s.name);
-    t.dataset.text = s.name;
-    t.classList.add('y-glitchy');
+    const t = title(s.name, 'mu-title k-title');
+    t.firstElementChild!.replaceChildren(...[...s.name].map((c) => h('i', {}, c)));
     const el = h(
       'div',
       { class: 'mu-body' },
-      h('i', { class: 'y-frame' }),
-      h('div', { class: 'y-head' }, h('span', { class: 'y-tag' }, 'AUDIO.LINK'), h('span', { class: 'y-req' }, `// 点歌 · REQ#${String(n.item.id).padStart(4, '0')}`), h('i', { class: 'y-code' }), h('span', { class: 'y-live' }, h('i'), 'LIVE')),
-      h('div', { class: 'mu-art' }, s.cover ? img('y-ghost c', s.cover) : null, s.cover ? img('y-ghost m', s.cover) : null, h('div', { class: 'mu-disc' }, cover(s), h('i', { class: 'y-scan' }))),
+      h('i', { class: 'k-edge' }),
+      h('i', { class: 'k-sun' }),
+      h('i', { class: 'k-cloud' }),
+      h('i', { class: 'k-grass' }),
+      h('div', { class: 'mu-art' }, h('div', { class: 'mu-disc' }, cover(s)), h('i', { class: 'k-ring' }), h('i', { class: 'k-sticker' })),
       h(
         'div',
         { class: 'mu-meta' },
+        h('div', { class: 'k-hello' }, '★ 正在放的歌 ★'),
         t,
-        h('div', { class: 'mu-artist' }, s.artists || 'UNKNOWN'),
-        h('div', { class: 'mu-row' }, byChip(n.item, 24, 'REQ')),
-        h('div', { class: 'y-prog' }, h('div', { class: 'mu-track' }, fill), h('div', { class: 'y-read' }, tCur, h('span', {}, ` / ${mmss(s.durationMs)}`), pct)),
+        h('div', { class: 'mu-artist' }, s.artists || '不知道是谁唱的'),
+        h('div', { class: 'mu-row' }, byChip(n.item, 26, '点的歌！')),
+        h('div', { class: 'k-prog' }, h('div', { class: 'mu-track' }, fill), h('div', { class: 'mu-time' }, tCur, h('span', {}, mmss(s.durationMs)))),
       ),
-      h('div', { class: 'y-side' }, 'サイバー · 点歌'),
-      h('div', { class: 'y-data' }, `TRK.${s.id} · ${s.source === 'local' ? 'LOCAL' : 'NETEASE'} · SYNC OK`),
     );
-    let last = -1;
-    return {
-      el,
-      fill,
-      tCur,
-      update(pos, dur) {
-        const v = Math.min(100, Math.floor((pos / dur) * 100));
-        if (v !== last) pct.textContent = `${(last = v)}%`;
-      },
-    };
+    return { el, fill, tCur };
   },
 
   // 手帐（日系）：方格纸，和纸胶带贴着拍立得风格的封面；歌名像用荧光笔划过，手写体；角落几个手绘的小星星、小爱心
@@ -289,7 +288,7 @@ function renderLyric(s: MusicState, pos: number): void {
 
 // ---------- 后面几首、空闲提示 ----------
 
-const QUEUE_HEAD: Partial<Record<MusicDisplay['style'], string>> = { cyber: 'QUEUE // 接下来', journal: '待播清单 ♡' };
+const QUEUE_HEAD: Partial<Record<MusicDisplay['style'], string>> = { crayon: '下一首是谁呢？', journal: '待播清单 ♡' };
 
 function renderQueue(s: MusicState): void {
   const n = s.display.showQueue;

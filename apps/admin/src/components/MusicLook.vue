@@ -64,9 +64,9 @@ function testNotice(): void {
 }
 
 const STYLES = [
-  { value: 'glass', label: '玻璃卡片', desc: '封面 + 歌名，封面颜色的柔光' },
-  { value: 'vinyl', label: '黑胶唱片', desc: '唱片转动，唱臂落下' },
-  { value: 'minimal', label: '细长胶囊', desc: '一行，占地方最少' },
+  { value: 'glass', label: '流光', desc: '封面的颜色铺满卡片，像音乐 App' },
+  { value: 'journal', label: '手帐', desc: '日系：方格纸、胶带、拍立得、手写字' },
+  { value: 'minimal', label: '灵动岛', desc: '黑色小胶囊，点歌时展开提示' },
 ] as const;
 
 // ---------- 声音 ----------
@@ -197,19 +197,28 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-pvt { display: flex; align-items: center; gap: 12px; margin: 12px 0 6px; }
 .ml-ck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--t2); }
 .ml-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
+@media (max-width: 1300px) { .ml-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ml-style { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
 .ml-style:hover { border-color: var(--line-strong); }
 .ml-style[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-ring); }
 .ml-style > b { font-size: 13.5px; font-weight: 600; }
 .ml-style > span:last-child { font-size: 12px; color: var(--t2); line-height: 1.5; }
 /* 三种样子的小示意图 */
-.ml-ill { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; height: 40px; margin-bottom: 4px; padding: 0 8px; border-radius: 10px; background: linear-gradient(135deg, #2a2b45, #16172a); }
-.ml-ill i { flex: none; width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #8d8bff, #e07ab5); }
-.ml-ill b { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .7); width: 40%; }
-.ml-ill b + b { width: 22%; background: rgba(255, 255, 255, .35); }
-.ml-ill.vinyl i { border-radius: 50%; background: radial-gradient(circle, #e07ab5 0 28%, #111 30% 100%); box-shadow: 0 0 0 1px rgba(255, 255, 255, .15); }
-.ml-ill.minimal { height: 28px; margin: 6px 0 10px; border-radius: 999px; }
-.ml-ill.minimal i { width: 18px; height: 18px; border-radius: 50%; }
+.ml-ill { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; height: 44px; margin-bottom: 4px; padding: 0 8px; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #2a2b45, #16172a); }
+.ml-ill i { flex: none; width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #8d8bff, #e07ab5); }
+.ml-ill b { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .75); width: 38%; }
+.ml-ill b + b { width: 20%; background: rgba(255, 255, 255, .35); }
+.ml-ill em { display: none; }
+.ml-ill.glass { background: radial-gradient(60% 120% at 20% 50%, rgba(224, 122, 181, .7), transparent), radial-gradient(60% 120% at 80% 50%, rgba(141, 139, 255, .6), transparent), #1d1c33; }
+.ml-ill.journal { background: radial-gradient(circle at 1px 1px, rgba(120, 110, 90, .3) 1px, transparent 1.5px) 0 0 / 8px 8px, #fffdf6; box-shadow: inset 0 0 0 1px rgba(120, 100, 70, .15); }
+.ml-ill.journal i { border-radius: 1px; background: linear-gradient(135deg, #8d8bff, #e07ab5) content-box, #fff; padding: 3px 3px 7px; width: 26px; height: 32px; transform: rotate(-6deg); box-shadow: 0 2px 4px rgba(60, 40, 20, .3); }
+.ml-ill.journal b { background: linear-gradient(transparent 0 0), #34312c; box-shadow: 0 3px 0 rgba(141, 139, 255, .45); }
+.ml-ill.journal b + b { background: #b3a98f; box-shadow: none; }
+.ml-ill.minimal { justify-content: center; background: linear-gradient(135deg, #3a3b5a, #20213a); }
+.ml-ill.minimal i { width: 16px; height: 16px; border-radius: 50%; position: relative; z-index: 1; }
+.ml-ill.minimal b { position: relative; z-index: 1; width: 30%; }
+.ml-ill.minimal b + b { display: none; }
+.ml-ill.minimal::before { content: ""; position: absolute; left: 18%; right: 18%; top: 12px; bottom: 12px; border-radius: 999px; background: #000; }
 .srow .line .gap { width: 12px; }
 .srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: 13px; color: var(--t2); }
 .ml-range { width: 180px; accent-color: var(--accent); }

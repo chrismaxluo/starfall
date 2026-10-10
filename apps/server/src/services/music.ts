@@ -8,7 +8,7 @@ import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { whoOk } from '@starfall/core/danmu';
 import { NeteaseError, pick } from '@starfall/music';
 import type { NeteaseSong, PickResult } from '@starfall/music';
-import { MUSIC_DEFAULTS, MUSIC_QUEUE_SEND, MusicSettingsSchema, parseLrc } from '@starfall/shared';
+import { MUSIC_DEFAULTS, MUSIC_QUEUE_SEND, MUSIC_STYLES, MusicSettingsSchema, parseLrc } from '@starfall/shared';
 import type { DanmuEvent, GuardLevel, LyricLine, MusicHold, MusicItem, MusicNotice, MusicRequester, MusicSettings, MusicSong, MusicState, PlayItem, StdEvent, Viewer } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
 import { musicRequests } from '../db/schema.ts';
@@ -122,7 +122,10 @@ export class MusicService {
   /** 点歌设置（以前没有的项用默认值补上） */
   cfg(): MusicSettings {
     const raw = this.d.settings.getRaw<Partial<MusicSettings>>(KEY) ?? {};
-    return { ...MUSIC_DEFAULTS, ...raw };
+    const s = { ...MUSIC_DEFAULTS, ...raw };
+    // 以前有、后来去掉的样子（黑胶、细长胶囊等）：换成流光
+    if (!(MUSIC_STYLES as readonly string[]).includes(s.style)) s.style = 'glass';
+    return s;
   }
 
   updateSettings(patch: Partial<MusicSettings>): MusicSettings {

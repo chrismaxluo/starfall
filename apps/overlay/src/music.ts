@@ -1,16 +1,22 @@
 // 点歌窗口：正在放的歌（封面、歌名、歌手、谁点的、进度）、滚动歌词、后面几首、点歌结果的提示。
 // 地址形如 /overlay/?output=1&key=...&music=1，在直播软件里单独加一个浏览器源（建议 640×560），拖到画面一侧。
 // 同时加了好几个时只有一个出声音（服务端指定，消息里 player 为 true），别的只显示；在浏览器里查看（&view=1）时只显示不出声。
-// 三种样子：glass 玻璃卡片（封面颜色的柔光）、vinyl 黑胶唱片（转动）、minimal 一条细长的胶囊。
+// 三种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
+//   glass 流光：封面的模糊色铺满卡片；journal 手帐（日系）：方格纸、和纸胶带、拍立得封面、荧光笔划线、手写体；
+//   minimal 灵动岛：黑色小胶囊，换歌、有人点歌时展开显示提示。
 import './music.css';
 import { lyricIndex } from '@starfall/shared/overlay';
-import type { LyricLine, MusicItem, MusicNotice, MusicState, ServerToOverlay } from '@starfall/shared/overlay';
+import type { LyricLine, MusicDisplay, MusicItem, MusicNotice, MusicNow, MusicSong, MusicState, ServerToOverlay } from '@starfall/shared/overlay';
 import { connect } from './conn.ts';
 import type { Conn } from './conn.ts';
 import { h } from './dom.ts';
 import { detect } from './env.ts';
+import { DEFAULT_TINT, tintOf } from './music-tint.ts';
+import type { Tint } from './music-tint.ts';
 import { avatar, withGuardFrame } from './parts.ts';
 import { autoUpdate, pageBuild } from './update.ts';
+// 手帐用的手写体（霞鹜文楷，按字切成小块，只下载用到的字）
+import 'lxgw-wenkai-webfont/lxgwwenkai-regular.css';
 
 const q = new URLSearchParams(location.search);
 const preview = q.get('preview') === '1';
@@ -53,104 +59,182 @@ function img(cls: string, src: string): HTMLImageElement {
   return el;
 }
 
+/** 封面：没有封面时画一个音符 */
+function cover(song: MusicSong, cls = 'mu-cover'): HTMLElement {
+  return song.cover ? img(cls, song.cover) : h('div', { class: `${cls} blank` }, icon(NOTE_SVG, 'mu-note'));
+}
+
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-/** 封面的主色（没有封面、跨域读不了时用星辉靛） */
-const DEFAULT_TINT = '139, 140, 255';
-const tints = new Map<string, string>();
-function tintOf(url: string, done: (rgb: string) => void): void {
-  const hit = tints.get(url);
-  if (hit) return done(hit);
-  const im = new Image();
-  im.crossOrigin = 'anonymous';
-  im.referrerPolicy = 'no-referrer';
-  im.onload = () => {
-    try {
-      const c = document.createElement('canvas');
-      c.width = c.height = 12;
-      const g = c.getContext('2d', { willReadFrequently: true })!;
-      g.drawImage(im, 0, 0, 12, 12);
-      const d = g.getImageData(0, 0, 12, 12).data;
-      // 挑饱和度高、不太暗不太亮的像素平均，免得灰扑扑
-      let r = 0, gg = 0, b = 0, w = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        const R = d[i]!, G = d[i + 1]!, B = d[i + 2]!;
-        const max = Math.max(R, G, B), min = Math.min(R, G, B);
-        const sat = max ? (max - min) / max : 0;
-        const lum = (max + min) / 2;
-        const k = sat * sat * (lum > 30 && lum < 235 ? 1 : 0.1) + 0.02;
-        r += R * k; gg += G * k; b += B * k; w += k;
-      }
-      // 提亮一点，放在深色玻璃上看得清；封面太素（黑白、灰）时掺一半星辉靛，免得灰扑扑
-      let [R, G, B] = [r / w, gg / w, b / w];
-      const max = Math.max(R, G, B), min = Math.min(R, G, B);
-      if (!max || (max - min) / max < 0.18) [R, G, B] = [(R + 139) / 2, (G + 140) / 2, (B + 255) / 2];
-      const lift = (x: number) => Math.round(Math.min(255, x * 0.75 + 70));
-      const rgb = `${lift(R)}, ${lift(G)}, ${lift(B)}`;
-      tints.set(url, rgb);
-      done(rgb);
-    } catch {
-      done(DEFAULT_TINT);
-    }
-  };
-  im.onerror = () => done(DEFAULT_TINT);
-  im.src = url;
-}
-
 /** 点歌的人：头像（大航海套头像框）+ 昵称 */
-function byChip(it: MusicItem, size: number): HTMLElement {
+function byChip(it: MusicItem, size: number, label = '点歌'): HTMLElement {
   const v = it.by;
   const av = avatar({ name: v.name, guard: v.guard, isMod: false, ...(v.face ? { face: v.face } : {}) }, size);
-  return h('span', { class: `mu-by${v.guard ? ` g${v.guard}` : ''}` }, v.guard ? withGuardFrame(av, v.guard) : av, h('span', { class: 'mu-byn' }, v.name), h('span', { class: 'mu-byt' }, '点歌'));
+  return h('span', { class: `mu-by${v.guard ? ` g${v.guard}` : ''}` }, v.guard ? withGuardFrame(av, v.guard) : av, h('span', { class: 'mu-byn' }, v.name), label ? h('span', { class: 'mu-byt' }, label) : null);
 }
+
+/** 歌名：放不下时来回滚动（放得下就不动） */
+function title(text: string, cls = 'mu-title'): HTMLElement {
+  const inner = h('span', { class: 'mu-tin' }, text);
+  const el = h('span', { class: cls }, inner);
+  // 用外层的滚动尺寸量（里面是行内元素，自己的尺寸量不出放不下多少）。字体加载完前量的不准，加载完再量一次
+  const check = () => {
+    if (!el.isConnected || el.classList.contains('marq')) return;
+    const over = el.scrollWidth - el.clientWidth;
+    if (over <= 2) return;
+    el.classList.add('marq');
+    el.style.setProperty('--dx', `${-over - 8}px`);
+    el.style.setProperty('--md', `${Math.max(8, over / 26 + 6).toFixed(1)}s`);
+  };
+  requestAnimationFrame(check);
+  void document.fonts?.ready.then(() => requestAnimationFrame(check));
+  setTimeout(check, 1500);
+  return el;
+}
+
+function eq(n = 4, cls = 'mu-eq'): HTMLElement {
+  const el = h('span', { class: cls });
+  for (let i = 0; i < n; i++) el.append(h('i', { style: { '--i': String(i) } }));
+  return el;
+}
+
+interface Built {
+  el: HTMLElement;
+  fill?: HTMLElement;
+  tCur?: HTMLElement;
+  /** 每一帧（约 20 次 / 秒）按进度更新 */
+  update?: (pos: number, dur: number) => void;
+}
+
+function prog(n: MusicNow, cls = 'mu-prog'): { el: HTMLElement; fill: HTMLElement; tCur: HTMLElement } {
+  const fill = h('div', { class: 'mu-fill' }, h('i', { class: 'mu-head' }));
+  const tCur = h('span', {}, '0:00');
+  const el = h('div', { class: cls }, h('div', { class: 'mu-track' }, fill), h('div', { class: 'mu-time' }, tCur, h('span', {}, mmss(n.item.song.durationMs))));
+  return { el, fill, tCur };
+}
+
+// ---------- 三种样子的「正在放」 ----------
+
+const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
+  // 流光：封面放大、模糊后铺满整张卡片做底色，上面一层暗色玻璃；封面上一道光定时扫过
+  glass(n) {
+    const s = n.item.song;
+    const p = prog(n);
+    const el = h(
+      'div',
+      { class: 'mu-body' },
+      s.cover ? img('g-bg', s.cover) : h('div', { class: 'g-bg blank' }),
+      h('div', { class: 'g-shade' }),
+      h('div', { class: 'mu-art' }, s.cover ? img('mu-glow', s.cover) : null, h('div', { class: 'mu-disc' }, cover(s), h('i', { class: 'g-sheen' }))),
+      h('div', { class: 'mu-meta' }, h('div', { class: 'mu-t1' }, eq(), title(s.name)), h('div', { class: 'mu-artist' }, s.artists || '未知歌手'), h('div', { class: 'mu-row' }, byChip(n.item, 30)), p.el),
+    );
+    return { el, fill: p.fill, tCur: p.tCur };
+  },
+
+  // 手帐（日系）：方格纸，和纸胶带贴着拍立得风格的封面；歌名像用荧光笔划过，手写体；角落几个手绘的小星星、小爱心
+  journal(n) {
+    const s = n.item.song;
+    const fill = h('div', { class: 'mu-fill' }, h('i', { class: 'j-pencil' }));
+    const tCur = h('span', {}, '0:00');
+    const d = new Date();
+    const date = `${d.getMonth() + 1}.${d.getDate()} ${['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()]}`;
+    const el = h(
+      'div',
+      { class: 'mu-body' },
+      h('div', { class: 'j-photo' }, h('i', { class: 'j-tape a' }), h('i', { class: 'j-tape b' }), h('div', { class: 'mu-disc' }, cover(s)), h('div', { class: 'j-cap' }, '♪ now playing')),
+      h(
+        'div',
+        { class: 'mu-meta' },
+        h('div', { class: 'j-date' }, date, h('span', {}, '今日点歌')),
+        title(s.name, 'mu-title j-title'),
+        h('div', { class: 'mu-artist' }, s.artists || '未知歌手'),
+        h('div', { class: 'mu-row' }, byChip(n.item, 28, '点的歌')),
+        h('div', { class: 'j-prog' }, h('div', { class: 'mu-track' }, fill), h('div', { class: 'mu-time' }, tCur, h('span', {}, mmss(s.durationMs)))),
+      ),
+      h('i', { class: 'j-doodle star' }),
+      h('i', { class: 'j-doodle heart' }),
+      h('i', { class: 'j-doodle swirl' }),
+    );
+    // 涂鸦的位置、角度按这首歌稍微变一变，每首不完全一样
+    const seed = [...s.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 997, 7);
+    el.style.setProperty('--j1', `${(seed % 7) * 3 - 9}deg`);
+    el.style.setProperty('--j2', `${(seed % 5) * 4}px`);
+    el.style.setProperty('--j3', `${((seed >> 2) % 5) * 5 - 10}deg`);
+    return { el, fill, tCur };
+  },
+
+  // 灵动岛：黑色胶囊，左边转动的小封面，右边跳动的音柱；有人点歌时胶囊展开显示提示，再收回去
+  minimal(n) {
+    const s = n.item.song;
+    const fill = h('div', { class: 'mu-fill' });
+    const el = h(
+      'div',
+      { class: 'mu-body' },
+      h('div', { class: 'mu-art' }, h('div', { class: 'mu-disc' }, cover(s))),
+      h('div', { class: 'mu-meta' }, title(s.name), h('div', { class: 'mu-artist' }, `${s.artists || '未知歌手'} · ${n.item.by.name} 点歌`)),
+      eq(5, 'mu-eq i-wave'),
+      h('div', { class: 'i-note' }),
+      h('div', { class: 'i-prog' }, fill),
+    );
+    return { el, fill };
+  },
+};
 
 // ---------- 正在放 ----------
 
-let shownId: number | null = null;
-let fill: HTMLElement | null = null;
-let tCur: HTMLElement | null = null;
-let tDur: HTMLElement | null = null;
+let shown: { id: number; style: string } | null = null;
+let built: Built | null = null;
 
 function renderCard(s: MusicState): void {
   const n = s.now;
   card.classList.toggle('on', Boolean(n));
   if (!n) {
-    shownId = null;
+    shown = null;
+    built = null;
     return;
   }
   card.classList.toggle('paused', n.paused || s.hold !== null);
-  if (shownId === n.item.id) return;
-  const fresh = shownId !== null;
-  shownId = n.item.id;
+  if (shown?.id === n.item.id && shown.style === s.display.style) return;
+  const fresh = shown !== null;
+  shown = { id: n.item.id, style: s.display.style };
+  built = BUILD[s.display.style](n);
+  card.replaceChildren(built.el);
   const song = n.item.song;
-  const art = h('div', { class: 'mu-art' });
-  if (song.cover) {
-    art.append(img('mu-glow', song.cover), h('div', { class: 'mu-disc' }, img('mu-cover', song.cover)));
-    tintOf(song.cover, (rgb) => root.style.setProperty('--tint', rgb));
-  } else {
-    art.append(h('div', { class: 'mu-disc' }, h('div', { class: 'mu-cover blank' }, icon(NOTE_SVG, 'mu-note'))));
-    root.style.setProperty('--tint', DEFAULT_TINT);
+  if (song.cover) tintOf(song.cover, applyTint);
+  else applyTint(DEFAULT_TINT);
+  if (fresh && !reduced()) {
+    built.el.animate([{ opacity: 0, transform: 'translateY(14px) scale(.98)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 560, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    const photo = built.el.querySelector('.j-photo');
+    const art = built.el.querySelector('.mu-art');
+    if (photo) photo.animate([{ opacity: 0, transform: 'translate(-10px, -26px) rotate(-14deg) scale(1.08)' }, { opacity: 1, transform: 'rotate(-4deg)' }], { duration: 700, delay: 120, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'backwards' });
+    else if (art) art.animate([{ opacity: 0, transform: 'scale(.7) rotate(-8deg)' }, { opacity: 1, transform: 'none' }], { duration: 720, delay: 100, easing: 'cubic-bezier(.3,1.5,.5,1)', fill: 'backwards' });
   }
-  art.append(h('div', { class: 'mu-arm' }));
-  const eq = h('span', { class: 'mu-eq' }, h('i'), h('i'), h('i'), h('i'));
-  fill = h('div', { class: 'mu-fill' });
-  tCur = h('span', {}, '0:00');
-  tDur = h('span', {}, mmss(song.durationMs));
-  const meta = h(
-    'div',
-    { class: 'mu-meta' },
-    h('div', { class: 'mu-t1' }, eq, h('span', { class: 'mu-title' }, song.name)),
-    h('div', { class: 'mu-artist' }, song.artists || '未知歌手'),
-    h('div', { class: 'mu-row' }, byChip(n.item, 30)),
-    h('div', { class: 'mu-prog' }, h('div', { class: 'mu-track' }, fill), h('div', { class: 'mu-time' }, tCur, tDur)),
-  );
-  const body = h('div', { class: 'mu-body' }, h('div', { class: 'mu-gl' }), art, meta);
-  card.replaceChildren(body);
-  if (fresh && !reduced()) body.animate([{ opacity: 0, transform: 'translateY(14px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  // 灵动岛：换了歌先展开，写一下现在放的是什么
+  if (s.display.style === 'minimal') island([h('i', { class: 'i-dot play' }), h('span', {}, '正在播放'), h('b', {}, `《${song.name}》`), h('span', {}, `${n.item.by.name} 点的`)], 3200);
   lastLine = -2;
+}
+
+let noteTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 灵动岛展开一会儿，显示 nodes，再收回去 */
+function island(nodes: Node[], ms: number): boolean {
+  const note = built?.el.querySelector<HTMLElement>('.i-note');
+  if (!note) return false;
+  note.replaceChildren(...nodes);
+  card.classList.add('noting');
+  if (noteTimer) clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => card.classList.remove('noting'), ms);
+  return true;
+}
+
+function applyTint(t: Tint): void {
+  root.style.setProperty('--tint', t.c1);
+  root.style.setProperty('--tint2', t.c2);
+  root.style.setProperty('--tintD', t.d1);
+  root.style.setProperty('--tintD2', t.d2);
 }
 
 // ---------- 歌词 ----------
@@ -174,11 +258,11 @@ function renderLyric(s: MusicState, pos: number): void {
     const cur = lines[Math.max(0, i)] ?? null;
     const next = lines[Math.max(0, i) + 1] ?? null;
     lyCur = h('div', { class: 'ly-cur' }, cur?.text ?? '');
-    const subText = s.display.lyricsTrans && cur?.tr ? cur.tr : (next?.text ?? '');
-    const sub = h('div', { class: `ly-sub${s.display.lyricsTrans && cur?.tr ? ' tr' : ''}` }, subText);
+    const tr = s.display.lyricsTrans && cur?.tr ? cur.tr : null;
+    const sub = h('div', { class: `ly-sub${tr ? ' tr' : ''}` }, tr ?? next?.text ?? '');
     const box = h('div', { class: 'ly-box' }, lyCur, sub);
     lyric.replaceChildren(box);
-    if (!reduced()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    if (!reduced()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 460, easing: 'cubic-bezier(.2,.8,.2,1)' });
   }
   // 这一句唱到哪：从这一句开始到下一句开始，颜色从左往右填过去
   if (lyCur && i < 0) lyCur.style.setProperty('--p', '0%');
@@ -192,6 +276,8 @@ function renderLyric(s: MusicState, pos: number): void {
 
 // ---------- 后面几首、空闲提示 ----------
 
+const QUEUE_HEAD: Partial<Record<MusicDisplay['style'], string>> = { journal: '待播清单 ♡' };
+
 function renderQueue(s: MusicState): void {
   const n = s.display.showQueue;
   const items = s.queue.slice(0, n);
@@ -200,9 +286,9 @@ function renderQueue(s: MusicState): void {
   const more = s.total - items.length;
   const tail = more > 0 ? [h('div', { class: 'mu-qmore' }, `还有 ${more} 首`)] : [];
   queue.replaceChildren(
-    h('div', { class: 'mu-qh' }, h('span', {}, '接下来'), h('span', { class: 'mu-qn' }, `共 ${s.total} 首`)),
+    h('div', { class: 'mu-qh' }, h('span', {}, QUEUE_HEAD[s.display.style] ?? '接下来'), h('span', { class: 'mu-qn' }, `共 ${s.total} 首`)),
     ...items.map((it, i) =>
-      h('div', { class: 'mu-qi' }, h('span', { class: 'mu-qx' }, String(i + 1)), h('span', { class: 'mu-qt' }, h('b', {}, it.song.name), it.song.artists ? h('span', {}, ` · ${it.song.artists}`) : null), h('span', { class: 'mu-qb' }, it.by.name)),
+      h('div', { class: 'mu-qi' }, h('span', { class: 'mu-qx' }, String(i + 1)), it.song.cover ? img('mu-qc', it.song.cover) : h('span', { class: 'mu-qc blank' }, icon(NOTE_SVG, 'mu-note')), h('span', { class: 'mu-qt' }, h('b', {}, it.song.name), it.song.artists ? h('span', {}, ` · ${it.song.artists}`) : null), h('span', { class: 'mu-qb' }, it.by.name)),
     ),
     ...tail,
   );
@@ -218,11 +304,12 @@ function renderIdle(s: MusicState): void {
 
 function toast(n: MusicNotice): void {
   if (!state?.enabled) return;
-  const el = h('div', { class: `mu-toast ${n.ok ? 'ok' : 'no'}` }, h('b', {}, n.who), h('span', {}, n.ok ? ` ${n.text}` : `：${n.text}`));
+  // 灵动岛：胶囊展开，把提示写在里面
+  if (state.display.style === 'minimal' && island([h('i', { class: `i-dot ${n.ok ? 'ok' : 'no'}` }), h('b', {}, n.who), h('span', {}, n.ok ? ` ${n.text}` : `：${n.text}`)], 3800)) return;
+  const el = h('div', { class: `mu-toast ${n.ok ? 'ok' : 'no'}` }, h('i', { class: 'mu-td' }), h('b', {}, n.who), h('span', {}, n.ok ? ` ${n.text}` : `：${n.text}`));
   toasts.append(el);
   while (toasts.children.length > 2) toasts.firstElementChild?.remove();
-  const anim = reduced() ? null : el.animate([{ opacity: 0, transform: 'translateY(-10px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 360, easing: 'cubic-bezier(.2,.8,.2,1)' });
-  void anim;
+  if (!reduced()) el.animate([{ opacity: 0, transform: 'translateY(-10px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 360, easing: 'cubic-bezier(.2,.8,.2,1)' });
   setTimeout(() => {
     const out = el.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-6px)' }], { duration: 300, fill: 'forwards' });
     out.onfinish = () => el.remove();
@@ -264,8 +351,10 @@ function tick(): void {
     lastPaint = now;
     const pos = position();
     const dur = s.now.item.song.durationMs || (player ? audio.duration * 1000 : 0) || 1;
-    if (fill) fill.style.width = `${Math.min(100, (pos / dur) * 100).toFixed(2)}%`;
-    if (tCur) tCur.textContent = mmss(pos);
+    const b = built;
+    if (b?.fill) b.fill.style.setProperty('--w', `${Math.min(100, (pos / dur) * 100).toFixed(2)}%`);
+    if (b?.tCur) b.tCur.textContent = mmss(pos);
+    b?.update?.(pos, dur);
     renderLyric(s, pos);
   }
   const moving = !(s.now.paused || s.hold !== null) || (player && !audio.paused);
@@ -337,21 +426,21 @@ function play(): void {
     () => {
       if (blocked) {
         blocked = false;
-        idleHint();
+        blockedHint();
       }
     },
     (e: Error) => {
       // 浏览器要求先点一下页面才能出声（直播软件里不会这样）：不当作放不了
       if (e.name === 'NotAllowedError') {
         blocked = true;
-        idleHint();
+        blockedHint();
       }
     },
   );
 }
 
 /** 浏览器拦住了声音时，在页面上提示点一下 */
-function idleHint(): void {
+function blockedHint(): void {
   root.querySelector('.mu-blocked')?.remove();
   if (blocked) root.append(h('div', { class: 'mu-blocked' }, '浏览器拦住了声音，点一下页面开启'));
 }
@@ -444,10 +533,10 @@ if (preview) {
   }
 }
 
-function notice(title: string, detail: string): void {
+function notice(t: string, detail: string): void {
   root.querySelector('.notice')?.remove();
   root.className = 'mu-root';
-  root.append(h('div', { class: 'notice' }, title, h('small', {}, detail)));
+  root.append(h('div', { class: 'notice' }, t, h('small', {}, detail)));
 }
 
 // 方便在浏览器控制台里调试

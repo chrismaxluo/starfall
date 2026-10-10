@@ -1,6 +1,9 @@
 // 服务端与特效页之间的消息（方案设计 9.3）。特效页和服务端共用这些类型。
 import type { GuardLevel, TriggerKind } from './events.ts';
 import type { Position } from './rules.ts';
+import type { MusicNotice, MusicState } from './music.ts';
+
+export * from './music.ts';
 
 /**
  * B 站的大航海头像框（200×200 透明 PNG，1 总督、2 提督、3 舰长）。版权归 B 站：只在运行时从 B 站加载，不打包；
@@ -235,6 +238,12 @@ export type ServerToOverlay =
   | { type: 'gifts_clear' }
   /** 送礼名单：挂上的记录变了（整份发过来，按顺序） */
   | { type: 'gift_pins'; items: GiftListItem[] }
+  /** 点歌窗口：全部状态（有变化就整份发）；player 为 true 的那个窗口负责出声音，别的只显示 */
+  | { type: 'music'; state: MusicState; player: boolean }
+  /** 点歌窗口（出声音的那个）：有带声音的特效在播，音乐调小 / 恢复 */
+  | { type: 'music_duck'; on: boolean; pct: number }
+  /** 点歌窗口：点歌结果的提示 */
+  | { type: 'music_notice'; notice: MusicNotice }
   /** 心跳：特效页据此判断连接是否还活着（浏览器里收不到协议层的 ping） */
   | { type: 'ping' };
 
@@ -244,7 +253,12 @@ export type OverlayToServer =
   | { type: 'ended'; id: string }
   | { type: 'error'; id?: string; message: string }
   /** 特效页定时报平安：页面卡死时服务端能发现 */
-  | { type: 'alive' };
+  | { type: 'alive' }
+  /** 点歌窗口（出声音的那个）：开始出声了、播放到哪里（每几秒报一次）、放完了、放不了 */
+  | { type: 'music_started'; id: number; load: number }
+  | { type: 'music_pos'; id: number; pos: number }
+  | { type: 'music_ended'; id: number }
+  | { type: 'music_error'; id: number; load: number; message: string };
 
 /** 连接保活的时间（毫秒） */
 export const OVERLAY_TIMING = {

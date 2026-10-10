@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import CdPick from '../components/CdPick.vue';
 import ChatPreview from '../components/ChatPreview.vue';
 import AddSteps from '../components/AddSteps.vue';
@@ -9,11 +9,12 @@ import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
+import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { isFxLive, isFxView, overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
+import { loadMusic, music, saveMusic } from '../lib/music.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { OutputDto, OverlayConfig, OverlayInfo } from '../lib/types.ts';
 
@@ -135,6 +136,9 @@ const mask = (u: string, show: boolean) => (show || !o.value ? u : u.replace(o.v
 const shownUrl = computed(() => mask(url.value, showKey.value));
 const shownChatUrl = computed(() => mask(chatUrl.value, showChatKey.value));
 const giftsUrl = computed(() => (o.value ? `${location.origin}${o.value.giftsPath}` : ''));
+const musicUrl = computed(() => (o.value ? `${location.origin}${o.value.musicPath}` : ''));
+const showMusicKey = ref(false);
+const shownMusicUrl = computed(() => mask(musicUrl.value, showMusicKey.value));
 const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 /** 送礼名单浏览器源的建议宽高 */
 const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize) } : { w: GIFTS_WIDTH, h: 650 }));
@@ -154,13 +158,14 @@ function setChatFade(v: number): void {
   if (!o.value || v === o.value.chatFadeSec) return;
   void save({ chatFadeSec: v }, v ? `没人发弹幕 ${v} 秒后，从最旧的开始一条一条消失` : '弹幕一直显示，只被新弹幕顶走');
 }
-async function copy(which: 'fx' | 'chat' | 'gifts'): Promise<void> {
+async function copy(which: 'fx' | 'chat' | 'gifts' | 'music'): Promise<void> {
   try {
-    await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : which === 'gifts' ? giftsUrl.value : url.value);
-    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : which === 'gifts' ? `已复制送礼名单地址，宽高填 ${giftsWh.value.w} × ${giftsWh.value.h}` : '已复制特效页地址');
+    await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : which === 'gifts' ? giftsUrl.value : which === 'music' ? musicUrl.value : url.value);
+    toast(which === 'chat' ? `已复制弹幕列表地址，宽高填 ${chatWh.value.w} × ${chatWh.value.h}` : which === 'gifts' ? `已复制送礼名单地址，宽高填 ${giftsWh.value.w} × ${giftsWh.value.h}` : which === 'music' ? `已复制点歌窗口地址，宽高填 ${MUSIC_WIDTH} × ${MUSIC_HEIGHT}` : '已复制特效页地址');
   } catch {
     if (which === 'chat') showChatKey.value = true;
     else if (which === 'gifts') showGiftsKey.value = true;
+    else if (which === 'music') showMusicKey.value = true;
     else showKey.value = true;
     toast('浏览器不允许自动复制，请手动选中地址复制', 'info');
   }
@@ -168,7 +173,7 @@ async function copy(which: 'fx' | 'chat' | 'gifts'): Promise<void> {
 async function resetKey(): Promise<void> {
   const target = o.value;
   if (!target) return;
-  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：特效页、弹幕列表、送礼名单的旧地址立即失效，请把新地址重新填到直播软件');
+  const r = await attempt(() => post<OutputDto>(`/api/outputs/${target.id}/reset-key`), '已重置密钥：特效页、弹幕列表、送礼名单、点歌窗口的旧地址立即失效，请把新地址重新填到直播软件');
   if (r) Object.assign(target, r);
 }
 
@@ -186,6 +191,9 @@ const overlays = computed(() => state.overlays.filter((x) => x.outputId === o.va
 const viewing = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && isFxView(x)));
 const chats = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'chat'));
 const giftLists = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'gifts'));
+const musicWins = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'music' && !x.view));
+// 点歌开关在「弹幕点歌」页，这里也放一个（还没读过点歌设置时读一次）
+onMounted(() => !music.loaded && void loadMusic().catch(() => undefined));
 /** 在线状态：「在线 · 直播姬」，几个同时在线时写个数 */
 function liveText(list: OverlayInfo[]): string {
   if (!list.length) return '不在线';
@@ -346,6 +354,27 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <span class="wh2">宽高填 <code>{{ giftsWh.w }} × {{ giftsWh.h }}</code></span>
               <span>高度按一屏 {{ o.giftsMax }} 条算好了</span>
               <span class="links"><a class="linkish" href="#giftlist">名单内容、外观 →</a><a class="linkish" :href="`${o.giftsPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
+            </div>
+          </div>
+
+          <div class="srcbox">
+            <div class="src-h">
+              <span class="src-ic mu"><Icon name="i-music" /></span>
+              <span class="src-t"><b>点歌窗口</b><span>观众点的歌在这里播放：正在放的歌、歌词、接下来几首 · 拖到画面一侧</span></span>
+              <span class="right">
+                <span class="live" :class="music.settings?.enabled && musicWins.length ? '' : 'off'"><i />{{ music.settings && !music.settings.enabled ? '点歌关着' : liveText(musicWins) }}</span>
+                <button v-if="music.settings" class="switch" role="switch" type="button" :aria-checked="music.settings.enabled" aria-label="点歌开关" @click="saveMusic({ enabled: !music.settings.enabled }, music.settings.enabled ? '已关闭点歌：正在放的歌停下，列表保留' : '已打开点歌：观众可以发弹幕点歌了')" />
+              </span>
+            </div>
+            <div class="src-url">
+              <input class="inp" :value="shownMusicUrl" readonly aria-label="点歌窗口地址" @focus="(e) => showMusicKey && (e.target as HTMLInputElement).select()" />
+              <button class="btn primary" @click="copy('music')"><Icon name="i-copy" />复制地址</button>
+              <button class="btn ic" :title="showMusicKey ? '隐藏密钥' : '显示密钥'" :aria-label="showMusicKey ? '隐藏密钥' : '显示密钥'" @click="showMusicKey = !showMusicKey"><Icon :name="showMusicKey ? 'i-eye-off' : 'i-eye'" /></button>
+            </div>
+            <div class="src-f">
+              <span class="wh2">宽高填 <code>{{ MUSIC_WIDTH }} × {{ MUSIC_HEIGHT }}</code></span>
+              <span>声音从这个窗口出来，加了好几个也只有一个出声</span>
+              <span class="links"><a class="linkish" href="#music">点歌设置 →</a><a class="linkish" :href="`${o.musicPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看，不出声；直播软件里请用上面的地址">在浏览器里查看</a></span>
             </div>
           </div>
 

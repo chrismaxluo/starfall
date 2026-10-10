@@ -15,3 +15,4 @@ export function goldToYuan(gold: number): number {
 export * from './events.ts';
 export * from './rules.ts';
 export * from './overlay.ts';
+export * from './music-rules.ts';

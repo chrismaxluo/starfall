@@ -49,9 +49,9 @@ export const state = reactive({
 export const effectById = (id: number | null | undefined) => (id ? state.effects.find((e) => e.id === id) : undefined);
 export const output = () => state.outputs[0];
 /** 加到直播软件里的特效页（不算弹幕列表，也不算「在浏览器里查看」打开的页面） */
-export const isFxLive = (x: OverlayInfo) => x.role !== 'chat' && x.role !== 'gifts' && !x.view && !x.env?.view;
+export const isFxLive = (x: OverlayInfo) => x.role !== 'chat' && x.role !== 'gifts' && x.role !== 'music' && !x.view && !x.env?.view;
 /** 「在浏览器里查看」打开的特效页 */
-export const isFxView = (x: OverlayInfo) => x.role !== 'chat' && x.role !== 'gifts' && Boolean(x.view || x.env?.view);
+export const isFxView = (x: OverlayInfo) => x.role !== 'chat' && x.role !== 'gifts' && x.role !== 'music' && Boolean(x.view || x.env?.view);
 
 /** 输出的设置换成特效页、弹幕列表收到的格式（预览用）；嵌套的设置复制一份（发给预览页时不能带响应式代理） */
 export function overlayConfigOf(o: OutputDto): OverlayConfig {

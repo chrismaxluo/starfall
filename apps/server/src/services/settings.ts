@@ -32,6 +32,10 @@ export class SettingsStore {
     return this.db.select().from(settings).where(eq(settings.key, key)).get()?.value as T | undefined;
   }
 
+  deleteRaw(key: string): void {
+    this.db.delete(settings).where(eq(settings.key, key)).run();
+  }
+
   setRaw(key: string, value: unknown): void {
     this.db.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
   }

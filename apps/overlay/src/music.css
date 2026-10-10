@@ -1,0 +1,183 @@
+/* 点歌窗口：尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍。
+   --tint 是封面的主色（r, g, b），用在柔光、描边末端、进度条、歌词填色和跳动的音柱上。
+   三种样子：st-glass 玻璃卡片、st-vinyl 黑胶唱片、st-minimal 细长胶囊。 */
+:root {
+  --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; color: #fff; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%, rgba(139,140,255,.35), transparent 70%), radial-gradient(60% 40% at 85% 75%, rgba(255,120,170,.25), transparent 70%), #121320; }
+
+.mu-root { --tint: 139, 140, 255; position: fixed; inset: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 66px 18px 18px; }
+.mu-root.large { zoom: 1.25; }
+.mu-root.side-right { align-items: flex-end; }
+.mu-root.off > * { display: none !important; }
+.mu-card, .mu-lyric, .mu-queue, .mu-idle { display: none; }
+.mu-card.on, .mu-lyric.on, .mu-queue.on, .mu-idle.on { display: flex; }
+
+/* ---------- 玻璃（三种样子共用的底子） ---------- */
+.mu-body, .mu-queue, .mu-idle, .mu-toast { position: relative; isolation: isolate; color: #fff;
+  background: linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,.05) 42%, rgba(255,255,255,.02)), rgba(16,18,30,.52);
+  -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.18), 0 26px 60px -22px rgba(0,0,0,.65), 0 6px 16px -6px rgba(0,0,0,.35); }
+.mu-body::before, .mu-queue::before, .mu-idle::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.6px; pointer-events: none;
+  background: linear-gradient(140deg, rgba(255,255,255,.8), rgba(255,255,255,.14) 28%, rgba(255,255,255,.04) 60%, rgba(var(--tint), .8));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.lite .mu-body, .lite .mu-queue, .lite .mu-idle, .lite .mu-toast { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 45%), rgba(16,18,28,.88); }
+
+/* ---------- 正在放 ---------- */
+.mu-card { width: min(604px, 100%); }
+.mu-body { display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 20px; width: 100%; padding: 18px 24px 18px 18px; border-radius: 30px; overflow: hidden; }
+/* 封面颜色的柔光：左边一团，慢慢呼吸 */
+.mu-gl { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.mu-gl::before { content: ""; position: absolute; left: -18%; top: -70%; width: 70%; height: 240%; background: radial-gradient(closest-side, rgba(var(--tint), .55), transparent); animation: muBreath 6s ease-in-out infinite; }
+.mu-gl::after { content: ""; position: absolute; right: -30%; bottom: -120%; width: 80%; height: 220%; background: radial-gradient(closest-side, rgba(var(--tint), .22), transparent); }
+@keyframes muBreath { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: .85; transform: scale(1.08); } }
+
+.mu-art { position: relative; width: 132px; height: 132px; }
+.mu-glow { position: absolute; inset: 6%; width: 88%; height: 88%; object-fit: cover; border-radius: 24px; filter: blur(22px) saturate(1.7); opacity: .75; transform: translateY(10px) scale(1.05); z-index: -1; }
+.lite .mu-glow { display: none; }
+.mu-disc { position: relative; width: 100%; height: 100%; border-radius: 22px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 14px 30px -10px rgba(0,0,0,.7); }
+.mu-disc::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(155deg, rgba(255,255,255,.32), transparent 38%); pointer-events: none; }
+.mu-cover { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mu-cover.blank { display: grid; place-items: center; background: linear-gradient(135deg, rgba(var(--tint), .9), rgba(var(--tint), .35)); }
+.mu-cover.blank .mu-note { width: 44%; height: 44%; color: #fff; opacity: .9; }
+.mu-arm { display: none; }
+
+.mu-meta { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.mu-t1 { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mu-title { font-size: 31px; line-height: 1.2; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 14px rgba(0,0,0,.3); }
+.mu-artist { font-size: 19px; color: rgba(255,255,255,.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-row { display: flex; margin-top: 4px; min-width: 0; }
+
+/* 跳动的音柱（暂停时停下、压低） */
+.mu-eq { flex: none; display: inline-flex; align-items: flex-end; gap: 3px; height: 22px; }
+.mu-eq i { width: 4px; height: 100%; border-radius: 2px; background: linear-gradient(rgb(var(--tint)), rgba(var(--tint), .55)); transform-origin: bottom; animation: muEq 1s ease-in-out infinite; box-shadow: 0 0 10px rgba(var(--tint), .6); }
+.mu-eq i:nth-child(2) { animation-delay: -.35s; animation-duration: .8s; }
+.mu-eq i:nth-child(3) { animation-delay: -.6s; animation-duration: 1.15s; }
+.mu-eq i:nth-child(4) { animation-delay: -.15s; animation-duration: .9s; }
+@keyframes muEq { 0%, 100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+.paused .mu-eq i { animation-play-state: paused; transform: scaleY(.25); transition: transform .4s; }
+
+/* 点歌的人 */
+.mu-by { display: inline-flex; align-items: center; gap: 8px; height: 36px; max-width: 100%; padding: 0 14px 0 3px; border-radius: 999px; background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.mu-by .av { position: relative; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; flex: none; font-size: 13px; font-weight: 600; box-shadow: 0 0 0 1.5px rgba(255,255,255,.5); }
+.mu-by .av img { width: 100%; height: 100%; object-fit: cover; }
+.mu-by .av-framed { position: relative; display: inline-grid; flex: none; margin: 0 2px; }
+.mu-by .av-framed .av { box-shadow: none; }
+.mu-by .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
+.mu-by.g3 { box-shadow: inset 0 0 0 1.5px rgba(74,155,255,.7); background: rgba(74,155,255,.18); }
+.mu-by.g2 { box-shadow: inset 0 0 0 1.5px rgba(167,116,255,.75); background: rgba(167,116,255,.2); }
+.mu-by.g1 { box-shadow: inset 0 0 0 1.5px rgba(255,106,61,.8); background: rgba(255,106,61,.2); }
+.mu-byn { font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 9em; }
+.mu-byt { font-size: 14px; color: rgba(255,255,255,.6); letter-spacing: .06em; flex: none; }
+
+/* 进度 */
+.mu-prog { margin-top: 8px; }
+.mu-track { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
+.mu-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: inherit; background: linear-gradient(90deg, rgba(var(--tint), .9), #fff); box-shadow: 0 0 12px rgba(var(--tint), .8); }
+.mu-time { display: flex; justify-content: space-between; margin-top: 6px; font: 500 14px/1 var(--font-mono); color: rgba(255,255,255,.58); letter-spacing: .02em; }
+
+/* ---------- 歌词：当前这句从左往右填色，下面一行是翻译或下一句 ---------- */
+.mu-lyric { width: min(604px, 100%); }
+.side-right .mu-lyric { justify-content: flex-end; text-align: right; }
+/* 歌词垫一层淡淡的玻璃：画面很亮（天空、白墙）时也看得清 */
+.ly-box { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-width: 100%; padding: 10px 20px 12px; border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(12,14,26,.34);
+  -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 12px 30px -18px rgba(0,0,0,.55); }
+.lite .ly-box { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(12,14,26,.62); }
+.ly-cur { --p: 0%; font-size: 30px; line-height: 1.3; font-weight: 700; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(90deg, #fff, rgb(var(--tint)) 140%) 0 0 / var(--p) 100% no-repeat, rgba(255,255,255,.5);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 14px rgba(var(--tint), .35)); }
+.ly-sub { font-size: 20px; line-height: 1.3; color: rgba(255,255,255,.66); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.ly-sub.tr { color: rgba(255,255,255,.8); }
+
+/* ---------- 接下来 ---------- */
+.mu-queue { flex-direction: column; gap: 6px; width: min(560px, 100%); padding: 12px 16px 14px; border-radius: 22px; }
+.mu-qh { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; letter-spacing: .14em; color: rgba(255,255,255,.62); padding: 0 2px 4px; }
+.mu-qn { letter-spacing: .04em; }
+.mu-qi { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 18px; min-height: 32px; }
+.mu-qx { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 13px/1 var(--font-mono); background: rgba(var(--tint), .28); box-shadow: inset 0 0 0 1px rgba(var(--tint), .6); }
+.mu-qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-qt b { font-weight: 600; }
+.mu-qt span { color: rgba(255,255,255,.58); }
+.mu-qb { font-size: 15px; color: rgba(255,255,255,.6); max-width: 7em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-qmore { font-size: 14px; color: rgba(255,255,255,.5); padding-left: 34px; }
+
+/* ---------- 空闲：提示怎么点歌 ---------- */
+.mu-idle { align-items: center; gap: 12px; height: 54px; padding: 0 24px 0 18px; border-radius: 999px; font-size: 19px; color: rgba(255,255,255,.86); }
+.mu-idle b { color: #fff; font-weight: 700; padding: 2px 10px; margin: 0 2px; border-radius: 8px; background: rgba(var(--tint), .32); box-shadow: inset 0 0 0 1px rgba(var(--tint), .7); }
+.mu-note { display: inline-grid; width: 24px; height: 24px; color: rgb(var(--tint)); }
+.mu-note svg { width: 100%; height: 100%; }
+.mu-idle .mu-note { animation: muBob 2.4s ease-in-out infinite; filter: drop-shadow(0 0 8px rgba(var(--tint), .7)); }
+@keyframes muBob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-8deg); } }
+
+/* ---------- 提示 ---------- */
+.mu-toasts { position: absolute; top: 12px; left: 18px; right: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+.side-right .mu-toasts { align-items: flex-end; }
+.mu-toast { max-width: 100%; padding: 8px 16px; border-radius: 999px; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mu-toast b { font-weight: 700; }
+.mu-toast.ok { box-shadow: inset 0 0 0 1.5px rgba(88,214,141,.7), 0 10px 24px -12px rgba(0,0,0,.6); }
+.mu-toast.ok::before { content: "♪ "; color: #7FE3A8; }
+.mu-toast.no { box-shadow: inset 0 0 0 1.5px rgba(255,150,120,.65), 0 10px 24px -12px rgba(0,0,0,.6); color: rgba(255,235,228,.95); }
+
+.mu-blocked { position: absolute; left: 18px; bottom: 18px; padding: 10px 16px; border-radius: 12px; background: rgba(40,12,16,.9); color: #FFD9D9; font-size: 16px; box-shadow: inset 0 0 0 1.5px rgba(240,114,114,.5); }
+
+/* ---------- 黑胶唱片 ---------- */
+.st-vinyl .mu-body { grid-template-columns: 156px minmax(0, 1fr); padding: 16px 24px 16px 16px; }
+.st-vinyl .mu-art { width: 156px; height: 156px; }
+.st-vinyl .mu-glow { inset: 18%; width: 64%; height: 64%; border-radius: 50%; filter: blur(26px) saturate(1.8); }
+.st-vinyl .mu-disc { border-radius: 50%; display: grid; place-items: center; overflow: visible;
+  background:
+    conic-gradient(from 20deg, rgba(255,255,255,0) 0deg, rgba(255,255,255,.16) 30deg, rgba(255,255,255,0) 70deg, rgba(255,255,255,0) 180deg, rgba(255,255,255,.12) 215deg, rgba(255,255,255,0) 250deg),
+    repeating-radial-gradient(circle, #0d0d10 0 1.6px, #1c1c22 1.6px 3px),
+    #111;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.08), 0 16px 34px -10px rgba(0,0,0,.8);
+  animation: muSpin 9s linear infinite; }
+.st-vinyl .mu-disc::after { background: none; }
+.st-vinyl .mu-disc .mu-cover { width: 50%; height: 50%; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,.55), 0 0 0 4px rgba(var(--tint), .5); }
+.st-vinyl .mu-disc::before { content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #0b0b0d; box-shadow: 0 0 0 2px rgba(255,255,255,.35); z-index: 1; }
+.st-vinyl.paused .mu-disc, .st-vinyl .paused .mu-disc { animation-play-state: paused; }
+@keyframes muSpin { to { transform: rotate(360deg); } }
+/* 唱臂：放的时候落在唱片上，暂停时抬起来 */
+.st-vinyl .mu-arm { display: block; position: absolute; right: -10px; top: -14px; width: 10px; height: 104px; border-radius: 5px; transform-origin: 50% 8px; transform: rotate(24deg); transition: transform .7s cubic-bezier(.3,.7,.2,1);
+  background: linear-gradient(90deg, #9a9aa4, #f4f4f8 45%, #8a8a94); box-shadow: 0 6px 12px -4px rgba(0,0,0,.6); z-index: 2; }
+.st-vinyl .mu-arm::before { content: ""; position: absolute; left: 50%; top: -4px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #9a9aa4 60%, #5a5a64); box-shadow: 0 3px 8px rgba(0,0,0,.5); }
+.st-vinyl .mu-arm::after { content: ""; position: absolute; left: -5px; bottom: -6px; width: 20px; height: 14px; border-radius: 4px; background: linear-gradient(#e8e8ee, #7a7a84); transform: rotate(-24deg); }
+.st-vinyl .paused .mu-arm { transform: rotate(4deg); }
+
+/* ---------- 细长胶囊 ---------- */
+.st-minimal .mu-card { width: auto; max-width: 100%; }
+.st-minimal .mu-body { grid-template-columns: 60px minmax(0, 1fr); gap: 14px; padding: 8px 26px 8px 8px; border-radius: 999px; }
+.st-minimal .mu-art { width: 60px; height: 60px; }
+.st-minimal .mu-glow { display: none; }
+.st-minimal .mu-disc { border-radius: 50%; animation: muSpin 14s linear infinite; }
+.st-minimal .paused .mu-disc { animation-play-state: paused; }
+.st-minimal .mu-meta { display: grid; grid-template-columns: minmax(0, auto) auto; grid-template-areas: "t1 row" "ar row"; column-gap: 16px; row-gap: 2px; align-items: center; }
+.st-minimal .mu-t1 { grid-area: t1; gap: 9px; }
+.st-minimal .mu-title { font-size: 23px; }
+.st-minimal .mu-eq { height: 16px; }
+.st-minimal .mu-eq i { width: 3px; }
+.st-minimal .mu-artist { grid-area: ar; font-size: 15px; }
+.st-minimal .mu-row { grid-area: row; margin: 0; }
+.st-minimal .mu-by { height: 30px; padding-right: 10px; }
+.st-minimal .mu-by .av { width: 24px; height: 24px; }
+.st-minimal .mu-byn { font-size: 15px; max-width: 6em; }
+.st-minimal .mu-byt { display: none; }
+.st-minimal .mu-prog { position: absolute; left: 80px; right: 30px; bottom: 5px; margin: 0; }
+.st-minimal .mu-track { height: 3px; }
+.st-minimal .mu-time { display: none; }
+.st-minimal .ly-cur { font-size: 25px; }
+.st-minimal .ly-sub { display: none; }
+.st-minimal .mu-queue { width: min(460px, 100%); padding: 10px 14px; border-radius: 18px; }
+.st-minimal .mu-qi { font-size: 16px; min-height: 28px; }
+
+.notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; }
+.notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mu-eq i, .mu-gl::before, .mu-disc, .mu-idle .mu-note { animation: none !important; }
+}

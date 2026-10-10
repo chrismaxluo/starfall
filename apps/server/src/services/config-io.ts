@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -22,6 +22,7 @@ import type { BlacklistStore } from './blacklist.ts';
 import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rules.ts';
 import { OutputInputSchema } from './outputs.ts';
 import type { OutputStore } from './outputs.ts';
+import type { MusicService } from './music.ts';
 import type { QuickPlayStore } from './quick-play.ts';
 import type { EnterRuleStore } from './rules.ts';
 import type { SettingsStore } from './settings.ts';
@@ -178,12 +179,14 @@ export const ConfigFileSchema = z.object({
     .array(z.object({ effect: z.string().min(1), label: QuickButtonSchema.shape.label, hotkey: QuickButtonSchema.shape.hotkey, globalHotkey: QuickButtonSchema.shape.globalHotkey }))
     .max(QUICK_MAX)
     .optional(),
+  // 点歌设置是 v1.7 加的：以前导出的文件里没有，导入时不动
+  music: MusicSettingsSchema.partial().optional(),
 });
 export type ConfigFile = z.infer<typeof ConfigFileSchema>;
 
 /** 导入预览里的一组变化 */
 export interface PlanSection {
-  key: 'settings' | 'effects' | 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard' | 'quickplay' | 'blacklist' | 'outputs';
+  key: 'settings' | 'effects' | 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard' | 'quickplay' | 'music' | 'blacklist' | 'outputs';
   label: string;
   /** 一句话概括，例如"新增 2 · 修改 1" */
   summary: string;
@@ -241,9 +244,40 @@ interface Deps {
   quickPlay: QuickPlayStore;
   blacklist: BlacklistStore;
   outputs: OutputStore;
+  music?: Pick<MusicService, 'cfg' | 'updateSettings'>;
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+/** 导入预览里点歌设置各项的名字 */
+const MUSIC_NAMES: Record<string, string> = {
+  enabled: '点歌开关',
+  cmdRequest: '点歌指令',
+  cmdSkip: '切歌指令',
+  cmdCancel: '取消点歌指令',
+  who: '谁能点歌',
+  perUser: '每人最多排几首',
+  userCdSec: '点歌间隔',
+  queueMax: '列表最多几首',
+  maxDurationSec: '歌最长多久',
+  guardFirst: '大航海优先',
+  skipByRequester: '点歌的人能切歌',
+  skipByMod: '房管能切歌',
+  sourceNetease: '网易云',
+  sourceLocal: '本地歌库',
+  localFirst: '先找本地歌库',
+  volume: '音量',
+  duck: '特效时调小音乐',
+  duckPct: '调小到多少',
+  autoPause: '下播自动暂停',
+  style: '点歌窗口样式',
+  side: '点歌窗口对齐',
+  size: '点歌窗口字号',
+  showQueue: '显示后面几首',
+  lyrics: '显示歌词',
+  lyricsTrans: '显示歌词翻译',
+  blockWords: '不收的歌',
+  bannedUids: '不让点歌的观众',
+};
 const clip = (xs: string[]) => (xs.length > 20 ? [...xs.slice(0, 20), `…… 还有 ${xs.length - 20} 条`] : xs);
 const counts = (add: number, mod: number, del = 0) => [add && `新增 ${add}`, mod && `修改 ${mod}`, del && `删除 ${del}`].filter(Boolean).join(' · ') || '没有变化';
 
@@ -328,6 +362,7 @@ export class ConfigIO {
         const effect = ref(b.effectId);
         return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
       }),
+      ...(this.d.music ? { music: this.d.music.cfg() } : {}),
       outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter })),
     };
   }
@@ -501,6 +536,13 @@ export class ConfigIO {
       });
     }
 
+    // 点歌设置（整体替换；旧版本导出的文件里没有，不动）
+    if (file.music && this.d.music) {
+      const curMusic = this.d.music.cfg() as Record<string, unknown>;
+      const keys = Object.entries(file.music).filter(([k, v]) => !same(curMusic[k], v)).map(([k]) => MUSIC_NAMES[k] ?? k);
+      sections.push({ key: 'music', label: '点歌设置', summary: keys.length ? `修改 ${keys.length} 项` : '没有变化', changed: keys.length > 0, details: clip(keys) });
+    }
+
     // 黑名单（合并）
     {
       const have = new Set(cur.blacklist.map((b) => b.uid));
@@ -611,6 +653,9 @@ export class ConfigIO {
         });
         this.d.quickPlay.save(keep);
       }
+
+      // 点歌设置
+      if (file.music && this.d.music) this.d.music.updateSettings(file.music);
 
       // 8. 黑名单：合并
       const have = new Set(this.d.blacklist.list().map((b) => b.uid));

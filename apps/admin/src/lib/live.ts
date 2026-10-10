@@ -2,6 +2,7 @@
 import { setTimeZone } from './format.ts';
 import { CHAT_MAX_LIMIT, GIFTS_KEEP, OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
 import type { ChatItem, GiftListItem } from '@starfall/shared/overlay';
+import { loadMusic, music, onMusicMessage } from './music.ts';
 import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshQuick, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
@@ -23,7 +24,9 @@ type Msg =
   | { type: 'event'; event: EventDto }
   | { type: 'event_status'; id: number; status: PlayStatus }
   /** 别的设备（或这台）改了规则、素材、设置、输出 */
-  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'quickplay' | 'all' };
+  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'quickplay' | 'music' | 'music_library' | 'all' }
+  /** 弹幕点歌：整份状态、新的提示、网易云账号 */
+  | { type: 'music' | 'music_notice' | 'music_account'; [k: string]: unknown };
 
 const eventListeners = new Set<(e: EventDto) => void>();
 const statusListeners = new Set<(id: number, s: PlayStatus) => void>();
@@ -85,11 +88,21 @@ function handle(m: Msg): void {
       state.giftPins = m.pins ?? [];
       // 重连：断开期间的事件和别处的修改都补回来
       if (hellos++ > 0) {
-        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs(), refreshQuick()]).catch(() => undefined);
+        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs(), refreshQuick(), ...(music.loaded ? [loadMusic()] : [])]).catch(() => undefined);
         for (const fn of resyncListeners) fn();
       }
       break;
+    case 'music':
+    case 'music_notice':
+    case 'music_account':
+      onMusicMessage(m);
+      break;
     case 'changed': {
+      if (m.what === 'music' || m.what === 'music_library' || m.what === 'all') {
+        if (m.what === 'music_library') music.libraryRev++;
+        if (music.loaded) void loadMusic().catch(() => undefined);
+        if (m.what !== 'all') break;
+      }
       const jobs = { rules: [refreshRules], library: [refreshEffects, refreshRules, refreshQuick], settings: [refreshSettings, refreshStatus], outputs: [refreshOutputs], quickplay: [refreshQuick], all: [refreshRules, refreshEffects, refreshSettings, refreshOutputs, refreshQuick] }[m.what] ?? [];
       void Promise.all(jobs.map((f) => f())).catch(() => undefined);
       break;

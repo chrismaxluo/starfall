@@ -2,8 +2,9 @@
 import { reactive } from 'vue';
 import type { MusicSettings } from '@starfall/shared';
 import type { MusicItem, MusicNotice, MusicSong, MusicState } from '@starfall/shared/overlay';
-import { get, put } from './api.ts';
-import { attempt } from './toast.ts';
+import { del, get, post, put } from './api.ts';
+import { state } from './store.ts';
+import { attempt, toast, undoable } from './toast.ts';
 
 export interface MusicAccountStatus {
   loggedIn: boolean;
@@ -93,3 +94,57 @@ export const HOLD_TEXT: Record<Exclude<MusicState['hold'], null>, string> = {
   offline: '没开播，已自动暂停：开播后自动接着放',
   no_player: '直播软件里还没加点歌窗口：歌不会放',
 };
+
+// ---------- 列表、历史里的快捷操作（都能撤销） ----------
+
+/** 从列表删掉一首，提示里可以撤销 */
+export async function removeSong(it: MusicItem): Promise<void> {
+  if (!(await attempt(() => del(`/api/music/queue/${it.id}`)))) return;
+  undoable(`已从列表删掉《${it.song.name}》`, () => post('/api/music/queue/restore', { ids: [it.id] }));
+}
+
+/** 清空列表，提示里可以撤销 */
+export async function clearQueue(): Promise<void> {
+  const r = await attempt(() => post<{ cleared: number; ids: number[] }>('/api/music/queue/clear'));
+  if (!r) return;
+  if (!r.cleared) return toast('列表本来就是空的', 'info');
+  undoable(`已清空 ${r.cleared} 首（正在放的这首放完）`, () => post('/api/music/queue/restore', { ids: r.ids }));
+}
+
+/** 不让这位观众点歌（主播自己不受限制）；列表里 TA 还没放的歌一起删掉 */
+export async function banRequester(it: MusicItem): Promise<void> {
+  const s = music.settings;
+  if (!s) return;
+  if (it.by.uid <= 0 || it.by.uid === state.status?.room?.anchorUid) return toast('主播自己不受点歌限制', 'info');
+  const prev = s.bannedUids;
+  if (!prev.includes(it.by.uid) && !(await saveMusic({ bannedUids: [...prev, it.by.uid] }))) return;
+  const theirs = music.queue.filter((x) => x.by.uid === it.by.uid);
+  for (const x of theirs) await attempt(() => del(`/api/music/queue/${x.id}`));
+  undoable(`${it.by.name} 不能点歌了${theirs.length ? `，TA 列表里的 ${theirs.length} 首已删掉` : ''}`, async () => {
+    await saveMusic({ bannedUids: prev });
+    if (theirs.length) await post('/api/music/queue/restore', { ids: theirs.map((x) => x.id) });
+  });
+}
+
+/** 这首歌以后不收（歌名加进「不收的歌」）；还在列表里的一起删掉 */
+export async function blockSong(it: MusicItem): Promise<void> {
+  const s = music.settings;
+  if (!s) return;
+  const prev = s.blockWords;
+  if (!prev.includes(it.song.name) && !(await saveMusic({ blockWords: [...prev, it.song.name] }))) return;
+  const same = music.queue.filter((x) => x.song.source === it.song.source && x.song.id === it.song.id);
+  for (const x of same) await attempt(() => del(`/api/music/queue/${x.id}`));
+  undoable(`《${it.song.name}》以后不收了`, async () => {
+    await saveMusic({ blockWords: prev });
+    if (same.length) await post('/api/music/queue/restore', { ids: same.map((x) => x.id) });
+  });
+}
+
+/** 切歌、暂停 / 继续（总览卡片、命令面板用） */
+export async function skipSong(): Promise<void> {
+  await attempt(() => post('/api/music/skip'), '已切歌');
+}
+export async function toggleMusicPause(): Promise<void> {
+  const r = await attempt(() => post<{ paused: boolean }>('/api/music/toggle-pause'));
+  if (r) toast(r.paused ? '已暂停点歌：正在放的歌停在这里' : '继续放歌');
+}

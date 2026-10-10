@@ -4,9 +4,10 @@ import { computed, onMounted, ref, watch } from 'vue';
 import type { MusicSong } from '@starfall/shared/overlay';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
+import RowMenu from './RowMenu.vue';
 import { get, post } from '../lib/api.ts';
 import { dateTime } from '../lib/format.ts';
-import { music } from '../lib/music.ts';
+import { banRequester, blockSong, music } from '../lib/music.ts';
 import type { MusicHistoryRow } from '../lib/music.ts';
 import { attempt } from '../lib/toast.ts';
 
@@ -67,6 +68,7 @@ async function again(song: MusicSong): Promise<void> {
           <span class="mh-st" :class="STATUS[r.status].cls" :title="r.note ?? ''">{{ STATUS[r.status].text }}<template v-if="r.note && r.status !== 'played'"> · {{ r.note }}</template></span>
           <span v-if="inList.has(`${r.item.song.source}:${r.item.song.id}`)" class="mh-in">在列表里</span>
           <button v-else class="btn sm" type="button" @click="again(r.item.song)">再点一次</button>
+          <RowMenu :items="[{ icon: 'i-ban', label: `不让 ${r.item.by.name} 点歌`, run: () => void banRequester(r.item) }, { icon: 'i-x', label: '这首歌以后不收', run: () => void blockSong(r.item) }]" :label="`《${r.item.song.name}》：更多操作`" />
         </div>
       </div>
       <button v-if="more" class="btn mh-more" @click="loadMore">再往前看</button>
@@ -104,7 +106,7 @@ async function again(song: MusicSong): Promise<void> {
 .mh-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @media (max-width: 1100px) { .mh-grid { grid-template-columns: 1fr; } }
 .mh-list { display: flex; flex-direction: column; margin: 0 -6px; }
-.mh-row { display: grid; grid-template-columns: 112px 34px minmax(0, 1fr) minmax(0, 8em) minmax(0, 11em) 80px; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; font-size: 13px; }
+.mh-row { display: grid; grid-template-columns: 112px 34px minmax(0, 1fr) minmax(0, 8em) minmax(0, 11em) 80px 30px; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; font-size: 13px; }
 .mh-row + .mh-row { border-top: 1px solid var(--line); }
 .mh-row:hover { background: var(--hover); }
 .mh-row .t { font-size: 12px; color: var(--t3); }

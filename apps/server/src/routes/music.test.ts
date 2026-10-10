@@ -122,11 +122,22 @@ describe('点歌接口', () => {
     await t.req({ method: 'DELETE', url: `/api/music/queue/${ids[1]}` });
     expect(names()).toEqual(['一']);
     expect((await t.req({ method: 'DELETE', url: '/api/music/queue/999' })).statusCode).toBe(404);
-    expect((await t.req({ method: 'POST', url: '/api/music/queue/clear' })).json()).toEqual({ cleared: 1 });
+    const cleared = (await t.req({ method: 'POST', url: '/api/music/queue/clear' })).json();
+    expect(cleared).toMatchObject({ cleared: 1 });
+    expect((await t.req({ method: 'POST', url: '/api/music/queue/restore', payload: { ids: cleared.ids } })).json()).toEqual({ restored: 1 });
+    expect(names()).toEqual(['一']);
+    await t.req({ method: 'POST', url: '/api/music/queue/clear' });
     expect((await t.req({ method: 'POST', url: '/api/music/skip' })).statusCode).toBe(409);
     await t.req({ method: 'POST', url: '/api/music/pause', payload: { paused: true } });
     await t.req({ method: 'PUT', url: '/api/music/settings', payload: { enabled: true } });
     expect(t.ctx.music.state().hold).toBe('manual');
+    expect((await t.req({ method: 'POST', url: '/api/music/toggle-pause' })).json()).toEqual({ paused: false });
+    // 全局快捷键：格式要对，不能和快捷播放按钮、彼此重复
+    expect((await t.req({ method: 'PUT', url: '/api/music/settings', payload: { hotkeySkip: 'N' } })).statusCode).toBe(400);
+    expect((await t.req({ method: 'PUT', url: '/api/music/settings', payload: { hotkeySkip: 'Ctrl+Alt+N', hotkeyPause: 'Ctrl+Alt+N' } })).statusCode).toBe(409);
+    t.ctx.quickPlay.save([{ effectId: t.ctx.effects.list()[0]!.id, label: '晚安', hotkey: null, globalHotkey: 'Ctrl+Alt+1' }]);
+    expect((await t.req({ method: 'PUT', url: '/api/music/settings', payload: { hotkeyPause: 'Ctrl+Alt+1' } })).json().error.message).toContain('晚安');
+    expect((await t.req({ method: 'PUT', url: '/api/music/settings', payload: { hotkeySkip: 'Ctrl+Alt+N', hotkeyPause: 'Ctrl+Alt+P' } })).statusCode).toBe(200);
     // 本地歌库里没有的歌不能加
     expect((await t.req({ method: 'POST', url: '/api/music/queue', payload: { song: { source: 'local', id: '99', name: 'x', artists: '', durationMs: 1 } } })).statusCode).toBe(404);
   });

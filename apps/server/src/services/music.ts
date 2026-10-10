@@ -91,6 +91,23 @@ export function effectHasSound(item: PlayItem): boolean {
   return e.sound !== null || (e.visual.type === 'asset' && e.visual.kind === 'video');
 }
 
+/** 指令后面的歌名：观众常写「点歌：晴天」「点歌《晴天》」，把冒号、书名号、引号去掉 */
+export function cleanQuery(q: string): string {
+  return q
+    .replace(/^[\s:：,，、。.~～-]+/, '')
+    .replace(/[《》「」『』〈〉“”"'‘’【】]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** 大概还要等多久 */
+export function etaText(ms: number): string {
+  return ms < 60_000 ? '1 分钟内' : `大约 ${Math.round(ms / 60_000)} 分钟后`;
+}
+
+/** 不放的时候，点歌提示里加一句说明（不说「马上播放」骗人） */
+const HOLD_NOTE: Record<Exclude<MusicHold, null>, string> = { disabled: '', manual: '（主播暂时停了点歌）', offline: '（开播后放）', no_player: '（主播还没打开点歌窗口）' };
+
 const neteaseSong = (n: NeteaseSong): MusicSong => ({ source: 'netease', id: String(n.id), name: n.name, artists: n.artists.join(' / '), ...(n.album ? { album: n.album } : {}), ...(n.cover ? { cover: `${n.cover}?param=300y300` } : {}), durationMs: n.durationMs });
 
 export class MusicService {
@@ -100,6 +117,10 @@ export class MusicService {
   private pumping = false;
   private readonly cooldown = new Map<number, number>();
   private readonly inflight = new Set<number>();
+  /** 每个人上一次失败提示上了直播画面的时间：一分钟内又失败，只在后台显示 */
+  private readonly lastFail = new Map<number, number>();
+  /** 每个人上一次查「我的歌」的时间（防刷屏） */
+  private readonly mineAt = new Map<number, number>();
   private notices: MusicNotice[] = [];
   private duckOn = false;
   /** 没开播时后台手动点了「继续」：这次下播之前不再自动暂停 */
@@ -262,10 +283,10 @@ export class MusicService {
     } else this.changed();
   }
 
-  private notice(ok: boolean, who: string, text: string): MusicNotice {
-    const n: MusicNotice = { id: `m${this.now()}-${++this.seq}`, ok, who, text, ts: this.now() };
+  private notice(ok: boolean, who: string, text: string, quiet = false): MusicNotice {
+    const n: MusicNotice = { id: `m${this.now()}-${++this.seq}`, ok, who, text, ts: this.now(), ...(quiet ? { quiet: true } : {}) };
     this.notices = [n, ...this.notices].slice(0, NOTICE_KEEP);
-    this.d.hub.toMusic(() => ({ type: 'music_notice', notice: n }));
+    if (!quiet) this.d.hub.toMusic(() => ({ type: 'music_notice', notice: n }));
     this.d.hub.toAdmins({ type: 'music_notice', notice: n });
     return n;
   }
@@ -279,9 +300,10 @@ export class MusicService {
     const t = ev.text.normalize('NFKC').trim();
     if (t === s.cmdSkip.normalize('NFKC')) return void this.skipBy(ev.viewer);
     if (t === s.cmdCancel.normalize('NFKC')) return void this.cancelBy(ev.viewer);
+    if (t === s.cmdMine.normalize('NFKC')) return void this.mineBy(ev.viewer);
     const cmd = s.cmdRequest.normalize('NFKC');
     if (!t.startsWith(cmd)) return;
-    const q = t.slice(cmd.length).trim();
+    const q = cleanQuery(t.slice(cmd.length));
     if (!q) return;
     void this.request(ev.viewer, q).catch((e: Error) => console.error('[点歌] 处理点歌出错：', e));
   }
@@ -303,8 +325,13 @@ export class MusicService {
   async request(viewer: Viewer, query: string, opts: { admin?: boolean } = {}): Promise<RequestResult> {
     const s = this.cfg();
     const exempt = opts.admin === true || this.isAnchor(viewer);
+    // 失败提示：同一个人一分钟内又失败（多半在反复试），只在后台显示，不刷直播画面
     const fail = (text: string, quiet = false): RequestResult => {
-      if (!quiet) this.notice(false, viewer.name, text);
+      const now = this.now();
+      const last = this.lastFail.get(viewer.uid);
+      const hide = quiet || (!opts.admin && last !== undefined && now - last < 60_000);
+      if (!hide) this.lastFail.set(viewer.uid, now);
+      this.notice(false, viewer.name, text, hide);
       return { ok: false, text };
     };
     if (!s.enabled && !opts.admin) return fail('点歌没有打开');
@@ -317,7 +344,8 @@ export class MusicService {
       if (mine >= s.perUser) return fail(s.perUser === 1 ? '你点的歌还没放，放完再点' : `你已经点了 ${mine} 首，放完再点`);
       const last = this.cooldown.get(viewer.uid);
       const wait = last === undefined ? 0 : last + s.userCdSec * 1000 - this.now();
-      if (wait > 0) return fail(`点得太快了，${Math.ceil(wait / 1000)} 秒后再点`);
+      // 「点得太快」只在后台显示：观众多半在反复试，画面上不用一条条提示
+      if (wait > 0) return fail(`点得太快了，${Math.ceil(wait / 1000)} 秒后再点`, true);
       // 上一首还在找：不重复处理（同一个人连发两条）
       if (this.inflight.has(viewer.uid)) return fail('正在找你点的上一首', true);
     }
@@ -332,15 +360,64 @@ export class MusicService {
     const song = found.song;
     const same = (r: Row) => r.source === song.source && r.songId === song.id;
     if ((this.cur && same(this.cur.row)) || this.queuedRows().some(same)) return fail(`《${song.name}》已经在列表里了`);
+    // 刚放过的歌：一段时间内不能再点（防止同一首被反复点）
+    if (!exempt && s.repeatMin > 0) {
+      const until = this.playedUntil(song, s.repeatMin);
+      if (until !== null) return fail(`《${song.name}》刚放过，${Math.max(1, Math.ceil((until - this.now()) / 60_000))} 分钟后再点`);
+    }
     if (full()) return fail(`列表满了（${s.queueMax} 首），等放完几首再点`);
     const row = this.insert(song, this.requester(viewer), s.guardFirst && viewer.guard > 0);
     if (!exempt) this.cooldown.set(viewer.uid, this.now());
+    this.lastFail.delete(viewer.uid);
     const pos = this.queuedRows().findIndex((r) => r.id === row.id);
-    const where = pos === 0 && !this.cur ? '马上播放' : `排在第 ${pos + 1 + (this.cur ? 1 : 0)} 首`;
+    const where = this.whereText(pos);
     this.notice(true, viewer.name, `点了《${song.name}》，${where}`);
     this.changed();
     this.pump();
     return { ok: true, text: `已点《${song.name}》，${where}`, item: this.item(row) };
+  }
+
+  /** 列表里第 index 首（从 0 起）大概多久后开始放；不放的时候返回 null */
+  private etaMs(index: number): number | null {
+    if (this.hold() !== null) return null;
+    const rows = this.queuedRows();
+    let ms = this.cur ? Math.max(0, this.cur.row.durationMs - this.pos(this.cur)) : 0;
+    for (let i = 0; i < index && i < rows.length; i++) ms += rows[i]!.durationMs;
+    return ms + (index + (this.cur ? 1 : 0)) * MUSIC_GAP_MS;
+  }
+
+  /** 「马上播放」「排在第 3 首，大约 8 分钟后」「排在第 2 首（主播暂时停了点歌）」 */
+  private whereText(index: number): string {
+    const hold = this.hold();
+    if (hold === null && index === 0 && !this.cur) return '马上播放';
+    const nth = `排在第 ${index + 1 + (this.cur ? 1 : 0)} 首`;
+    if (hold !== null) return `${nth}${HOLD_NOTE[hold]}`;
+    return `${nth}，${etaText(this.etaMs(index) ?? 0)}`;
+  }
+
+  /** 这首歌最近放过：返回什么时候以后才能再点；没放过（或已经过了时间）返回 null */
+  private playedUntil(song: MusicSong, minutes: number): number | null {
+    const since = this.now() - minutes * 60_000;
+    const r = this.d.db
+      .select({ startedAt: musicRequests.startedAt })
+      .from(musicRequests)
+      .where(and(eq(musicRequests.source, song.source), eq(musicRequests.songId, song.id), inArray(musicRequests.status, ['played', 'skipped']), gte(musicRequests.startedAt, since)))
+      .orderBy(desc(musicRequests.startedAt))
+      .get();
+    return r?.startedAt ? r.startedAt + minutes * 60_000 : null;
+  }
+
+  /** 弹幕「我的歌」：自己点的歌正在放、排第几、还要等多久（同一个人 15 秒内只回一次） */
+  private mineBy(v: Viewer): void {
+    const now = this.now();
+    if (now - (this.mineAt.get(v.uid) ?? 0) < 15_000) return;
+    this.mineAt.set(v.uid, now);
+    const parts: string[] = [];
+    if (this.cur && this.cur.row.uid === v.uid) parts.push(`《${this.cur.row.name}》正在放`);
+    this.queuedRows().forEach((r, i) => {
+      if (r.uid === v.uid) parts.push(`《${r.name}》${this.whereText(i).replace(/^马上播放$/, '马上就放')}`);
+    });
+    this.notice(true, v.name, parts.length ? `你点的${parts.join('；')}` : `还没有点歌，发送「${this.cfg().cmdRequest} 歌名」点一首`);
   }
 
   /** 后台直接加一首（搜歌结果里选的） */
@@ -463,12 +540,36 @@ export class MusicService {
     this.pump();
   }
 
-  /** 清空列表（正在放的放完） */
-  clear(): number {
+  /** 清空列表（正在放的放完）；返回清掉的编号（撤销用） */
+  clear(): number[] {
     const rows = this.queuedRows();
     if (rows.length) this.d.db.update(musicRequests).set({ status: 'cancelled', note: '后台清空', endedAt: this.now() }).where(inArray(musicRequests.id, rows.map((r) => r.id))).run();
     this.changed();
+    return rows.map((r) => r.id);
+  }
+
+  /** 撤销：刚删掉、清空的歌（5 分钟内）放回列表，顺序和原来一样 */
+  restore(ids: number[]): number {
+    if (!ids.length) return 0;
+    const since = this.now() - 5 * 60_000;
+    const rows = this.d.db
+      .select()
+      .from(musicRequests)
+      .where(and(inArray(musicRequests.id, ids), eq(musicRequests.status, 'cancelled'), gte(musicRequests.endedAt, since)))
+      .all();
+    if (!rows.length) return 0;
+    this.d.db.update(musicRequests).set({ status: 'queued', note: null, endedAt: null }).where(inArray(musicRequests.id, rows.map((r) => r.id))).run();
+    this.renumber(this.queuedRows());
+    this.changed();
+    this.pump();
     return rows.length;
+  }
+
+  /** 暂停和继续来回切（桌面版全局快捷键用）；返回切换后是不是暂停 */
+  togglePause(): boolean {
+    const p = !this.paused();
+    this.setPaused(p);
+    return p;
   }
 
   /** 暂停 / 继续。没开播时点「继续」：这次下播前不再自动暂停 */
@@ -486,12 +587,13 @@ export class MusicService {
     const t = text.normalize('NFKC').trim();
     if (!s.enabled) return { ok: false, text: '点歌没有打开：先打开右上角的「点歌」开关' };
     const cmd = s.cmdRequest.normalize('NFKC');
-    if (t === s.cmdSkip.normalize('NFKC') || t === s.cmdCancel.normalize('NFKC')) {
+    if ([s.cmdSkip, s.cmdCancel, s.cmdMine].some((c) => t === c.normalize('NFKC'))) {
       this.onDanmu({ kind: 'danmu', id: `sim${this.now()}`, ts: this.now(), viewer: v, text: t });
-      return { ok: true, text: '已发送' };
+      return { ok: true, text: '已发送，结果看「最近的点歌消息」' };
     }
-    if (!t.startsWith(cmd) || !t.slice(cmd.length).trim()) return { ok: false, text: `点歌弹幕要以「${s.cmdRequest}」开头，后面写歌名` };
-    return this.request(v, t.slice(cmd.length).trim());
+    const q = t.startsWith(cmd) ? cleanQuery(t.slice(cmd.length)) : '';
+    if (!q) return { ok: false, text: `点歌弹幕要以「${s.cmdRequest}」开头，后面写歌名` };
+    return this.request(v, q);
   }
 
   /** 后台搜歌：本地歌库和网易云的结果都列出来（放不了的也列，写明原因） */

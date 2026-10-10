@@ -29,6 +29,7 @@ import { startLive, stopLive } from './lib/live.ts';
 import { go, route } from './lib/route.ts';
 import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
+import { loadMusic, music } from './lib/music.ts';
 import { toggleTheme } from './lib/theme.ts';
 import { attempt, runAction, toast, toasts } from './lib/toast.ts';
 
@@ -62,6 +63,8 @@ async function boot(): Promise<void> {
   }
   state.authed = true;
   await attempt(loadAll);
+  // 点歌：总览的小卡片、顶部的网易云登录提醒要用（读不到不影响别的）
+  void loadMusic().catch(() => undefined);
   startLive();
   // 首次使用、还没设置好时自动打开新手引导（跳过或完成后不再弹出）
   const s = state.status;
@@ -157,6 +160,7 @@ const alerts = computed((): Alert[] => {
   else if (days !== null && days < 0) out.push({ key: 'login', level: 'red', title: 'B站登录已过期', text: '收不到直播间的消息，特效不会播放。扫码重新登录就能恢复。', action: rescan });
   else if (s.room && !a.loggedIn && s.live.live) out.push({ key: 'login', level: 'red', title: '还没登录 B站', text: '收不到直播间的消息，特效不会播放。', action: { label: '扫码登录', run: () => (ui.qr = true) } });
   else if (days !== null && days <= 3) out.push({ key: `expire${days}`, level: 'amber', title: `B站登录还剩 ${days} 天`, text: '到期后收不到直播间的消息，建议现在就重新扫码。', action: rescan });
+  if (music.settings?.enabled && music.settings.sourceNetease && music.account?.invalid) out.push({ key: 'netease', level: 'amber', title: '网易云登录失效了', text: '点歌时会员歌放不了，免费歌照常。重新扫码就能恢复。', action: { label: '去扫码', run: () => go('music', 'rules') } });
   if (fxDownLong.value) out.push({ key: 'fx', level: 'red', title: '正在直播，但特效页没连上', text: '直播软件里的特效页不在线，观众看不到特效。', action: { label: '去检查', run: () => go('obs') } });
   return out.filter((x) => x.level === 'red' || !dismissed.value.includes(x.key));
 });

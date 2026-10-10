@@ -222,7 +222,7 @@ async function api<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-// ---------- 素材快捷播放的全局快捷键 ----------
+// ---------- 素材快捷播放、弹幕点歌（切歌、暂停）的全局快捷键 ----------
 // 在直播姬、游戏等别的窗口里按也能播放。按快捷键找按钮播放（保存按钮后按钮编号会变，快捷键不会）。
 // 启动时注册；之后每 30 秒看一次按钮有没有变（在浏览器里改按钮、导入配置也能跟上），后台保存按钮后立即重新注册（sf:reload-hotkeys）。
 // 后台编辑快捷播放按钮时先全部注销（sf:pause-hotkeys），不然录快捷键时按下已有的组合会被系统先拦走、直接播出来
@@ -242,7 +242,16 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     log('读取快捷播放按钮失败', e);
     return { failed: [] };
   }
-  const sig = [...keys].sort().join(' ');
+  // 弹幕点歌的切歌、暂停 / 继续（读不到不影响快捷播放）
+  const music: Record<string, string> = {};
+  try {
+    const m = (await api<{ settings: { hotkeySkip?: string | null; hotkeyPause?: string | null } }>('/api/music')).settings;
+    if (m.hotkeySkip) music[m.hotkeySkip] = '/api/music/skip';
+    if (m.hotkeyPause) music[m.hotkeyPause] = '/api/music/toggle-pause';
+  } catch (e) {
+    log('读取点歌快捷键失败', e);
+  }
+  const sig = [...keys, ...Object.entries(music).map(([k, v]) => `${k}=${v}`)].sort().join(' ');
   if (!force && sig === hotkeysNow) return { failed: [] };
   globalShortcut.unregisterAll();
   hotkeysNow = sig;
@@ -261,7 +270,21 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     }
     if (!ok) failed.push(hotkey);
   }
-  log(`全局快捷键：注册了 ${keys.length - failed.length} 个${failed.length ? `；被别的软件占用：${failed.join('、')}` : ''}`);
+  for (const [hotkey, url] of Object.entries(music)) {
+    const run = () =>
+      void fetch(`${base()}${url}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(3000) })
+        .then(async (r) => r.ok || log(`点歌快捷键 ${hotkey} 没有生效：${r.status} ${await r.text()}`))
+        .catch((e: unknown) => log(`点歌快捷键 ${hotkey} 没有生效`, e));
+    let ok = false;
+    try {
+      ok = globalShortcut.register(hotkey, run);
+    } catch (e) {
+      log(`点歌快捷键 ${hotkey} 写法不对`, e);
+    }
+    if (!ok) failed.push(hotkey);
+  }
+  const total = keys.length + Object.keys(music).length;
+  log(`全局快捷键：注册了 ${total - failed.length} 个${failed.length ? `；被别的软件占用：${failed.join('、')}` : ''}`);
   return { failed };
 }
 

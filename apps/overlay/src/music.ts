@@ -411,13 +411,14 @@ function volumeTarget(): number {
   const base = (state?.volume ?? 70) / 100;
   return duck.on ? base * (duck.pct / 100) : base;
 }
-/** 音量慢慢变过去（特效开始、结束时不突兀） */
-function rampVolume(): void {
+/** 音量慢慢变过去（特效开始、结束时不突兀）；speed 越小越慢（新歌淡入用慢的） */
+function rampVolume(speed = 0.25): void {
+  if (fadeTimer) return;
   if (volTimer) clearInterval(volTimer);
   const target = volumeTarget();
   volTimer = setInterval(() => {
     const d = target - vol;
-    vol = Math.abs(d) < 0.02 ? target : vol + d * 0.25;
+    vol = Math.abs(d) < 0.01 ? target : vol + d * speed;
     audio.volume = Math.min(1, Math.max(0, vol));
     if (vol === target && volTimer) {
       clearInterval(volTimer);
@@ -426,35 +427,76 @@ function rampVolume(): void {
   }, 40);
 }
 
+/** 淡出（约 0.35 秒）后再做 then：切歌、暂停、歌放完时不突然断掉。又来了新的状态时，用新的 then */
+let fadeTimer: ReturnType<typeof setInterval> | null = null;
+function fadeOut(then: () => void): void {
+  if (volTimer) clearInterval(volTimer);
+  volTimer = null;
+  if (fadeTimer) clearInterval(fadeTimer);
+  fadeTimer = null;
+  if (audio.paused || vol < 0.01) return then();
+  const step = Math.max(0.01, vol / 12);
+  fadeTimer = setInterval(() => {
+    vol = Math.max(0, vol - step);
+    audio.volume = vol;
+    if (vol > 0) return;
+    clearInterval(fadeTimer!);
+    fadeTimer = null;
+    then();
+  }, 30);
+}
+
 function syncAudio(): void {
   const n = state?.now;
   if (!player || !n?.url) {
-    if (!audio.paused) audio.pause();
-    if (!n || !player) {
-      if (loaded) {
-        audio.removeAttribute('src');
-        audio.load();
+    const playerNow = player;
+    fadeOut(() => {
+      if (!audio.paused) audio.pause();
+      if (!n || !playerNow) {
+        if (loaded) {
+          audio.removeAttribute('src');
+          audio.load();
+        }
+        loaded = null;
       }
-      loaded = null;
-    }
+    });
     return;
   }
+  const url = n.url;
+  const go = () => {
+    if (state?.hold === null) {
+      play();
+      rampVolume(loaded && startedSent ? 0.25 : 0.1);
+    } else fadeOut(() => audio.pause());
+  };
   if (!loaded || loaded.id !== n.item.id || loaded.load !== n.load) {
-    loaded = { id: n.item.id, load: n.load };
-    startedSent = false;
-    seekTo = n.posMs / 1000;
-    vol = volumeTarget();
-    audio.volume = vol;
-    audio.src = n.url;
-    audio.load();
+    // 换歌：旧的先淡出，新的从静音开始淡入
+    const next = { id: n.item.id, load: n.load, posMs: n.posMs };
+    fadeOut(() => {
+      loaded = { id: next.id, load: next.load };
+      startedSent = false;
+      seekTo = next.posMs / 1000;
+      vol = 0;
+      audio.volume = 0;
+      audio.src = url;
+      audio.load();
+      go();
+    });
+    return;
   }
-  if (state!.hold === null) play();
-  else if (!audio.paused) audio.pause();
-  rampVolume();
+  if (fadeTimer && state?.hold === null) {
+    // 正在淡出（刚才要暂停），又说继续：停止淡出，淡入回来
+    clearInterval(fadeTimer);
+    fadeTimer = null;
+  }
+  go();
 }
 
 function play(): void {
   if (!audio.paused) return;
+  // 暂停后继续：从静音淡入
+  vol = 0;
+  audio.volume = 0;
   audio.play().then(
     () => {
       if (blocked) {
@@ -530,7 +572,7 @@ function onMessage(m: ServerToOverlay): void {
       break;
     case 'music_duck':
       duck = { on: m.on, pct: m.pct };
-      rampVolume();
+      if (!audio.paused) rampVolume();
       break;
     case 'music_notice':
       toast(m.notice);

@@ -64,9 +64,12 @@ function testNotice(): void {
 }
 
 const STYLES = [
-  { value: 'glass', label: '玻璃卡片', desc: '封面 + 歌名，封面颜色的柔光' },
-  { value: 'vinyl', label: '黑胶唱片', desc: '唱片转动，唱臂落下' },
-  { value: 'minimal', label: '细长胶囊', desc: '一行，占地方最少' },
+  { value: 'glass', label: '流光', desc: '封面的颜色铺满卡片，像音乐 App' },
+  { value: 'vinyl', label: '黑胶', desc: '胡桃木唱机，唱片转、唱臂落下' },
+  { value: 'neon', label: '霓虹', desc: '霓虹描边、扫描线、跳动的频谱' },
+  { value: 'cassette', label: '卡带', desc: '复古磁带，带子随进度绕过去' },
+  { value: 'ink', label: '国风', desc: '宣纸远山，竖排歌词，朱红印章' },
+  { value: 'minimal', label: '灵动岛', desc: '黑色小胶囊，点歌时展开提示' },
 ] as const;
 
 // ---------- 声音 ----------
@@ -109,7 +112,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
         <div class="card-h"><h2>外观</h2><span class="aside">改了马上生效</span></div>
         <div class="ml-styles" role="radiogroup" aria-label="样子">
           <button v-for="x in STYLES" :key="x.value" type="button" class="ml-style" role="radio" :aria-checked="s.style === x.value" @click="set({ style: x.value }, `换成「${x.label}」`)">
-            <span class="ml-ill" :class="x.value"><i /><b /><b /></span>
+            <span class="ml-ill" :class="x.value"><i /><b /><b /><em /></span>
             <b>{{ x.label }}</b><span>{{ x.desc }}</span>
           </button>
         </div>
@@ -197,19 +200,41 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-pvt { display: flex; align-items: center; gap: 12px; margin: 12px 0 6px; }
 .ml-ck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--t2); }
 .ml-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
+@media (max-width: 1300px) { .ml-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ml-style { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
 .ml-style:hover { border-color: var(--line-strong); }
 .ml-style[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-ring); }
 .ml-style > b { font-size: 13.5px; font-weight: 600; }
 .ml-style > span:last-child { font-size: 12px; color: var(--t2); line-height: 1.5; }
-/* 三种样子的小示意图 */
-.ml-ill { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; height: 40px; margin-bottom: 4px; padding: 0 8px; border-radius: 10px; background: linear-gradient(135deg, #2a2b45, #16172a); }
-.ml-ill i { flex: none; width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #8d8bff, #e07ab5); }
-.ml-ill b { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .7); width: 40%; }
-.ml-ill b + b { width: 22%; background: rgba(255, 255, 255, .35); }
-.ml-ill.vinyl i { border-radius: 50%; background: radial-gradient(circle, #e07ab5 0 28%, #111 30% 100%); box-shadow: 0 0 0 1px rgba(255, 255, 255, .15); }
-.ml-ill.minimal { height: 28px; margin: 6px 0 10px; border-radius: 999px; }
-.ml-ill.minimal i { width: 18px; height: 18px; border-radius: 50%; }
+/* 六种样子的小示意图 */
+.ml-ill { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; height: 44px; margin-bottom: 4px; padding: 0 8px; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #2a2b45, #16172a); }
+.ml-ill i { flex: none; width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #8d8bff, #e07ab5); }
+.ml-ill b { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .75); width: 38%; }
+.ml-ill b + b { width: 20%; background: rgba(255, 255, 255, .35); }
+.ml-ill em { display: none; }
+.ml-ill.glass { background: radial-gradient(60% 120% at 20% 50%, rgba(224, 122, 181, .7), transparent), radial-gradient(60% 120% at 80% 50%, rgba(141, 139, 255, .6), transparent), #1d1c33; }
+.ml-ill.vinyl { padding-left: 0; background: linear-gradient(90deg, #6b3f22 0 34%, #1a120d 34%); }
+.ml-ill.vinyl i { width: 32px; height: 32px; margin-left: 8px; border-radius: 50%; background: radial-gradient(circle, #e07ab5 0 22%, #0e0e10 24% 100%); box-shadow: 0 0 0 2px #c9c9cf; }
+.ml-ill.vinyl b { background: #f6ecdc; margin-left: 14px; }
+.ml-ill.vinyl b + b { background: #d9b26f; margin-left: 0; }
+.ml-ill.neon { background: #07051a; box-shadow: inset 0 0 0 1.5px #8d8bff, inset 0 0 12px rgba(141, 139, 255, .6); }
+.ml-ill.neon i { border-radius: 4px; box-shadow: -2px 0 0 rgba(255, 60, 90, .8), 2px 0 0 rgba(60, 200, 255, .8); }
+.ml-ill.neon b { background: #fff; box-shadow: 0 0 6px #8d8bff; }
+.ml-ill.neon b + b { background: #e07ab5; box-shadow: 0 0 6px #e07ab5; }
+.ml-ill.cassette { justify-content: center; background: linear-gradient(160deg, #a58bff, #e07ab5); }
+.ml-ill.cassette i, .ml-ill.cassette em { display: block; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle, #f4f0e6 0 30%, #2b1d14 34%); box-shadow: 0 0 0 4px #241a30; }
+.ml-ill.cassette b { width: 26%; height: 10px; border-radius: 2px; background: #241a30; }
+.ml-ill.cassette b + b { display: none; }
+.ml-ill.cassette em { order: 3; }
+.ml-ill.ink { justify-content: flex-end; gap: 7px; padding-right: 12px; background: linear-gradient(180deg, #fbf7ee, #ece2cc); }
+.ml-ill.ink i { order: 9; width: 14px; height: 14px; border-radius: 3px; background: #b5281f; margin-left: auto; position: absolute; left: 12px; }
+.ml-ill.ink b { width: 5px; height: 30px; background: #1a1612; }
+.ml-ill.ink b + b { height: 22px; background: rgba(26, 22, 18, .35); width: 4px; }
+.ml-ill.minimal { justify-content: center; background: linear-gradient(135deg, #3a3b5a, #20213a); }
+.ml-ill.minimal i { width: 16px; height: 16px; border-radius: 50%; position: relative; z-index: 1; }
+.ml-ill.minimal b { position: relative; z-index: 1; width: 30%; }
+.ml-ill.minimal b + b { display: none; }
+.ml-ill.minimal::before { content: ""; position: absolute; left: 18%; right: 18%; top: 12px; bottom: 12px; border-radius: 999px; background: #000; }
 .srow .line .gap { width: 12px; }
 .srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: 13px; color: var(--t2); }
 .ml-range { width: 180px; accent-color: var(--accent); }

@@ -1,0 +1,17 @@
+{
+  "name": "@starfall/music",
+  "version": "1.6.0",
+  "private": true,
+  "description": "弹幕点歌：网易云音乐接口、选歌",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@starfall/shared": "workspace:*"
+  }
+}

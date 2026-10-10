@@ -1,9 +1,9 @@
 // 点歌窗口：正在放的歌（封面、歌名、歌手、谁点的、进度）、滚动歌词、后面几首、点歌结果的提示。
 // 地址形如 /overlay/?output=1&key=...&music=1，在直播软件里单独加一个浏览器源（建议 640×560），拖到画面一侧。
 // 同时加了好几个时只有一个出声音（服务端指定，消息里 player 为 true），别的只显示；在浏览器里查看（&view=1）时只显示不出声。
-// 四种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
-//   glass 流光：封面的模糊色铺满卡片；crayon 蜡笔：小朋友蜡笔涂鸦的画风，彩色手写字、抖动的蜡笔线；
-//   journal 手帐（日系）：方格纸、和纸胶带、拍立得封面、荧光笔划线、手写体；minimal 灵动岛：黑色小胶囊，有人点歌时展开显示提示。
+// 三种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
+//   glass 流光：封面的模糊色铺满卡片；journal 手帐（日系）：方格纸、和纸胶带、拍立得封面、荧光笔划线、手写体；
+//   minimal 灵动岛：黑色小胶囊，换歌、有人点歌时展开显示提示。
 import './music.css';
 import { lyricIndex } from '@starfall/shared/overlay';
 import type { LyricLine, MusicDisplay, MusicItem, MusicNotice, MusicNow, MusicSong, MusicState, ServerToOverlay } from '@starfall/shared/overlay';
@@ -26,15 +26,6 @@ const env = detect();
 document.getElementById('stage')?.remove();
 document.documentElement.classList.add('mu-page');
 if (browse) document.documentElement.classList.add('mu-view');
-
-// 蜡笔线条的抖动：三个不同种子的扭曲滤镜，CSS 里轮流切换，线条就像手绘动画一样轻轻抖
-const filters = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-filters.setAttribute('width', '0');
-filters.setAttribute('height', '0');
-filters.setAttribute('aria-hidden', 'true');
-filters.style.position = 'absolute';
-filters.innerHTML = [1, 2, 3].map((i) => `<filter id="mu-wob${i}"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="${i * 7}"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter>`).join('');
-document.body.append(filters);
 
 const root = h('div', { class: 'mu-root' });
 const toasts = h('div', { class: 'mu-toasts' });
@@ -125,7 +116,7 @@ function prog(n: MusicNow, cls = 'mu-prog'): { el: HTMLElement; fill: HTMLElemen
   return { el, fill, tCur };
 }
 
-// ---------- 四种样子的「正在放」 ----------
+// ---------- 三种样子的「正在放」 ----------
 
 const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
   // 流光：封面放大、模糊后铺满整张卡片做底色，上面一层暗色玻璃；封面上一道光定时扫过
@@ -143,39 +134,10 @@ const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
     return { el, fill: p.fill, tCur: p.tCur };
   },
 
-  // 蜡笔：小朋友蜡笔涂鸦的画风。白画纸，歪歪扭扭、还会轻轻抖动的蜡笔边框；歌名每个字一种蜡笔颜色、东倒西歪；
-  // 角上画着太阳、白云、小草和星星；封面套一个手画的圆圈；进度是一道粗蜡笔线，头上一颗小星星
-  crayon(n) {
-    const s = n.item.song;
-    const fill = h('div', { class: 'mu-fill' }, h('i', { class: 'k-star-head' }));
-    const tCur = h('span', {}, '0:00');
-    const t = title(s.name, 'mu-title k-title');
-    t.firstElementChild!.replaceChildren(...[...s.name].map((c) => h('i', {}, c)));
-    const el = h(
-      'div',
-      { class: 'mu-body' },
-      h('i', { class: 'k-edge' }),
-      h('i', { class: 'k-sun' }),
-      h('i', { class: 'k-cloud' }),
-      h('i', { class: 'k-grass' }),
-      h('div', { class: 'mu-art' }, h('div', { class: 'mu-disc' }, cover(s)), h('i', { class: 'k-ring' }), h('i', { class: 'k-sticker' })),
-      h(
-        'div',
-        { class: 'mu-meta' },
-        h('div', { class: 'k-hello' }, '★ 正在放的歌 ★'),
-        t,
-        h('div', { class: 'mu-artist' }, s.artists || '不知道是谁唱的'),
-        h('div', { class: 'mu-row' }, byChip(n.item, 26, '点的歌！')),
-        h('div', { class: 'k-prog' }, h('div', { class: 'mu-track' }, fill), h('div', { class: 'mu-time' }, tCur, h('span', {}, mmss(s.durationMs)))),
-      ),
-    );
-    return { el, fill, tCur };
-  },
-
   // 手帐（日系）：方格纸，和纸胶带贴着拍立得风格的封面；歌名像用荧光笔划过，手写体；角落几个手绘的小星星、小爱心
   journal(n) {
     const s = n.item.song;
-    const fill = h('div', { class: 'mu-fill' });
+    const fill = h('div', { class: 'mu-fill' }, h('i', { class: 'j-pencil' }));
     const tCur = h('span', {}, '0:00');
     const d = new Date();
     const date = `${d.getMonth() + 1}.${d.getDate()} ${['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getDay()]}`;
@@ -189,13 +151,18 @@ const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
         h('div', { class: 'j-date' }, date, h('span', {}, '今日点歌')),
         title(s.name, 'mu-title j-title'),
         h('div', { class: 'mu-artist' }, s.artists || '未知歌手'),
-        h('div', { class: 'mu-row' }, byChip(n.item, 24)),
+        h('div', { class: 'mu-row' }, byChip(n.item, 28, '点的歌')),
         h('div', { class: 'j-prog' }, h('div', { class: 'mu-track' }, fill), h('div', { class: 'mu-time' }, tCur, h('span', {}, mmss(s.durationMs)))),
       ),
       h('i', { class: 'j-doodle star' }),
       h('i', { class: 'j-doodle heart' }),
       h('i', { class: 'j-doodle swirl' }),
     );
+    // 涂鸦的位置、角度按这首歌稍微变一变，每首不完全一样
+    const seed = [...s.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 997, 7);
+    el.style.setProperty('--j1', `${(seed % 7) * 3 - 9}deg`);
+    el.style.setProperty('--j2', `${(seed % 5) * 4}px`);
+    el.style.setProperty('--j3', `${((seed >> 2) % 5) * 5 - 10}deg`);
     return { el, fill, tCur };
   },
 
@@ -238,8 +205,29 @@ function renderCard(s: MusicState): void {
   const song = n.item.song;
   if (song.cover) tintOf(song.cover, applyTint);
   else applyTint(DEFAULT_TINT);
-  if (fresh && !reduced()) built.el.animate([{ opacity: 0, transform: 'translateY(14px) scale(.98)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 560, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  if (fresh && !reduced()) {
+    built.el.animate([{ opacity: 0, transform: 'translateY(14px) scale(.98)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 560, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    const photo = built.el.querySelector('.j-photo');
+    const art = built.el.querySelector('.mu-art');
+    if (photo) photo.animate([{ opacity: 0, transform: 'translate(-10px, -26px) rotate(-14deg) scale(1.08)' }, { opacity: 1, transform: 'rotate(-4deg)' }], { duration: 700, delay: 120, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'backwards' });
+    else if (art) art.animate([{ opacity: 0, transform: 'scale(.7) rotate(-8deg)' }, { opacity: 1, transform: 'none' }], { duration: 720, delay: 100, easing: 'cubic-bezier(.3,1.5,.5,1)', fill: 'backwards' });
+  }
+  // 灵动岛：换了歌先展开，写一下现在放的是什么
+  if (s.display.style === 'minimal') island([h('i', { class: 'i-dot play' }), h('span', {}, '正在播放'), h('b', {}, `《${song.name}》`), h('span', {}, `${n.item.by.name} 点的`)], 3200);
   lastLine = -2;
+}
+
+let noteTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 灵动岛展开一会儿，显示 nodes，再收回去 */
+function island(nodes: Node[], ms: number): boolean {
+  const note = built?.el.querySelector<HTMLElement>('.i-note');
+  if (!note) return false;
+  note.replaceChildren(...nodes);
+  card.classList.add('noting');
+  if (noteTimer) clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => card.classList.remove('noting'), ms);
+  return true;
 }
 
 function applyTint(t: Tint): void {
@@ -288,7 +276,7 @@ function renderLyric(s: MusicState, pos: number): void {
 
 // ---------- 后面几首、空闲提示 ----------
 
-const QUEUE_HEAD: Partial<Record<MusicDisplay['style'], string>> = { crayon: '下一首是谁呢？', journal: '待播清单 ♡' };
+const QUEUE_HEAD: Partial<Record<MusicDisplay['style'], string>> = { journal: '待播清单 ♡' };
 
 function renderQueue(s: MusicState): void {
   const n = s.display.showQueue;
@@ -300,7 +288,7 @@ function renderQueue(s: MusicState): void {
   queue.replaceChildren(
     h('div', { class: 'mu-qh' }, h('span', {}, QUEUE_HEAD[s.display.style] ?? '接下来'), h('span', { class: 'mu-qn' }, `共 ${s.total} 首`)),
     ...items.map((it, i) =>
-      h('div', { class: 'mu-qi' }, h('span', { class: 'mu-qx' }, String(i + 1)), h('span', { class: 'mu-qt' }, h('b', {}, it.song.name), it.song.artists ? h('span', {}, ` · ${it.song.artists}`) : null), h('span', { class: 'mu-qb' }, it.by.name)),
+      h('div', { class: 'mu-qi' }, h('span', { class: 'mu-qx' }, String(i + 1)), it.song.cover ? img('mu-qc', it.song.cover) : h('span', { class: 'mu-qc blank' }, icon(NOTE_SVG, 'mu-note')), h('span', { class: 'mu-qt' }, h('b', {}, it.song.name), it.song.artists ? h('span', {}, ` · ${it.song.artists}`) : null), h('span', { class: 'mu-qb' }, it.by.name)),
     ),
     ...tail,
   );
@@ -314,19 +302,10 @@ function renderIdle(s: MusicState): void {
 
 // ---------- 提示 ----------
 
-let noteTimer: ReturnType<typeof setTimeout> | null = null;
-
 function toast(n: MusicNotice): void {
   if (!state?.enabled) return;
   // 灵动岛：胶囊展开，把提示写在里面
-  const island = state.display.style === 'minimal' && built ? built.el.querySelector<HTMLElement>('.i-note') : null;
-  if (island) {
-    island.replaceChildren(h('i', { class: `i-dot ${n.ok ? 'ok' : 'no'}` }), h('b', {}, n.who), h('span', {}, n.ok ? ` ${n.text}` : `：${n.text}`));
-    card.classList.add('noting');
-    if (noteTimer) clearTimeout(noteTimer);
-    noteTimer = setTimeout(() => card.classList.remove('noting'), 3800);
-    return;
-  }
+  if (state.display.style === 'minimal' && island([h('i', { class: `i-dot ${n.ok ? 'ok' : 'no'}` }), h('b', {}, n.who), h('span', {}, n.ok ? ` ${n.text}` : `：${n.text}`)], 3800)) return;
   const el = h('div', { class: `mu-toast ${n.ok ? 'ok' : 'no'}` }, h('i', { class: 'mu-td' }), h('b', {}, n.who), h('span', {}, n.ok ? ` ${n.text}` : `：${n.text}`));
   toasts.append(el);
   while (toasts.children.length > 2) toasts.firstElementChild?.remove();

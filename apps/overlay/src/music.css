@@ -1,6 +1,6 @@
 /* 点歌窗口：尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍。
    --tint、--tint2 是从封面取的主色、辅色（r, g, b），各个样子拿来做柔光、描边、渐变、歌词填色。
-   四种样子各自一段：st-glass 流光、st-crayon 蜡笔（涂鸦）、st-journal 手帐（日系）、st-minimal 灵动岛。
+   三种样子各自一段：st-glass 流光、st-journal 手帐（日系）、st-minimal 灵动岛。
    每段都包括：正在放（.mu-body）、歌词（.ly-box）、接下来（.mu-queue）、空闲提示（.mu-idle）、点歌提示（.mu-toast）。 */
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -77,13 +77,17 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .mu-queue { flex-direction: column; gap: 6px; width: min(560px, 100%); padding: 12px 16px 14px; }
 .mu-qh { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; letter-spacing: .14em; opacity: .7; padding: 0 2px 4px; }
 .mu-qn { letter-spacing: .04em; }
-.mu-qi { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 18px; min-height: 32px; }
-.mu-qx { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 13px/1 var(--font-mono); }
+.mu-qi { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; font-size: 18px; min-height: 40px; }
+/* 序号先不显示（从上往下就是顺序），每首歌前面是小封面 */
+.mu-qx { display: none; }
+.mu-qc { width: 34px; height: 34px; object-fit: cover; border-radius: 8px; }
+.mu-qc.blank { display: grid; place-items: center; background: linear-gradient(135deg, rgb(var(--tint)), rgb(var(--tint2))); }
+.mu-qc.blank .mu-note { width: 16px; height: 16px; color: #fff; }
 .mu-qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mu-qt b { font-weight: 600; }
 .mu-qt span { opacity: .62; }
 .mu-qb { font-size: 15px; opacity: .62; max-width: 7em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mu-qmore { font-size: 14px; opacity: .55; padding-left: 34px; }
+.mu-qmore { font-size: 14px; opacity: .55; padding-left: 46px; }
 
 /* 空闲：提示怎么点歌 */
 .mu-idle { position: relative; align-items: center; gap: 12px; height: 54px; padding: 0 24px 0 18px; font-size: 19px; }
@@ -119,7 +123,9 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .g-bg { position: absolute; left: -30%; top: -60%; width: 160%; height: 220%; object-fit: cover; z-index: -2; filter: blur(42px) saturate(1.9) brightness(.92); opacity: .95; animation: gDrift 28s ease-in-out infinite alternate; }
 .g-bg.blank { background: radial-gradient(40% 60% at 25% 40%, rgb(var(--tint)), transparent), radial-gradient(40% 60% at 80% 70%, rgb(var(--tint2)), transparent), #1a1a2e; }
 @keyframes gDrift { from { transform: scale(1) rotate(0); } to { transform: scale(1.18) rotate(6deg); } }
-.g-shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(100deg, rgba(8,8,18,.62), rgba(8,8,18,.28) 52%, rgba(8,8,18,.5)), var(--grain); background-blend-mode: normal, overlay; opacity: .96; }
+.g-shade { position: absolute; inset: 0; z-index: -1; opacity: .96;
+  background: radial-gradient(55% 120% at 0% 0%, rgba(var(--tint), .42), transparent 70%), radial-gradient(60% 120% at 100% 100%, rgba(var(--tint2), .36), transparent 70%), linear-gradient(100deg, rgba(8,8,18,.6), rgba(8,8,18,.3) 52%, rgba(8,8,18,.52)), var(--grain);
+  background-blend-mode: screen, screen, normal, overlay; }
 .st-glass .mu-art { width: 136px; height: 136px; }
 .mu-glow { position: absolute; inset: 8%; width: 84%; height: 84%; object-fit: cover; border-radius: 26px; filter: blur(20px) saturate(1.8); opacity: .85; transform: translateY(12px) scale(1.06); z-index: -1; }
 .st-glass .mu-disc { border-radius: 22px; box-shadow: 0 0 0 1px rgba(255,255,255,.22), 0 16px 32px -12px rgba(0,0,0,.75); }
@@ -132,98 +138,20 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .st-glass .mu-eq i { box-shadow: 0 0 10px rgba(var(--tint2), .7); }
 .st-glass .mu-prog { margin-top: 10px; }
 .st-glass .mu-fill { background: linear-gradient(90deg, rgba(var(--tint), .9), rgb(var(--tint2)) 70%, #fff); box-shadow: 0 0 12px rgba(var(--tint2), .7); }
-.st-glass .ly-box { padding: 10px 20px 12px; border-radius: 20px; background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(12,14,26,.36); -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%); }
-.st-glass .ly-cur { filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)) drop-shadow(0 0 14px rgba(var(--tint2), .35)); }
+.st-glass .ly-box { width: 100%; padding: 12px 22px 14px; border-radius: 22px; background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(12,14,26,.36); -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%); }
+.st-glass .ly-cur { filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)) drop-shadow(0 0 16px rgba(var(--tint2), .55)); }
+.st-glass .mu-head { animation: gPulse 1.8s ease-in-out infinite; }
+@keyframes gPulse { 50% { box-shadow: 0 0 0 5px rgba(var(--tint2), .2), 0 0 18px rgba(var(--tint2), 1); } }
+.paused .mu-head { animation: none; }
 .st-glass .ly-sub { text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 .st-glass .mu-queue { border-radius: 22px; }
-.st-glass .mu-qx { background: rgba(var(--tint), .3); box-shadow: inset 0 0 0 1px rgba(var(--tint2), .7); }
+.st-glass .mu-qc { box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 4px 10px -4px rgba(0,0,0,.5); }
 .st-glass .mu-idle { border-radius: 999px; }
 .st-glass .mu-idle b { background: rgba(var(--tint), .32); box-shadow: inset 0 0 0 1px rgba(var(--tint2), .7); }
 .st-glass .mu-note { color: rgb(var(--tint2)); filter: drop-shadow(0 0 8px rgba(var(--tint2), .7)); }
 .st-glass .mu-toast { border-radius: 999px; }
 .lite.st-glass .mu-body, .lite.st-glass .mu-queue, .lite.st-glass .mu-idle, .lite.st-glass .mu-toast, .lite.st-glass .ly-box { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(14,15,26,.88); }
 .lite .g-bg, .lite .mu-glow { filter: none; opacity: .35; }
-
-/* ===================================================================
-   蜡笔：小朋友蜡笔涂鸦的画风。白画纸；边框是歪歪扭扭的蜡笔线，用三个扭曲滤镜轮流切换，像手绘动画一样轻轻抖；
-   红黄蓝绿橙粉几支蜡笔的颜色固定（不跟封面变）；字用手写体，歌名每个字一种颜色
-   =================================================================== */
-.st-crayon { --ink: #3a3530; --kr: #F2545B; --ky: #FFC93C; --kb: #3E92CC; --kg: #6BBF59; --ko: #FF8C42; --kp: #F49AC2; --paper: #fffbf2; --font-hand: "LXGW WenKai", "Kaiti SC", "STKaiti", "KaiTi", var(--font-serif); }
-@keyframes kBoil { 0% { filter: url(#mu-wob1); } 33% { filter: url(#mu-wob2); } 66% { filter: url(#mu-wob3); } }
-.st-crayon .mu-body { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: center; gap: 24px; padding: 28px 34px 34px 26px; border-radius: 28px; color: var(--ink); font-family: var(--font-hand);
-  background: var(--grain), var(--paper); background-blend-mode: multiply; box-shadow: 0 18px 32px -18px rgba(60,40,20,.55), 0 2px 6px -2px rgba(60,40,20,.2); }
-.st-crayon .mu-body::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--paper); opacity: .9; z-index: -1; }
-/* 歪歪扭扭的蜡笔边框 */
-.k-edge { position: absolute; inset: 7px; border: 3.5px solid var(--ink); border-radius: 26px 32px 24px 30px / 30px 24px 32px 26px; opacity: .88; pointer-events: none; animation: kBoil .5s steps(1) infinite; }
-/* 角上的涂鸦：太阳（慢慢转）、白云（飘）、底下一排小草 */
-.k-sun, .k-cloud, .k-grass, .k-sticker, .k-star-head { position: absolute; pointer-events: none; background: center / contain no-repeat; }
-.k-sun { right: 16px; top: 10px; width: 56px; height: 56px; animation: kSpin 14s linear infinite;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23FF8C42' stroke-width='3.5' stroke-linecap='round'%3E%3Cpath d='M32 3v9M32 52v9M3 32h9M52 32h9M11 11l6 6M47 47l6 6M53 11l-6 6M17 47l-6 6'/%3E%3C/g%3E%3Ccircle cx='32' cy='32' r='14' fill='%23FFC93C' stroke='%23FF8C42' stroke-width='3'/%3E%3Cpath d='M26 30q2-3 4 0M34 30q2-3 4 0M26 36q6 5 12 0' fill='none' stroke='%233a3530' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E"); }
-@keyframes kSpin { to { transform: rotate(360deg); } }
-.k-cloud { right: 84px; top: 14px; width: 60px; height: 30px; animation: kDrift 6s ease-in-out infinite alternate;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 32'%3E%3Cpath d='M12 27c-6 0-9-4-8-8 1-5 6-6 9-5 1-6 7-10 13-8 3-5 12-6 16 0 5-2 11 1 11 7 5 0 8 4 7 8-1 4-4 6-8 6z' fill='%23fff' stroke='%233E92CC' stroke-width='2.8' stroke-linejoin='round'/%3E%3C/svg%3E"); }
-@keyframes kDrift { to { transform: translateX(-12px); } }
-.k-grass { left: 24px; right: 24px; bottom: 12px; height: 14px; background-size: 28px 14px; background-repeat: repeat-x; opacity: .9;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Cpath d='M1 13l4-9 4 9 4-11 4 11 4-8 4 8' fill='none' stroke='%236BBF59' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
-.k-cloud, .k-grass { filter: url(#mu-wob2); }
-/* 封面：稍微歪一点，外面套一个手画的红圈，贴一颗星星贴纸 */
-.st-crayon .mu-art { width: 128px; height: 128px; margin-left: 4px; transform: rotate(-3deg); }
-.st-crayon .mu-disc { border-radius: 50%; }
-.k-ring { position: absolute; inset: -9px; border: 3.5px solid var(--kr); border-radius: 48% 52% 50% 50% / 52% 48% 52% 48%; pointer-events: none; animation: kBoil .5s steps(1) infinite; }
-.k-sticker { right: -14px; top: -12px; width: 38px; height: 38px; transform: rotate(14deg); filter: drop-shadow(0 2px 2px rgba(0,0,0,.2));
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2.5l3.9 8.4 9.1 1-6.8 6.2 1.9 9-8.1-4.6-8.1 4.6 1.9-9L3 11.9l9.1-1z' fill='%23FFC93C' stroke='%23FF8C42' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E"); }
-.paused .k-edge, .paused .k-ring, .paused .k-sun { animation-play-state: paused; }
-.k-hello { font-size: 15px; letter-spacing: .12em; color: var(--ko); }
-/* 歌名：每个字一种蜡笔颜色，东倒西歪 */
-.st-crayon .mu-title.k-title { margin-top: 2px; font-size: 36px; line-height: 1.3; font-weight: 400; -webkit-text-stroke: .7px currentColor; }
-.k-title i { display: inline-block; font-style: normal; }
-.k-title i:nth-child(5n + 1) { color: var(--kr); transform: rotate(-5deg); }
-.k-title i:nth-child(5n + 2) { color: var(--kb); transform: rotate(4deg) translateY(2px); }
-.k-title i:nth-child(5n + 3) { color: var(--kg); transform: rotate(-3deg) translateY(-1px); }
-.k-title i:nth-child(5n + 4) { color: var(--ko); transform: rotate(6deg) translateY(1px); }
-.k-title i:nth-child(5n + 5) { color: #E3609A; transform: rotate(-4deg); }
-.st-crayon .mu-artist { font-size: 17px; color: #7a7166; }
-.st-crayon .mu-row { margin-top: 6px; }
-.st-crayon .mu-by { height: 30px; padding: 0; gap: 7px; color: var(--ink); background: none; box-shadow: none; }
-.st-crayon .mu-by .av { width: 26px; height: 26px; box-shadow: 0 0 0 2.5px var(--ky); }
-.st-crayon .mu-byn { font-size: 17px; font-weight: 400; }
-.st-crayon .mu-byt { font-size: 15px; color: var(--kr); opacity: 1; }
-/* 进度：一道粗粗的彩色蜡笔线，头上一颗小星星 */
-.k-prog { margin-top: 14px; padding-right: 10px; }
-.st-crayon .mu-track { height: 6px; border-radius: 3px; background: repeating-linear-gradient(90deg, #ddd5c4 0 10px, transparent 10px 16px); }
-.st-crayon .mu-fill { top: -3px; bottom: -3px; border-radius: 8px; background: linear-gradient(90deg, var(--ky), var(--ko) 60%, var(--kr)); filter: url(#mu-wob1); }
-.k-star-head { right: -14px; top: 50%; width: 26px; height: 26px; margin-top: -13px; animation: kSpin 4s linear infinite;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2.5l3.9 8.4 9.1 1-6.8 6.2 1.9 9-8.1-4.6-8.1 4.6 1.9-9L3 11.9l9.1-1z' fill='%23FFC93C' stroke='%23F2545B' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E"); }
-.paused .k-star-head { animation-play-state: paused; }
-.st-crayon .mu-time { margin-top: 9px; font: 14px/1 var(--font-hand); color: #9a9184; opacity: 1; }
-/* 歌词、接下来、空闲提示、点歌提示：白纸 + 手画的彩色边框 */
-.st-crayon .ly-box, .st-crayon .mu-queue, .st-crayon .mu-idle, .st-crayon .mu-toast { position: relative; color: var(--ink); font-family: var(--font-hand); background: var(--paper); border-radius: 20px; box-shadow: 0 12px 24px -14px rgba(60,40,20,.5); }
-.st-crayon .ly-box::before, .st-crayon .mu-queue::before, .st-crayon .mu-idle::before, .st-crayon .mu-toast::before { content: ""; position: absolute; inset: 4px; border: 3px solid var(--kb); border-radius: 18px 22px 16px 20px / 20px 16px 22px 18px; pointer-events: none; animation: kBoil .5s steps(1) infinite; }
-.st-crayon .ly-box { padding: 12px 26px 14px; }
-.st-crayon .ly-cur { width: fit-content; max-width: 100%; font-weight: 400; font-size: 30px; color: var(--ink); -webkit-text-fill-color: var(--ink); -webkit-text-stroke: .5px var(--ink);
-  background: linear-gradient(transparent 56%, rgba(255,201,60,.75) 56%, rgba(255,201,60,.75) 90%, transparent 90%) 0 0 / var(--p) 100% no-repeat; -webkit-background-clip: border-box; background-clip: border-box; }
-.st-crayon .ly-sub { font-size: 18px; color: #8a8174; opacity: 1; }
-.st-crayon .mu-queue { padding: 16px 22px 14px; }
-.st-crayon .mu-queue::before { border-color: var(--kg); }
-.st-crayon .mu-qh { font-size: 16px; letter-spacing: .08em; color: var(--ko); opacity: 1; }
-.st-crayon .mu-qi { font-size: 18px; }
-.st-crayon .mu-qt b { font-weight: 400; }
-.st-crayon .mu-qx { color: #fff; font: 14px/1 var(--font-hand); }
-.st-crayon .mu-qi:nth-of-type(4n + 2) .mu-qx { background: var(--kr); }
-.st-crayon .mu-qi:nth-of-type(4n + 3) .mu-qx { background: var(--kb); }
-.st-crayon .mu-qi:nth-of-type(4n + 4) .mu-qx { background: var(--kg); }
-.st-crayon .mu-qi:nth-of-type(4n + 5) .mu-qx { background: var(--ko); }
-.st-crayon .mu-qt span, .st-crayon .mu-qb, .st-crayon .mu-qmore { color: #8a8174; opacity: 1; }
-.st-crayon .mu-idle { font-size: 19px; border-radius: 999px; }
-.st-crayon .mu-idle::before { border-color: #E3609A; border-radius: 999px; }
-.st-crayon .mu-idle b { font-weight: 400; border-radius: 0; background: linear-gradient(transparent 50%, rgba(255,201,60,.75) 50%, rgba(255,201,60,.75) 90%, transparent 90%); }
-.st-crayon .mu-note { color: var(--kr); }
-/* 点歌提示：手画边框的对话气泡（左下角一个小尾巴） */
-.st-crayon .mu-toast { overflow: visible; padding: 9px 20px 9px 16px; font-size: 17px; border-radius: 18px; }
-.st-crayon .mu-toast::before { border-color: var(--ko); }
-.st-crayon .mu-toast::after { content: ""; position: absolute; left: 22px; bottom: -9px; width: 16px; height: 12px; background: var(--paper); border: 3px solid var(--ko); border-top: 0; border-left: 0; transform: skewX(30deg) rotate(20deg); }
-.st-crayon .mu-toast b { font-weight: 700; }
-.st-crayon .mu-toasts { gap: 14px; }
 
 /* ===================================================================
    手帐（日系）：方格点纸；和纸胶带贴着拍立得风格的封面；歌名像用荧光笔划过；手写体（霞鹜文楷）；角落手绘的小涂鸦
@@ -244,39 +172,49 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .j-tape.a { left: -18px; transform: rotate(-34deg); background: repeating-linear-gradient(45deg, rgba(var(--tint), .6) 0 6px, rgba(255,255,255,.6) 6px 12px); }
 .j-tape.b { right: -20px; transform: rotate(30deg); background: radial-gradient(circle, rgba(255,255,255,.75) 2px, transparent 2.5px) 0 0 / 9px 9px, rgba(var(--tint2), .55); }
 .j-date { display: flex; align-items: baseline; gap: 10px; font-size: 15px; color: #a0957f; letter-spacing: .08em; }
-.j-date span { padding: 1px 9px; border: 1px dashed rgba(120,100,70,.45); border-radius: 10px; font-size: 12.5px; letter-spacing: .1em; }
+/* 「今日点歌」像盖上去的红色橡皮章 */
+.j-date span { padding: 2px 8px 1px; border: 1.5px solid rgba(214,74,66,.75); border-radius: 4px; font-size: 12.5px; letter-spacing: .14em; color: rgba(200,60,52,.85); transform: rotate(-5deg); box-shadow: inset 0 0 0 1.5px rgba(255,253,246,.9), inset 0 0 0 2.5px rgba(214,74,66,.45);
+  -webkit-mask: var(--grain) center / 120px; mask: var(--grain) center / 120px; }
 .st-journal .j-title { margin-top: 2px; font-size: 33px; line-height: 1.35; font-weight: 400; color: #2c2a26; letter-spacing: .02em; }
 /* 荧光笔：只划在字的下半截 */
 .st-journal .j-title .mu-tin { padding: 0 5px; margin-left: -5px; background: linear-gradient(transparent 56%, rgba(var(--tint), .55) 56%, rgba(var(--tint), .55) 90%, transparent 90%); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .st-journal .mu-artist { font-size: 16px; color: #877e6e; letter-spacing: .03em; }
 .st-journal .mu-row { margin-top: 6px; }
 .st-journal .mu-by { height: 28px; padding: 0; gap: 7px; color: var(--ink); background: none; box-shadow: none; }
-.st-journal .mu-by .av { width: 24px; height: 24px; box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0,0,0,.25); }
+/* 点歌人的头像：白边圆贴纸，有点歪 */
+.st-journal .mu-by .av { width: 28px; height: 28px; transform: rotate(-6deg); box-shadow: 0 0 0 3px #fff, 0 2px 5px rgba(0,0,0,.3); }
 .st-journal .mu-byn { font-size: 16px; font-weight: 400; }
 .st-journal .mu-byt { font-size: 14px; color: rgb(var(--tintD2)); opacity: 1; }
-.st-journal .mu-byt::before { content: "♡ "; }
+.st-journal .mu-byt::after { content: " ♡"; }
 .j-prog { margin-top: 12px; }
 .st-journal .mu-track { height: 0; border-top: 2px dashed rgba(120,100,70,.3); background: none; }
 .st-journal .mu-fill { top: -2px; bottom: auto; height: 2px; border-radius: 1px; background: rgb(var(--tintD)); }
+/* 一支小铅笔，沿着虚线写过去 */
+.j-pencil { position: absolute; right: -6px; top: -22px; width: 26px; height: 26px; pointer-events: none; background: center / contain no-repeat; animation: jWrite .9s ease-in-out infinite;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg transform='rotate(45 16 16)'%3E%3Crect x='12' y='0' width='8' height='20' rx='1.5' fill='%23ffd166' stroke='%235a4a32' stroke-width='1.4'/%3E%3Crect x='12' y='0' width='8' height='4' rx='1.5' fill='%23f28b9b' stroke='%235a4a32' stroke-width='1.4'/%3E%3Cpath d='M12 20h8l-4 8z' fill='%23f3dcb2' stroke='%235a4a32' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M14.6 25.2L16 28l1.4-2.8z' fill='%235a4a32'/%3E%3C/g%3E%3C/svg%3E"); }
+@keyframes jWrite { 0%, 100% { transform: translate(0, 0) rotate(0); } 50% { transform: translate(-1px, 1px) rotate(-6deg); } }
+.paused .j-pencil { animation: none; }
 .st-journal .mu-time { margin-top: 8px; font: 13px/1 var(--font-hand); color: #a0957f; opacity: 1; letter-spacing: .06em; }
 /* 手绘小涂鸦：放在卡片右边留出的那一条里，不压字 */
 .j-doodle { position: absolute; pointer-events: none; background: center / contain no-repeat; }
-.j-doodle.star { right: 24px; top: 16px; width: 26px; height: 26px; animation: jWobble 3.6s ease-in-out infinite;
+.j-doodle.star { right: 24px; top: calc(14px + var(--j2, 0px)); width: 26px; height: 26px; animation: jWobble 3.6s ease-in-out infinite;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3.5l3.4 8.3 8.8.6-6.8 5.6 2.2 8.6L16 21.9l-7.6 4.7 2.2-8.6-6.8-5.6 8.8-.6z' fill='%23ffe08a' fill-opacity='.7' stroke='%23e0a234' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/svg%3E"); }
-.j-doodle.heart { right: 24px; bottom: 50px; width: 20px; height: 20px; animation: jBeat 2.4s ease-in-out infinite;
+.j-doodle.heart { right: calc(20px + var(--j2, 0px)); bottom: 50px; width: 20px; height: 20px; animation: jBeat 2.4s ease-in-out infinite;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 27s-10.5-6.4-10.5-13.6C5.5 9 8.4 6.5 11.4 6.5c2.2 0 3.7 1.3 4.6 2.8.9-1.5 2.4-2.8 4.6-2.8 3 0 5.9 2.5 5.9 6.9C26.5 20.6 16 27 16 27z' fill='%23ffb3c6' fill-opacity='.65' stroke='%23e2708f' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/svg%3E"); }
-.j-doodle.swirl { right: 12px; bottom: 20px; width: 40px; height: 16px;
+.j-doodle.swirl { right: 12px; bottom: 20px; width: 40px; height: 16px; transform: rotate(var(--j3, 0deg));
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 20'%3E%3Cpath d='M2 12c5-8 9-8 12 0s8 8 11 0 8-8 11 0 7 7 10 1' fill='none' stroke='%2378a6d8' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E"); }
-@keyframes jWobble { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg) scale(1.06); } }
+@keyframes jWobble { 0%, 100% { transform: rotate(calc(var(--j1, 0deg) - 8deg)); } 50% { transform: rotate(calc(var(--j1, 0deg) + 10deg)) scale(1.06); } }
 @keyframes jBeat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.18); } 30% { transform: scale(.98); } }
 /* 歌词：横线本上的一行，荧光笔跟着唱的进度划过去 */
-.st-journal .ly-box { padding: 10px 24px 12px; border-radius: 4px; color: var(--ink); font-family: var(--font-hand);
+.st-journal .ly-box { position: relative; width: 100%; padding: 12px 26px 13px; border-radius: 4px; color: var(--ink); font-family: var(--font-hand);
   background: repeating-linear-gradient(180deg, transparent 0 33px, rgba(110,140,190,.24) 33px 34px) 0 7px, #fffdf6;
   box-shadow: 0 0 0 1px rgba(120,100,70,.12), 0 14px 28px -16px rgba(70,50,20,.5); transform: rotate(.4deg); }
 .st-journal .ly-cur { width: fit-content; max-width: 100%; font-weight: 400; font-size: 29px; color: #2c2a26; -webkit-text-fill-color: #2c2a26;
   background: linear-gradient(transparent 58%, rgba(var(--tint), .55) 58%, rgba(var(--tint), .55) 92%, transparent 92%) 0 0 / var(--p) 100% no-repeat;
   -webkit-background-clip: border-box; background-clip: border-box; }
 .st-journal .ly-sub { font-size: 18px; color: #8f8574; opacity: 1; }
+.st-journal .ly-box::before { content: ""; position: absolute; left: 18px; top: -9px; width: 64px; height: 19px; opacity: .85; transform: rotate(-4deg); clip-path: polygon(4% 8%, 96% 0, 100% 46%, 95% 100%, 3% 94%, 0 52%);
+  background: repeating-linear-gradient(90deg, rgba(var(--tint2), .5) 0 5px, rgba(255,255,255,.6) 5px 10px); }
 /* 接下来：一张便利贴，上面贴一小段胶带 */
 .st-journal .mu-queue { position: relative; width: min(500px, 100%); padding: 18px 20px 14px; border-radius: 2px; color: var(--ink); font-family: var(--font-hand);
   background: linear-gradient(180deg, #fff7cf, #fdf0b8); box-shadow: 0 14px 24px -14px rgba(90,70,20,.55), 0 0 0 1px rgba(160,130,40,.12); transform: rotate(.8deg); }
@@ -284,7 +222,9 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .st-journal .mu-qh { font-size: 16px; letter-spacing: .12em; color: #a0773a; opacity: 1; }
 .st-journal .mu-qi { font-size: 18px; }
 .st-journal .mu-qt b { font-weight: 400; }
-.st-journal .mu-qx { border-radius: 3px; border: 1.5px solid #9a8a6a; color: #9a8a6a; font: 13px/1 var(--font-hand); }
+/* 迷你拍立得 */
+.st-journal .mu-qc { width: 34px; height: 38px; padding: 3px 3px 7px; border-radius: 1px; background: #fff; box-shadow: 0 2px 5px -1px rgba(60,40,20,.35); transform: rotate(-4deg); }
+.st-journal .mu-qi:nth-of-type(odd) .mu-qc { transform: rotate(3deg); }
 .st-journal .mu-qt span, .st-journal .mu-qb, .st-journal .mu-qmore { color: #8f7f5f; opacity: 1; }
 .st-journal .mu-idle { border-radius: 4px; color: var(--ink); font-family: var(--font-hand); font-size: 19px; background: radial-gradient(circle at 1px 1px, rgba(120,110,90,.22) 1px, transparent 1.5px) 0 0 / 14px 14px, #fffdf6; box-shadow: 0 0 0 1px rgba(120,100,70,.12), 0 12px 24px -14px rgba(70,50,20,.5); transform: rotate(-.6deg); }
 .st-journal .mu-idle b { font-weight: 400; border-radius: 0; background: linear-gradient(transparent 50%, rgba(var(--tint), .55) 50%, rgba(var(--tint), .55) 90%, transparent 90%); }
@@ -297,32 +237,41 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
    =================================================================== */
 .st-minimal .mu-card { width: auto; max-width: 100%; }
 .st-minimal .mu-body { display: grid; grid-template-columns: 48px minmax(0, auto) auto; align-items: center; gap: 14px; max-width: 540px; padding: 9px 20px 9px 9px; border-radius: 999px; overflow: hidden;
-  background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 14px 34px -10px rgba(0,0,0,.6);
+  background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 0 0 1px rgba(var(--tint), .22), 0 0 18px -2px rgba(var(--tint), .45), 0 14px 34px -10px rgba(0,0,0,.6); animation: iGlow 3.6s ease-in-out infinite;
   transition: padding .5s cubic-bezier(.3,1.5,.5,1), transform .5s cubic-bezier(.3,1.5,.5,1); }
+@keyframes iGlow { 50% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 0 0 1px rgba(var(--tint2), .35), 0 0 30px 2px rgba(var(--tint2), .55), 0 14px 34px -10px rgba(0,0,0,.6); } }
+.st-minimal .paused .mu-body { animation: none; }
 .st-minimal .mu-art { width: 48px; height: 48px; transition: opacity .25s; }
 .st-minimal .mu-disc { border-radius: 50%; animation: muSpin 12s linear infinite; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .st-minimal .paused .mu-disc { animation-play-state: paused; }
 .st-minimal .mu-meta { gap: 2px; transition: opacity .25s; }
 .st-minimal .mu-title { font-size: 19px; font-weight: 600; letter-spacing: -.005em; }
 .st-minimal .mu-artist { font-size: 13px; color: rgba(255,255,255,.52); }
-.i-wave { height: 22px; gap: 3px; margin-left: 6px; transition: opacity .25s; }
+.i-wave { position: relative; height: 22px; gap: 3px; margin-left: 6px; transition: opacity .25s; }
+/* 暂停时音柱换成暂停符号 */
+.paused .i-wave i { opacity: 0; }
+.paused .i-wave::after { content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 15px; margin: -7.5px 0 0 -6.5px; border-left: 4.5px solid rgb(var(--tint2)); border-right: 4.5px solid rgb(var(--tint2)); border-radius: 1px; }
 .i-wave i { width: 3.5px; }
 .i-prog { position: absolute; left: 70px; right: 26px; bottom: 5px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.1); overflow: hidden; transition: opacity .25s; }
 .i-prog .mu-fill { background: linear-gradient(90deg, rgb(var(--tint)), rgb(var(--tint2))); }
 .i-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 0; padding: 0 22px; font-size: 16px; white-space: nowrap; opacity: 0; transform: scale(.92); transition: opacity .3s .1s, transform .4s cubic-bezier(.3,1.5,.5,1); pointer-events: none; }
 .i-note > span { overflow: hidden; text-overflow: ellipsis; color: rgba(255,255,255,.82); }
-.i-note b { margin: 0 6px 0 10px; flex: none; }
-.i-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #34C759; box-shadow: 0 0 10px #34C759; }
+.i-note b { margin: 0 6px 0 0; flex: none; }
+.i-dot { flex: none; width: 9px; height: 9px; margin-right: 10px; border-radius: 50%; background: #34C759; box-shadow: 0 0 10px #34C759; }
 .i-dot.no { background: #FF9F0A; box-shadow: 0 0 10px #FF9F0A; }
+.i-dot.play { background: rgb(var(--tint2)); box-shadow: 0 0 10px rgb(var(--tint2)); }
+.i-note > span + b { margin-left: 4px; }
+.i-note b + span { margin-left: 8px; color: rgba(255,255,255,.55); flex: none; }
 .noting .mu-body { padding: 15px 26px 15px 15px; transform: scale(1.04); }
 .noting .i-note { opacity: 1; transform: none; }
 .noting .mu-art, .noting .mu-meta, .noting .i-wave, .noting .i-prog { opacity: 0; }
+.st-minimal .mu-lyric { margin-top: -4px; }
 .st-minimal .ly-box { padding: 8px 18px 9px; border-radius: 18px; background: rgba(3,3,3,.82); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
 .st-minimal .ly-cur { font-size: 23px; }
 .st-minimal .ly-sub { display: none; }
 .st-minimal .mu-queue { width: min(440px, 100%); padding: 10px 16px 12px; border-radius: 20px; background: rgba(3,3,3,.86); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
 .st-minimal .mu-qi { font-size: 16px; min-height: 28px; }
-.st-minimal .mu-qx { color: rgba(255,255,255,.7); background: rgba(255,255,255,.08); }
+.st-minimal .mu-qc { border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .st-minimal .mu-idle { height: 44px; padding: 0 20px 0 14px; border-radius: 999px; font-size: 16px; background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 12px 28px -10px rgba(0,0,0,.6); color: rgba(255,255,255,.82); }
 .st-minimal .mu-idle b { background: rgba(255,255,255,.1); }
 .st-minimal .mu-note { width: 20px; height: 20px; color: rgb(var(--tint2)); }
@@ -332,5 +281,5 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mu-eq i, .mu-disc, .g-bg, .g-sheen, .k-edge, .k-ring, .k-sun, .k-cloud, .k-star-head, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin, .st-crayon .ly-box::before, .st-crayon .mu-queue::before, .st-crayon .mu-idle::before, .st-crayon .mu-toast::before { animation: none !important; }
+  .mu-eq i, .mu-disc, .g-bg, .g-sheen, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
 }

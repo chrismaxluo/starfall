@@ -45,8 +45,8 @@ export interface LyricLine {
 
 /** 点歌窗口的样子（后台「点歌 · 画面」里设置） */
 export interface MusicDisplay {
-  /** glass 流光、crayon 蜡笔（涂鸦）、journal 手帐（日系）、minimal 灵动岛 */
-  style: 'glass' | 'crayon' | 'journal' | 'minimal';
+  /** glass 流光、journal 手帐（日系）、minimal 灵动岛 */
+  style: 'glass' | 'journal' | 'minimal';
   side: 'left' | 'right';
   size: 'normal' | 'large';
   /** 显示后面几首（0 不显示列表） */

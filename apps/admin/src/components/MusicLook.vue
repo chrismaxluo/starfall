@@ -65,10 +65,8 @@ function testNotice(): void {
 
 const STYLES = [
   { value: 'glass', label: '流光', desc: '封面的颜色铺满卡片，像音乐 App' },
-  { value: 'vinyl', label: '黑胶', desc: '胡桃木唱机，唱片转、唱臂落下' },
-  { value: 'neon', label: '霓虹', desc: '霓虹描边、扫描线、跳动的频谱' },
-  { value: 'cassette', label: '卡带', desc: '复古磁带，带子随进度绕过去' },
-  { value: 'ink', label: '国风', desc: '宣纸远山，竖排歌词，朱红印章' },
+  { value: 'day', label: '白昼', desc: '小清新：白色磨砂卡片，淡淡的封面色' },
+  { value: 'journal', label: '手帐', desc: '日系：方格纸、胶带、拍立得、手写字' },
   { value: 'minimal', label: '灵动岛', desc: '黑色小胶囊，点歌时展开提示' },
 ] as const;
 
@@ -112,7 +110,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
         <div class="card-h"><h2>外观</h2><span class="aside">改了马上生效</span></div>
         <div class="ml-styles" role="radiogroup" aria-label="样子">
           <button v-for="x in STYLES" :key="x.value" type="button" class="ml-style" role="radio" :aria-checked="s.style === x.value" @click="set({ style: x.value }, `换成「${x.label}」`)">
-            <span class="ml-ill" :class="x.value"><i /><b /><b /><em /></span>
+            <span class="ml-ill" :class="x.value"><i /><b /><b /></span>
             <b>{{ x.label }}</b><span>{{ x.desc }}</span>
           </button>
         </div>
@@ -199,37 +197,28 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-pv iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: transparent; }
 .ml-pvt { display: flex; align-items: center; gap: 12px; margin: 12px 0 6px; }
 .ml-ck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--t2); }
-.ml-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
+.ml-styles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
 @media (max-width: 1300px) { .ml-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ml-style { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
 .ml-style:hover { border-color: var(--line-strong); }
 .ml-style[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-ring); }
 .ml-style > b { font-size: 13.5px; font-weight: 600; }
 .ml-style > span:last-child { font-size: 12px; color: var(--t2); line-height: 1.5; }
-/* 六种样子的小示意图 */
+/* 四种样子的小示意图 */
 .ml-ill { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; height: 44px; margin-bottom: 4px; padding: 0 8px; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #2a2b45, #16172a); }
 .ml-ill i { flex: none; width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #8d8bff, #e07ab5); }
 .ml-ill b { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .75); width: 38%; }
 .ml-ill b + b { width: 20%; background: rgba(255, 255, 255, .35); }
 .ml-ill em { display: none; }
 .ml-ill.glass { background: radial-gradient(60% 120% at 20% 50%, rgba(224, 122, 181, .7), transparent), radial-gradient(60% 120% at 80% 50%, rgba(141, 139, 255, .6), transparent), #1d1c33; }
-.ml-ill.vinyl { padding-left: 0; background: linear-gradient(90deg, #6b3f22 0 34%, #1a120d 34%); }
-.ml-ill.vinyl i { width: 32px; height: 32px; margin-left: 8px; border-radius: 50%; background: radial-gradient(circle, #e07ab5 0 22%, #0e0e10 24% 100%); box-shadow: 0 0 0 2px #c9c9cf; }
-.ml-ill.vinyl b { background: #f6ecdc; margin-left: 14px; }
-.ml-ill.vinyl b + b { background: #d9b26f; margin-left: 0; }
-.ml-ill.neon { background: #07051a; box-shadow: inset 0 0 0 1.5px #8d8bff, inset 0 0 12px rgba(141, 139, 255, .6); }
-.ml-ill.neon i { border-radius: 4px; box-shadow: -2px 0 0 rgba(255, 60, 90, .8), 2px 0 0 rgba(60, 200, 255, .8); }
-.ml-ill.neon b { background: #fff; box-shadow: 0 0 6px #8d8bff; }
-.ml-ill.neon b + b { background: #e07ab5; box-shadow: 0 0 6px #e07ab5; }
-.ml-ill.cassette { justify-content: center; background: linear-gradient(160deg, #a58bff, #e07ab5); }
-.ml-ill.cassette i, .ml-ill.cassette em { display: block; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle, #f4f0e6 0 30%, #2b1d14 34%); box-shadow: 0 0 0 4px #241a30; }
-.ml-ill.cassette b { width: 26%; height: 10px; border-radius: 2px; background: #241a30; }
-.ml-ill.cassette b + b { display: none; }
-.ml-ill.cassette em { order: 3; }
-.ml-ill.ink { justify-content: flex-end; gap: 7px; padding-right: 12px; background: linear-gradient(180deg, #fbf7ee, #ece2cc); }
-.ml-ill.ink i { order: 9; width: 14px; height: 14px; border-radius: 3px; background: #b5281f; margin-left: auto; position: absolute; left: 12px; }
-.ml-ill.ink b { width: 5px; height: 30px; background: #1a1612; }
-.ml-ill.ink b + b { height: 22px; background: rgba(26, 22, 18, .35); width: 4px; }
+.ml-ill.day { background: radial-gradient(50% 120% at 90% 0%, rgba(141, 139, 255, .35), transparent), linear-gradient(160deg, #ffffff, #f2f4fa); box-shadow: inset 0 0 0 1px rgba(30, 40, 70, .08); }
+.ml-ill.day i { box-shadow: 0 4px 8px -3px rgba(141, 139, 255, .6); }
+.ml-ill.day b { background: #2f3441; }
+.ml-ill.day b + b { background: #b5bac6; }
+.ml-ill.journal { background: radial-gradient(circle at 1px 1px, rgba(120, 110, 90, .3) 1px, transparent 1.5px) 0 0 / 8px 8px, #fffdf6; box-shadow: inset 0 0 0 1px rgba(120, 100, 70, .15); }
+.ml-ill.journal i { border-radius: 1px; background: linear-gradient(135deg, #8d8bff, #e07ab5) content-box, #fff; padding: 3px 3px 7px; width: 26px; height: 32px; transform: rotate(-6deg); box-shadow: 0 2px 4px rgba(60, 40, 20, .3); }
+.ml-ill.journal b { background: linear-gradient(transparent 0 0), #34312c; box-shadow: 0 3px 0 rgba(141, 139, 255, .45); }
+.ml-ill.journal b + b { background: #b3a98f; box-shadow: none; }
 .ml-ill.minimal { justify-content: center; background: linear-gradient(135deg, #3a3b5a, #20213a); }
 .ml-ill.minimal i { width: 16px; height: 16px; border-radius: 50%; position: relative; z-index: 1; }
 .ml-ill.minimal b { position: relative; z-index: 1; width: 30%; }

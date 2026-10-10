@@ -269,6 +269,13 @@ describe('弹幕点歌', () => {
     expect(effectHasSound({ effect: { volume: 50, sound: null, visual: { type: 'asset', kind: 'image' } } } as unknown as PlayItem)).toBe(false);
   });
 
+  it('以前选的样子后来去掉了：换成流光，改别的设置也不报错', async () => {
+    const t = await setup({ player: false });
+    t.ctx.settings.setRaw('music', { ...t.m.cfg(), style: 'vinyl' });
+    expect(t.m.cfg().style).toBe('glass');
+    expect(t.m.updateSettings({ volume: 50 })).toMatchObject({ style: 'glass', volume: 50 });
+  });
+
   it('后台：模拟点歌、直接加歌（不受规则限制）、清空；重启后正在放的回到最前面', async () => {
     const t = await setup({ player: false, settings: { who: { ...DANMU_WHO_ALL, all: false, mod: true } } });
     expect(await t.m.simulate('点歌 起风了')).toMatchObject({ ok: false, text: '没有点歌的权限' });

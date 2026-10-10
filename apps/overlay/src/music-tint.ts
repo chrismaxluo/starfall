@@ -3,12 +3,15 @@
 // 封面太素（黑白、灰）时用星辉靛和粉紫。
 
 export interface Tint {
-  /** "r, g, b"，用在 rgba(var(--tint), .5) */
+  /** "r, g, b"，用在 rgba(var(--tint), .5)：放在深色底上 */
   c1: string;
   c2: string;
+  /** 同样的颜色调深：放在白色、纸色底上（白昼、手帐） */
+  d1: string;
+  d2: string;
 }
 
-export const DEFAULT_TINT: Tint = { c1: '139, 140, 255', c2: '224, 122, 181' };
+export const DEFAULT_TINT: Tint = { c1: '139, 140, 255', c2: '224, 122, 181', d1: '84, 81, 214', d2: '196, 72, 140' };
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255;
@@ -55,8 +58,8 @@ export function tintFromPixels(data: ArrayLike<number>): Tint {
   const far = order.find((b) => b.w > top.w * 0.12 && Math.min(Math.abs(b.i - top.i), 12 - Math.abs(b.i - top.i)) >= 2);
   const hue2 = far ? far.h / far.w : (hue1 + 40) % 360;
   const sat2 = far ? Math.max(0.5, Math.min(0.9, far.s / far.w)) : sat1;
-  // 亮度固定在中间偏亮：放在深色底上看得清，又不发白
-  return { c1: hslToRgb(hue1, sat1, 0.66), c2: hslToRgb(hue2, sat2, 0.7) };
+  // 亮度固定：浅的放在深色底上看得清、又不发白；深的放在白底上看得清
+  return { c1: hslToRgb(hue1, sat1, 0.66), c2: hslToRgb(hue2, sat2, 0.7), d1: hslToRgb(hue1, Math.min(0.75, sat1), 0.44), d2: hslToRgb(hue2, Math.min(0.75, sat2), 0.48) };
 }
 
 const cache = new Map<string, Tint>();

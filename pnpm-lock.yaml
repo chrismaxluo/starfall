@@ -260,6 +260,9 @@ importers:
       lottie-web:
         specifier: ^5.13.0
         version: 5.13.0
+      lxgw-wenkai-webfont:
+        specifier: 1.7.0
+        version: 1.7.0
       svgaplayerweb:
         specifier: 2.3.2
         version: 2.3.2
@@ -1912,6 +1915,9 @@ packages:
   lru-cache@11.5.3:
     resolution: {integrity: sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg==}
     engines: {node: 20 || >=22}
+
+  lxgw-wenkai-webfont@1.7.0:
+    resolution: {integrity: sha512-kVJmT4xMAyOLhG6q0w63wJkVU7RP8UMQRGoAWj9tnpzL7sWFFYiEHBdUQyW9myqBQFa5SQfWfa2VLYF4IJBL5g==}
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -3738,6 +3744,8 @@ snapshots:
   lottie-web@5.13.0: {}
 
   lru-cache@11.5.3: {}
+
+  lxgw-wenkai-webfont@1.7.0: {}
 
   magic-string@0.30.21:
     dependencies:

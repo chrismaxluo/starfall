@@ -66,7 +66,7 @@ function testNotice(): void {
 const STYLES = [
   { value: 'glass', label: '流光', desc: '封面的颜色铺满卡片，像音乐 App' },
   { value: 'journal', label: '手帐', desc: '日系：方格纸、胶带、拍立得、手写字' },
-  { value: 'minimal', label: '灵动岛', desc: '黑色小胶囊，点歌时展开提示' },
+  { value: 'minimal', label: '灵动岛', desc: '玻璃小胶囊，换歌、点歌时展开提示' },
 ] as const;
 
 // ---------- 声音 ----------
@@ -218,7 +218,8 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-ill.minimal i { width: 16px; height: 16px; border-radius: 50%; position: relative; z-index: 1; }
 .ml-ill.minimal b { position: relative; z-index: 1; width: 30%; }
 .ml-ill.minimal b + b { display: none; }
-.ml-ill.minimal::before { content: ""; position: absolute; left: 18%; right: 18%; top: 12px; bottom: 12px; border-radius: 999px; background: #000; }
+.ml-ill.minimal { background: linear-gradient(135deg, #6f86c8, #c98bb5 60%, #e9b48c); }
+.ml-ill.minimal::before { content: ""; position: absolute; left: 18%; right: 18%; top: 12px; bottom: 12px; border-radius: 999px; background: linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, .12)), rgba(20, 20, 30, .25); box-shadow: inset 0 1px 1px rgba(255, 255, 255, .7), inset 0 0 0 1px rgba(255, 255, 255, .35); }
 .srow .line .gap { width: 12px; }
 .srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: 13px; color: var(--t2); }
 .ml-range { width: 180px; accent-color: var(--accent); }

@@ -233,29 +233,47 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .st-journal .mu-toast b { font-weight: 700; }
 
 /* ===================================================================
-   灵动岛：黑色胶囊；有人点歌时胶囊放大，提示写在里面
+   灵动岛：玻璃胶囊（液态玻璃：后面的画面透出来并模糊，上沿一道高光，四周一圈渐变亮边，略压暗让字看得清）；
+   换歌、有人点歌时胶囊放大，提示写在里面；歌词、接下来、提示用同款玻璃
    =================================================================== */
 .st-minimal .mu-card { width: auto; max-width: 100%; }
+.st-minimal .mu-body, .st-minimal .ly-box, .st-minimal .mu-queue, .st-minimal .mu-idle, .st-minimal .mu-toast { position: relative; isolation: isolate; color: #fff;
+  background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,.06) 48%, rgba(255,255,255,.1)), rgba(16,16,26,.38);
+  -webkit-backdrop-filter: blur(24px) saturate(190%); backdrop-filter: blur(24px) saturate(190%);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 1px rgba(255,255,255,.12), inset 0 0 14px rgba(255,255,255,.06), 0 14px 32px -12px rgba(0,0,0,.5); }
+/* 一圈渐变的亮边（左上、右下亮） */
+.st-minimal .mu-body::before, .st-minimal .ly-box::before, .st-minimal .mu-queue::before, .st-minimal .mu-idle::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.2px; pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.8), rgba(255,255,255,.12) 32%, rgba(255,255,255,.04) 62%, rgba(255,255,255,.5));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+/* 上沿的一道高光 */
+.st-minimal .mu-body::after, .st-minimal .mu-idle::after { content: ""; position: absolute; left: 14%; right: 14%; top: 1px; height: 14px; border-radius: 999px; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,0)); }
+.lite.st-minimal .mu-body, .lite.st-minimal .ly-box, .lite.st-minimal .mu-queue, .lite.st-minimal .mu-idle, .lite.st-minimal .mu-toast { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), rgba(18,18,28,.86); }
 .st-minimal .mu-body { display: grid; grid-template-columns: 48px minmax(0, auto) auto; align-items: center; gap: 14px; max-width: 540px; padding: 9px 20px 9px 9px; border-radius: 999px; overflow: hidden;
-  background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 0 0 1px rgba(var(--tint), .22), 0 0 18px -2px rgba(var(--tint), .45), 0 14px 34px -10px rgba(0,0,0,.6); animation: iGlow 3.6s ease-in-out infinite;
-  transition: padding .5s cubic-bezier(.3,1.5,.5,1), transform .5s cubic-bezier(.3,1.5,.5,1); }
-@keyframes iGlow { 50% { box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 0 0 1px rgba(var(--tint2), .35), 0 0 30px 2px rgba(var(--tint2), .55), 0 14px 34px -10px rgba(0,0,0,.6); } }
+  animation: iGlow 3.6s ease-in-out infinite; transition: padding .5s cubic-bezier(.3,1.5,.5,1), transform .5s cubic-bezier(.3,1.5,.5,1); }
+/* 外圈封面色的呼吸光（叠在玻璃本身的阴影上） */
+@keyframes iGlow {
+  0%, 100% { box-shadow: inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 1px rgba(255,255,255,.12), inset 0 0 14px rgba(255,255,255,.06), 0 0 18px -2px rgba(var(--tint), .45), 0 14px 32px -12px rgba(0,0,0,.5); }
+  50% { box-shadow: inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 1px rgba(255,255,255,.12), inset 0 0 14px rgba(255,255,255,.06), 0 0 30px 2px rgba(var(--tint2), .55), 0 14px 32px -12px rgba(0,0,0,.5); } }
 .st-minimal .paused .mu-body { animation: none; }
-.st-minimal .mu-art { width: 48px; height: 48px; transition: opacity .25s; }
+.st-minimal .mu-art { width: 48px; height: 48px; transition: opacity .25s .12s; }
+.noting .mu-art, .noting .mu-meta, .noting .i-wave, .noting .i-prog { transition: opacity .15s; }
 .st-minimal .mu-disc { border-radius: 50%; animation: muSpin 12s linear infinite; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .st-minimal .paused .mu-disc { animation-play-state: paused; }
-.st-minimal .mu-meta { gap: 2px; transition: opacity .25s; }
-.st-minimal .mu-title { font-size: 19px; font-weight: 600; letter-spacing: -.005em; }
-.st-minimal .mu-artist { font-size: 13px; color: rgba(255,255,255,.52); }
+.st-minimal .mu-meta { gap: 2px; transition: opacity .25s .12s; }
+.st-minimal .mu-title { font-size: 19px; font-weight: 600; letter-spacing: -.005em; text-shadow: 0 1px 4px rgba(0,0,0,.45); }
+.st-minimal .mu-artist { font-size: 13px; color: rgba(255,255,255,.72); text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.st-minimal .mu-disc { box-shadow: 0 0 0 1.5px rgba(255,255,255,.35), 0 2px 8px rgba(0,0,0,.35); }
 .i-wave { position: relative; height: 22px; gap: 3px; margin-left: 6px; transition: opacity .25s; }
 /* 暂停时音柱换成暂停符号 */
 .paused .i-wave i { opacity: 0; }
 .paused .i-wave::after { content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 15px; margin: -7.5px 0 0 -6.5px; border-left: 4.5px solid rgb(var(--tint2)); border-right: 4.5px solid rgb(var(--tint2)); border-radius: 1px; }
 .i-wave i { width: 3.5px; }
-.i-prog { position: absolute; left: 70px; right: 26px; bottom: 5px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.1); overflow: hidden; transition: opacity .25s; }
+.i-prog { position: absolute; left: 70px; right: 26px; bottom: 5px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.2); overflow: hidden; transition: opacity .25s; }
 .i-prog .mu-fill { background: linear-gradient(90deg, rgb(var(--tint)), rgb(var(--tint2))); }
-.i-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 0; padding: 0 22px; font-size: 16px; white-space: nowrap; opacity: 0; transform: scale(.92); transition: opacity .3s .1s, transform .4s cubic-bezier(.3,1.5,.5,1); pointer-events: none; }
-.i-note > span { overflow: hidden; text-overflow: ellipsis; color: rgba(255,255,255,.82); }
+.i-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 0; padding: 0 22px; font-size: 16px; white-space: nowrap; opacity: 0; transform: scale(.92); transition: opacity .18s, transform .4s cubic-bezier(.3,1.5,.5,1); pointer-events: none; }
+.noting .i-note { transition: opacity .3s .15s, transform .4s cubic-bezier(.3,1.5,.5,1); }
+.i-note { text-shadow: 0 1px 4px rgba(0,0,0,.45); }
+.i-note > span { overflow: hidden; text-overflow: ellipsis; color: rgba(255,255,255,.88); }
 .i-note b { margin: 0 6px 0 0; flex: none; }
 .i-dot { flex: none; width: 9px; height: 9px; margin-right: 10px; border-radius: 50%; background: #34C759; box-shadow: 0 0 10px #34C759; }
 .i-dot.no { background: #FF9F0A; box-shadow: 0 0 10px #FF9F0A; }
@@ -266,16 +284,17 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .noting .i-note { opacity: 1; transform: none; }
 .noting .mu-art, .noting .mu-meta, .noting .i-wave, .noting .i-prog { opacity: 0; }
 .st-minimal .mu-lyric { margin-top: -4px; }
-.st-minimal .ly-box { padding: 8px 18px 9px; border-radius: 18px; background: rgba(3,3,3,.82); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
-.st-minimal .ly-cur { font-size: 23px; }
+.st-minimal .ly-box { padding: 8px 18px 9px; border-radius: 18px; }
+.st-minimal .ly-cur { font-size: 23px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
 .st-minimal .ly-sub { display: none; }
-.st-minimal .mu-queue { width: min(440px, 100%); padding: 10px 16px 12px; border-radius: 20px; background: rgba(3,3,3,.86); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.st-minimal .mu-queue { width: min(440px, 100%); padding: 10px 16px 12px; border-radius: 20px; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.st-minimal .mu-qt span, .st-minimal .mu-qb, .st-minimal .mu-qh, .st-minimal .mu-qmore { opacity: .8; }
 .st-minimal .mu-qi { font-size: 16px; min-height: 28px; }
 .st-minimal .mu-qc { border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
-.st-minimal .mu-idle { height: 44px; padding: 0 20px 0 14px; border-radius: 999px; font-size: 16px; background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 12px 28px -10px rgba(0,0,0,.6); color: rgba(255,255,255,.82); }
-.st-minimal .mu-idle b { background: rgba(255,255,255,.1); }
+.st-minimal .mu-idle { height: 44px; padding: 0 20px 0 14px; border-radius: 999px; font-size: 16px; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.st-minimal .mu-idle b { background: rgba(255,255,255,.18); }
 .st-minimal .mu-note { width: 20px; height: 20px; color: rgb(var(--tint2)); }
-.st-minimal .mu-toast { border-radius: 999px; background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 10px 22px -10px rgba(0,0,0,.6); }
+.st-minimal .mu-toast { border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
 
 .notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; }
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }

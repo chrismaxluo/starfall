@@ -3,7 +3,7 @@
 // 同时加了好几个时只有一个出声音（服务端指定，消息里 player 为 true），别的只显示；在浏览器里查看（&view=1）时只显示不出声。
 // 三种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
 //   glass 流光：封面的模糊色铺满卡片；journal 手帐（日系）：方格纸、和纸胶带、拍立得封面、荧光笔划线、手写体；
-//   minimal 灵动岛：黑色小胶囊，换歌、有人点歌时展开显示提示。
+//   minimal 灵动岛：玻璃小胶囊，换歌、有人点歌时展开显示提示。
 import './music.css';
 import { lyricIndex } from '@starfall/shared/overlay';
 import type { LyricLine, MusicDisplay, MusicItem, MusicNotice, MusicNow, MusicSong, MusicState, ServerToOverlay } from '@starfall/shared/overlay';
@@ -166,7 +166,7 @@ const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
     return { el, fill, tCur };
   },
 
-  // 灵动岛：黑色胶囊，左边转动的小封面，右边跳动的音柱；有人点歌时胶囊展开显示提示，再收回去
+  // 灵动岛：玻璃胶囊，左边转动的小封面，右边跳动的音柱；换歌、有人点歌时胶囊展开显示提示，再收回去
   minimal(n) {
     const s = n.item.song;
     const fill = h('div', { class: 'mu-fill' });

@@ -241,6 +241,9 @@ function applyTint(t: Tint): void {
 
 let lastLine = -2;
 let lyCur: HTMLElement | null = null;
+/** 当前这句的文字（染色、滑动都在它身上）；放不下时多出来多少像素 */
+let lyIn: HTMLElement | null = null;
+let lyOver = 0;
 
 function renderLyric(s: MusicState, pos: number): void {
   const n = s.now;
@@ -257,7 +260,20 @@ function renderLyric(s: MusicState, pos: number): void {
     // 还没唱到第一句（前奏）：先把第一句摆出来，不填色
     const cur = lines[Math.max(0, i)] ?? null;
     const next = lines[Math.max(0, i) + 1] ?? null;
-    lyCur = h('div', { class: 'ly-cur' }, cur?.text ?? '');
+    const inner = h('span', { class: 'ly-in' }, cur?.text ?? '');
+    const line = h('div', { class: 'ly-cur' }, inner);
+    lyIn = inner;
+    lyCur = line;
+    lyOver = 0;
+    // 量一下这句放不放得下（字体加载完前量的可能不准，过一会儿再量一次）
+    const measure = () => {
+      if (!inner.isConnected || lyIn !== inner) return;
+      lyOver = Math.max(0, inner.offsetWidth - line.clientWidth);
+      line.classList.toggle('long', lyOver > 2);
+      if (lyOver > 2 && !line.classList.contains('fade-l')) line.classList.add('fade-r');
+    };
+    requestAnimationFrame(measure);
+    setTimeout(measure, 700);
     const tr = s.display.lyricsTrans && cur?.tr ? cur.tr : null;
     const sub = h('div', { class: `ly-sub${tr ? ' tr' : ''}` }, tr ?? next?.text ?? '');
     const box = h('div', { class: 'ly-box' }, lyCur, sub);
@@ -271,6 +287,13 @@ function renderLyric(s: MusicState, pos: number): void {
     const t1 = lines[i + 1]?.t ?? t0 + 5000;
     const p = Math.min(1, Math.max(0, (pos - t0) / Math.max(400, Math.min(t1 - t0, 12_000))));
     lyCur.style.setProperty('--p', `${(p * 100).toFixed(1)}%`);
+    // 太长放不下：唱到两成后开始往左滑，唱到八成半滑到句尾，正在唱的地方一直留在框里
+    if (lyOver > 2 && lyIn) {
+      const k = Math.min(1, Math.max(0, (p - 0.2) / 0.65));
+      lyIn.style.transform = `translateX(${(-lyOver * k).toFixed(1)}px)`;
+      lyCur.classList.toggle('fade-l', k > 0);
+      lyCur.classList.toggle('fade-r', k < 1);
+    }
   }
 }
 
@@ -329,7 +352,17 @@ function render(): void {
   renderCard(s);
   renderQueue(s);
   renderIdle(s);
+  // 没有在放的歌（这首放完了、切掉了）：歌词也收起来。歌词平时在每一帧里更新，没歌时不跑那一段，要在这里清掉
+  if (!s.now) clearLyric();
   tick();
+}
+
+function clearLyric(): void {
+  lyric.classList.remove('on');
+  lyric.replaceChildren();
+  lastLine = -2;
+  lyCur = lyIn = null;
+  lyOver = 0;
 }
 
 /** 现在放到哪（毫秒）：出声的窗口直接看播放器，别的按收到状态后过了多久算 */

@@ -65,7 +65,7 @@ function testNotice(): void {
 
 const STYLES = [
   { value: 'glass', label: '流光', desc: '封面的颜色铺满卡片，像音乐 App' },
-  { value: 'day', label: '白昼', desc: '小清新：白色磨砂卡片，淡淡的封面色' },
+  { value: 'cyber', label: '赛博朋克', desc: '切角面板，酸性黄配青色，信号故障闪烁' },
   { value: 'journal', label: '手帐', desc: '日系：方格纸、胶带、拍立得、手写字' },
   { value: 'minimal', label: '灵动岛', desc: '黑色小胶囊，点歌时展开提示' },
 ] as const;
@@ -211,10 +211,11 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-ill b + b { width: 20%; background: rgba(255, 255, 255, .35); }
 .ml-ill em { display: none; }
 .ml-ill.glass { background: radial-gradient(60% 120% at 20% 50%, rgba(224, 122, 181, .7), transparent), radial-gradient(60% 120% at 80% 50%, rgba(141, 139, 255, .6), transparent), #1d1c33; }
-.ml-ill.day { background: radial-gradient(50% 120% at 90% 0%, rgba(141, 139, 255, .35), transparent), linear-gradient(160deg, #ffffff, #f2f4fa); box-shadow: inset 0 0 0 1px rgba(30, 40, 70, .08); }
-.ml-ill.day i { box-shadow: 0 4px 8px -3px rgba(141, 139, 255, .6); }
-.ml-ill.day b { background: #2f3441; }
-.ml-ill.day b + b { background: #b5bac6; }
+.ml-ill.cyber { background: linear-gradient(135deg, #0d1118, #07090d); box-shadow: inset 0 0 0 1.5px #fcee0a; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+.ml-ill.cyber::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 6px; width: 4px; background: repeating-linear-gradient(-45deg, #fcee0a 0 3px, #07090d 3px 6px); }
+.ml-ill.cyber i { margin-left: 6px; border-radius: 0; box-shadow: inset 0 0 0 1.5px #00f0ff; background: linear-gradient(135deg, #2a3550, #10141c); }
+.ml-ill.cyber b { background: #fff; box-shadow: -2px 0 0 #00f0ff, 2px 0 0 #ff2a6d; }
+.ml-ill.cyber b + b { background: repeating-linear-gradient(90deg, #fcee0a 0 4px, transparent 4px 6px); box-shadow: none; }
 .ml-ill.journal { background: radial-gradient(circle at 1px 1px, rgba(120, 110, 90, .3) 1px, transparent 1.5px) 0 0 / 8px 8px, #fffdf6; box-shadow: inset 0 0 0 1px rgba(120, 100, 70, .15); }
 .ml-ill.journal i { border-radius: 1px; background: linear-gradient(135deg, #8d8bff, #e07ab5) content-box, #fff; padding: 3px 3px 7px; width: 26px; height: 32px; transform: rotate(-6deg); box-shadow: 0 2px 4px rgba(60, 40, 20, .3); }
 .ml-ill.journal b { background: linear-gradient(transparent 0 0), #34312c; box-shadow: 0 3px 0 rgba(141, 139, 255, .45); }

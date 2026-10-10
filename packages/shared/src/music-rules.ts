@@ -11,7 +11,7 @@ const Cmd = z
   .refine((s) => !/\s/.test(s), '指令里不能有空格');
 
 export const MUSIC_BANNED_MAX = 500;
-export const MUSIC_STYLES = ['glass', 'day', 'journal', 'minimal'] as const;
+export const MUSIC_STYLES = ['glass', 'cyber', 'journal', 'minimal'] as const;
 export const MUSIC_WORDS_MAX = 100;
 
 export const MusicSettingsSchema = z
@@ -48,7 +48,7 @@ export const MusicSettingsSchema = z
     /** 下播后自动暂停，下次开播接着放 */
     autoPause: z.boolean(),
     // 画面
-    /** 点歌窗口的样子：流光、白昼（小清新）、手帐（日系）、灵动岛 */
+    /** 点歌窗口的样子：流光、赛博朋克、手帐（日系）、灵动岛 */
     style: z.enum(MUSIC_STYLES),
     side: z.enum(['left', 'right']),
     size: z.enum(['normal', 'large']),

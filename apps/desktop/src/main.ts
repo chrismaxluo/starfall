@@ -610,6 +610,12 @@ function setupIpc(): void {
   });
   handle('sf:reload-hotkeys', () => registerHotkeys(true));
   handle('sf:pause-hotkeys', () => pauseHotkeys());
+  // 点歌的本地歌库：选一个放音乐的文件夹，返回完整路径（取消时为 null）
+  handle('sf:pick-folder', async () => {
+    const opts: Electron.OpenDialogOptions = { title: '选择放音乐的文件夹', properties: ['openDirectory'] };
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    return r.canceled ? null : (r.filePaths[0] ?? null);
+  });
   handle('sf:open-data', () => void shell.openPath(USER_DIR));
   handle('sf:open-logs', () => void shell.openPath(LOG_DIR));
 }

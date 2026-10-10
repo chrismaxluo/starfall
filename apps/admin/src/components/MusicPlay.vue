@@ -1,0 +1,291 @@
+<script setup lang="ts">
+// 点歌 · 播放：正在放的歌（暂停、切歌、音量）、列表（拖动排序、置顶、删除、清空）；右边加歌（搜本地歌库和网易云）、模拟点歌、最近的点歌消息
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import type { MusicItem, MusicSong } from '@starfall/shared/overlay';
+import Avatar from './Avatar.vue';
+import ConfirmButton from './ConfirmButton.vue';
+import Icon from './Icon.vue';
+import { del, get, post, put } from '../lib/api.ts';
+import { clock } from '../lib/format.ts';
+import { mmss, music, saveMusic } from '../lib/music.ts';
+import type { SearchHit } from '../lib/music.ts';
+import { attempt, toast } from '../lib/toast.ts';
+
+// ---------- 正在放 ----------
+const now = computed(() => music.state?.now ?? null);
+const holding = computed(() => (music.state?.hold ?? null) !== null);
+const paused = computed(() => music.state?.hold === 'manual');
+const tickNow = ref(performance.now());
+let timer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => (timer = setInterval(() => (tickNow.value = performance.now()), 500)));
+onBeforeUnmount(() => timer && clearInterval(timer));
+const pos = computed(() => {
+  const n = now.value;
+  if (!n) return 0;
+  return n.paused ? n.posMs : n.posMs + (tickNow.value - music.gotAt);
+});
+const pct = computed(() => (now.value?.item.song.durationMs ? Math.min(100, (pos.value / now.value.item.song.durationMs) * 100) : 0));
+
+async function togglePause(): Promise<void> {
+  await attempt(() => post('/api/music/pause', { paused: !paused.value }), paused.value ? '继续放歌' : '已暂停：正在放的歌停在这里');
+}
+async function skip(): Promise<void> {
+  await attempt(() => post('/api/music/skip'), '已切歌');
+}
+// 音量：拖动时只改显示，松手后保存
+const vol = ref<number | null>(null);
+const volShown = computed(() => vol.value ?? music.settings?.volume ?? 70);
+async function saveVol(): Promise<void> {
+  if (vol.value === null) return;
+  const v = vol.value;
+  await saveMusic({ volume: v });
+  vol.value = null;
+}
+
+// ---------- 列表 ----------
+const queue = computed(() => music.queue);
+async function order(ids: number[]): Promise<void> {
+  await attempt(() => put('/api/music/queue/order', { ids }));
+}
+async function remove(it: MusicItem): Promise<void> {
+  await attempt(() => del(`/api/music/queue/${it.id}`), `已从列表删掉《${it.song.name}》`);
+}
+function toTop(i: number): void {
+  const ids = queue.value.map((x) => x.id);
+  const [id] = ids.splice(i, 1);
+  void order([id!, ...ids]);
+}
+async function clear(): Promise<void> {
+  const r = await attempt(() => post<{ cleared: number }>('/api/music/queue/clear'));
+  if (r) toast(`已清空 ${r.cleared} 首（正在放的这首放完）`);
+}
+const dragFrom = ref<number | null>(null);
+const dragOver = ref<number | null>(null);
+function onDragStart(e: DragEvent, i: number): void {
+  dragFrom.value = i;
+  e.dataTransfer?.setData('text/plain', String(i));
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+}
+function onDrop(to: number): void {
+  const from = dragFrom.value;
+  dragFrom.value = dragOver.value = null;
+  if (from === null || from === to) return;
+  const ids = queue.value.map((x) => x.id);
+  const [id] = ids.splice(from, 1);
+  ids.splice(to, 0, id!);
+  void order(ids);
+}
+
+// ---------- 加歌 ----------
+const q = ref('');
+const searching = ref(false);
+const hits = ref<{ local: SearchHit[]; netease: SearchHit[]; neteaseError?: string } | null>(null);
+async function search(): Promise<void> {
+  const s = q.value.trim();
+  if (!s) return;
+  searching.value = true;
+  hits.value = (await attempt(() => get<{ local: SearchHit[]; netease: SearchHit[]; neteaseError?: string }>(`/api/music/search?q=${encodeURIComponent(s)}`))) ?? null;
+  searching.value = false;
+}
+const inList = computed(() => new Set([...(now.value ? [now.value.item] : []), ...queue.value].map((x) => `${x.song.source}:${x.song.id}`)));
+async function add(h: SearchHit, front: boolean): Promise<void> {
+  const song: MusicSong = { source: h.source, id: h.id, name: h.name, artists: h.artists, ...(h.album ? { album: h.album } : {}), ...(h.cover ? { cover: h.cover } : {}), durationMs: h.durationMs };
+  await attempt(() => post('/api/music/queue', { song, front }), front ? `《${h.name}》排到下一首` : `已加《${h.name}》到列表最后`);
+}
+
+// ---------- 模拟点歌 ----------
+const simText = ref('');
+const simGuard = ref<0 | 1 | 2 | 3>(0);
+const simResult = ref<{ ok: boolean; text: string } | null>(null);
+const simBusy = ref(false);
+async function simulate(): Promise<void> {
+  const text = simText.value.trim() || `${music.settings?.cmdRequest ?? '点歌'} 起风了`;
+  simBusy.value = true;
+  simResult.value = (await attempt(() => post<{ ok: boolean; text: string }>('/api/music/simulate', { text, guard: simGuard.value }))) ?? null;
+  simBusy.value = false;
+}
+</script>
+
+<template>
+  <div class="mp-grid">
+    <div class="mp-col">
+      <div class="card">
+        <div class="card-h"><h2>正在放</h2><span class="aside">{{ holding ? (paused ? '已暂停' : '没在放') : now ? '播放中' : '' }}</span></div>
+        <div v-if="now" class="mp-now" :class="{ paused: now.paused }">
+          <img v-if="now.item.song.cover" class="mp-cover" :src="now.item.song.cover" alt="" referrerpolicy="no-referrer" />
+          <span v-else class="mp-cover blank"><Icon name="i-music" /></span>
+          <div class="mp-info">
+            <b class="mp-title">{{ now.item.song.name }}</b>
+            <span class="mp-artist">{{ now.item.song.artists || '未知歌手' }}<span class="mp-src">{{ now.item.song.source === 'local' ? '本地歌库' : '网易云' }}</span></span>
+            <span class="mp-by"><Avatar :name="now.item.by.name" :face="now.item.by.face" :guard="now.item.by.guard" :size="20" />{{ now.item.by.name }} 点的</span>
+            <div class="mp-bar"><i :style="{ width: `${pct}%` }" /></div>
+            <span class="mp-time num"><span>{{ mmss(pos) }}</span><span>{{ mmss(now.item.song.durationMs) }}</span></span>
+          </div>
+        </div>
+        <div v-else class="mp-empty">
+          <Icon name="i-music" />
+          <span>{{ queue.length ? '列表里有歌，等能放的时候自动开始' : `还没有人点歌。观众发弹幕「${music.settings?.cmdRequest} 歌名」就能点，也可以在右边直接加歌。` }}</span>
+        </div>
+        <div class="mp-ctl">
+          <button class="btn" :disabled="!music.settings?.enabled" @click="togglePause"><Icon :name="paused ? 'i-play' : 'i-pause'" />{{ paused ? '继续' : '暂停' }}</button>
+          <button class="btn" :disabled="!now" @click="skip"><Icon name="i-arrow" />切歌</button>
+          <label class="mp-vol"><span>音量</span><input type="range" min="0" max="100" step="5" :value="volShown" aria-label="音量" @input="(e) => (vol = Number((e.target as HTMLInputElement).value))" @change="saveVol" /><span class="num">{{ volShown }}</span></label>
+        </div>
+        <p class="inline-hint mp-tip">直播软件的混音器里也能单独调点歌窗口的音量。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          <h2>列表 {{ queue.length }} 首</h2>
+          <span class="aside">
+            拖动左边的序号调整顺序
+            <ConfirmButton v-if="queue.length" label="清空" confirm-label="确认清空？" cls="btn" @confirm="clear" />
+          </span>
+        </div>
+        <div v-if="!queue.length" class="inline-hint">列表是空的。</div>
+        <div v-else class="mp-list">
+          <div
+            v-for="(it, i) in queue"
+            :key="it.id"
+            class="mp-row"
+            :class="{ dragging: dragFrom === i, dropto: dragOver === i && dragFrom !== i }"
+            @dragover.prevent="dragFrom !== null && (dragOver = i)"
+            @dragleave="dragOver === i && (dragOver = null)"
+            @drop.prevent="onDrop(i)"
+          >
+            <span class="rl-no grab" draggable="true" title="按住拖动调整顺序" @dragstart="(e) => onDragStart(e, i)" @dragend="(dragFrom = null), (dragOver = null)"><Icon name="i-grip" class="grip" />{{ i + 1 }}</span>
+            <img v-if="it.song.cover" class="mp-thumb" :src="it.song.cover" alt="" referrerpolicy="no-referrer" />
+            <span v-else class="mp-thumb blank"><Icon name="i-music" /></span>
+            <span class="mp-t"><b>{{ it.song.name }}</b><span>{{ it.song.artists }}</span></span>
+            <span class="mp-who"><Avatar :name="it.by.name" :face="it.by.face" :guard="it.by.guard" :size="20" /><span>{{ it.by.name }}</span></span>
+            <span class="mp-d num">{{ mmss(it.song.durationMs) }}</span>
+            <span class="mp-acts">
+              <button class="icon-btn" type="button" :disabled="i === 0" :aria-label="`把《${it.song.name}》排到下一首`" title="排到下一首" @click="toTop(i)"><Icon name="i-up" /></button>
+              <button class="icon-btn" type="button" :aria-label="`删掉《${it.song.name}》`" title="从列表删掉" @click="remove(it)"><Icon name="i-x" /></button>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mp-col">
+      <div class="card">
+        <div class="card-h"><h2>加歌</h2><span class="aside">不受点歌规则限制</span></div>
+        <form class="mp-search" @submit.prevent="search">
+          <input v-model="q" class="inp" placeholder="歌名，或者 歌名 歌手" aria-label="搜歌" maxlength="60" />
+          <button class="btn primary" type="submit" :disabled="searching || !q.trim()"><Icon name="i-search" />{{ searching ? '搜索中…' : '搜索' }}</button>
+        </form>
+        <template v-if="hits">
+          <template v-for="grp in [{ key: 'local', title: '本地歌库', list: hits.local }, { key: 'netease', title: '网易云', list: hits.netease }]" :key="grp.key">
+            <h3 v-if="grp.list.length || (grp.key === 'netease' && hits.neteaseError)" class="mp-sub">{{ grp.title }}</h3>
+            <p v-if="grp.key === 'netease' && hits.neteaseError" class="inline-hint err">{{ hits.neteaseError }}</p>
+            <div v-for="h in grp.list" :key="`${h.source}${h.id}`" class="mp-hit" :class="{ dim: !h.playable }">
+              <img v-if="h.cover" class="mp-thumb" :src="h.cover" alt="" referrerpolicy="no-referrer" />
+              <span v-else class="mp-thumb blank"><Icon name="i-music" /></span>
+              <span class="mp-t"><b>{{ h.name }}</b><span>{{ h.artists }}<template v-if="h.note"> · {{ h.note }}</template></span></span>
+              <span class="mp-d num">{{ mmss(h.durationMs) }}</span>
+              <span v-if="inList.has(`${h.source}:${h.id}`)" class="mp-in">已在列表</span>
+              <span v-else class="mp-acts">
+                <button class="btn sm" type="button" :disabled="!h.playable" @click="add(h, true)">下一首</button>
+                <button class="btn sm" type="button" :disabled="!h.playable" @click="add(h, false)">加到最后</button>
+              </span>
+            </div>
+          </template>
+          <p v-if="!hits.local.length && !hits.netease.length && !hits.neteaseError" class="inline-hint">没有找到。</p>
+        </template>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>模拟点歌</h2><span class="aside">按点歌规则判断，不用开播</span></div>
+        <form class="mp-sim" @submit.prevent="simulate">
+          <input v-model="simText" class="inp" :placeholder="`${music.settings?.cmdRequest ?? '点歌'} 起风了`" aria-label="模拟的弹幕" maxlength="100" />
+          <select v-model.number="simGuard" class="sel" aria-label="以什么身份发">
+            <option :value="0">普通观众</option>
+            <option :value="3">舰长</option>
+            <option :value="2">提督</option>
+            <option :value="1">总督</option>
+          </select>
+          <button class="btn" type="submit" :disabled="simBusy">发送</button>
+        </form>
+        <p v-if="simResult" class="mp-simr" :class="{ bad: !simResult.ok }"><Icon :name="simResult.ok ? 'i-check' : 'i-info'" />{{ simResult.text }}</p>
+        <p class="inline-hint">用「测试观众」的身份发一条弹幕，点到的歌会真的进列表（直播画面上也会放）。</p>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>最近的点歌消息</h2><span class="aside">直播画面上也会提示</span></div>
+        <div v-if="!music.notices.length" class="inline-hint">还没有。</div>
+        <div v-else class="mp-notes">
+          <div v-for="n in music.notices" :key="n.id" class="mp-note" :class="{ bad: !n.ok }">
+            <span class="t num">{{ clock(n.ts) }}</span><Icon :name="n.ok ? 'i-check' : 'i-x'" /><span><b>{{ n.who }}</b> {{ n.text }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.mp-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.mp-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 1100px) { .mp-grid { grid-template-columns: 1fr; } }
+
+.mp-now { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: center; }
+.mp-cover { width: 96px; height: 96px; border-radius: 14px; object-fit: cover; box-shadow: var(--shadow-card), 0 0 0 1px var(--line); }
+.mp-cover.blank, .mp-thumb.blank { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.mp-cover.blank svg { width: 36px; height: 36px; }
+.mp-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mp-title { font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-artist { font-size: 13px; color: var(--t2); display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mp-src { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--hover); color: var(--t3); flex: none; }
+.mp-by { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--t2); }
+.mp-bar { position: relative; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--hover); overflow: hidden; }
+.mp-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--accent); transition: width .5s linear; }
+.mp-now.paused .mp-bar i { background: var(--t3); }
+.mp-time { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--t3); }
+.mp-empty { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; background: var(--hover); font-size: 13px; color: var(--t2); line-height: 1.6; }
+.mp-empty svg { width: 24px; height: 24px; flex: none; color: var(--accent); }
+.mp-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.mp-vol { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 12.5px; color: var(--t2); }
+.mp-vol input { width: 140px; accent-color: var(--accent); }
+.mp-vol .num { width: 26px; text-align: right; }
+.mp-tip { margin: 8px 0 0; }
+
+.mp-list { display: flex; flex-direction: column; margin: 0 -6px; max-height: 620px; overflow: auto; }
+.mp-row, .mp-hit { display: grid; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; font-size: 13px; }
+.mp-row { grid-template-columns: 44px 36px minmax(0, 1fr) minmax(0, 9em) 40px 64px; }
+.mp-row + .mp-row, .mp-hit + .mp-hit { border-top: 1px solid var(--line); }
+.mp-row:hover, .mp-hit:hover { background: var(--hover); }
+.mp-row.dragging { opacity: .4; }
+.mp-row.dropto { box-shadow: inset 0 2px 0 var(--accent); }
+.mp-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.mp-thumb.blank svg { width: 16px; height: 16px; }
+.mp-t { display: flex; flex-direction: column; min-width: 0; }
+.mp-t b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-t span { font-size: 12px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--t2); }
+.mp-who span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-d { font-size: 12px; color: var(--t3); text-align: right; }
+.mp-acts { display: flex; gap: 4px; justify-content: flex-end; }
+.mp-acts .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+
+.mp-search, .mp-sim { display: flex; gap: 8px; }
+.mp-search .inp, .mp-sim .inp { flex: 1; min-width: 0; }
+.mp-sim .sel { width: 108px; }
+.mp-sub { margin: 16px 0 4px; font-size: 12.5px; font-weight: 600; color: var(--t2); }
+.mp-hit { grid-template-columns: 36px minmax(0, 1fr) 40px auto; margin: 0 -6px; }
+.mp-hit.dim { opacity: .55; }
+.mp-in { font-size: 12px; color: var(--t3); }
+.err { color: #D64545; }
+.mp-simr { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--ok-soft); font-size: 13px; }
+.mp-simr svg { width: 15px; height: 15px; color: var(--ok); flex: none; }
+.mp-simr.bad { background: var(--gov-soft); }
+.mp-simr.bad svg { color: var(--gov); }
+
+.mp-notes { display: flex; flex-direction: column; max-height: 320px; overflow: auto; }
+.mp-note { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12.5px; color: var(--t2); }
+.mp-note + .mp-note { border-top: 1px solid var(--line); }
+.mp-note .t { width: 58px; flex: none; color: var(--t3); font-size: 11.5px; }
+.mp-note svg { width: 14px; height: 14px; flex: none; color: var(--ok); }
+.mp-note.bad svg { color: var(--gov); }
+.mp-note b { color: var(--t1); font-weight: 600; }
+</style>

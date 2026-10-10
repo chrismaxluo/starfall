@@ -12,7 +12,7 @@ import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
 import { pushEsc } from '../lib/esc.ts';
 
-const props = defineProps<{ modelValue: DanmuWho; people: DanmuPerson[]; blockAnchor?: boolean }>();
+const props = defineProps<{ modelValue: DanmuWho; people: DanmuPerson[]; blockAnchor?: boolean; title?: string }>();
 const emit = defineEmits<{ change: [value: DanmuWho] }>();
 const btn = ref<HTMLButtonElement | null>(null);
 const pop = ref<HTMLDivElement | null>(null);
@@ -167,10 +167,10 @@ onBeforeUnmount(close);
 </script>
 
 <template>
-  <button ref="btn" type="button" class="cdpick whopick" :aria-label="`谁发的弹幕才算：${text}`" :aria-expanded="open" @click.stop="toggle">{{ text }}<Icon name="i-chev" /></button>
+  <button ref="btn" type="button" class="cdpick whopick" :aria-label="`${title ?? '谁发的弹幕才算'}：${text}`" :aria-expanded="open" @click.stop="toggle">{{ text }}<Icon name="i-chev" /></button>
   <Teleport to="body">
     <div v-if="open" ref="pop" class="cdpop whopop" :style="{ left: `${pos.left}px`, top: `${pos.top}px` }">
-      <div class="lbl">谁发的弹幕才算：满足任意一项就算，改了立即保存</div>
+      <div class="lbl">{{ title ?? '谁发的弹幕才算' }}：满足任意一项就算，改了立即保存</div>
       <label class="ck"><input type="checkbox" :checked="w.all" @change="(e) => keep(e, toggleAll())" />所有人</label>
       <div class="ckrow" :class="{ dim: w.all }">
         <label v-for="r in ROLES" :key="r.key" class="ck"><input type="checkbox" :checked="!w.all && w[r.key]" @change="(e) => keep(e, toggleRole(r.key))" />{{ r.name }}</label>

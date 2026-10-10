@@ -170,9 +170,10 @@ function renderLyric(s: MusicState, pos: number): void {
   const i = lyricIndex(lines, pos);
   if (i !== lastLine) {
     lastLine = i;
-    const cur = lines[i] ?? null;
-    const next = lines[i + 1] ?? null;
-    lyCur = h('div', { class: 'ly-cur' }, cur?.text ?? (i < 0 ? '♪' : ''));
+    // 还没唱到第一句（前奏）：先把第一句摆出来，不填色
+    const cur = lines[Math.max(0, i)] ?? null;
+    const next = lines[Math.max(0, i) + 1] ?? null;
+    lyCur = h('div', { class: 'ly-cur' }, cur?.text ?? '');
     const subText = s.display.lyricsTrans && cur?.tr ? cur.tr : (next?.text ?? '');
     const sub = h('div', { class: `ly-sub${s.display.lyricsTrans && cur?.tr ? ' tr' : ''}` }, subText);
     const box = h('div', { class: 'ly-box' }, lyCur, sub);
@@ -180,7 +181,8 @@ function renderLyric(s: MusicState, pos: number): void {
     if (!reduced()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' });
   }
   // 这一句唱到哪：从这一句开始到下一句开始，颜色从左往右填过去
-  if (lyCur && i >= 0) {
+  if (lyCur && i < 0) lyCur.style.setProperty('--p', '0%');
+  else if (lyCur) {
     const t0 = lines[i]!.t;
     const t1 = lines[i + 1]?.t ?? t0 + 5000;
     const p = Math.min(1, Math.max(0, (pos - t0) / Math.max(400, Math.min(t1 - t0, 12_000))));

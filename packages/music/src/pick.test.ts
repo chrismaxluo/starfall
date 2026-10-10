@@ -13,8 +13,8 @@ describe('选歌', () => {
     expect(words('  ')).toEqual([]);
   });
 
-  it('按搜索顺序选第一首能放的；放不了、太长的跳过', () => {
-    const r = pick('起风了', [song('起风了', ['买辣椒也用券'], { playable: false }), song('起风了', ['周深'], { durationMs: 500_000 }), song('起风了', ['吴青峰'])], O);
+  it('按搜索顺序选第一首能放的；太长的、不让点的跳过', () => {
+    const r = pick('起风了', [song('起风了', ['周深'], { durationMs: 500_000 }), song('起风了', ['某DJ']), song('起风了', ['吴青峰'])], { ...O, blockWords: ['dj'] });
     expect(r).toMatchObject({ ok: true, song: { artists: ['吴青峰'] } });
   });
 
@@ -38,6 +38,30 @@ describe('选歌', () => {
     expect(pick('qifengle', [song('起风了', ['买辣椒也用券'])], O)).toMatchObject({ ok: true, song: { name: '起风了' } });
     const r = pick('孤勇者', [song('孤勇者', ['陈奕迅'], { playable: false }), song('别的歌', ['某人'])], O);
     expect(r).toMatchObject({ ok: false, reason: 'unplayable', text: '《孤勇者》需要会员或者暂时放不了' });
+  });
+
+  it('翻唱歌名里的「原唱 xx」不算对上歌手；挂一长串别名的冒名歌手不认别名', () => {
+    const results = [song('晴天(深情版)', ['Lucky小爱']), song('晴天', ['Jay'], { artistAlias: ['嚜日', '周杰伦', '林俊杰', '权志龙', '章若楠'], durationMs: 112_000 }), song('晴天 (原唱 周杰伦)', ['RyaVocal']), song('周杰伦“晴天”Beat', ['某人'])];
+    expect(pick('晴天 周杰伦', results.slice(0, 3), O)).toMatchObject({ ok: false, reason: 'no_version', text: '没有找到「周杰伦」的版本' });
+    // 歌手名出现在别人的歌名里（伴奏、Beat）也不算
+    expect(pick('晴天 周杰伦', results, O)).toMatchObject({ ok: false, reason: 'no_version' });
+    // 观众写的几个词都是歌名（不是歌手）：照样能点
+    expect(pick('Shape of You', [song('Shape of You', ['Ed Sheeran'])], O)).toMatchObject({ ok: true });
+  });
+
+  it('最相关的那首是会员歌：只换同一位歌手的版本，没有就说需要会员；不到 1 分钟的片段往后排', () => {
+    const vip = song('孤勇者', ['陈奕迅'], { playable: false });
+    expect(pick('孤勇者', [vip, song('孤勇者 (Single Version)', ['田一名']), song('孤勇者', ['小石头和孩子们'], { durationMs: 36_000 })], O)).toMatchObject({ ok: false, reason: 'unplayable', text: '《孤勇者》需要会员或者暂时放不了' });
+    expect(pick('孤勇者', [vip, song('孤勇者 (Live)', ['陈奕迅'])], O)).toMatchObject({ ok: true, song: { name: '孤勇者 (Live)' } });
+    expect(pick('起风了', [song('起风了', ['某人'], { durationMs: 40_000 }), song('起风了', ['另一人'])], O)).toMatchObject({ ok: true, song: { artists: ['另一人'] } });
+  });
+
+  it('伴奏、纯音乐不收（观众自己写了除外）；中文名前后多了符号的冒名歌手不算对上', () => {
+    const vip = song('后来', ['刘若英'], { playable: false });
+    expect(pick('后来', [vip, song('后来 (伴奏)', ['刘若英'])], O)).toMatchObject({ ok: false, reason: 'unplayable' });
+    expect(pick('后来 伴奏', [vip, song('后来 (伴奏)', ['刘若英'])], O)).toMatchObject({ ok: true, song: { name: '后来 (伴奏)' } });
+    expect(pick('稻香 周杰伦', [song('稻香(治愈版)', ['周杰伦.', '某人'])], O)).toMatchObject({ ok: false, reason: 'no_version' });
+    expect(pick('光年之外 邓紫棋', [song('光年之外', ['G.E.M.邓紫棋'])], O)).toMatchObject({ ok: true });
   });
 
   it('说明为什么不能点：太长、不让点、搜不到', () => {

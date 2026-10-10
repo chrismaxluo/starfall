@@ -60,6 +60,8 @@ export const overlayPath = (o: Pick<OutputRow, 'id' | 'key'>) => `/overlay/?outp
 export const chatPath = (o: Pick<OutputRow, 'id' | 'key'>) => `${overlayPath(o)}&chat=1`;
 /** 送礼名单地址：多一个 gifts=1 */
 export const giftsPath = (o: Pick<OutputRow, 'id' | 'key'>) => `${overlayPath(o)}&gifts=1`;
+/** 点歌窗口地址：多一个 music=1 */
+export const musicPath = (o: Pick<OutputRow, 'id' | 'key'>) => `${overlayPath(o)}&music=1`;
 
 export class OutputStore {
   private readonly db: Db;

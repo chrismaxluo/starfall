@@ -1,3 +1,5 @@
+import { mix } from './color.ts';
+
 // 礼物按价值分档的颜色（金瓜子）：B站连击条的四种颜色。礼物卡片（晶礼、晶耀）和送礼名单共用
 export interface Tier {
   c1: string;
@@ -22,5 +24,18 @@ const GUARD_TIERS: Record<1 | 2 | 3, Tier> = {
 };
 export const guardTier = (level: 1 | 2 | 3): Tier => GUARD_TIERS[level];
 
-/** 写成 CSS 变量 */
-export const tierVars = (t: Tier) => ({ '--c1': t.c1, '--c2': t.c2, '--c3': t.c3 });
+/** 写成 CSS 变量；半透明、加深的颜色也在这里算好（旧内核不认 color-mix），变量名后面的数字是百分比 */
+export const tierVars = (t: Tier) => ({
+  '--c1': t.c1,
+  '--c2': t.c2,
+  '--c3': t.c3,
+  '--c1-94': mix(t.c1, 94),
+  '--c1-80': mix(t.c1, 80),
+  '--c1-75': mix(t.c1, 75),
+  '--c1-70': mix(t.c1, 70),
+  '--c1-dark': mix(t.c1, 85, '#000'),
+  '--c2-78': mix(t.c2, 78),
+  '--c2-75': mix(t.c2, 75),
+  '--c2-end': mix(t.c2, 18, 'rgba(16,14,32,.4)'),
+  '--c3-70': mix(t.c3, 70),
+});

@@ -63,13 +63,24 @@ function testNotice(): void {
   frame.value?.contentWindow?.postMessage({ type: 'music_notice', notice: { id: `t${Date.now()}`, ok: true, who: '测试观众', text: '点了《示例歌曲》，排在第 2 首', ts: Date.now() } }, location.origin);
 }
 
-const STYLES = [
-  { value: 'glass', label: '流光', desc: '封面的颜色铺满卡片，像音乐 App' },
-  { value: 'journal', label: '手帐', desc: '日系：方格纸、胶带、拍立得、手写字' },
-  { value: 'minimal', label: '灵动岛', desc: '玻璃小胶囊，换歌、点歌时展开提示' },
-  { value: 'card', label: '玻璃卡片', desc: '最早的样子：封面 + 封面颜色的柔光' },
-  { value: 'vinyl', label: '黑胶唱片', desc: '最早的样子：唱片转动，唱臂落下' },
-  { value: 'capsule', label: '细长胶囊', desc: '最早的样子：一行，占地方最少' },
+/** 常规三种在前，风格样式在后 */
+const STYLE_GROUPS = [
+  {
+    name: '常规',
+    list: [
+      { value: 'card', label: '玻璃卡片', desc: '封面、歌名和点歌人，衬一圈封面颜色的柔光' },
+      { value: 'vinyl', label: '黑胶唱片', desc: '封面印在转动的唱片上，暂停时唱臂抬起' },
+      { value: 'capsule', label: '细长胶囊', desc: '一行显示，占地方最少' },
+    ],
+  },
+  {
+    name: '风格',
+    list: [
+      { value: 'glass', label: '流光', desc: '封面的颜色铺满整张卡片，像音乐 App 的播放页' },
+      { value: 'journal', label: '手帐', desc: '日系手帐：方格纸、和纸胶带、拍立得、手写字' },
+      { value: 'minimal', label: '灵动岛', desc: '玻璃小胶囊，换歌、有人点歌时弹性展开' },
+    ],
+  },
 ] as const;
 
 // ---------- 声音 ----------
@@ -110,12 +121,15 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
     <div class="ml-col">
       <div class="card">
         <div class="card-h"><h2>外观</h2><span class="aside">改了马上生效</span></div>
-        <div class="ml-styles" role="radiogroup" aria-label="样子">
-          <button v-for="x in STYLES" :key="x.value" type="button" class="ml-style" role="radio" :aria-checked="s.style === x.value" @click="set({ style: x.value }, `换成「${x.label}」`)">
-            <span class="ml-ill" :class="x.value"><i /><b /><b /></span>
-            <b>{{ x.label }}</b><span>{{ x.desc }}</span>
-          </button>
-        </div>
+        <template v-for="g in STYLE_GROUPS" :key="g.name">
+          <h3 class="ml-grp">{{ g.name }}</h3>
+          <div class="ml-styles" role="radiogroup" :aria-label="`${g.name}样子`">
+            <button v-for="x in g.list" :key="x.value" type="button" class="ml-style" role="radio" :aria-checked="s.style === x.value" @click="set({ style: x.value }, `换成「${x.label}」`)">
+              <span class="ml-ill" :class="x.value"><i /><b /><b /></span>
+              <b>{{ x.label }}</b><span>{{ x.desc }}</span>
+            </button>
+          </div>
+        </template>
         <div class="srows">
           <div class="srow">
             <span class="lb">对齐</span>
@@ -199,6 +213,8 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-pv iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: transparent; }
 .ml-pvt { display: flex; align-items: center; gap: 12px; margin: 12px 0 6px; }
 .ml-ck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--t2); }
+.ml-grp { margin: 2px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--t3); }
+.ml-styles + .ml-grp { margin-top: 14px; }
 .ml-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
 @media (max-width: 1300px) { .ml-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ml-style { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }

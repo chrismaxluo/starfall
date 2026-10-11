@@ -1,9 +1,10 @@
 // 点歌窗口：正在放的歌（封面、歌名、歌手、谁点的、进度）、滚动歌词、后面几首、点歌结果的提示。
 // 地址形如 /overlay/?output=1&key=...&music=1，在直播软件里单独加一个浏览器源（建议 640×560），拖到画面一侧。
 // 同时加了好几个时只有一个出声音（服务端指定，消息里 player 为 true），别的只显示；在浏览器里查看（&view=1）时只显示不出声。
-// 三种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
+// 六种样子（display.style），每种的「正在放」各自搭，歌词、接下来、提示共用同一套结构，样子不同：
 //   glass 流光：封面的模糊色铺满卡片；journal 手帐（日系）：方格纸、和纸胶带、拍立得封面、荧光笔划线、手写体；
-//   minimal 灵动岛：玻璃小胶囊，换歌、有人点歌时展开显示提示。
+//   minimal 灵动岛：玻璃小胶囊，换歌、有人点歌时展开显示提示；
+//   最早的三种：card 玻璃卡片（封面颜色的柔光）、vinyl 黑胶唱片（唱片转动、唱臂落下）、capsule 细长胶囊（一行，占地方最少）。
 import './music.css';
 import { lyricIndex } from '@starfall/shared/overlay';
 import type { LyricLine, MusicDisplay, MusicItem, MusicNotice, MusicNow, MusicSong, MusicState, ServerToOverlay } from '@starfall/shared/overlay';
@@ -116,7 +117,21 @@ function prog(n: MusicNow, cls = 'mu-prog'): { el: HTMLElement; fill: HTMLElemen
   return { el, fill, tCur };
 }
 
-// ---------- 三种样子的「正在放」 ----------
+// ---------- 「正在放」 ----------
+
+/** 最早的三种样子共用：封面（带柔光）、跳动的音柱 + 歌名、歌手、谁点的、进度 */
+function classic(n: MusicNow): Built {
+  const s = n.item.song;
+  const p = prog(n);
+  const el = h(
+    'div',
+    { class: 'mu-body' },
+    h('div', { class: 'mu-gl' }),
+    h('div', { class: 'mu-art' }, s.cover ? img('mu-glow', s.cover) : null, h('div', { class: 'mu-disc' }, cover(s)), h('div', { class: 'mu-arm' })),
+    h('div', { class: 'mu-meta' }, h('div', { class: 'mu-t1' }, eq(), title(s.name)), h('div', { class: 'mu-artist' }, s.artists || '未知歌手'), h('div', { class: 'mu-row' }, byChip(n.item, 30)), p.el),
+  );
+  return { el, fill: p.fill, tCur: p.tCur };
+}
 
 const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
   // 流光：封面放大、模糊后铺满整张卡片做底色，上面一层暗色玻璃；封面上一道光定时扫过
@@ -166,6 +181,11 @@ const BUILD: Record<MusicDisplay['style'], (n: MusicNow) => Built> = {
     return { el, fill, tCur };
   },
 
+  // 最早的三种（玻璃卡片、黑胶唱片、细长胶囊）：同一套结构，样子在 CSS 里分开（唱臂只在黑胶里显示）
+  card: classic,
+  vinyl: classic,
+  capsule: classic,
+
   // 灵动岛：玻璃胶囊，左边转动的小封面，右边跳动的音柱；换歌、有人点歌时胶囊展开显示提示，再收回去
   minimal(n) {
     const s = n.item.song;
@@ -212,21 +232,78 @@ function renderCard(s: MusicState): void {
     if (photo) photo.animate([{ opacity: 0, transform: 'translate(-10px, -26px) rotate(-14deg) scale(1.08)' }, { opacity: 1, transform: 'rotate(-4deg)' }], { duration: 700, delay: 120, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'backwards' });
     else if (art) art.animate([{ opacity: 0, transform: 'scale(.7) rotate(-8deg)' }, { opacity: 1, transform: 'none' }], { duration: 720, delay: 100, easing: 'cubic-bezier(.3,1.5,.5,1)', fill: 'backwards' });
   }
-  // 灵动岛：换了歌先展开，写一下现在放的是什么
-  if (s.display.style === 'minimal') island([h('i', { class: 'i-dot play' }), h('span', {}, '正在播放'), h('b', {}, `《${song.name}》`), h('span', {}, `${n.item.by.name} 点的`)], 3200);
+  // 灵动岛：从一个小胶囊弹开到正常大小，再展开写一下现在放的是什么
+  if (s.display.style === 'minimal') {
+    const b = built.el;
+    requestAnimationFrame(() => {
+      measureIsland(b);
+      if (!reduced()) {
+        b.style.transition = 'none';
+        b.style.width = '120px';
+        b.style.height = '36px';
+        void b.offsetWidth;
+        b.style.transition = '';
+      }
+      requestAnimationFrame(() => sizeIsland(b, null));
+    });
+    // 字体加载完后歌名的宽度会变：重新量一次
+    void document.fonts?.ready.then(() => {
+      if (built?.el !== b || card.classList.contains('noting')) return;
+      measureIsland(b);
+      sizeIsland(b, null);
+    });
+    const name = song.name;
+    const by = n.item.by.name;
+    setTimeout(() => built?.el === b && island([h('i', { class: 'i-dot play' }), h('span', {}, '正在播放'), h('b', {}, `《${name}》`), h('span', { class: 'i-dim' }, `${by} 点的`)], 3200), reduced() ? 0 : 650);
+  }
   lastLine = -2;
+}
+
+/** 量灵动岛平时（收起时）的宽高：先临时取消固定的宽高量自然大小，再放回去（不触发动画） */
+function measureIsland(b: HTMLElement): void {
+  const w = b.style.width;
+  const hh = b.style.height;
+  b.style.transition = 'none';
+  b.style.width = '';
+  b.style.height = '';
+  b.dataset.cw = String(Math.ceil(b.offsetWidth));
+  b.dataset.ch = String(Math.ceil(b.offsetHeight));
+  b.style.width = w;
+  b.style.height = hh;
+  void b.offsetWidth;
+  b.style.transition = '';
+}
+
+/** 灵动岛的宽高（带弹性的过渡）：note 为展开时里面提示的宽度，null 为收起 */
+function sizeIsland(b: HTMLElement, note: number | null): void {
+  if (!b.dataset.cw) measureIsland(b);
+  const cw = Number(b.dataset.cw);
+  const ch = Number(b.dataset.ch);
+  if (note === null) {
+    b.style.width = `${cw}px`;
+    b.style.height = `${ch}px`;
+  } else {
+    b.style.width = `${Math.min(580, Math.max(cw + 30, note + 60))}px`;
+    b.style.height = `${ch + 18}px`;
+  }
 }
 
 let noteTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** 灵动岛展开一会儿，显示 nodes，再收回去 */
+/** 灵动岛展开一会儿，显示 nodes，再收回去：胶囊按提示的长度弹性变宽变高，原来的内容先淡出，提示从模糊变清楚 */
 function island(nodes: Node[], ms: number): boolean {
-  const note = built?.el.querySelector<HTMLElement>('.i-note');
-  if (!note) return false;
-  note.replaceChildren(...nodes);
+  const b = built?.el;
+  const note = b?.querySelector<HTMLElement>('.i-note');
+  if (!b || !note) return false;
+  const inner = h('span', { class: 'i-nin' }, ...nodes);
+  note.replaceChildren(inner);
   card.classList.add('noting');
+  sizeIsland(b, inner.offsetWidth);
   if (noteTimer) clearTimeout(noteTimer);
-  noteTimer = setTimeout(() => card.classList.remove('noting'), ms);
+  noteTimer = setTimeout(() => {
+    card.classList.remove('noting');
+    if (built?.el === b) sizeIsland(b, null);
+  }, ms);
   return true;
 }
 

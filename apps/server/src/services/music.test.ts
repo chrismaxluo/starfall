@@ -338,7 +338,7 @@ describe('弹幕点歌', () => {
 
   it('以前选的样子后来去掉了：换成流光，改别的设置也不报错', async () => {
     const t = await setup({ player: false });
-    t.ctx.settings.setRaw('music', { ...t.m.cfg(), style: 'vinyl' });
+    t.ctx.settings.setRaw('music', { ...t.m.cfg(), style: 'neon' });
     expect(t.m.cfg().style).toBe('glass');
     expect(t.m.updateSettings({ volume: 50 })).toMatchObject({ style: 'glass', volume: 50 });
   });

@@ -12,12 +12,13 @@ html.chat-view, html.chat-view body { background: radial-gradient(60% 40% at 25%
 .chat-root.off .chat { display: none; }
 .chat { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; }
 
-.msg { position: relative; display: flex; align-items: flex-start; gap: calc(14px * var(--k)); --acc: rgba(255,255,255,.55); --acc2: #fff; }
+/* --acc-55 这类是提前算好的半透明色（直播软件旧内核不认 color-mix），数字是百分比 */
+.msg { position: relative; display: flex; align-items: flex-start; gap: calc(14px * var(--k)); --acc: rgba(255,255,255,.55); --acc2: #fff; --acc-55: rgba(255, 255, 255, 0.3025); }
 .side-right .msg { flex-direction: row-reverse; }
-.msg.lv-3 { --acc: #4A9BFF; --acc2: #A9D2FF; }
-.msg.lv-2 { --acc: #A774FF; --acc2: #DCC6FF; }
-.msg.lv-1 { --acc: #FF6A3D; --acc2: #FFD27A; }
-.msg.anchor { --acc: #FF6699; --acc2: #FFC2D6; }
+.msg.lv-3 { --acc: #4A9BFF; --acc2: #A9D2FF; --acc-55: rgba(74, 155, 255, 0.55); --acc-40: rgba(74, 155, 255, 0.4); --acc-60: rgba(74, 155, 255, 0.6); --acc-85: rgba(74, 155, 255, 0.85); --acc2-90: rgba(169, 210, 255, 0.9); }
+.msg.lv-2 { --acc: #A774FF; --acc2: #DCC6FF; --acc-55: rgba(167, 116, 255, 0.55); --acc-40: rgba(167, 116, 255, 0.4); --acc-60: rgba(167, 116, 255, 0.6); --acc-85: rgba(167, 116, 255, 0.85); --acc2-90: rgba(220, 198, 255, 0.9); }
+.msg.lv-1 { --acc: #FF6A3D; --acc2: #FFD27A; --acc-55: rgba(255, 106, 61, 0.55); --acc-40: rgba(255, 106, 61, 0.4); --acc-60: rgba(255, 106, 61, 0.6); --acc-85: rgba(255, 106, 61, 0.85); --acc2-90: rgba(255, 210, 122, 0.9); }
+.msg.anchor { --acc: #FF6699; --acc2: #FFC2D6; --acc-55: rgba(255, 102, 153, 0.55); --acc-40: rgba(255, 102, 153, 0.4); --acc-60: rgba(255, 102, 153, 0.6); --acc-85: rgba(255, 102, 153, 0.85); --acc2-90: rgba(255, 194, 214, 0.9); }
 
 /* 头像（大航海套 B 站头像框） */
 .msg .avw { position: relative; flex: none; width: calc(64px * var(--k)); height: calc(64px * var(--k)); margin-top: calc(4px * var(--k)); }
@@ -36,12 +37,12 @@ html.chat-view, html.chat-view body { background: radial-gradient(60% 40% at 25%
   box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.16), 0 16px 36px -16px rgba(0,0,0,.55); }
 .side-right .msg .g { border-radius: calc(26px * var(--k)) calc(8px * var(--k)) calc(26px * var(--k)) calc(26px * var(--k)); }
 .msg .g::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px; pointer-events: none;
-  background: linear-gradient(140deg, rgba(255,255,255,.7), rgba(255,255,255,.12) 30%, rgba(255,255,255,.04) 60%, color-mix(in srgb, var(--acc) 55%, transparent));
+  background: linear-gradient(140deg, rgba(255,255,255,.7), rgba(255,255,255,.12) 30%, rgba(255,255,255,.04) 60%, var(--acc-55));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 /* 大航海、主播：描边和柔光换成身份色 */
-.msg.guard .g::before, .msg.anchor .g::before { padding: 2px; background: linear-gradient(140deg, color-mix(in srgb, var(--acc2) 90%, transparent), color-mix(in srgb, var(--acc) 40%, transparent) 35%, rgba(255,255,255,.06) 65%, color-mix(in srgb, var(--acc) 85%, transparent)); }
+.msg.guard .g::before, .msg.anchor .g::before { padding: 2px; background: linear-gradient(140deg, var(--acc2-90), var(--acc-40) 35%, rgba(255,255,255,.06) 65%, var(--acc-85)); }
 .msg .gl { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
-.msg.guard .gl::before, .msg.anchor .gl::before { content: ""; position: absolute; left: -20%; top: -120%; width: 70%; height: 260%; background: radial-gradient(closest-side, color-mix(in srgb, var(--acc) 60%, transparent), transparent); opacity: .45; }
+.msg.guard .gl::before, .msg.anchor .gl::before { content: ""; position: absolute; left: -20%; top: -120%; width: 70%; height: 260%; background: radial-gradient(closest-side, var(--acc-60), transparent); opacity: .45; }
 .side-right .msg .gl::before { left: auto; right: -20%; }
 .msg .sheen { position: absolute; top: -30%; bottom: -30%; left: 0; width: 30%; opacity: 0; transform: translateX(-120%) skewX(-18deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.38), transparent); }
 

@@ -44,7 +44,7 @@ export function giftStrip(item: PlayItem, big = false): HTMLElement {
     // 大航海送的礼物：头像套上 B站的头像框
     h('div', { class: 'gc-bar' }, h('div', { class: 'gc-sheen' }), withGuardFrame(avatar(item.viewer), item.viewer.guard), h('div', { class: 'gc-tx' }, h('span', { class: 'nm' }, item.viewer.name), h('span', { class: 'say' }, ...restWithGift(item)))),
     img ? h('div', { class: 'gc-gift' }, h('div', { class: 'gc-rays' }), h('div', { class: 'gc-glow' }), img, burst('gc-burst', big ? 22 : 14, big ? [90, 200] : [70, 150], 0.45)) : null,
-    item.gift ? h('div', { class: 'gc-num', style: { '--pd': `${0.75 + countSec(n)}s` } }, h('small', {}, '×'), count(n, 0.75)) : null,
+    item.gift ? h('div', { class: 'gc-num', style: { '--pd': `${Math.max(1.1, 0.75 + countSec(n))}s` } }, h('small', {}, '×'), count(n, 0.75)) : null,
   );
 }
 

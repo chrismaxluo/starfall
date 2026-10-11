@@ -1,6 +1,6 @@
 /* 点歌窗口：尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍。
    --tint、--tint2 是从封面取的主色、辅色（r, g, b），各个样子拿来做柔光、描边、渐变、歌词填色。
-   六种样子各自一段：st-glass 流光、st-journal 手帐（日系）、st-minimal 灵动岛；最早的三种 st-card 玻璃卡片、st-vinyl 黑胶唱片、st-capsule 细长胶囊。
+   六种样子各自一段：常规的 st-card 玻璃卡片、st-vinyl 黑胶唱片、st-capsule 细长胶囊（放在最后一段）；风格的 st-glass 流光、st-journal 手帐（日系）、st-minimal 灵动岛。
    每段都包括：正在放（.mu-body）、歌词（.ly-box）、接下来（.mu-queue）、空闲提示（.mu-idle）、点歌提示（.mu-toast）。 */
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -245,7 +245,7 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
    =================================================================== */
 .st-minimal .mu-card { width: auto; max-width: 100%; }
 /* 清透玻璃：直播软件里，窗口模糊不到下面的游戏、摄像头画面（backdrop-filter 只对网页自己的内容有效），
-   所以不靠模糊，靠通透的底 + 四周亮边 + 上沿高光 + 一道定时扫过的反光体现玻璃感；边缘稍压暗、字加阴影，花哨的画面上也看得清 */
+   所以不靠模糊，靠通透的底 + 四周亮边 + 上沿高光 + 一道斜着的固定光泽体现玻璃感；边缘稍压暗、字加阴影，花哨的画面上也看得清 */
 .st-minimal .mu-body, .st-minimal .ly-box, .st-minimal .mu-queue, .st-minimal .mu-idle, .st-minimal .mu-toast { position: relative; isolation: isolate; color: #fff; overflow: hidden;
   background:
     linear-gradient(115deg, transparent 28%, rgba(255,255,255,.16) 40%, rgba(255,255,255,.04) 48%, transparent 56%),
@@ -258,9 +258,8 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .st-minimal .mu-body::before, .st-minimal .ly-box::before, .st-minimal .mu-queue::before, .st-minimal .mu-idle::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
   background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.22) 30%, rgba(255,255,255,.08) 62%, rgba(255,255,255,.8));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-/* 一道反光，每隔几秒从左到右扫过 */
-.st-minimal .mu-body::after, .st-minimal .mu-idle::after { content: ""; position: absolute; left: -45%; top: 0; width: 40%; height: 100%; pointer-events: none; transform: skewX(-18deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent); animation: iSheen 6s ease-in-out infinite; }
-@keyframes iSheen { 0%, 55% { left: -45%; } 100% { left: 130%; } }
+/* 上沿一道不动的淡高光（不做扫过去的反光） */
+.st-minimal .mu-body::after, .st-minimal .mu-idle::after { content: ""; position: absolute; left: 14%; right: 14%; top: 1px; height: 14px; border-radius: 999px; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0)); }
 .st-minimal .mu-title, .st-minimal .mu-artist, .st-minimal .i-note, .st-minimal .mu-queue, .st-minimal .mu-idle, .st-minimal .mu-toast { text-shadow: 0 1px 2px rgba(0,0,0,.65), 0 0 12px rgba(0,0,0,.35); }
 .lite.st-minimal .mu-body, .lite.st-minimal .ly-box, .lite.st-minimal .mu-queue, .lite.st-minimal .mu-idle, .lite.st-minimal .mu-toast { -webkit-backdrop-filter: none; backdrop-filter: none; }
 .st-minimal .mu-body { display: grid; grid-template-columns: 48px minmax(0, auto) auto; align-items: center; gap: 14px; max-width: 580px; padding: 9px 20px 9px 9px; border-radius: 999px; overflow: hidden;
@@ -320,7 +319,7 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .st-minimal .mu-toast { border-radius: 999px; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
 
 /* ===================================================================
-   最早的三种：玻璃卡片（st-card）、黑胶唱片（st-vinyl）、细长胶囊（st-capsule）。和第一版一样，只是挪进了现在的结构
+   常规三种：玻璃卡片（st-card）、黑胶唱片（st-vinyl）、细长胶囊（st-capsule），共用一套玻璃底子
    =================================================================== */
 :is(.st-card, .st-vinyl, .st-capsule) :is(.mu-body, .mu-queue, .mu-idle, .mu-toast, .ly-box) { color: #fff;
   background: linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,.05) 42%, rgba(255,255,255,.02)), rgba(16,18,30,.52);
@@ -417,5 +416,5 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mu-eq i, .mu-disc, .mu-gl::before, .g-bg, .g-sheen, .st-minimal .mu-body::after, .st-minimal .mu-idle::after, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
+  .mu-eq i, .mu-disc, .mu-gl::before, .g-bg, .g-sheen, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
 }

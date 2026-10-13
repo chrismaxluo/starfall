@@ -1,17 +1,23 @@
 <script setup lang="ts">
-// 点歌 · 画面：预览（在 iframe 里运行真正的点歌窗口，不出声）、样子、对齐、字号、接下来几首、歌词；声音（音量、特效时调小）；点歌窗口地址
+// 点歌 · 画面：预览（在 iframe 里运行真正的点歌窗口，不出声）、样子、对齐、字号、接下来几首、歌词（先改草稿，点「保存」才到直播画面）；声音（音量、音量均衡、特效时调小，改了立即生效）；点歌窗口地址
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MUSIC_HEIGHT, MUSIC_WIDTH } from '@starfall/shared/overlay';
 import type { MusicSettings } from '@starfall/shared';
 import type { MusicState } from '@starfall/shared/overlay';
+import DraftBar from './DraftBar.vue';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
+import { useDraft } from '../lib/draft.ts';
 import { music, saveMusic } from '../lib/music.ts';
 import { state } from '../lib/store.ts';
 import { toast } from '../lib/toast.ts';
 
 const s = computed(() => music.settings!);
 const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patch, msg);
+// 外观先改草稿：预览照着草稿显示，点「保存」才到直播画面
+const look = useDraft(() => music.settings ?? undefined, ['style', 'side', 'size', 'showQueue', 'lyrics', 'lyricsTrans'] as const, (p) => saveMusic(p, '已保存，直播画面已更新'));
+/** 已保存 + 外观草稿 */
+const v = computed(() => look.view.value!);
 
 // ---------- 预览 ----------
 const frame = ref<HTMLIFrameElement | null>(null);
@@ -42,7 +48,7 @@ const sample = ref(false);
 const pvState = computed((): MusicState | null => {
   const st = music.state;
   if (!st || !music.settings) return null;
-  const display = { style: s.value.style, side: s.value.side, size: s.value.size, showQueue: s.value.showQueue, lyrics: s.value.lyrics, lyricsTrans: s.value.lyricsTrans };
+  const display = { style: v.value.style, side: v.value.side, size: v.value.size, showQueue: v.value.showQueue, lyrics: v.value.lyrics, lyricsTrans: v.value.lyricsTrans };
   const base = { enabled: true, cmd: s.value.cmdRequest, volume: s.value.volume, normalize: s.value.normalize, display };
   return sample.value || !st.now ? { ...SAMPLE, ...base } : { ...st, ...base, hold: null };
 });
@@ -120,11 +126,11 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 
     <div class="ml-col">
       <div class="card">
-        <div class="card-h"><h2>外观</h2><span class="aside">改了马上生效</span></div>
+        <div class="card-h"><h2>外观</h2><span class="aside">改完点「保存」才到直播画面</span></div>
         <template v-for="g in STYLE_GROUPS" :key="g.name">
           <h3 class="ml-grp">{{ g.name }}</h3>
           <div class="ml-styles" role="radiogroup" :aria-label="`${g.name}样子`">
-            <button v-for="x in g.list" :key="x.value" type="button" class="ml-style" role="radio" :aria-checked="s.style === x.value" @click="set({ style: x.value }, `换成「${x.label}」`)">
+            <button v-for="x in g.list" :key="x.value" type="button" class="ml-style" role="radio" :aria-checked="v.style === x.value" @click="look.set({ style: x.value })">
               <span class="ml-ill" :class="x.value"><i /><b /><b /></span>
               <b>{{ x.label }}</b><span>{{ x.desc }}</span>
             </button>
@@ -135,8 +141,8 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
             <span class="lb">对齐</span>
             <div class="ctl"><div class="line">
               <span class="seg" role="group" aria-label="对齐">
-                <button :aria-pressed="s.side === 'left'" @click="set({ side: 'left' })">靠左</button>
-                <button :aria-pressed="s.side === 'right'" @click="set({ side: 'right' })">靠右</button>
+                <button :aria-pressed="v.side === 'left'" @click="look.set({ side: 'left' })">靠左</button>
+                <button :aria-pressed="v.side === 'right'" @click="look.set({ side: 'right' })">靠右</button>
               </span>
               <span class="hint">放在画面哪边就选哪边</span>
             </div></div>
@@ -145,17 +151,17 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
             <span class="lb">字号</span>
             <div class="ctl"><div class="line">
               <span class="seg" role="group" aria-label="字号">
-                <button :aria-pressed="s.size === 'normal'" @click="set({ size: 'normal' })">标准</button>
-                <button :aria-pressed="s.size === 'large'" @click="set({ size: 'large' })">大</button>
+                <button :aria-pressed="v.size === 'normal'" @click="look.set({ size: 'normal' })">标准</button>
+                <button :aria-pressed="v.size === 'large'" @click="look.set({ size: 'large' })">大</button>
               </span>
-              <span class="hint">{{ s.size === 'large' ? `浏览器源宽高建议 ${Math.round(MUSIC_WIDTH * 1.25)} × ${Math.round(MUSIC_HEIGHT * 1.25)}` : '' }}</span>
+              <span class="hint">{{ v.size === 'large' ? `浏览器源宽高建议 ${Math.round(MUSIC_WIDTH * 1.25)} × ${Math.round(MUSIC_HEIGHT * 1.25)}` : '' }}</span>
             </div></div>
           </div>
           <div class="srow">
             <span class="lb">接下来</span>
             <div class="ctl"><div class="line">
               <span class="seg" role="group" aria-label="显示接下来几首">
-                <button v-for="n in [0, 1, 2, 3, 4, 5]" :key="n" :aria-pressed="s.showQueue === n" @click="set({ showQueue: n })">{{ n === 0 ? '不显示' : n }}</button>
+                <button v-for="n in [0, 1, 2, 3, 4, 5]" :key="n" :aria-pressed="v.showQueue === n" @click="look.set({ showQueue: n })">{{ n === 0 ? '不显示' : n }}</button>
               </span>
               <span class="hint">显示后面几首</span>
             </div></div>
@@ -163,12 +169,13 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
           <div class="srow">
             <span class="lb">歌词</span>
             <div class="ctl"><div class="line">
-              <Switch :model-value="s.lyrics" label="显示歌词" @change="(v) => set({ lyrics: v })" /><span>滚动歌词</span>
+              <Switch :model-value="v.lyrics" label="显示歌词" @change="(x) => look.set({ lyrics: x })" /><span>滚动歌词</span>
               <span class="gap" />
-              <Switch :model-value="s.lyricsTrans" :disabled="!s.lyrics" label="显示翻译" @change="(v) => set({ lyricsTrans: v })" /><span>外文歌显示中文翻译</span>
+              <Switch :model-value="v.lyricsTrans" :disabled="!v.lyrics" label="显示翻译" @change="(x) => look.set({ lyricsTrans: x })" /><span>外文歌显示中文翻译</span>
             </div></div>
           </div>
         </div>
+        <DraftBar :dirty="look.dirty.value" :saving="look.saving.value" @save="look.commit" @discard="look.reset" />
       </div>
 
       <div class="card">

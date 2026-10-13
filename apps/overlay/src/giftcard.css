@@ -14,9 +14,9 @@
 .gc-bar { position: relative; display: flex; align-items: center; gap: 18px; height: 98px; min-width: 560px; padding: 0 214px 0 12px; border-radius: 49px; color: #fff;
   background:
     repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 14px, transparent 14px 30px),
-    linear-gradient(100deg, color-mix(in srgb, var(--c1) 94%, transparent), color-mix(in srgb, var(--c2) 78%, transparent) 58%, color-mix(in srgb, var(--c2) 18%, rgba(16,14,32,.4))),
+    linear-gradient(100deg, var(--c1-94), var(--c2-78) 58%, var(--c2-end)),
     rgba(16,14,32,.55);
-  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 0 0 1.5px rgba(255,255,255,.22), inset 0 -10px 24px -10px rgba(0,0,0,.25), 0 0 44px -8px color-mix(in srgb, var(--c1) 80%, transparent), 0 20px 44px -18px rgba(0,0,0,.65); }
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 0 0 1.5px rgba(255,255,255,.22), inset 0 -10px 24px -10px rgba(0,0,0,.25), 0 0 44px -8px var(--c1-80), 0 20px 44px -18px rgba(0,0,0,.65); }
 .gc.no-img .gc-bar { padding-right: 168px; }
 /* 扫光裁在横条里面（横条本身不裁：头像框会伸出去一点） */
 .gc-sheen { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
@@ -24,7 +24,7 @@
   animation: gcSheen 1s .45s cubic-bezier(.45,0,.3,1) forwards, gcSheen 1s 1.9s cubic-bezier(.45,0,.3,1) forwards; }
 @keyframes gcSheen { 0% { opacity: 0; left: -30%; } 15% { opacity: 1; } 100% { opacity: 0; left: 120%; } }
 .gc .av { position: relative; flex: none; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; font-size: 31px; font-weight: 600;
-  box-shadow: 0 0 0 3px #fff, 0 0 0 7px color-mix(in srgb, var(--c3) 70%, transparent), 0 6px 16px -4px rgba(0,0,0,.5); }
+  box-shadow: 0 0 0 3px #fff, 0 0 0 7px var(--c3-70), 0 6px 16px -4px rgba(0,0,0,.5); }
 .gc .av img { width: 100%; height: 100%; object-fit: cover; }
 /* 套了头像框：框本身就是边，不再加白圈 */
 .gc .av-framed { flex: none; }
@@ -37,31 +37,31 @@
 /* 礼物图：后面转着光芒，从小弹出来再浮动 */
 .gc-gift { position: absolute; right: 26px; top: 0; width: 176px; height: 176px; }
 .gc-rays { position: absolute; inset: -74px; border-radius: 50%; opacity: 0;
-  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--c3) 70%, transparent) 0deg 6deg, transparent 6deg 20deg);
+  background: repeating-conic-gradient(from 0deg, var(--c3-70) 0deg 6deg, transparent 6deg 20deg);
   -webkit-mask: radial-gradient(closest-side, #000 18%, transparent 72%); mask: radial-gradient(closest-side, #000 18%, transparent 72%);
   animation: gcIn .5s .35s ease-out forwards, gcSpin 7s linear infinite; }
-.gc-glow { position: absolute; inset: -24px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c2) 75%, transparent), transparent 75%); opacity: 0; animation: gcIn .4s .35s forwards; }
+.gc-glow { position: absolute; inset: -24px; border-radius: 50%; background: radial-gradient(closest-side, var(--c2-75), transparent 75%); opacity: 0; animation: gcIn .4s .35s forwards; }
 .gc-img { position: absolute; inset: 0; animation: gcPop .6s .3s cubic-bezier(.3,1.6,.5,1) both, gcBob 2.4s 1s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(0,0,0,.45)); }
 .gc-img img { width: 100%; height: 100%; object-fit: contain; }
 @keyframes gcIn { to { opacity: 1; } }
-@keyframes gcSpin { to { rotate: 360deg; } }
+@keyframes gcSpin { to { transform: rotate(360deg); } }
 @keyframes gcPop { from { opacity: 0; transform: scale(.25) rotate(-16deg); } to { opacity: 1; transform: none; } }
-@keyframes gcBob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -9px; } }
+@keyframes gcBob { 0%, 100% { transform: none; } 50% { transform: translateY(-9px); } }
 
-/* 数量：大号斜体砸进来，数完再跳一下 */
+/* 数量：大号斜体砸进来，数完再跳一下（动画都用 transform：旧内核不认单独的 scale/rotate/translate 属性） */
 /* 斜体字会往右歪出文字框，渐变裁字时会被切掉：右边和下边留出空隙 */
 .gc-num { position: absolute; right: 8px; bottom: -40px; padding: 0 .16em .06em .04em; font-family: var(--font-mono); font-weight: 800; font-style: italic; font-size: 66px; line-height: 1; letter-spacing: -.03em;
   background: linear-gradient(180deg, #fff 35%, var(--c3) 70%, var(--c2)); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 3px 0 color-mix(in srgb, var(--c1) 85%, #000)) drop-shadow(0 0 14px color-mix(in srgb, var(--c1) 70%, transparent));
+  filter: drop-shadow(0 3px 0 var(--c1-dark)) drop-shadow(0 0 14px var(--c1-70));
   animation: gcSlam .45s .65s cubic-bezier(.2,1.4,.4,1) both, gcBump .45s var(--pd, 1.6s) cubic-bezier(.3,1.6,.5,1); transform-origin: 80% 70%; }
 .gc-num small { font-size: 40px; margin-right: 2px; }
 .gc.no-img .gc-num { top: calc(74px + 49px); bottom: auto; margin-top: -33px; }
 @keyframes gcSlam { 0% { opacity: 0; transform: scale(2.6) rotate(-8deg); } 60% { opacity: 1; transform: scale(.9); } 80% { transform: scale(1.06) rotate(1deg); } 100% { opacity: 1; transform: none; } }
-@keyframes gcBump { 0%, 100% { scale: 1; } 40% { scale: 1.3; } }
+@keyframes gcBump { 0%, 100% { transform: none; } 40% { transform: scale(1.3); } }
 
 /* ---------------- 碎片（晶礼） ---------------- */
 .gc-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
-.gc-burst i { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -11px; opacity: 0; scale: var(--s);
+.gc-burst i { position: absolute; left: 0; top: 0; width: 22px; height: 22px; margin: -11px; opacity: 0;
   background: var(--c3); animation: gcBurst 1s var(--d) cubic-bezier(.15,.7,.3,1) forwards; }
 .gc-burst .k1 { background: var(--c2); }
 .gc-burst .k2 { background: #fff; }
@@ -69,9 +69,9 @@
 .gc-burst .dot { border-radius: 50%; width: 14px; height: 14px; margin: -7px; }
 .gc-burst .bit { width: 10px; height: 20px; margin: -10px -5px; border-radius: 2px; }
 @keyframes gcBurst {
-  0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(.2); }
-  55% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1); }
-  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 70px)) rotate(calc(var(--rot) * 1.4)) scale(.6); }
+  0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(calc(var(--s) * .2)); }
+  55% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(var(--s)); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 70px)) rotate(calc(var(--rot) * 1.4)) scale(calc(var(--s) * .6)); }
 }
 
 /* ---------------- 省资源模式：碎片减半、光芒不转 ---------------- */

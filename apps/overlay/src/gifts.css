@@ -22,16 +22,16 @@ html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%
 .gl-bar { position: relative; display: flex; align-items: center; gap: 14px; height: 72px; width: min(580px, calc(100vw / var(--k) - 36px)); padding: 0 168px 0 9px; border-radius: 36px; color: #fff;
   background:
     repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 12px, transparent 12px 26px),
-    linear-gradient(100deg, color-mix(in srgb, var(--c1) 94%, transparent), color-mix(in srgb, var(--c2) 78%, transparent) 58%, color-mix(in srgb, var(--c2) 18%, rgba(16,14,32,.4))),
+    linear-gradient(100deg, var(--c1-94), var(--c2-78) 58%, var(--c2-end)),
     rgba(16,14,32,.55);
-  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.5), inset 0 0 0 1.5px rgba(255,255,255,.2), 0 0 30px -8px color-mix(in srgb, var(--c1) 75%, transparent), 0 14px 30px -14px rgba(0,0,0,.6); }
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.5), inset 0 0 0 1.5px rgba(255,255,255,.2), 0 0 30px -8px var(--c1-75), 0 14px 30px -14px rgba(0,0,0,.6); }
 .gl-row.no-pic .gl-bar { padding-right: 96px; }
 .gl-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
 .gl-sheen { position: absolute; top: -30%; bottom: -30%; left: -30%; width: 22%; transform: skewX(-20deg); opacity: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); }
 
 /* 头像（大航海套 B站头像框） */
 .gl .av { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; font-size: 23px; font-weight: 600;
-  box-shadow: 0 0 0 2.5px #fff, 0 0 0 5.5px color-mix(in srgb, var(--c3) 70%, transparent), 0 4px 12px -3px rgba(0,0,0,.5); }
+  box-shadow: 0 0 0 2.5px #fff, 0 0 0 5.5px var(--c3-70), 0 4px 12px -3px rgba(0,0,0,.5); }
 .gl .av img { width: 100%; height: 100%; object-fit: cover; }
 .gl .av-framed { position: relative; display: inline-grid; flex: none; }
 .gl .av-framed .av { box-shadow: 0 4px 12px -3px rgba(0,0,0,.5); }
@@ -46,10 +46,10 @@ html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%
 .gl-pic { position: absolute; right: 74px; top: 0; width: 88px; height: 88px; display: grid; place-items: center; filter: drop-shadow(0 8px 12px rgba(0,0,0,.45)); }
 .gl-img { width: 100%; height: 100%; object-fit: contain; }
 .gl-badge { width: 70px; height: 70px; object-fit: contain; }
-.gl-sc { padding: 4px 12px; border-radius: 10px; background: #fff; color: color-mix(in srgb, var(--c1) 85%, #000); font: italic 800 26px/1 var(--font-mono); letter-spacing: .02em; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c3) 70%, transparent); }
+.gl-sc { padding: 4px 12px; border-radius: 10px; background: #fff; color: var(--c1-dark); font: italic 800 26px/1 var(--font-mono); letter-spacing: .02em; box-shadow: 0 0 0 3px var(--c3-70); }
 .gl-num { position: absolute; right: 10px; top: calc(14px + 36px); transform: translateY(-50%); padding: 0 .14em .05em .04em; font-family: var(--font-mono); font-weight: 800; font-style: italic; font-size: 36px; line-height: 1; letter-spacing: -.03em;
   background: linear-gradient(180deg, #fff 35%, var(--c3) 70%, var(--c2)); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--c1) 85%, #000)); }
+  filter: drop-shadow(0 2px 0 var(--c1-dark)); }
 .gl-num small { font-size: 22px; margin-right: 1px; }
 .gl-num.months small:last-child, .gl-num.yuan small { font-size: 16px; font-style: normal; margin-left: 2px; }
 .gl-row.no-pic .gl-num { right: 18px; }

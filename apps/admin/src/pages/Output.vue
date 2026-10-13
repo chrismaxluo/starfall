@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import CdPick from '../components/CdPick.vue';
+import DraftBar from '../components/DraftBar.vue';
 import ChatPreview from '../components/ChatPreview.vue';
 import AddSteps from '../components/AddSteps.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
@@ -10,11 +11,13 @@ import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
 import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
+import { useDraft } from '../lib/draft.ts';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { isFxLive, isFxView, overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
 import { loadMusic, music, saveMusic } from '../lib/music.ts';
+import { confirmLeave } from '../lib/route.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { OutputDto, OverlayConfig, OverlayInfo } from '../lib/types.ts';
 
@@ -37,12 +40,31 @@ watch(selId, (id) => {
 });
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
 const online = (id: number) => state.overlays.some((x) => x.outputId === id && isFxLive(x));
-const cfg = computed<OverlayConfig | null>(() => {
-  const x = o.value;
-  return x ? overlayConfigOf(x) : null;
+
+// 特效页设置、弹幕列表设置先改草稿，点「保存」才到直播画面；预览照着草稿显示
+const fx = useDraft(() => o.value, ['orient', 'width', 'height', 'safeTop', 'safeBottom', 'marginX', 'scale', 'liteMode'] as const, (p): Promise<boolean> =>
+  save(p, 'width' in p || 'height' in p ? '已保存：分辨率改了，直播软件里的浏览器源宽高也要一起改' : '已保存，直播画面已更新'),
+);
+const chat = useDraft(() => o.value, ['chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec'] as const, (p): Promise<boolean> => {
+  const x = { ...o.value!, ...p };
+  return save(p, 'chatMax' in p || 'chatSize' in p ? `已保存：浏览器源的高度建议改成 ${chatHeight(x.chatMax, x.chatSize)}` : '已保存，直播画面已更新');
+},
+);
+/** 已保存 + 两张卡片的草稿（模板里只在有输出时用） */
+const v = computed(() => ({ ...o.value!, ...fx.pending.value, ...chat.pending.value }));
+const cfg = computed<OverlayConfig | null>(() => (o.value ? overlayConfigOf(v.value) : null));
+/** 换输出：草稿是上一个输出的，先问再丢掉 */
+function pickOutput(id: number): void {
+  if (id === selId.value || !confirmLeave()) return;
+  selId.value = id;
+}
+watch(() => o.value?.id, () => {
+  fx.reset();
+  chat.reset();
 });
 
 async function addOutput(): Promise<void> {
+  if (!confirmLeave()) return;
   // 还没有横屏输出时，新建的默认就是「横屏录播」
   const land = !state.outputs.some((x) => x.orient === 'landscape');
   const body = land
@@ -105,30 +127,36 @@ const PRESETS = {
 } as const;
 
 // 请求返回前可能已经切到另一个输出：结果写回发请求时的那一个
-async function save(patch: Partial<OutputDto>, msg?: string): Promise<void> {
+async function save(patch: Partial<OutputDto>, msg?: string): Promise<boolean> {
   const target = o.value;
-  if (!target) return;
+  if (!target) return false;
   const r = await attempt(() => put<OutputDto>(`/api/outputs/${target.id}`, patch), msg);
   if (r) Object.assign(target, r);
   else await refreshOutputs();
+  return Boolean(r);
 }
 function setOrient(orient: 'portrait' | 'landscape'): void {
-  if (!o.value || o.value.orient === orient) return;
+  if (!o.value || v.value.orient === orient) return;
   const [w, h] = PRESETS[orient][0];
   // 横屏没有手机端的信息栏和弹幕区，安全区清零；左右边距也小一些
-  void save(orient === 'portrait' ? { orient, width: w, height: h, safeTop: 12, safeBottom: 40, marginX: 9 } : { orient, width: w, height: h, safeTop: 0, safeBottom: 0, marginX: 3 }, orient === 'portrait' ? '已切换为竖屏' : '已切换为横屏');
+  fx.set(orient === 'portrait' ? { orient, width: w, height: h, safeTop: 12, safeBottom: 40, marginX: 9 } : { orient, width: w, height: h, safeTop: 0, safeBottom: 0, marginX: 3 });
 }
 function setSize(e: Event, k: 'width' | 'height'): void {
-  const v = Math.round(Number((e.target as HTMLInputElement).value));
-  if (!(v >= 320 && v <= 7680)) return toast('宽高要在 320 – 7680 之间', 'err');
-  void save({ [k]: v }, '分辨率已修改，直播软件里的浏览器源宽高也要一起改');
+  const el = e.target as HTMLInputElement;
+  const n = Math.round(Number(el.value));
+  if (!(n >= 320 && n <= 7680)) {
+    el.value = String(v.value[k]);
+    return toast('宽高要在 320 – 7680 之间', 'err');
+  }
+  fx.set({ [k]: n });
 }
+const num = (e: Event) => Number((e.target as HTMLInputElement).value);
 const ratio = computed(() => {
   if (!o.value) return '';
-  const g = gcd(o.value.width, o.value.height);
-  return `比例 ${o.value.width / g}:${o.value.height / g}`;
+  const g = gcd(v.value.width, v.value.height);
+  return `比例 ${v.value.width / g}:${v.value.height / g}`;
 });
-const mismatch = computed(() => o.value && (o.value.orient === 'portrait') !== o.value.height > o.value.width);
+const mismatch = computed(() => o.value && (v.value.orient === 'portrait') !== v.value.height > v.value.width);
 
 const url = computed(() => (o.value ? `${location.origin}${o.value.path}` : ''));
 const chatUrl = computed(() => (o.value ? `${location.origin}${o.value.chatPath}` : ''));
@@ -144,20 +172,16 @@ const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize) } : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
-function setChatMax(v: number): void {
+function setChatMax(x: number): void {
   if (!o.value) return;
-  const n = Math.round(v);
+  const n = Math.round(x);
   if (!(n >= 1 && n <= CHAT_MAX_LIMIT)) return toast(`条数要在 1 – ${CHAT_MAX_LIMIT} 之间`, 'err');
-  if (n === o.value.chatMax) return;
-  void save({ chatMax: n }, `最多显示 ${n} 条；浏览器源的高度建议改成 ${chatHeight(n, o.value.chatSize)}`);
+  chat.set({ chatMax: n });
 }
 /** 弹幕自动消失：0 为一直显示；打开时用上次选的秒数（默认 10 秒） */
 const lastFade = ref(10);
-watch(() => o.value?.chatFadeSec, (v) => v && (lastFade.value = v), { immediate: true });
-function setChatFade(v: number): void {
-  if (!o.value || v === o.value.chatFadeSec) return;
-  void save({ chatFadeSec: v }, v ? `没人发弹幕 ${v} 秒后，从最旧的开始一条一条消失` : '弹幕一直显示，只被新弹幕顶走');
-}
+watch(() => (o.value ? v.value.chatFadeSec : 0), (x) => x && (lastFade.value = x), { immediate: true });
+const setChatFade = (x: number) => chat.set({ chatFadeSec: x });
 async function copy(which: 'fx' | 'chat' | 'gifts' | 'music'): Promise<void> {
   try {
     await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : which === 'gifts' ? giftsUrl.value : which === 'music' ? musicUrl.value : url.value);
@@ -207,8 +231,8 @@ const howtoOpen = ref(false);
 watch(() => o.value?.id, () => (howtoOpen.value = !overlays.value.length), { immediate: true });
 const stageStyle = computed(() => {
   if (!o.value) return {};
-  const portrait = o.value.orient === 'portrait';
-  return portrait ? { width: '300px', height: `${Math.round((300 * o.value.height) / o.value.width)}px` } : { width: '100%', aspectRatio: `${o.value.width} / ${o.value.height}` };
+  const x = v.value;
+  return x.orient === 'portrait' ? { width: '300px', height: `${Math.round((300 * x.height) / x.width)}px` } : { width: '100%', aspectRatio: `${x.width} / ${x.height}` };
 });
 /** 特效页环境检测：只列出有问题的项目，每项写清楚影响和怎么办；全都正常时只说一句 */
 const CAP_HINT: Record<string, { name: string; tip: string }> = {
@@ -259,7 +283,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
     </div>
 
     <div class="outbar" role="tablist" aria-label="输出">
-      <button v-for="x in state.outputs" :key="x.id" class="otab" role="tab" :aria-selected="x.id === o.id" @click="selId = x.id"><span class="dot" :class="{ off: !online(x.id) }" />{{ x.name }}<span class="res num">{{ x.width }}×{{ x.height }}</span></button>
+      <button v-for="x in state.outputs" :key="x.id" class="otab" role="tab" :aria-selected="x.id === o.id" @click="pickOutput(x.id)"><span class="dot" :class="{ off: !online(x.id) }" />{{ x.name }}<span class="res num">{{ x.width }}×{{ x.height }}</span></button>
       <button class="otab add" @click="addOutput"><Icon name="i-plus" />新建输出</button>
       <div class="omore">
         <input v-if="renaming" :key="o.id" :ref="(el) => (el as HTMLInputElement | null)?.focus()" class="inp" :value="o.name" maxlength="40" aria-label="输出名称" @change="rename" @blur="renaming = false" @keydown.enter="(e) => (e.target as HTMLInputElement).blur()" @keydown.esc="renaming = false" />
@@ -386,70 +410,71 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
 
         <!-- ② 特效页设置 -->
         <div class="card">
-          <div class="card-h"><h2>特效页设置</h2><span class="aside">改了马上生效，不用刷新直播软件</span></div>
+          <div class="card-h"><h2>特效页设置</h2><span class="aside">改完点「保存」才到直播画面，不用刷新直播软件</span></div>
           <div class="srows">
             <div class="srow">
               <span class="lb">画布方向</span>
               <div class="ctl"><div class="line">
                 <span class="seg" role="group" aria-label="画布方向">
-                  <button :aria-pressed="o.orient === 'portrait'" @click="setOrient('portrait')"><span class="shp" style="width: 9px; height: 14px" />竖屏</button>
-                  <button :aria-pressed="o.orient === 'landscape'" @click="setOrient('landscape')"><span class="shp" style="width: 15px; height: 9px" />横屏</button>
+                  <button :aria-pressed="v.orient === 'portrait'" @click="setOrient('portrait')"><span class="shp" style="width: 9px; height: 14px" />竖屏</button>
+                  <button :aria-pressed="v.orient === 'landscape'" @click="setOrient('landscape')"><span class="shp" style="width: 15px; height: 9px" />横屏</button>
                 </span>
-                <span class="hint">{{ o.orient === 'portrait' ? '手机直播' : '电脑游戏直播' }}</span>
+                <span class="hint">{{ v.orient === 'portrait' ? '手机直播' : '电脑游戏直播' }}</span>
               </div></div>
             </div>
             <div class="srow">
               <span class="lb">分辨率<small>和直播软件里的宽高一致</small></span>
               <div class="ctl">
                 <div class="presets">
-                  <button v-for="p in PRESETS[o.orient]" :key="p[2]" :aria-pressed="p[0] === o.width && p[1] === o.height" @click="save({ width: p[0], height: p[1] }, `分辨率：${p[0]}×${p[1]}`)">{{ p[0] }}×{{ p[1] }}<small>{{ p[2] }}</small></button>
+                  <button v-for="p in PRESETS[v.orient]" :key="p[2]" :aria-pressed="p[0] === v.width && p[1] === v.height" @click="fx.set({ width: p[0], height: p[1] })">{{ p[0] }}×{{ p[1] }}<small>{{ p[2] }}</small></button>
                 </div>
                 <div class="line">
                   <span class="wh3">
-                    <input class="inp num" type="number" min="320" max="7680" :value="o.width" aria-label="宽" @change="(e) => setSize(e, 'width')" /><span>×</span>
-                    <input class="inp num" type="number" min="320" max="7680" :value="o.height" aria-label="高" @change="(e) => setSize(e, 'height')" />
+                    <input :key="`w${v.width}`" class="inp num" type="number" min="320" max="7680" :value="v.width" aria-label="宽" @change="(e) => setSize(e, 'width')" /><span>×</span>
+                    <input :key="`h${v.height}`" class="inp num" type="number" min="320" max="7680" :value="v.height" aria-label="高" @change="(e) => setSize(e, 'height')" />
                   </span>
                   <span class="hint">{{ ratio }}<span v-if="mismatch" style="color: var(--gov)">　宽高和方向不一致，请检查</span></span>
                 </div>
               </div>
             </div>
-            <div v-if="o.orient === 'portrait'" class="srow">
+            <div v-if="v.orient === 'portrait'" class="srow">
               <span class="lb">竖屏安全区<small>特效自动避开</small></span>
               <div class="ctl">
-                <div class="slider-row"><label for="st">顶部</label><input id="st" v-model.number="o.safeTop" type="range" min="0" max="25" @change="save({ safeTop: o.safeTop })" /><output>{{ o.safeTop }}%</output></div>
-                <div class="slider-row"><label for="sb">底部</label><input id="sb" v-model.number="o.safeBottom" type="range" min="0" max="45" @change="save({ safeBottom: o.safeBottom })" /><output>{{ o.safeBottom }}%</output></div>
+                <div class="slider-row"><label for="st">顶部</label><input id="st" :value="v.safeTop" type="range" min="0" max="25" @input="fx.set({ safeTop: num($event) })" /><output>{{ v.safeTop }}%</output></div>
+                <div class="slider-row"><label for="sb">底部</label><input id="sb" :value="v.safeBottom" type="range" min="0" max="45" @input="fx.set({ safeBottom: num($event) })" /><output>{{ v.safeBottom }}%</output></div>
                 <span class="hint">B站手机端竖屏直播时，顶部是主播信息，底部是弹幕和礼物栏。默认按实测：顶部 12%、底部 40%。<label class="inline-ck"><input v-model="showSafe" type="checkbox" />预览里显示</label></span>
               </div>
             </div>
             <div class="srow">
               <span class="lb">特效大小<small>作用于所有规则</small></span>
               <div class="ctl">
-                <div class="slider-row"><label for="scale">整体缩放</label><input id="scale" v-model.number="o.scale" type="range" min="60" max="160" step="5" @change="save({ scale: o.scale })" /><output>{{ o.scale }}%</output></div>
-                <div class="slider-row"><label for="mx">左右边距</label><input id="mx" v-model.number="o.marginX" type="range" min="0" max="15" @change="save({ marginX: o.marginX })" /><output>{{ o.marginX }}%</output></div>
+                <div class="slider-row"><label for="scale">整体缩放</label><input id="scale" :value="v.scale" type="range" min="60" max="160" step="5" @input="fx.set({ scale: num($event) })" /><output>{{ v.scale }}%</output></div>
+                <div class="slider-row"><label for="mx">左右边距</label><input id="mx" :value="v.marginX" type="range" min="0" max="15" @input="fx.set({ marginX: num($event) })" /><output>{{ v.marginX }}%</output></div>
               </div>
             </div>
             <div class="srow">
               <span class="lb">兼容模式</span>
               <div class="ctl"><div class="line">
-                <select class="sel" aria-label="兼容模式" :value="o.liteMode" @change="(e) => save({ liteMode: (e.target as HTMLSelectElement).value as OutputDto['liteMode'] }, '兼容模式已修改')">
+                <select class="sel" aria-label="兼容模式" :value="v.liteMode" @change="(e) => fx.set({ liteMode: (e.target as HTMLSelectElement).value as OutputDto['liteMode'] })">
                   <option value="auto">自动</option><option value="on">始终开启</option><option value="off">关闭</option>
                 </select>
                 <span class="hint">关掉毛玻璃、粒子等较重的效果。电脑性能一般或直播软件版本旧时用（弹幕列表也跟着用）。</span>
               </div></div>
             </div>
           </div>
+          <DraftBar :dirty="fx.dirty.value" :saving="fx.saving.value" @save="fx.commit" @discard="fx.reset" />
         </div>
 
         <!-- ③ 弹幕列表设置 -->
         <div class="card" :class="{ dimmed: !o.chatEnabled }">
-          <div class="card-h"><h2>弹幕列表设置</h2><span class="aside">{{ o.chatEnabled ? '改了马上生效' : '弹幕列表已关闭' }}</span></div>
+          <div class="card-h"><h2>弹幕列表设置</h2><span class="aside">{{ o.chatEnabled ? '改完点「保存」才到直播画面' : '弹幕列表已关闭' }}</span></div>
           <div class="srows">
             <div class="srow">
               <span class="lb">对齐</span>
               <div class="ctl"><div class="line">
                 <span class="seg" role="group" aria-label="对齐">
-                  <button :aria-pressed="o.chatSide === 'left'" @click="save({ chatSide: 'left' })">靠左</button>
-                  <button :aria-pressed="o.chatSide === 'right'" @click="save({ chatSide: 'right' })">靠右</button>
+                  <button :aria-pressed="v.chatSide === 'left'" @click="chat.set({ chatSide: 'left' })">靠左</button>
+                  <button :aria-pressed="v.chatSide === 'right'" @click="chat.set({ chatSide: 'right' })">靠右</button>
                 </span>
                 <span class="hint">放在画面左边选靠左，右边选靠右（头像跟着换边）</span>
               </div></div>
@@ -458,8 +483,8 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <span class="lb">字号</span>
               <div class="ctl"><div class="line">
                 <span class="seg" role="group" aria-label="字号">
-                  <button :aria-pressed="o.chatSize === 'normal'" @click="save({ chatSize: 'normal' })">标准</button>
-                  <button :aria-pressed="o.chatSize === 'large'" @click="save({ chatSize: 'large' })">大</button>
+                  <button :aria-pressed="v.chatSize === 'normal'" @click="chat.set({ chatSize: 'normal' })">标准</button>
+                  <button :aria-pressed="v.chatSize === 'large'" @click="chat.set({ chatSize: 'large' })">大</button>
                 </span>
                 <span class="hint">字号改了，浏览器源的高度也跟着变（上面「宽高填」已经算好）</span>
               </div></div>
@@ -469,11 +494,11 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <div class="ctl">
                 <div class="line">
                   <span class="seg" role="group" aria-label="粉丝牌">
-                    <button :aria-pressed="o.chatMedal === 'own'" @click="save({ chatMedal: 'own' })">只显示本直播间的</button>
-                    <button :aria-pressed="o.chatMedal === 'all'" @click="save({ chatMedal: 'all' })">戴什么显示什么</button>
+                    <button :aria-pressed="v.chatMedal === 'own'" @click="chat.set({ chatMedal: 'own' })">只显示本直播间的</button>
+                    <button :aria-pressed="v.chatMedal === 'all'" @click="chat.set({ chatMedal: 'all' })">戴什么显示什么</button>
                   </span>
                 </div>
-                <span class="hint">{{ o.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
+                <span class="hint">{{ v.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
               </div>
             </div>
             <div class="srow">
@@ -481,9 +506,9 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <div class="ctl">
                 <div class="line">
                   <span class="stepper">
-                    <button type="button" aria-label="少一条" :disabled="o.chatMax <= 1" @click="setChatMax(o.chatMax - 1)">−</button>
-                    <input :key="`${o.id}-${o.chatMax}`" class="inp num" type="number" min="1" :max="CHAT_MAX_LIMIT" :value="o.chatMax" aria-label="最多显示几条" @change="(e) => setChatMax(Number((e.target as HTMLInputElement).value))" />
-                    <button type="button" aria-label="多一条" :disabled="o.chatMax >= CHAT_MAX_LIMIT" @click="setChatMax(o.chatMax + 1)">+</button>
+                    <button type="button" aria-label="少一条" :disabled="v.chatMax <= 1" @click="setChatMax(v.chatMax - 1)">−</button>
+                    <input :key="`${o.id}-${v.chatMax}`" class="inp num" type="number" min="1" :max="CHAT_MAX_LIMIT" :value="v.chatMax" aria-label="最多显示几条" @change="(e) => setChatMax(Number((e.target as HTMLInputElement).value))" />
+                    <button type="button" aria-label="多一条" :disabled="v.chatMax >= CHAT_MAX_LIMIT" @click="setChatMax(v.chatMax + 1)">+</button>
                   </span>
                   <span class="hint">最多显示几条（1 – {{ CHAT_MAX_LIMIT }}）</span>
                 </div>
@@ -494,16 +519,17 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               <span class="lb">自动消失</span>
               <div class="ctl">
                 <div class="line">
-                  <Switch :model-value="o.chatFadeSec > 0" label="弹幕自动消失" @change="(v) => setChatFade(v ? lastFade : 0)" />
-                  <template v-if="o.chatFadeSec > 0">
+                  <Switch :model-value="v.chatFadeSec > 0" label="弹幕自动消失" @change="(v) => setChatFade(v ? lastFade : 0)" />
+                  <template v-if="v.chatFadeSec > 0">
                     <span class="hint">没人发弹幕</span>
-                    <CdPick :model-value="o.chatFadeSec" unit="sec" :options="CHAT_FADE_OPTIONS" :max="CHAT_FADE_MAX" :allow-zero="false" hint="最后一条弹幕之后过多久开始消失" after="后开始消失" @change="setChatFade" />
+                    <CdPick :model-value="v.chatFadeSec" unit="sec" :options="CHAT_FADE_OPTIONS" :max="CHAT_FADE_MAX" :allow-zero="false" hint="最后一条弹幕之后过多久开始消失" after="后开始消失" @change="setChatFade" />
                   </template>
                 </div>
-                <span class="hint">{{ o.chatFadeSec > 0 ? `没人发弹幕 ${o.chatFadeSec} 秒后，从最上面最旧的那条开始，每 2 秒淡出一条；有新弹幕来就重新计时。满 ${o.chatMax} 条时，新弹幕照样会把最旧的顶走。` : '关着时弹幕一直显示，只被新弹幕顶走（没人说话时最后几条一直留在画面上）。' }}</span>
+                <span class="hint">{{ v.chatFadeSec > 0 ? `没人发弹幕 ${v.chatFadeSec} 秒后，从最上面最旧的那条开始，每 2 秒淡出一条；有新弹幕来就重新计时。满 ${v.chatMax} 条时，新弹幕照样会把最旧的顶走。` : '关着时弹幕一直显示，只被新弹幕顶走（没人说话时最后几条一直留在画面上）。' }}</span>
               </div>
             </div>
           </div>
+          <DraftBar :dirty="chat.dirty.value" :saving="chat.saving.value" @save="chat.commit" @discard="chat.reset" />
         </div>
 
       </div>
@@ -514,10 +540,10 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           <div class="ptabs" role="tablist" aria-label="预览">
             <button role="tab" :aria-selected="ptab === 'fx'" @click="ptab = 'fx'">特效页</button>
             <button role="tab" :aria-selected="ptab === 'chat'" @click="ptab = 'chat'">弹幕列表</button>
-            <span class="aside">{{ ptab === 'fx' ? `${o.width} × ${o.height} · 只在这里播放` : o.chatEnabled ? `${chatWh.w} × ${chatWh.h} · 实时弹幕` : '弹幕列表已关闭' }}</span>
+            <span class="aside">{{ ptab === 'fx' ? `${v.width} × ${v.height} · 只在这里播放` : o.chatEnabled ? `${CHAT_WIDTH} × ${chatHeight(v.chatMax, v.chatSize)} · 实时弹幕` : '弹幕列表已关闭' }}</span>
           </div>
           <div class="ostage-wrap">
-            <PreviewStage v-if="ptab === 'fx'" ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && o.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
+            <PreviewStage v-if="ptab === 'fx'" ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && v.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
             <ChatPreview v-else-if="cfg" ref="chatPv" :key="`c${o.id}`" :config="cfg" :alpha="alphaBg" />
           </div>
           <div class="prev-tools">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockedBy, norm, pick, words } from './pick.ts';
+import { blockedBy, norm, pick, rank, splitNth, words } from './pick.ts';
 import type { Candidate } from './pick.ts';
 
 const song = (name: string, artists: string[], p: Partial<Candidate> = {}): Candidate => ({ name, artists, durationMs: 240_000, playable: true, ...p });
@@ -62,6 +62,19 @@ describe('选歌', () => {
     expect(pick('后来 伴奏', [vip, song('后来 (伴奏)', ['刘若英'])], O)).toMatchObject({ ok: true, song: { name: '后来 (伴奏)' } });
     expect(pick('稻香 周杰伦', [song('稻香(治愈版)', ['周杰伦.', '某人'])], O)).toMatchObject({ ok: false, reason: 'no_version' });
     expect(pick('光年之外 邓紫棋', [song('光年之外', ['G.E.M.邓紫棋'])], O)).toMatchObject({ ok: true });
+  });
+
+  it('点第几个版本：「晴天 2」「晴天 #2」；能放的版本按好坏排；没有那么多时说明', () => {
+    expect(splitNth('晴天 2')).toEqual({ query: '晴天', nth: 2 });
+    expect(splitNth('晴天#3')).toEqual({ query: '晴天', nth: 3 });
+    expect(splitNth('晴天 ＃ 2')).toEqual({ query: '晴天', nth: 2 });
+    expect(splitNth('2002年的第一场雪')).toEqual({ query: '2002年的第一场雪', nth: 1 });
+    expect(splitNth('7')).toEqual({ query: '7', nth: 1 });
+    const results = [song('晴天 (伴奏)', ['某人']), song('晴天 (Live)', ['某人']), song('晴天', ['甲']), song('晴天', ['乙'], { playable: false }), song('晴天', ['丙'])];
+    const r = rank('晴天', results, O);
+    expect(r.ok && r.list.map((x) => `${x.name}/${x.artists[0]}`)).toEqual(['晴天/甲', '晴天/丙', '晴天 (Live)/某人']);
+    expect(pick('晴天', results, O, 2)).toMatchObject({ ok: true, song: { artists: ['丙'] } });
+    expect(pick('晴天', results, O, 5)).toMatchObject({ ok: false, reason: 'no_index', text: '「晴天」只找到 3 个能放的版本' });
   });
 
   it('说明为什么不能点：太长、不让点、搜不到', () => {

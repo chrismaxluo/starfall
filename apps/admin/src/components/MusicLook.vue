@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 点歌 · 画面：预览（在 iframe 里运行真正的点歌窗口，不出声）、样子、对齐、字号、接下来几首、歌词（先改草稿，点「保存」才到直播画面）；声音（音量、特效时调小，改了立即生效）；点歌窗口地址
+// 点歌 · 画面：预览（在 iframe 里运行真正的点歌窗口，不出声）、样子、对齐、字号、接下来几首、歌词（先改草稿，点「保存」才到直播画面）；声音（音量、音量均衡、特效时调小，改了立即生效）；点歌窗口地址
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MUSIC_HEIGHT, MUSIC_WIDTH } from '@starfall/shared/overlay';
 import type { MusicSettings } from '@starfall/shared';
@@ -24,7 +24,7 @@ const frame = ref<HTMLIFrameElement | null>(null);
 const K = 0.62;
 let ready = false;
 /** 有歌在放时预览真实的，没有时用示例 */
-const SAMPLE: Omit<MusicState, 'display' | 'cmd' | 'volume' | 'enabled'> = {
+const SAMPLE: Omit<MusicState, 'display' | 'cmd' | 'volume' | 'normalize' | 'enabled'> = {
   hold: null,
   now: {
     item: { id: -1, song: { source: 'local', id: '0', name: '示例歌曲', artists: '星临乐队', durationMs: 215_000 }, by: { uid: 0, name: '测试观众', guard: 3 }, at: 0 },
@@ -49,7 +49,7 @@ const pvState = computed((): MusicState | null => {
   const st = music.state;
   if (!st || !music.settings) return null;
   const display = { style: v.value.style, side: v.value.side, size: v.value.size, showQueue: v.value.showQueue, lyrics: v.value.lyrics, lyricsTrans: v.value.lyricsTrans };
-  const base = { enabled: true, cmd: s.value.cmdRequest, volume: s.value.volume, display };
+  const base = { enabled: true, cmd: s.value.cmdRequest, volume: s.value.volume, normalize: s.value.normalize, display };
   return sample.value || !st.now ? { ...SAMPLE, ...base } : { ...st, ...base, hold: null };
 });
 function send(): void {
@@ -186,6 +186,13 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
             <div class="ctl"><div class="line">
               <input class="ml-range" type="range" min="0" max="100" step="5" :value="volShown" aria-label="音量" @input="(e) => (vol = Number((e.target as HTMLInputElement).value))" @change="saveVol" /><span class="num">{{ volShown }}</span>
               <span class="hint">直播软件的混音器里也能单独调</span>
+            </div></div>
+          </div>
+          <div class="srow">
+            <span class="lb">音量均衡</span>
+            <div class="ctl"><div class="line">
+              <Switch :model-value="s.normalize" label="音量均衡" @change="(v) => set({ normalize: v }, v ? '音量均衡已打开：从下一首开始生效' : '音量均衡已关闭')" />
+              <span class="hint">有的歌录得响、有的轻，打开后自动拉到差不多的音量，换歌时不会忽大忽小</span>
             </div></div>
           </div>
           <div class="srow">

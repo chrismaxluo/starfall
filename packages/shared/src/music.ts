@@ -85,6 +85,8 @@ export interface MusicState {
   cmd: string;
   /** 音量 0 – 100 */
   volume: number;
+  /** 音量均衡（点歌窗口边放边测，把每首歌拉到差不多响） */
+  normalize: boolean;
 }
 
 /** 点歌结果的提示（画面角落闪一下，后台也显示） */

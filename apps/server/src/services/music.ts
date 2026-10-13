@@ -6,7 +6,7 @@
 // 有带声音的特效在播时，让出声的窗口把音乐调小。
 import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { whoOk } from '@starfall/core/danmu';
-import { NeteaseError, pick } from '@starfall/music';
+import { NeteaseError, pick, rank, splitNth } from '@starfall/music';
 import type { NeteaseSong, PickResult } from '@starfall/music';
 import { MUSIC_DEFAULTS, MUSIC_QUEUE_SEND, MUSIC_STYLES, MusicSettingsSchema, parseLrc } from '@starfall/shared';
 import type { DanmuEvent, GuardLevel, LyricLine, MusicHold, MusicItem, MusicNotice, MusicRequester, MusicSettings, MusicSong, MusicState, PlayItem, StdEvent, Viewer } from '@starfall/shared';
@@ -241,6 +241,7 @@ export class MusicService {
       display: { style: s.style, side: s.side, size: s.size, showQueue: s.showQueue, lyrics: s.lyrics, lyricsTrans: s.lyricsTrans },
       cmd: s.cmdRequest,
       volume: s.volume,
+      normalize: s.normalize,
     };
   }
 
@@ -305,7 +306,9 @@ export class MusicService {
     if (!t.startsWith(cmd)) return;
     const q = cleanQuery(t.slice(cmd.length));
     if (!q) return;
-    void this.request(ev.viewer, q).catch((e: Error) => console.error('[点歌] 处理点歌出错：', e));
+    // 「点歌 晴天 2」：点第 2 个版本
+    const { query, nth } = splitNth(q);
+    void this.request(ev.viewer, query, { nth }).catch((e: Error) => console.error('[点歌] 处理点歌出错：', e));
   }
 
   private isAnchor(v: Pick<Viewer, 'uid'>): boolean {
@@ -322,7 +325,7 @@ export class MusicService {
    * 点歌：检查能不能点 → 找歌 → 排队。admin 为后台点的（不受规则限制，点歌关着也能加）。
    * 结果同时显示在点歌窗口和后台
    */
-  async request(viewer: Viewer, query: string, opts: { admin?: boolean } = {}): Promise<RequestResult> {
+  async request(viewer: Viewer, query: string, opts: { admin?: boolean; nth?: number } = {}): Promise<RequestResult> {
     const s = this.cfg();
     const exempt = opts.admin === true || this.isAnchor(viewer);
     // 失败提示：同一个人一分钟内又失败（多半在反复试），只在后台显示，不刷直播画面
@@ -352,7 +355,7 @@ export class MusicService {
     this.inflight.add(viewer.uid);
     let found: PickResult<MusicSong>;
     try {
-      found = await this.find(query, s);
+      found = await this.find(query, s, opts.nth ?? 1);
     } finally {
       this.inflight.delete(viewer.uid);
     }
@@ -371,7 +374,8 @@ export class MusicService {
     this.lastFail.delete(viewer.uid);
     const pos = this.queuedRows().findIndex((r) => r.id === row.id);
     const where = this.whereText(pos);
-    this.notice(true, viewer.name, `点了《${song.name}》，${where}`);
+    const ver = (opts.nth ?? 1) > 1 ? `（第 ${opts.nth} 个版本）` : '';
+    this.notice(true, viewer.name, `点了《${song.name}》${ver}，${where}`);
     this.changed();
     this.pump();
     return { ok: true, text: `已点《${song.name}》，${where}`, item: this.item(row) };
@@ -433,9 +437,10 @@ export class MusicService {
     return this.item(row);
   }
 
-  /** 按设置的顺序在本地歌库、网易云里找；都没有时说明原因（优先说网易云的） */
-  private async find(query: string, s: MusicSettings): Promise<PickResult<MusicSong>> {
+  /** 按设置的顺序在本地歌库、网易云里找；都没有时说明原因（优先说网易云的）。nth 为点名要第几个版本 */
+  private async find(query: string, s: MusicSettings, nth = 1): Promise<PickResult<MusicSong>> {
     const opts = { maxMs: s.maxDurationSec * 1000, blockWords: s.blockWords };
+    if (nth > 1) return this.findNth(query, s, nth);
     const order: Array<'local' | 'netease'> = s.localFirst ? ['local', 'netease'] : ['netease', 'local'];
     let failed: PickResult<MusicSong> | null = null;
     let tried = false;
@@ -465,6 +470,56 @@ export class MusicService {
     }
     if (!tried) return { ok: false, reason: 'not_found', text: '没有可以找歌的地方（网易云和本地歌库都关着）' };
     return failed ?? { ok: false, reason: 'not_found', text: `没有找到「${query}」` };
+  }
+
+  /** 点第几个版本：本地歌库、网易云（按设置的先后）能放的版本排成一串，取第 nth 个 */
+  private async findNth(query: string, s: MusicSettings, nth: number): Promise<PickResult<MusicSong>> {
+    const opts = { maxMs: s.maxDurationSec * 1000, blockWords: s.blockWords };
+    const order: Array<'local' | 'netease'> = s.localFirst ? ['local', 'netease'] : ['netease', 'local'];
+    const all: MusicSong[] = [];
+    let failed: PickResult<MusicSong> | null = null;
+    for (const src of order) {
+      if (src === 'local' && s.sourceLocal) {
+        const r = rank(query, this.d.library.search(query), opts);
+        if (r.ok) all.push(...r.list.map((c) => this.d.library.song(c.row)));
+      } else if (src === 'netease' && s.sourceNetease) {
+        try {
+          const r = rank(query, await this.d.account.client().search(query, 20), opts);
+          if (r.ok) all.push(...r.list.map(neteaseSong));
+          else failed = r;
+        } catch (e) {
+          console.warn('[点歌] 网易云搜歌失败：', (e as Error).message);
+          failed = { ok: false, reason: 'not_found', text: '网易云暂时连不上，过一会儿再点' };
+        }
+      }
+    }
+    const song = all[nth - 1];
+    if (song) return { ok: true, song };
+    if (!all.length && failed) return failed;
+    return { ok: false, reason: 'no_index', text: all.length ? `「${query}」只找到 ${all.length} 个能放的版本` : `没有找到「${query}」` };
+  }
+
+  /**
+   * 后台「换个版本」：列表里的直接换成这一首（点歌的人、位置不变）；正在放的切掉，换的这首排到下一首马上放
+   */
+  swap(id: number, song: MusicSong): MusicItem {
+    const fields = { source: song.source, songId: song.id, name: song.name, artists: song.artists, album: song.album ?? '', cover: song.cover ?? '', durationMs: song.durationMs };
+    if (this.cur?.row.id === id) {
+      const old = this.cur.row;
+      const row = this.d.db
+        .insert(musicRequests)
+        .values({ ...fields, roomId: old.roomId, uid: old.uid, uname: old.uname, face: old.face, guard: old.guard, status: 'queued', sort: 0, createdAt: old.createdAt })
+        .returning()
+        .get();
+      this.renumber([row, ...this.queuedRows().filter((r) => r.id !== row.id)]);
+      this.finish('skipped', '换了版本');
+      return this.item(row);
+    }
+    const r = this.queuedRows().find((x) => x.id === id);
+    if (!r) throw new HttpError(404, 'not_found', '这首歌已经不在列表里了');
+    this.d.db.update(musicRequests).set(fields).where(eq(musicRequests.id, id)).run();
+    this.changed();
+    return this.item({ ...r, ...fields });
   }
 
   /** 加进列表：大航海插到第一首普通观众点的歌前面；front 放最前面；其余放最后。然后重新编顺序 */
@@ -593,7 +648,8 @@ export class MusicService {
     }
     const q = t.startsWith(cmd) ? cleanQuery(t.slice(cmd.length)) : '';
     if (!q) return { ok: false, text: `点歌弹幕要以「${s.cmdRequest}」开头，后面写歌名` };
-    return this.request(v, q);
+    const { query, nth } = splitNth(q);
+    return this.request(v, query, { nth });
   }
 
   /** 后台搜歌：本地歌库和网易云的结果都列出来（放不了的也列，写明原因） */

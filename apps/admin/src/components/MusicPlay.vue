@@ -5,6 +5,7 @@ import type { MusicItem, MusicSong } from '@starfall/shared/overlay';
 import Avatar from './Avatar.vue';
 import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
+import MusicSwap from './MusicSwap.vue';
 import RowMenu from './RowMenu.vue';
 import type { MenuItem } from './RowMenu.vue';
 import { get, post, put } from '../lib/api.ts';
@@ -52,8 +53,12 @@ const queue = computed(() => music.queue);
 async function order(ids: number[]): Promise<void> {
   await attempt(() => put('/api/music/queue/order', { ids }));
 }
+// 换个版本（弹窗）
+const swapping = ref<{ item: MusicItem; playing: boolean } | null>(null);
 function rowMenu(it: MusicItem): Array<MenuItem | null> {
   return [
+    { icon: 'i-replay', label: '换个版本', run: () => (swapping.value = { item: it, playing: false }) },
+    null,
     { icon: 'i-ban', label: `不让 ${it.by.name} 点歌`, run: () => void banRequester(it) },
     { icon: 'i-x', label: '这首歌以后不收', run: () => void blockSong(it) },
     null,
@@ -178,6 +183,7 @@ async function simulate(): Promise<void> {
         <div class="mp-ctl">
           <button class="btn" :disabled="!music.settings?.enabled" @click="togglePause"><Icon :name="paused ? 'i-play' : 'i-pause'" />{{ paused ? '继续' : '暂停' }}</button>
           <button class="btn" :disabled="!now" @click="skip"><Icon name="i-arrow" />切歌</button>
+          <button class="btn" :disabled="!now" title="点到的不是想要的那版（翻唱、现场版、伴奏）时，换成别的版本" @click="now && (swapping = { item: now.item, playing: true })"><Icon name="i-replay" />换个版本</button>
           <label class="mp-vol"><span>音量</span><input type="range" min="0" max="100" step="5" :value="volShown" aria-label="音量" @input="(e) => (vol = Number((e.target as HTMLInputElement).value))" @change="saveVol" /><span class="num">{{ volShown }}</span></label>
         </div>
         <p class="inline-hint mp-tip">直播软件的混音器里也能单独调点歌窗口的音量。</p>
@@ -279,6 +285,7 @@ async function simulate(): Promise<void> {
         </div>
       </div>
     </div>
+    <MusicSwap v-if="swapping" :item="swapping.item" :playing="swapping.playing" @close="swapping = null" />
   </div>
 </template>
 

@@ -22,7 +22,7 @@ export interface PickOptions {
   blockWords: readonly string[];
 }
 
-export type PickResult<T> = { ok: true; song: T } | { ok: false; reason: 'not_found' | 'unplayable' | 'too_long' | 'blocked' | 'no_version'; text: string };
+export type PickResult<T> = { ok: true; song: T } | { ok: false; reason: 'not_found' | 'unplayable' | 'too_long' | 'blocked' | 'no_version' | 'no_index'; text: string };
 
 /** 英文不分大小写、全角半角当成一样，去掉空格和常见符号 */
 export function norm(s: string): string {
@@ -92,8 +92,24 @@ const REASON_TEXT = {
 
 /**
  * 按搜索结果的顺序挑一首。results 是搜索结果（已经按相关度排好）；没有能放的时候说明原因。
+ * nth：观众点名要第几个版本（「点歌 晴天 2」），在能放的版本里按好坏排好后取第 nth 个
  */
-export function pick<T extends Candidate>(query: string, results: readonly T[], o: PickOptions): PickResult<T> {
+export function pick<T extends Candidate>(query: string, results: readonly T[], o: PickOptions, nth = 1): PickResult<T> {
+  const r = rank(query, results, o);
+  if (!r.ok) return r;
+  const song = r.list[nth - 1];
+  if (!song) return { ok: false, reason: 'no_index', text: `「${query}」只找到 ${r.list.length} 个能放的版本` };
+  return { ok: true, song };
+}
+
+/** 观众写的歌名后面跟着「 2」「#2」：点第几个版本（1 – 9）。歌名本身至少要剩下一个字 */
+export function splitNth(query: string): { query: string; nth: number } {
+  const m = query.match(/^(.+?)\s*[#＃]\s*([1-9])$/) ?? query.match(/^(.+?)\s+([1-9])$/);
+  return m && m[1]!.trim() ? { query: m[1]!.trim(), nth: Number(m[2]) } : { query, nth: 1 };
+}
+
+/** 能放的版本，按好坏排好（第一个就是默认会选的）；一个都没有时说明原因 */
+export function rank<T extends Candidate>(query: string, results: readonly T[], o: PickOptions): { ok: true; list: T[] } | Extract<PickResult<T>, { ok: false }> {
   const ws = words(query);
   if (!results.length || !ws.length) return { ok: false, reason: 'not_found', text: `没有找到「${query}」` };
   // 第二个词起，是歌手名的（结果里有歌手叫这个，或者翻唱写着「原唱 xx」）必须对上歌手，光出现在歌名里不算
@@ -114,11 +130,11 @@ export function pick<T extends Candidate>(query: string, results: readonly T[], 
     ok = ok.filter((s) => s.covered && sameArtist(s.c, top.c));
     if (!ok.length) return { ok: false, reason: 'unplayable', text: REASON_TEXT.unplayable(top.c.name) };
   }
-  const best = [...ok].sort((a, b) => b.score - a.score)[0];
-  if (best?.covered) return { ok: true, song: best.c };
+  const sorted = [...ok].sort((a, b) => b.score - a.score);
+  if (sorted[0]?.covered) return { ok: true, list: sorted.filter((x) => x.covered).map((x) => x.c) };
   // 只写了一个词、结果里没有一首原样包含它（拼音、简繁、错别字）：相信网易云的排序。
   // 有包含它的、只是都放不了时，不拿别的歌顶替
-  if (best && ws.length === 1 && !scored.some((s) => s.covered)) return { ok: true, song: best.c };
+  if (sorted.length && ws.length === 1 && !scored.some((x) => x.covered)) return { ok: true, list: sorted.map((x) => x.c) };
   // 好几个词，没有一首全对得上：哪些词在所有结果里都找不到（多半是不在这里的歌手）
   if (ws.length > 1) {
     const missing = ws.filter((w) => !results.some((c) => hits(c, w)));

@@ -66,6 +66,14 @@ export function musicRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { item: music.add(song, front) };
   });
 
+  // 换个版本：列表里的直接换；正在放的切掉，换上的这首马上放
+  app.post('/api/music/queue/:id/swap', async (req) => {
+    const { id } = parseBody(IdParam, req.params);
+    const { song } = parseBody(z.object({ song: SongSchema }).strict(), req.body);
+    if (song.source === 'local' && !library.get(Number(song.id))) throw new HttpError(404, 'not_found', '这首歌不在歌库里了');
+    return { item: music.swap(id, song) };
+  });
+
   app.delete('/api/music/queue/:id', async (req) => {
     music.remove(parseBody(IdParam, req.params).id);
     return { ok: true };

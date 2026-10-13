@@ -46,6 +46,8 @@ export const MusicSettingsSchema = z
     localFirst: z.boolean(),
     /** 音量 0 – 100 */
     volume: z.number().int().min(0).max(100),
+    /** 音量均衡：边放边测每首歌有多响，太响的调小、太轻的调大 */
+    normalize: z.boolean(),
     /** 有带声音的特效时把音乐调小；duckPct 是调到原来的百分之几 */
     duck: z.boolean(),
     duckPct: z.number().int().min(0).max(90),
@@ -90,6 +92,7 @@ export const MUSIC_DEFAULTS: MusicSettings = {
   sourceLocal: true,
   localFirst: true,
   volume: 70,
+  normalize: true,
   duck: true,
   duckPct: 30,
   autoPause: true,

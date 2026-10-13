@@ -12,6 +12,7 @@ import { connect } from './conn.ts';
 import type { Conn } from './conn.ts';
 import { h } from './dom.ts';
 import { detect } from './env.ts';
+import { Leveler } from './music-level.ts';
 import { DEFAULT_TINT, tintOf } from './music-tint.ts';
 import type { Tint } from './music-tint.ts';
 import { avatar, withGuardFrame } from './parts.ts';
@@ -473,8 +474,18 @@ function tick(): void {
 
 // ---------- 出声音（只有服务端指定的那个窗口） ----------
 
-const audio = new Audio();
-audio.preload = 'auto';
+// 每首歌用一个新的播放器：要不要接音量均衡、能不能跨域读取，每首分开决定
+const leveler = new Leveler();
+/** 不允许跨域读取的音乐服务器：以后这里的歌不接音量均衡（不然连加载都会失败） */
+const corsBad = new Set<string>();
+const hostOf = (url: string) => {
+  try {
+    return new URL(url, location.href).host;
+  } catch {
+    return '';
+  }
+};
+let audio = makeAudio(false);
 let loaded: { id: number; load: number } | null = null;
 let seekTo = 0;
 let startedSent = false;
@@ -533,12 +544,14 @@ function syncAudio(): void {
         if (loaded) {
           audio.removeAttribute('src');
           audio.load();
+          leveler.detach();
         }
         loaded = null;
       }
     });
     return;
   }
+  leveler.setEnabled(state?.normalize !== false);
   const url = n.url;
   const go = () => {
     if (state?.hold === null) {
@@ -554,9 +567,7 @@ function syncAudio(): void {
       startedSent = false;
       seekTo = next.posMs / 1000;
       vol = 0;
-      audio.volume = 0;
-      audio.src = url;
-      audio.load();
+      startAudio(url, Boolean(state?.normalize) && !corsBad.has(hostOf(url)));
       go();
     });
     return;
@@ -598,34 +609,68 @@ function blockedHint(): void {
 }
 addEventListener('pointerdown', () => blocked && play());
 
-audio.addEventListener('loadedmetadata', () => {
-  if (seekTo > 0.5 && (!Number.isFinite(audio.duration) || seekTo < audio.duration - 1)) audio.currentTime = seekTo;
-  seekTo = 0;
-});
-audio.addEventListener('playing', () => {
-  if (!loaded) return;
-  if (!startedSent) {
-    startedSent = true;
-    conn?.send({ type: 'music_started', id: loaded.id, load: loaded.load });
-  }
-  tick();
-});
-audio.addEventListener('timeupdate', () => {
-  if (!loaded || !startedSent) return;
-  const now = performance.now();
-  if (now - lastPosSent < 5000) return;
-  lastPosSent = now;
-  conn?.send({ type: 'music_pos', id: loaded.id, pos: Math.round(audio.currentTime * 1000) });
-});
-audio.addEventListener('ended', () => {
-  if (loaded) conn?.send({ type: 'music_ended', id: loaded.id });
-});
-audio.addEventListener('error', () => {
-  if (!loaded || !audio.getAttribute('src')) return;
-  const e = audio.error;
-  const why = e ? ({ 1: '加载被中止', 2: '网络错误', 3: '解码失败', 4: '格式不支持或地址失效' } as Record<number, string>)[e.code] ?? `错误 ${e.code}` : '未知错误';
-  conn?.send({ type: 'music_error', id: loaded.id, load: loaded.load, message: `${why}${e?.message ? `（${e.message}）` : ''}` });
-});
+/** 换一个新的播放器放 url：cors 为要接音量均衡（要求音乐服务器允许跨域读取） */
+function startAudio(url: string, cors: boolean): void {
+  const old = audio;
+  old.pause();
+  old.removeAttribute('src');
+  old.load();
+  leveler.detach();
+  audio = makeAudio(cors);
+  if (cors) leveler.attach(audio);
+  vol = 0;
+  audio.volume = 0;
+  audio.src = url;
+  audio.load();
+}
+
+function makeAudio(cors: boolean): HTMLAudioElement {
+  const a = new Audio();
+  a.preload = 'auto';
+  if (cors) a.crossOrigin = 'anonymous';
+  // 换了新的播放器以后，旧播放器的事件不再理会
+  a.addEventListener('loadedmetadata', () => {
+    if (a !== audio) return;
+    if (seekTo > 0.5 && (!Number.isFinite(a.duration) || seekTo < a.duration - 1)) a.currentTime = seekTo;
+    seekTo = 0;
+  });
+  a.addEventListener('playing', () => {
+    if (a !== audio || !loaded) return;
+    if (!startedSent) {
+      startedSent = true;
+      conn?.send({ type: 'music_started', id: loaded.id, load: loaded.load });
+    }
+    tick();
+  });
+  a.addEventListener('timeupdate', () => {
+    if (a !== audio || !loaded || !startedSent) return;
+    const now = performance.now();
+    if (now - lastPosSent < 5000) return;
+    lastPosSent = now;
+    conn?.send({ type: 'music_pos', id: loaded.id, pos: Math.round(a.currentTime * 1000) });
+  });
+  a.addEventListener('ended', () => {
+    if (a === audio && loaded) conn?.send({ type: 'music_ended', id: loaded.id });
+  });
+  a.addEventListener('error', () => {
+    if (a !== audio || !loaded || !a.getAttribute('src')) return;
+    // 要跨域读取（音量均衡）却加载失败：多半是这个音乐服务器不允许，换普通播放器再试一次，不算放不了
+    if (a.crossOrigin && !startedSent) {
+      const url = a.src;
+      corsBad.add(hostOf(url));
+      startAudio(url, false);
+      if (state?.hold === null) {
+        play();
+        rampVolume(0.1);
+      }
+      return;
+    }
+    const e = a.error;
+    const why = e ? ({ 1: '加载被中止', 2: '网络错误', 3: '解码失败', 4: '格式不支持或地址失效' } as Record<number, string>)[e.code] ?? `错误 ${e.code}` : '未知错误';
+    conn?.send({ type: 'music_error', id: loaded.id, load: loaded.load, message: `${why}${e?.message ? `（${e.message}）` : ''}` });
+  });
+  return a;
+}
 
 // ---------- 连接 ----------
 
@@ -692,4 +737,4 @@ function notice(t: string, detail: string): void {
 }
 
 // 方便在浏览器控制台里调试
-(window as unknown as { starfall: unknown }).starfall = { get state() { return state; }, audio };
+(window as unknown as { starfall: unknown }).starfall = { get state() { return state; }, get audio() { return audio; } };

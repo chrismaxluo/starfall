@@ -59,7 +59,7 @@ const settle = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(
 let cleanup: Array<() => Promise<unknown> | void> = [];
 afterEach(async () => { for (const c of cleanup) await c(); cleanup = []; vi.useRealTimers(); });
 
-const CATALOG = [ns(1, '起风了', ['买辣椒也用券']), ns(2, '孤勇者', ['陈奕迅']), ns(3, '平凡之路', ['朴树']), ns(4, '会员歌', ['某人'], { playable: false, fee: 1 }), ns(5, '晴天(深情版)', ['Lucky小爱'])];
+const CATALOG = [ns(1, '起风了', ['买辣椒也用券']), ns(2, '孤勇者', ['陈奕迅']), ns(3, '平凡之路', ['朴树']), ns(4, '会员歌', ['某人'], { playable: false, fee: 1 }), ns(5, '晴天(深情版)', ['Lucky小爱']), ns(6, '起风了', ['周深'])];
 
 async function setup(opts: { live?: boolean; settings?: Partial<typeof MUSIC_DEFAULTS>; player?: boolean } = {}) {
   const t = await testApp();
@@ -334,6 +334,32 @@ describe('弹幕点歌', () => {
     t.m.remove(a!.id);
     vi.advanceTimersByTime(6 * 60_000);
     expect(t.m.restore([a!.id])).toBe(0);
+  });
+
+  it('「点歌 起风了 2」点第 2 个版本；没有那么多版本时说明', async () => {
+    const t = await setup({ player: false, settings: { perUser: 3, userCdSec: 0 } });
+    await t.say('点歌 起风了 2');
+    expect(t.notices().at(-1)).toBe('✓ 小星：点了《起风了》（第 2 个版本），排在第 1 首（主播还没打开点歌窗口）');
+    expect(t.m.snapshot().queue[0]!.song.artists).toBe('周深');
+    await t.say('点歌 孤勇者 #3', { uid: 2, name: '阿二' });
+    expect(t.notices().at(-1)).toBe('✗ 阿二：「孤勇者」只找到 1 个能放的版本');
+  });
+
+  it('后台换个版本：列表里的直接换（点歌的人、位置不变）；正在放的切掉，换上的马上放', async () => {
+    const t = await setup({ settings: { perUser: 3 } });
+    await t.say('点歌 起风了');
+    await t.say('点歌 孤勇者', { uid: 2, name: '阿二' });
+    const other = { source: 'netease' as const, id: '6', name: '起风了', artists: '周深', durationMs: 1000 };
+    const queued = t.m.snapshot().queue[0]!;
+    expect(t.m.swap(queued.id, { ...other, id: '3', name: '平凡之路', artists: '朴树' })).toMatchObject({ id: queued.id, song: { name: '平凡之路' }, by: { name: '阿二' } });
+    const cur = t.m.state().now!.item;
+    t.m.swap(cur.id, other);
+    expect(t.m.history()[0]).toMatchObject({ status: 'skipped', note: '换了版本' });
+    vi.advanceTimersByTime(MUSIC_GAP_MS);
+    await settle();
+    expect(t.m.state().now?.item).toMatchObject({ song: { artists: '周深' }, by: { name: '小星' } });
+    expect(t.queue()).toEqual(['平凡之路']);
+    expect(() => t.m.swap(9999, other)).toThrow('不在列表里');
   });
 
   it('以前选的样子后来去掉了：换成流光，改别的设置也不报错', async () => {

@@ -270,6 +270,7 @@ const MUSIC_NAMES: Record<string, string> = {
   sourceLocal: '本地歌库',
   localFirst: '先找本地歌库',
   volume: '音量',
+  normalize: '音量均衡',
   duck: '特效时调小音乐',
   duckPct: '调小到多少',
   autoPause: '下播自动暂停',

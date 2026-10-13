@@ -6,13 +6,16 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_WIDTH, giftListShows, giftsHeight } from '@starfall/shared/overlay';
 import type { GiftListItem, GiftsFilter } from '@starfall/shared/overlay';
 import Avatar from '../components/Avatar.vue';
+import DraftBar from '../components/DraftBar.vue';
 import GiftsFilterPick from '../components/GiftsFilterPick.vue';
 import GiftsPreview from '../components/GiftsPreview.vue';
 import Icon from '../components/Icon.vue';
 import Switch from '../components/Switch.vue';
 import { del, get, post, put } from '../lib/api.ts';
+import { useDraft } from '../lib/draft.ts';
 import { clock, dateTime } from '../lib/format.ts';
 import { battery } from '../lib/preview.ts';
+import { confirmLeave } from '../lib/route.ts';
 import { overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { OutputDto } from '../lib/types.ts';
@@ -20,17 +23,32 @@ import type { OutputDto } from '../lib/types.ts';
 // ---------- 输出（只有一个输出时不显示切换） ----------
 const selId = ref<number | null>(null);
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
-const cfg = computed(() => (o.value ? overlayConfigOf(o.value) : null));
+// 外观（滚动、对齐、字号、条数）先改草稿，点「保存」才到直播画面；预览照着草稿显示
+const look = useDraft(() => o.value, ['giftsSpeed', 'giftsSide', 'giftsSize', 'giftsMax'] as const, (p): Promise<boolean> =>
+  save(p, 'giftsMax' in p || 'giftsSize' in p ? `已保存：浏览器源宽高建议填 ${whOf({ ...o.value!, ...p })}` : '已保存，直播画面已更新'),
+);
+/** 已保存 + 外观草稿（模板里只在有输出时用） */
+const v = computed(() => ({ ...o.value!, ...look.pending.value }));
+const cfg = computed(() => (o.value ? overlayConfigOf(v.value) : null));
 const online = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'gifts').length);
 const pv = ref<InstanceType<typeof GiftsPreview> | null>(null);
-const wh = computed(() => (o.value ? `${GIFTS_WIDTH} × ${giftsHeight(o.value.giftsMax, o.value.giftsSize)}` : ''));
+const whOf = (x: OutputDto) => `${GIFTS_WIDTH} × ${giftsHeight(x.giftsMax, x.giftsSize)}`;
+const wh = computed(() => (o.value ? whOf(o.value) : ''));
+/** 换输出：草稿是上一个输出的，先问再丢掉 */
+function pickOutput(e: Event): void {
+  const el = e.target as HTMLSelectElement;
+  if (confirmLeave()) selId.value = Number(el.value);
+  else el.value = String(o.value?.id);
+}
+watch(() => o.value?.id, () => look.reset());
 
-async function save(patch: Partial<OutputDto>, msg?: string): Promise<void> {
+async function save(patch: Partial<OutputDto>, msg?: string): Promise<boolean> {
   const target = o.value;
-  if (!target) return;
+  if (!target) return false;
   const r = await attempt(() => put<OutputDto>(`/api/outputs/${target.id}`, patch), msg);
   if (r) Object.assign(target, r);
   else await refreshOutputs();
+  return Boolean(r);
 }
 async function copyUrl(): Promise<void> {
   if (!o.value) return;
@@ -78,17 +96,17 @@ const summary = computed<{ text: string; bad: boolean }>(() => {
 });
 
 // ---------- 外观 ----------
-function setMax(v: number): void {
+function setMax(x: number): void {
   if (!o.value) return;
-  const n = Math.round(v);
+  const n = Math.round(x);
   if (!(n >= 1 && n <= GIFTS_MAX_LIMIT)) return toast(`条数要在 1 – ${GIFTS_MAX_LIMIT} 之间`, 'err');
-  if (n !== o.value.giftsMax) void save({ giftsMax: n }, `一屏显示 ${n} 条；浏览器源的高度建议改成 ${giftsHeight(n, o.value.giftsSize)}`);
+  look.set({ giftsMax: n });
 }
-const SPEED: Array<{ value: OutputDto['giftsSpeed']; label: string; msg: string }> = [
-  { value: 'off', label: '不滚动', msg: '不滚动：名单固定挂着，放不下时只留最新的几条' },
-  { value: 'slow', label: '慢', msg: '滚动速度：慢（约 5 秒一条）' },
-  { value: 'normal', label: '中', msg: '滚动速度：中（约 3 秒一条）' },
-  { value: 'fast', label: '快', msg: '滚动速度：快（约 2 秒一条）' },
+const SPEED: Array<{ value: OutputDto['giftsSpeed']; label: string; hint: string }> = [
+  { value: 'off', label: '不滚动', hint: '固定挂着，放不下时只留最新的几条' },
+  { value: 'slow', label: '慢', hint: '一屏放不下时从下往上循环滚动，约 5 秒一条' },
+  { value: 'normal', label: '中', hint: '一屏放不下时从下往上循环滚动，约 3 秒一条' },
+  { value: 'fast', label: '快', hint: '一屏放不下时从下往上循环滚动，约 2 秒一条' },
 ];
 
 // ---------- 送礼记录（按场次，手动时用） ----------
@@ -190,7 +208,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
     <div class="page-head">
       <div><h1>送礼名单</h1><p>把收到的礼物、上舰、醒目留言排成一列显示在直播画面上。</p></div>
       <div class="gl-head-r">
-        <select v-if="state.outputs.length > 1" v-model="selId" class="sel" aria-label="输出"><option v-for="x in state.outputs" :key="x.id" :value="x.id">{{ x.name }}</option></select>
+        <select v-if="state.outputs.length > 1" class="sel" aria-label="输出" :value="o.id" @change="pickOutput"><option v-for="x in state.outputs" :key="x.id" :value="x.id">{{ x.name }}</option></select>
         <span class="live" :class="o.giftsEnabled && online ? '' : 'off'"><i />{{ !o.giftsEnabled ? '已关闭' : online ? '直播软件里已加上' : '直播软件里还没加' }}</span>
         <button class="btn" :title="`在直播软件里加一个浏览器源，宽高填 ${wh}`" @click="copyUrl"><Icon name="i-copy" />复制地址</button>
         <Switch :model-value="o.giftsEnabled" label="送礼名单开关" @change="(v) => save({ giftsEnabled: v }, v ? '已打开送礼名单' : '已关闭送礼名单：直播画面上不再显示')" />
@@ -222,7 +240,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
                     <button :aria-pressed="f.mode === 'all'" @click="setFilter({ mode: 'all' }, '名单显示本场所有付费礼物')">全部礼物</button>
                     <button :aria-pressed="f.mode === 'only'" @click="setFilter({ mode: 'only' }, '名单只显示选中的几种礼物')">只要这几种</button>
                   </span>
-                  <select v-if="f.mode === 'all'" class="sel" aria-label="最低金额" :value="listMin" @change="setMin(Number(($event.target as HTMLSelectElement).value))"><option v-for="v in GIFTS_MIN_OPTIONS" :key="v" :value="v">{{ v ? `${yuanOf(v)}以上` : '金额不限' }}</option></select>
+                  <select v-if="f.mode === 'all'" class="sel" aria-label="最低金额" :value="listMin" @change="setMin(Number(($event.target as HTMLSelectElement).value))"><option v-for="g in GIFTS_MIN_OPTIONS" :key="g" :value="g">{{ g ? `${yuanOf(g)}以上` : '金额不限' }}</option></select>
                   <span class="hint">{{ f.mode === 'all' ? (listMin ? `一次送出（连击合起来算）满 ${yuanOf(listMin)}才显示，小礼物不进名单` : '所有付费礼物都显示（免费礼物不显示）') : '只显示下面选中的礼物，谁送的都算' }}</span>
                 </div>
                 <GiftsFilterPick v-if="f.mode === 'only'" :model-value="f.gifts" @change="(gifts, msg) => setFilter({ gifts }, msg)" />
@@ -246,7 +264,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
           <div class="gl-tools">
             <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
             <input v-model.trim="q" class="inp" placeholder="观众名、UID、礼物名" aria-label="搜观众名、UID、礼物名" />
-            <select v-model.number="minGold" class="sel amt" aria-label="金额"><option v-for="v in MIN_OPTIONS" :key="v" :value="v">{{ v ? `${v / 1000} 元以上` : '金额不限' }}</option></select>
+            <select v-model.number="minGold" class="sel amt" aria-label="金额"><option v-for="g in MIN_OPTIONS" :key="g" :value="g">{{ g ? `${g / 1000} 元以上` : '金额不限' }}</option></select>
           </div>
           <div v-if="!sessions.length" class="inline-hint">还没有直播记录。开播后收到的礼物会出现在这里。</div>
           <div v-else-if="loading && !records.length" class="inline-hint">读取中…</div>
@@ -290,23 +308,23 @@ async function move(i: number, d: -1 | 1): Promise<void> {
         <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示</span></div>
         <div class="gl-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
         <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled || manual" :title="manual ? '手动时只显示名单里的记录' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
-        <h3 class="gl-sub">外观</h3>
+        <h3 class="gl-sub">外观<small>改完点「保存」才到直播画面</small></h3>
         <div class="srows">
           <div class="srow">
             <span class="lb">滚动</span>
             <div class="ctl">
               <span class="seg" role="group" aria-label="滚动">
-                <button v-for="s in SPEED" :key="s.value" :aria-pressed="o.giftsSpeed === s.value" @click="save({ giftsSpeed: s.value }, s.msg)">{{ s.label }}</button>
+                <button v-for="s in SPEED" :key="s.value" :aria-pressed="v.giftsSpeed === s.value" @click="look.set({ giftsSpeed: s.value })">{{ s.label }}</button>
               </span>
-              <span class="hint">{{ o.giftsSpeed === 'off' ? '固定挂着，放不下时只留最新的几条' : '一屏放不下时从下往上循环滚动' }}</span>
+              <span class="hint">{{ SPEED.find((s) => s.value === v.giftsSpeed)?.hint }}</span>
             </div>
           </div>
           <div class="srow">
             <span class="lb">对齐</span>
             <div class="ctl"><div class="line">
               <span class="seg" role="group" aria-label="对齐">
-                <button :aria-pressed="o.giftsSide === 'left'" @click="save({ giftsSide: 'left' })">靠左</button>
-                <button :aria-pressed="o.giftsSide === 'right'" @click="save({ giftsSide: 'right' })">靠右</button>
+                <button :aria-pressed="v.giftsSide === 'left'" @click="look.set({ giftsSide: 'left' })">靠左</button>
+                <button :aria-pressed="v.giftsSide === 'right'" @click="look.set({ giftsSide: 'right' })">靠右</button>
               </span>
               <span class="hint">放在画面哪边就选哪边</span>
             </div></div>
@@ -315,8 +333,8 @@ async function move(i: number, d: -1 | 1): Promise<void> {
             <span class="lb">字号</span>
             <div class="ctl"><div class="line">
               <span class="seg" role="group" aria-label="字号">
-                <button :aria-pressed="o.giftsSize === 'normal'" @click="save({ giftsSize: 'normal' })">标准</button>
-                <button :aria-pressed="o.giftsSize === 'large'" @click="save({ giftsSize: 'large' })">大</button>
+                <button :aria-pressed="v.giftsSize === 'normal'" @click="look.set({ giftsSize: 'normal' })">标准</button>
+                <button :aria-pressed="v.giftsSize === 'large'" @click="look.set({ giftsSize: 'large' })">大</button>
               </span>
             </div></div>
           </div>
@@ -324,14 +342,15 @@ async function move(i: number, d: -1 | 1): Promise<void> {
             <span class="lb">一屏几条</span>
             <div class="ctl"><div class="line">
               <span class="stepper">
-                <button type="button" aria-label="少一条" :disabled="o.giftsMax <= 1" @click="setMax(o.giftsMax - 1)">−</button>
-                <input :key="`${o.id}-${o.giftsMax}`" class="inp num" type="number" min="1" :max="GIFTS_MAX_LIMIT" :value="o.giftsMax" aria-label="一屏显示几条" @change="(e) => setMax(Number((e.target as HTMLInputElement).value))" />
-                <button type="button" aria-label="多一条" :disabled="o.giftsMax >= GIFTS_MAX_LIMIT" @click="setMax(o.giftsMax + 1)">+</button>
+                <button type="button" aria-label="少一条" :disabled="v.giftsMax <= 1" @click="setMax(v.giftsMax - 1)">−</button>
+                <input :key="`${o.id}-${v.giftsMax}`" class="inp num" type="number" min="1" :max="GIFTS_MAX_LIMIT" :value="v.giftsMax" aria-label="一屏显示几条" @change="(e) => setMax(Number((e.target as HTMLInputElement).value))" />
+                <button type="button" aria-label="多一条" :disabled="v.giftsMax >= GIFTS_MAX_LIMIT" @click="setMax(v.giftsMax + 1)">+</button>
               </span>
-              <span class="hint">浏览器源宽高填 {{ wh }}</span>
+              <span class="hint">浏览器源宽高填 {{ whOf(v) }}</span>
             </div></div>
           </div>
         </div>
+        <DraftBar :dirty="look.dirty.value" :saving="look.saving.value" @save="look.commit" @discard="look.reset" />
       </div>
     </div>
   </section>
@@ -363,7 +382,8 @@ async function move(i: number, d: -1 | 1): Promise<void> {
 .gl-sum.bad svg { color: #D64545; }
 
 .gl-pv { display: grid; place-items: center; padding: 6px 0; }
-.gl-sub { margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--t2); }
+.gl-sub { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--t2); }
+.gl-sub small { font-size: 12px; font-weight: 400; color: var(--t3); }
 .gl-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .gl-tools .inp { width: 180px; height: 32px; }
 .gl-tools .sel { height: 32px; min-width: 240px; max-width: 100%; }

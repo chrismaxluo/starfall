@@ -8,6 +8,7 @@ import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
 import OvPanel from '../components/OvPanel.vue';
 import QuickPad from '../components/QuickPad.vue';
+import MusicMini from '../components/MusicMini.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
@@ -19,6 +20,7 @@ import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
 import { useQuickHotkeys } from '../lib/quick.ts';
 import { effectById, state, ui } from '../lib/store.ts';
+import { music } from '../lib/music.ts';
 import type { EventDto, StatsDto, TriggerKind, Viewer } from '../lib/types.ts';
 
 useQuickHotkeys();
@@ -199,6 +201,8 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
       <QuickPad v-if="state.quick.length" />
       <p v-else class="qp-tip">把常用的素材做成按钮，直播时点一下就能播，不用再发弹幕触发。</p>
     </div>
+
+    <MusicMini v-if="music.settings?.enabled" />
 
     <div class="bento">
       <div class="card span7" style="grid-row: span 2">

@@ -8,8 +8,8 @@ export interface Sock {
   close(code?: number, reason?: string): void;
 }
 
-/** fx：特效页；chat：弹幕列表；gifts：送礼名单 */
-export type OverlayRole = 'fx' | 'chat' | 'gifts';
+/** fx：特效页；chat：弹幕列表；gifts：送礼名单；music：点歌窗口 */
+export type OverlayRole = 'fx' | 'chat' | 'gifts' | 'music';
 
 export interface OverlayClient {
   sock: Sock;
@@ -95,6 +95,8 @@ export class Hub {
     this.overlays.add(c);
     if (role === 'chat') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), chat: this.chatRecent });
     else if (role === 'gifts') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), gifts: this.giftsRecent, pins: this.giftPins });
+    // 点歌窗口：点歌的状态由点歌服务在「上下线」通知里发
+    else if (role === 'music') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build() });
     else send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
     this.overlaysChanged();
     return c;
@@ -127,6 +129,28 @@ export class Hub {
       send(c.sock, msg);
       if (msg.type === 'play') c.pending.set(msg.item.id, { at: now, label: `${msg.item.effect.name} · ${msg.item.viewer.name}` });
     }
+  }
+
+  /**
+   * 负责出声音的点歌窗口：最早连上的、加在直播软件里的那个（浏览器查看页只显示，不出声）。
+   * 同时加了好几个点歌窗口时只有一个出声，免得两首叠在一起
+   */
+  musicPlayer(): OverlayClient | null {
+    let best: OverlayClient | null = null;
+    for (const c of this.overlays) if (c.role === 'music' && !c.view && (!best || c.since < best.since)) best = c;
+    return best;
+  }
+
+  /** 发给所有点歌窗口：build 按「是不是出声音的那个」生成消息 */
+  toMusic(build: (player: boolean) => ServerToOverlay): void {
+    const player = this.musicPlayer();
+    for (const c of this.overlays) if (c.role === 'music') send(c.sock, build(c === player));
+  }
+
+  /** 只发给出声音的点歌窗口 */
+  toMusicPlayer(msg: ServerToOverlay): void {
+    const p = this.musicPlayer();
+    if (p) send(p.sock, msg);
   }
 
   /** 新的一条弹幕：发给所有弹幕列表和管理后台（后台的预览用），记住最近的几条 */

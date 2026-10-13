@@ -80,6 +80,8 @@ export interface OutputDto {
   chatPath: string;
   /** 送礼名单地址 */
   giftsPath: string;
+  /** 点歌窗口地址 */
+  musicPath: string;
 }
 
 export type AccountStatus = { loggedIn: false } | { loggedIn: true; uid: number; name: string; face: string; expiresAt: number | null };
@@ -231,7 +233,7 @@ export interface RoomInfo {
 export interface OverlayInfo {
   outputId: number;
   /** fx：特效页；chat：弹幕列表 */
-  role: 'fx' | 'chat' | 'gifts';
+  role: 'fx' | 'chat' | 'gifts' | 'music';
   /** 浏览器查看页：不算加到了直播软件 */
   view?: boolean;
   since: number;

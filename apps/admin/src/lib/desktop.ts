@@ -37,6 +37,8 @@ export interface DesktopBridge {
   reloadHotkeys(): Promise<{ failed: string[] }>;
   /** 先注销全局快捷键（编辑快捷播放按钮时用） */
   pauseHotkeys(): Promise<void>;
+  /** 选一个文件夹（点歌的本地歌库），取消时为 null；旧版桌面版没有 */
+  pickFolder?(): Promise<string | null>;
   openDataDir(): Promise<void>;
   openLogs(): Promise<void>;
 }

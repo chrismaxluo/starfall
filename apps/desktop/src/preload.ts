@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('starfallDesktop', {
   reloadHotkeys: () => ipcRenderer.invoke('sf:reload-hotkeys'),
   /** 编辑快捷播放按钮时先注销全局快捷键（录快捷键时不会被系统拦走） */
   pauseHotkeys: () => ipcRenderer.invoke('sf:pause-hotkeys'),
+  /** 选一个文件夹（点歌的本地歌库），取消时为 null */
+  pickFolder: () => ipcRenderer.invoke('sf:pick-folder'),
   openDataDir: () => ipcRenderer.invoke('sf:open-data'),
   openLogs: () => ipcRenderer.invoke('sf:open-logs'),
 });

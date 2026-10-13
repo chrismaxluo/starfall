@@ -4,17 +4,21 @@ import type { PlayItem } from '@starfall/shared/overlay';
 import './glass.css';
 import { h } from './dom.ts';
 import { avatar, textWithoutName } from './parts.ts';
+import { mix } from './color.ts';
 
 
 /** 各样式的点缀色：只用在描边末端、左侧柔光、头像外圈 */
 const ACC = { mod: '#3DD6C1', dm: '#7CC7FF' } as const;
+
+/** 点缀色和提前算好的半透明版本（旧内核不认 color-mix），数字是百分比 */
+const accVars = (acc: string) => ({ '--acc': acc, '--acc-70': mix(acc, 70), '--acc-60': mix(acc, 60), '--acc-34': mix(acc, 34) });
 
 const SHIELD =
   '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>';
 
 /** 一块玻璃：点缀色 + 裁在里面的柔光和反光层 */
 function glass(cls: string, acc: string, dur: number, ...children: Array<Node | null>): HTMLElement {
-  return h('div', { class: `fx g ${cls}`, style: { '--acc': acc, '--dur': `${dur}ms` } }, h('div', { class: 'gl' }), ...children);
+  return h('div', { class: `fx g ${cls}`, style: { ...accVars(acc), '--dur': `${dur}ms` } }, h('div', { class: 'gl' }), ...children);
 }
 
 export function giftImg(item: PlayItem, cls: string): HTMLElement | null {
@@ -49,7 +53,7 @@ export function restWithGift(item: PlayItem): Array<string | HTMLElement> {
 }
 
 function mod(item: PlayItem): HTMLElement {
-  const chip = h('span', { class: 'chip', style: { '--acc': ACC.mod } });
+  const chip = h('span', { class: 'chip', style: accVars(ACC.mod) });
   chip.innerHTML = `${SHIELD}房管`;
   return glass(
     'gx-card life',

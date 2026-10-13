@@ -42,4 +42,6 @@ export const paths = (dataDir: string) => ({
   assets: path.join(dataDir, 'assets'),
   tmp: path.join(dataDir, 'tmp'),
   backups: path.join(dataDir, 'backups'),
+  /** 本地歌库上传的音乐和封面 */
+  music: path.join(dataDir, 'music'),
 });

@@ -14,6 +14,13 @@ contextBridge.exposeInMainWorld('starfallDesktop', {
     ipcRenderer.on('sf:update-state', l);
     return () => void ipcRenderer.removeListener('sf:update-state', l);
   },
+  /** 特效页没连上时的提醒（直播软件开着、端口变了）：先取一次现在的，之后有变化时回调；返回取消监听的函数 */
+  fxHint: () => ipcRenderer.invoke('sf:fx-hint'),
+  onFxHint: (cb: (h: unknown) => void) => {
+    const l = (_e: unknown, h: unknown) => cb(h);
+    ipcRenderer.on('sf:fx-hint', l);
+    return () => void ipcRenderer.removeListener('sf:fx-hint', l);
+  },
   /** 新版本下载好后：现在重启并安装 */
   installUpdate: () => ipcRenderer.invoke('sf:install-update'),
   /** 素材快捷播放的按钮保存后，重新注册全局快捷键；返回被别的软件占用的 */

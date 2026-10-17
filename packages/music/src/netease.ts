@@ -47,6 +47,40 @@ export interface NeteaseAccount {
   vip: boolean;
 }
 
+/** 会员情况 */
+export interface NeteaseVip {
+  /** 黑胶SVIP、黑胶VIP、音乐包；从没开过会员时为 null */
+  kind: string | null;
+  /** 到期时间（毫秒），已经到期的也给（是上一次的到期时间）；查不到时为 null */
+  until: number | null;
+  /** 现在还是会员 */
+  active: boolean;
+}
+
+/** 会员接口里的几种会员，按档次从高到低 */
+const VIP_TIERS = [
+  ['redplus', '黑胶SVIP'],
+  ['associator', '黑胶VIP'],
+  ['musicPackage', '音乐包'],
+] as const;
+
+/**
+ * 从会员接口的 data 里读出会员类型和到期时间：取到期最晚的那种（一样晚取档次高的）。
+ * 都过期了也照样给，就是上一次的到期时间
+ */
+export function vipFromRaw(data: unknown, now: number): NeteaseVip {
+  const d = (data ?? {}) as Record<string, { expireTime?: unknown } | null | undefined>;
+  let best: { kind: string; until: number } | null = null;
+  for (const [key, kind] of VIP_TIERS) {
+    const raw = Number(d[key]?.expireTime ?? 0);
+    if (!(raw > 0)) continue;
+    // 以防给的是秒
+    const until = raw < 1e12 ? raw * 1000 : raw;
+    if (!best || until > best.until) best = { kind, until };
+  }
+  return best ? { ...best, active: best.until > now } : { kind: null, until: null, active: false };
+}
+
 export type NeteaseQrState = 'waiting' | 'scanned' | 'expired' | 'success';
 
 // ---------- 网页版接口的加密（weapi）：AES-CBC 两次 + RSA（不补位） ----------
@@ -276,6 +310,13 @@ export class Netease {
     if (!body.account || !body.profile) return null;
     const vipType = body.account.vipType ?? body.profile.vipType ?? 0;
     return { uid: body.profile.userId ?? body.account.id ?? 0, name: body.profile.nickname ?? '', avatar: https(body.profile.avatarUrl), vip: vipType > 0 };
+  }
+
+  /** 登录的账号的会员类型、到期时间（要登录） */
+  async vipInfo(now = Date.now()): Promise<NeteaseVip> {
+    const { body } = await this.post<{ code?: number; message?: string; data?: unknown }>('/music-vip-membership/client/vip/info', {}, '查询网易云会员');
+    if (body.code !== 200) throw new NeteaseError(body.code ?? -1, `查询网易云会员失败（网易云返回 ${body.code}${body.message ? `：${body.message}` : ''}）`);
+    return vipFromRaw(body.data, now);
   }
 
   /** 退出登录（让网易云那边的登录失效） */

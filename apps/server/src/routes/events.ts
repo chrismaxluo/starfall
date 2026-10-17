@@ -5,7 +5,7 @@ import type { PlayStatus } from '@starfall/shared';
 import { z } from 'zod';
 import type { AppContext } from '../context.ts';
 import { parseBody } from '../http.ts';
-import { dayStart } from './playback.ts';
+import { dayStart } from '../time.ts';
 
 const STATUSES = Object.keys(PLAY_STATUS) as [PlayStatus, ...PlayStatus[]];
 

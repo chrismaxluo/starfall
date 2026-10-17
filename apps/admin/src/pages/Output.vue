@@ -10,7 +10,7 @@ import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
+import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsSourceSize } from '@starfall/shared/overlay';
 import { useDraft } from '../lib/draft.ts';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
@@ -169,7 +169,7 @@ const showMusicKey = ref(false);
 const shownMusicUrl = computed(() => mask(musicUrl.value, showMusicKey.value));
 const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 /** 送礼名单浏览器源的建议宽高 */
-const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize) } : { w: GIFTS_WIDTH, h: 650 }));
+const giftsWh = computed(() => (o.value ? giftsSourceSize(o.value) : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
 function setChatMax(x: number): void {
@@ -243,7 +243,10 @@ const CAP_HINT: Record<string, { name: string; tip: string }> = {
 };
 function capIssues(env: Record<string, unknown> | null): Array<{ name: string; tip: string }> {
   if (!env) return [];
-  return Object.keys(CAP_HINT).filter((k) => !env[k]).map((k) => CAP_HINT[k]!);
+  const out = Object.keys(CAP_HINT).filter((k) => !env[k]).map((k) => CAP_HINT[k]!);
+  // 桌面版才用得上（服务器版一直开着）；旧版特效页不报这一项（undefined），还在检测时是 null，都不算
+  if (state.desktop && env.recover === false) out.push({ name: '自动连接', tip: '这个直播软件比星临先打开时，特效页不会自己连上：先打开星临再开直播软件，或者在直播软件里右键特效源点「刷新」' });
+  return out;
 }
 /** 特效页报的错误翻成大白话，写上怎么办 */
 function plainError(msg: string): string {
@@ -363,7 +366,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           <div class="srcbox" :class="{ off: !o.giftsEnabled }">
             <div class="src-h">
               <span class="src-ic gf"><Icon name="i-gift" /></span>
-              <span class="src-t"><b>送礼名单</b><span>本场收到的礼物、上舰、醒目留言，一屏 {{ o.giftsMax }} 条，放不下时循环往上滚 · 拖到画面一侧</span></span>
+              <span class="src-t"><b>送礼名单</b><span>收到的礼物、上舰、醒目留言（本场、今天、本月或按人合计，在「送礼名单」页选），一屏 {{ o.giftsMax }} 条，放不下时循环往上滚 · 拖到画面一侧</span></span>
               <span class="right">
                 <span class="live" :class="o.giftsEnabled && giftLists.length ? '' : 'off'"><i />{{ o.giftsEnabled ? liveText(giftLists) : '已关闭' }}</span>
                 <button class="switch" role="switch" type="button" :aria-checked="o.giftsEnabled" aria-label="启用送礼名单" @click="save({ giftsEnabled: !o.giftsEnabled }, o.giftsEnabled ? '已关闭送礼名单：直播画面上不再显示' : '已打开送礼名单')" />

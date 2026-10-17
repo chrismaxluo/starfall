@@ -13,10 +13,11 @@ const ANCHOR = 20000;
 function fakeLive(live = true) {
   const events = new Set<(ev: StdEvent, raw: unknown) => void>();
   const status = new Set<(s: LiveStatus) => void>();
-  const state = { live };
-  const snap = () => ({ live: state.live, sessionId: 1, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, loginInvalid: false, adminCount: 0 }) as unknown as LiveStatus;
+  const state = { live, since: 0, last: null as { id: number; startedAt: number; endedAt: number } | null };
+  const snap = () => ({ live: state.live, sessionId: 1, liveSince: state.since, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, loginInvalid: false, adminCount: 0 }) as unknown as LiveStatus;
   return {
     state,
+    lastSession: () => state.last,
     onEvent: (fn: (ev: StdEvent, raw: unknown) => void) => (events.add(fn), () => events.delete(fn)),
     onStatus: (fn: (s: LiveStatus) => void) => (status.add(fn), () => status.delete(fn)),
     status: snap,
@@ -69,11 +70,12 @@ async function setup(opts: { live?: boolean; settings?: Partial<typeof MUSIC_DEF
   const live = fakeLive(opts.live ?? true);
   const hub = new Hub();
   const ne = fakeNetease(CATALOG);
+  const urlResults: string[] = [];
   let playing: PlayItem | null = null;
   const effectListeners = new Set<() => void>();
   const effects = { playingItem: () => playing, onQueueChange: (fn: () => void) => (effectListeners.add(fn), () => effectListeners.delete(fn)) };
   const setEffect = (item: PlayItem | null) => { playing = item; for (const fn of effectListeners) fn(); };
-  const m = new MusicService({ ...t.ctx, live, hub, account: { client: () => ne.client as never, vip: () => false }, library: t.ctx.musicLibrary, fx: effects });
+  const m = new MusicService({ ...t.ctx, live, hub, account: { client: () => ne.client as never, vip: () => false, urlResult: (ok, song) => urlResults.push(`${ok ? '✓' : '✗'} ${song.name}`) }, library: t.ctx.musicLibrary, fx: effects });
   m.updateSettings({ ...MUSIC_DEFAULTS, enabled: true, userCdSec: 0, ...opts.settings });
   m.start();
   cleanup.push(() => m.stop());
@@ -86,7 +88,7 @@ async function setup(opts: { live?: boolean; settings?: Partial<typeof MUSIC_DEF
   const notices = () => m.snapshot().notices.map((n) => `${n.ok ? '✓' : '✗'} ${n.who}：${n.text}`).reverse();
   const queue = () => m.snapshot().queue.map((i) => i.song.name);
   const say = async (text: string, p: Partial<Viewer> = {}) => { live.emit(danmu(text, p)); await settle(); };
-  return { ...t, m, live, hub, ne, sock, client: () => client!, connect, last, notices, queue, say, setEffect, output };
+  return { ...t, m, live, hub, ne, sock, client: () => client!, connect, last, notices, queue, say, setEffect, output, urlResults };
 }
 
 describe('弹幕点歌', () => {
@@ -255,6 +257,31 @@ describe('弹幕点歌', () => {
     await t.say('点歌 起风了');
     expect(t.notices()).toEqual(['✓ 小星：点了《起风了》，马上播放', '✗ 小星：《起风了》放不了（可能需要会员，或者暂时没有版权），已跳过']);
     expect(t.m.state().now).toBeNull();
+    // 拿地址的结果记给网易云账号（连着拿不到时后台提醒）；本地歌库的歌不算
+    await t.say('点歌 孤勇者', { uid: 2, name: '阿二' });
+    expect(t.urlResults).toEqual(['✗ 起风了', '✓ 孤勇者']);
+  });
+
+  it('本场：正在直播时从开播算起，没开播时是上一场；人数不算主播和测试观众，点得最多的歌要被点两次以上', async () => {
+    const t = await setup({ player: false, settings: { repeatMin: 0 } });
+    expect(t.m.session()).toBeNull();
+    const start = Date.now();
+    t.live.state.since = start;
+    expect(t.m.session()).toMatchObject({ live: true, startedAt: start, endedAt: null, requested: 0, played: 0, people: 0, topSong: null, topPerson: null });
+    await t.say('点歌 起风了');
+    await t.say('点歌 孤勇者', { uid: 2, name: '阿二' });
+    await t.say('点歌 平凡之路', { uid: ANCHOR, name: '主播' });
+    expect((await t.m.simulate('点歌 晴天(深情版)')).ok).toBe(true);
+    t.m.add({ source: 'netease', id: '6', name: '起风了', artists: '周深', durationMs: 200_000 });
+    t.m.remove(t.m.snapshot().queue.find((i) => i.song.name === '孤勇者')!.id);
+    await t.say('点歌 孤勇者', { uid: 2, name: '阿二' });
+    expect(t.m.session()).toMatchObject({ requested: 6, played: 0, people: 2, topSong: { song: { name: '孤勇者', artists: '陈奕迅' }, count: 2 }, topPerson: { uid: 2, name: '阿二', count: 2 } });
+    // 下播：看上一场；上一场之后点的不算
+    t.live.state.live = false;
+    t.live.state.last = { id: 1, startedAt: start, endedAt: Date.now() };
+    vi.advanceTimersByTime(60_000);
+    await t.say('点歌 孤勇者', { uid: 3, name: '阿三' });
+    expect(t.m.session()).toMatchObject({ live: false, startedAt: start, requested: 6, people: 2 });
   });
 
   it('有带声音的特效在播：让出声的窗口把音乐调小，播完恢复', async () => {
@@ -379,7 +406,7 @@ describe('弹幕点歌', () => {
     expect(t.m.snapshot().queue.map((i) => `${i.song.name} ${i.by.name}`)).toEqual(['孤勇者 主播', '平凡之路 主播']);
     // 假装上次正在放
     t.ctx.db.$client.prepare("update music_requests set status = 'playing' where name = '平凡之路'").run();
-    const again = new MusicService({ ...t.ctx, live: t.live, hub: t.hub, account: { client: () => t.ne.client as never, vip: () => false }, library: t.ctx.musicLibrary });
+    const again = new MusicService({ ...t.ctx, live: t.live, hub: t.hub, account: { client: () => t.ne.client as never, vip: () => false, urlResult: () => undefined }, library: t.ctx.musicLibrary });
     again.start();
     cleanup.push(() => again.stop());
     expect(again.snapshot().queue.map((i) => i.song.name)).toEqual(['平凡之路', '孤勇者']);

@@ -9,9 +9,10 @@ import { formFile, media, testApp } from '../testing.ts';
 let close: Array<() => Promise<unknown>> = [];
 afterEach(async () => { for (const c of close) await c(); close = []; });
 
-/** 假的网易云：只认扫码登录、账号、搜歌 */
+/** 假的网易云：只认扫码登录、账号、会员、搜歌、播放地址 */
 function fakeNetease() {
   let poll = 801;
+  const vip = { vipType: 11, expire: 2_000_000_000_000, url: true as boolean };
   const f = (async (url: string) => {
     const path = new URL(url).pathname;
     if (path === '/weapi/login/qrcode/unikey') return Response.json({ code: 200, unikey: 'key1' });
@@ -20,12 +21,14 @@ function fakeNetease() {
       if (poll === 803) headers.append('set-cookie', 'MUSIC_U=secret-cookie; Path=/');
       return new Response(JSON.stringify({ code: poll }), { headers });
     }
-    if (path === '/weapi/w/nuser/account/get') return Response.json({ code: 200, account: { id: 9, vipType: 11 }, profile: { userId: 9, nickname: '网易云用户', avatarUrl: 'http://a.jpg' } });
+    if (path === '/weapi/w/nuser/account/get') return Response.json({ code: 200, account: { id: 9, vipType: vip.vipType }, profile: { userId: 9, nickname: '网易云用户', avatarUrl: 'http://a.jpg' } });
+    if (path === '/weapi/music-vip-membership/client/vip/info') return Response.json({ code: 200, data: { associator: { vipCode: 100, expireTime: vip.expire }, musicPackage: { expireTime: 0 } } });
+    if (path === '/weapi/song/enhance/player/url/v1') return Response.json({ code: 200, data: [{ url: vip.url ? 'http://m701.music.126.net/1.mp3' : null, br: 320000 }] });
     if (path === '/weapi/logout') return Response.json({ code: 200 });
     if (path === '/api/cloudsearch/pc') return Response.json({ code: 200, result: { songs: [{ id: 1, name: '起风了', ar: [{ name: '买辣椒也用券' }], al: { name: '', picUrl: 'http://p1/x.jpg' }, dt: 300_000, fee: 8, privilege: { st: 0, pl: 320000 } }, { id: 2, name: '起风了', ar: [{ name: '会员' }], dt: 300_000, fee: 1, privilege: { st: 0, pl: 0 } }] } });
     return new Response('', { status: 404 });
   }) as typeof fetch;
-  return { f, setPoll: (c: number) => (poll = c) };
+  return { f, vip, setPoll: (c: number) => (poll = c) };
 }
 
 const setup = async () => {
@@ -58,14 +61,56 @@ describe('点歌接口', () => {
     expect(qr.image).toMatch(/^data:image\/png;base64,/);
     expect((await t.req({ method: 'GET', url: '/api/music/qrcode/key1' })).json()).toEqual({ state: 'waiting' });
     t.ne.setPoll(803);
-    expect((await t.req({ method: 'GET', url: '/api/music/qrcode/key1' })).json()).toMatchObject({ state: 'success', account: { loggedIn: true, name: '网易云用户', vip: true } });
+    expect((await t.req({ method: 'GET', url: '/api/music/qrcode/key1' })).json()).toMatchObject({ state: 'success', account: { loggedIn: true, name: '网易云用户', vip: true, vipKind: '黑胶VIP', vipUntil: 2_000_000_000_000 } });
     const raw = JSON.stringify(t.ctx.settings.getRaw('neteaseAccount'));
     expect(raw).not.toContain('secret-cookie');
     expect(t.ctx.musicAccount.client().cookies.MUSIC_U).toBe('secret-cookie');
     // 不认识的 key（过期了、服务重启过）
     expect((await t.req({ method: 'GET', url: '/api/music/qrcode/other' })).json()).toEqual({ state: 'expired' });
     expect((await t.req({ method: 'DELETE', url: '/api/music/account' })).statusCode).toBe(200);
-    expect((await t.req({ method: 'GET', url: '/api/music/account' })).json()).toEqual({ loggedIn: false });
+    expect((await t.req({ method: 'GET', url: '/api/music/account' })).json()).toEqual({ loggedIn: false, urls: { fails: 0 } });
+  });
+
+  it('会员到期：确认时查到期时间；过了到期时间就不算会员；登录失效要重新扫码', async () => {
+    const t = await setup();
+    await t.req({ method: 'POST', url: '/api/music/qrcode' });
+    t.ne.setPoll(803);
+    await t.req({ method: 'GET', url: '/api/music/qrcode/key1' });
+    // 续费了：到期时间跟着变
+    t.ne.vip.expire = 2_100_000_000_000;
+    expect((await t.req({ method: 'POST', url: '/api/music/account/check' })).json()).toMatchObject({ vip: true, vipKind: '黑胶VIP', vipUntil: 2_100_000_000_000 });
+    // 到期了：账号不是会员，到期时间还在（后台显示哪天到期的）
+    const past = Date.now() - 86400_000;
+    Object.assign(t.ne.vip, { vipType: 0, expire: past });
+    expect((await t.req({ method: 'POST', url: '/api/music/account/check' })).json()).toMatchObject({ vip: false, vipKind: '黑胶VIP', vipUntil: past });
+    expect(t.ctx.musicAccount.vip()).toBe(false);
+    // 账号说还是会员、会员接口说到期了（没跟上）：以账号为准，到期时间当作不知道
+    t.ne.vip.vipType = 11;
+    const acc = (await t.req({ method: 'POST', url: '/api/music/account/check' })).json();
+    expect(acc).toMatchObject({ vip: true, vipKind: '黑胶VIP' });
+    expect(acc.vipUntil).toBeUndefined();
+  });
+
+  it('拿不到播放地址：连着几首都记着；「现在重试」拿到了就恢复', async () => {
+    const t = await setup();
+    const a = t.ctx.musicAccount;
+    a.urlResult(true, { id: 5, name: '孤勇者' });
+    expect(a.status().urls).toMatchObject({ fails: 0, okName: '孤勇者' });
+    a.urlResult(false, { id: 1, name: '起风了' }, '只拿到试听片段，或者没有地址');
+    a.urlResult(false, { id: 1, name: '起风了' }, '只拿到试听片段，或者没有地址');
+    expect(a.status().urls).toMatchObject({ fails: 2, okName: '孤勇者', failText: '只拿到试听片段，或者没有地址' });
+    t.ne.vip.url = false;
+    expect((await t.req({ method: 'POST', url: '/api/music/account/retry' })).json()).toEqual({ ok: false, text: '《起风了》还是拿不到播放地址' });
+    expect(a.status().urls.fails).toBe(2);
+    t.ne.vip.url = true;
+    expect((await t.req({ method: 'POST', url: '/api/music/account/retry' })).json()).toEqual({ ok: true, text: '《起风了》能拿到了' });
+    expect(a.status().urls).toMatchObject({ fails: 0, okName: '起风了' });
+    expect((await t.req({ method: 'POST', url: '/api/music/account/retry' })).json()).toEqual({ ok: true, text: '最近没有拿不到的歌' });
+  });
+
+  it('本场：还没有直播记录时为空', async () => {
+    const t = await setup();
+    expect((await t.req({ method: 'GET', url: '/api/music/session' })).json()).toEqual({ session: null });
   });
 
   it('搜歌：放不了的也列出来，写明原因', async () => {

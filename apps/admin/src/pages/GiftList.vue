@@ -1,10 +1,10 @@
 <script setup lang="ts">
-// 送礼名单：先选「名单放什么」（自动：本场收到的 / 手动：我挑的记录），一行大白话写出画面上现在会显示什么；
-// 右边是预览和外观（滚动、对齐、字号、条数）；选了手动时左边接着出现送礼记录（按场次）和名单里的记录。
+// 送礼名单：先选「名单放什么」（自动：收到的礼物，可以选时间范围、一份一条还是按人合计 / 手动：我挑的记录），一行大白话写出画面上现在会显示什么；
+// 右边是预览和外观（样式、滚法、标题、速度、对齐、字号、条数）；选了手动或者自动里打开了置顶时，左边接着出现挑好的记录（可以拖动排顺序）和送礼记录（按场次，从这里挑）。
 // 开关、复制地址也在这里，不用跳到「直播软件输出」页
 import { computed, onMounted, ref, watch } from 'vue';
-import { GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_WIDTH, giftListShows, giftsHeight } from '@starfall/shared/overlay';
-import type { GiftListItem, GiftsFilter } from '@starfall/shared/overlay';
+import { GIFTS_ALPHA_MAX, GIFTS_ALPHA_MIN, GIFTS_KEEP, GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_PAGE_HOLD, GIFTS_STEP_HOLD, GIFTS_TITLE_MAX, giftsRange, giftsSourceSize, giftsView } from '@starfall/shared/overlay';
+import type { GiftListItem, GiftsFilter, GiftsLook, GiftsMotion, GiftsRange, GiftsSpeed } from '@starfall/shared/overlay';
 import Avatar from '../components/Avatar.vue';
 import DraftBar from '../components/DraftBar.vue';
 import GiftsFilterPick from '../components/GiftsFilterPick.vue';
@@ -13,7 +13,7 @@ import Icon from '../components/Icon.vue';
 import Switch from '../components/Switch.vue';
 import { del, get, post, put } from '../lib/api.ts';
 import { useDraft } from '../lib/draft.ts';
-import { clock, dateTime } from '../lib/format.ts';
+import { clock, dateTime, inputDateTime, parseInputDateTime } from '../lib/format.ts';
 import { battery } from '../lib/preview.ts';
 import { confirmLeave } from '../lib/route.ts';
 import { overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
@@ -23,16 +23,19 @@ import type { OutputDto } from '../lib/types.ts';
 // ---------- 输出（只有一个输出时不显示切换） ----------
 const selId = ref<number | null>(null);
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
-// 外观（滚动、对齐、字号、条数）先改草稿，点「保存」才到直播画面；预览照着草稿显示
-const look = useDraft(() => o.value, ['giftsSpeed', 'giftsSide', 'giftsSize', 'giftsMax'] as const, (p): Promise<boolean> =>
-  save(p, 'giftsMax' in p || 'giftsSize' in p ? `已保存：浏览器源宽高建议填 ${whOf({ ...o.value!, ...p })}` : '已保存，直播画面已更新'),
+// 外观（样式、滚法、透明度、标题、速度、对齐、字号、条数）先改草稿，点「保存」才到直播画面；预览照着草稿显示
+const look = useDraft(() => o.value, ['giftsLook', 'giftsMotion', 'giftsAlpha', 'giftsTitle', 'giftsSpeed', 'giftsSide', 'giftsSize', 'giftsMax'] as const, (p): Promise<boolean> =>
+  save(p, whOf({ ...o.value!, ...p }) !== whOf(o.value!) ? `已保存：浏览器源宽高建议填 ${whOf({ ...o.value!, ...p })}` : '已保存，直播画面已更新'),
 );
 /** 已保存 + 外观草稿（模板里只在有输出时用） */
 const v = computed(() => ({ ...o.value!, ...look.pending.value }));
 const cfg = computed(() => (o.value ? overlayConfigOf(v.value) : null));
 const online = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'gifts').length);
 const pv = ref<InstanceType<typeof GiftsPreview> | null>(null);
-const whOf = (x: OutputDto) => `${GIFTS_WIDTH} × ${giftsHeight(x.giftsMax, x.giftsSize)}`;
+const whOf = (x: OutputDto) => {
+  const s = giftsSourceSize(x);
+  return `${s.w} × ${s.h}`;
+};
 const wh = computed(() => (o.value ? whOf(o.value) : ''));
 /** 换输出：草稿是上一个输出的，先问再丢掉 */
 function pickOutput(e: Event): void {
@@ -63,7 +66,19 @@ async function copyUrl(): Promise<void> {
 // ---------- 名单放什么 ----------
 const f = computed(() => o.value!.giftsFilter);
 const manual = computed(() => f.value.mode === 'pinned');
-const setFilter = (patch: Partial<GiftsFilter>, msg: string) => void save({ giftsFilter: { ...f.value, ...patch } }, msg);
+/** 最后一次改的名单设置（还在保存中时）：前面几次的保存回来得晚，页面上也还是显示这一次的 */
+let filterNext: { id: number; f: GiftsFilter } | null = null;
+/** 先在页面上改好再保存：连着点几项时，后一项在前一项的基础上改，不会被还没保存完的旧设置盖掉（保存失败时 save 会取回原来的） */
+function setFilter(patch: Partial<GiftsFilter>, msg: string): void {
+  const target = o.value!;
+  const giftsFilter = { ...f.value, ...patch };
+  const mine = (filterNext = { id: target.id, f: giftsFilter });
+  target.giftsFilter = giftsFilter;
+  void save({ giftsFilter }, msg).then((ok) => {
+    if (filterNext === mine) filterNext = null;
+    else if (ok && filterNext && filterNext.id === target.id) target.giftsFilter = filterNext.f;
+  });
+}
 /** 全部礼物时的最低金额（金瓜子；0 为不限） */
 const listMin = computed(() => f.value.minGold ?? 0);
 const yuanOf = (gold: number) => `${gold / 1000} 元`;
@@ -73,8 +88,49 @@ function setMin(gold: number): void {
 function pickAuto(): void {
   if (!manual.value) return;
   // 回到自动：选过礼物种类就接着用，没选过就是全部礼物
-  setFilter({ mode: f.value.gifts.length ? 'only' : 'all' }, '名单改为自动显示本场收到的');
+  setFilter({ mode: f.value.gifts.length ? 'only' : 'all' }, '名单改为自动显示收到的礼物');
 }
+
+// 时间范围
+const range = computed(() => giftsRange(f.value));
+const RANGES: Array<{ value: GiftsRange; label: string; hint: string }> = [
+  { value: 'live', label: '本场直播', hint: '下次开播时清空；没开播时显示上一场的' },
+  { value: 'today', label: '今天', hint: '每天 0 点清空，一天播几场都算在一起；跨夜直播过了 0 点也会清空' },
+  { value: 'week', label: '本周', hint: '每周一 0 点清空' },
+  { value: 'month', label: '本月', hint: '每月 1 号 0 点清空' },
+  { value: 'since', label: '从某个时间起', hint: '从你定的时间开始一直累积，适合生日会、周年、活动，直到你换掉' },
+];
+const rangeName = (r: GiftsRange) => RANGES.find((x) => x.value === r)!.label;
+function setRange(r: GiftsRange): void {
+  if (r === range.value) return;
+  // 第一次选「从某个时间起」：从现在开始算
+  if (r === 'since') return setFilter({ range: r, since: f.value.since ?? Date.now() }, `名单改为从 ${dateTime(f.value.since ?? Date.now())} 起收到的`);
+  setFilter({ range: r }, `名单改为${rangeName(r)}收到的`);
+}
+const sinceValue = computed(() => (f.value.since ? inputDateTime(f.value.since) : ''));
+function setSince(v: string): void {
+  const t = parseInputDateTime(v);
+  if (!Number.isFinite(t)) return;
+  if (t > Date.now()) return toast('开始时间不能晚于现在', 'err');
+  setFilter({ since: t }, `名单改为从 ${dateTime(t)} 起收到的`);
+}
+const sinceNow = () => setFilter({ since: Date.now() }, '名单从现在开始重新算');
+/** 事件记录只保留几天：开始时间比这还早时提醒更早的礼物算不进来 */
+const tooOld = computed(() => {
+  const days = state.settings?.retentionDays ?? 0;
+  return range.value === 'since' && days > 0 && (f.value.since ?? 0) < Date.now() - days * 86_400_000 ? days : 0;
+});
+
+// 显示方式
+const view = computed(() => giftsView(f.value));
+function setView(v: 'item' | 'viewer'): void {
+  if (v !== view.value) setFilter({ view: v }, v === 'viewer' ? '名单改为按人合计：每人一条，送得多的在上面' : '名单改为一份礼物一条');
+}
+
+// 置顶：自动名单的最上面固定显示挑好的记录
+const showRecords = computed(() => manual.value || Boolean(f.value.pinTop));
+/** 名单里的记录这一块叫什么：手动时是名单本身，自动时是置顶的 */
+const pinsTitle = computed(() => (manual.value ? '名单里的记录' : '置顶的记录'));
 function pickManual(): void {
   if (!manual.value) setFilter({ mode: 'pinned' }, '名单改为只显示你挑的记录');
 }
@@ -90,24 +146,56 @@ const summary = computed<{ text: string; bad: boolean }>(() => {
   if (f.value.guard) parts.push('上舰');
   if (f.value.sc) parts.push('醒目留言');
   if (!parts.length) return { text: f.value.mode === 'only' ? '什么都不会显示：还没选礼物，上舰、醒目留言也关着' : '什么都不会显示', bad: true };
-  const n = state.gifts.filter((it) => giftListShows(f.value, it)).length;
+  const when = range.value === 'since' ? `${dateTime(f.value.since ?? 0)} 起` : range.value === 'live' ? '本场' : rangeName(range.value);
   const pre = f.value.mode === 'only' && !f.value.gifts.length ? '（还没选礼物）只有' : '';
-  return { text: `本场的${pre}${parts.join('、')}，现在有 ${n} 条`, bad: false };
+  const n = (state.giftBoards[x.id] ?? []).length;
+  const how = view.value === 'viewer' ? `按人合计，${n >= GIFTS_KEEP ? `名单里放送得最多的 ${GIFTS_KEEP} 人` : `现在有 ${n} 人`}` : `${f.value.sort === 'value' ? '大的在上，' : ''}${f.value.merge ? '同一个人的同一种礼物合成一条，' : ''}${n >= GIFTS_KEEP ? `名单里放${f.value.sort === 'value' ? '最大' : '最新'}的 ${GIFTS_KEEP} 条` : `现在有 ${n} 条`}`;
+  const top = f.value.pinTop ? (pins.value.length ? `；最上面固定 ${Math.min(pins.value.length, Math.max(0, x.giftsMax - 1))} 条你挑的记录` : '；置顶还没挑记录（在下面挑）') : '';
+  return { text: `${when}的${pre}${parts.join('、')}，${how}${top}`, bad: false };
 });
 
 // ---------- 外观 ----------
+/** 标题建议：手动时是一直挂着的记录；自动时按时间范围和显示方式 */
+const titleIdeas = computed(() => {
+  if (manual.value) return ['感谢墙', '荣誉榜'];
+  const rank = view.value === 'viewer';
+  return [{ live: rank ? '本场感谢榜' : '本场礼物', today: rank ? '今日感谢榜' : '今日礼物', week: rank ? '本周榜单' : '本周礼物', month: rank ? '本月榜单' : '本月礼物', since: rank ? '活动榜单' : '活动礼物' }[range.value]];
+});
 function setMax(x: number): void {
   if (!o.value) return;
   const n = Math.round(x);
   if (!(n >= 1 && n <= GIFTS_MAX_LIMIT)) return toast(`条数要在 1 – ${GIFTS_MAX_LIMIT} 之间`, 'err');
   look.set({ giftsMax: n });
 }
-const SPEED: Array<{ value: OutputDto['giftsSpeed']; label: string; hint: string }> = [
-  { value: 'off', label: '不滚动', hint: '固定挂着，放不下时只留最新的几条' },
-  { value: 'slow', label: '慢', hint: '一屏放不下时从下往上循环滚动，约 5 秒一条' },
-  { value: 'normal', label: '中', hint: '一屏放不下时从下往上循环滚动，约 3 秒一条' },
-  { value: 'fast', label: '快', hint: '一屏放不下时从下往上循环滚动，约 2 秒一条' },
+const LOOKS: Array<{ value: GiftsLook; label: string; hint: string }> = [
+  { value: 'jingcai', label: '晶彩', hint: '彩色横条，和礼物特效同一套，颜色按礼物价值分档' },
+  { value: 'glass', label: '流光', hint: '深色毛玻璃，礼物的颜色化成背后一团光；和点歌窗口「流光」是一套' },
+  { value: 'journal', label: '手帐', hint: '点点纸条、和纸胶带、手写字，数量用彩笔圈出来；和点歌窗口「手帐」是一套' },
+  { value: 'island', label: '灵动岛', hint: '黑色胶囊，一行写完，最省地方；和点歌窗口「灵动岛」是一套' },
+  { value: 'esports', label: '电竞', hint: '比赛直播的记分牌：碳纤维纹面板、青色比分框，每条一样' },
+  { value: 'diffuse', label: '弥散', hint: '半透明的雾面卡片，里面有淡淡的柔光，每条一样；透明度可以调' },
+  { value: 'pixel', label: '像素', hint: '复古游戏对话框、像素字，新礼物一个字一个字打出来' },
 ];
+const MOTIONS: Array<{ value: GiftsMotion; label: string; hint: string }> = [
+  { value: 'credits', label: '片尾字幕', hint: '一直慢慢往上走，像片尾字幕' },
+  { value: 'step', label: '逐条上移', hint: '停一会儿往上挪一条，每条都看得清' },
+  { value: 'page', label: '翻页', hint: '一屏停几秒，整屏换成下一屏' },
+  { value: 'marquee', label: '横向跑马灯', hint: '排成一行从右往左走，放在画面最上面或最下面' },
+];
+const SPEED: Array<{ value: GiftsSpeed; label: string }> = [
+  { value: 'off', label: '不滚动' },
+  { value: 'slow', label: '慢' },
+  { value: 'normal', label: '中' },
+  { value: 'fast', label: '快' },
+];
+/** 速度的说明：每种滚法的「快慢」说法不一样 */
+function speedHint(m: GiftsMotion, s: GiftsSpeed): string {
+  if (s === 'off') return m === 'marquee' ? '固定挂着，一行放不下时只留最新的几条' : '固定挂着，放不下时只留最新的几条';
+  if (m === 'step') return `一屏放不下时每条停 ${GIFTS_STEP_HOLD[s]} 秒，再往上挪一条`;
+  if (m === 'page') return `一屏放不下时每页停 ${GIFTS_PAGE_HOLD[s]} 秒，再换下一页`;
+  if (m === 'marquee') return `一行放不下时从右往左循环走（${s === 'slow' ? '慢慢走' : s === 'normal' ? '正常' : '走得快'}）`;
+  return `一屏放不下时从下往上循环滚动，约 ${s === 'slow' ? 5 : s === 'normal' ? 3 : 2} 秒一条`;
+}
 
 // ---------- 送礼记录（按场次，手动时用） ----------
 type Rec = GiftListItem & { eventId: number };
@@ -193,13 +281,31 @@ async function remove(id: number, name: string): Promise<void> {
   const res = await attempt(() => del<{ pins: Pin[] }>(`/api/gift-list/pins/${id}`), `已移出名单：${name}`);
   if (res) pins.value = res.pins;
 }
-async function move(i: number, d: -1 | 1): Promise<void> {
-  const ids = pins.value.map((p) => p.id);
-  const j = i + d;
-  if (j < 0 || j >= ids.length) return;
-  [ids[i], ids[j]] = [ids[j]!, ids[i]!];
-  const res = await attempt(() => put<{ pins: Pin[] }>('/api/gift-list/pins/order', { ids }));
+/** 把第 from 条挪到第 to 个位置：页面上先挪好再保存，保存失败时取回原来的顺序 */
+async function reorder(from: number, to: number): Promise<void> {
+  if (from === to || to < 0 || to >= pins.value.length) return;
+  const next = [...pins.value];
+  const [p] = next.splice(from, 1);
+  next.splice(to, 0, p!);
+  pins.value = next;
+  const res = await attempt(() => put<{ pins: Pin[] }>('/api/gift-list/pins/order', { ids: next.map((x) => x.id) }));
   if (res) pins.value = res.pins;
+  else await loadPins();
+}
+const move = (i: number, d: -1 | 1) => void reorder(i, i + d);
+
+// 拖动排序
+const dragFrom = ref<number | null>(null);
+const dragOver = ref<number | null>(null);
+function onDragStart(e: DragEvent, i: number): void {
+  dragFrom.value = i;
+  e.dataTransfer?.setData('text/plain', String(i));
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+}
+function onDrop(to: number): void {
+  const from = dragFrom.value;
+  dragFrom.value = dragOver.value = null;
+  if (from !== null) void reorder(from, to);
 }
 </script>
 
@@ -222,8 +328,8 @@ async function move(i: number, d: -1 | 1): Promise<void> {
           <div class="card-h"><h2>名单放什么</h2><span class="aside">改了马上生效</span></div>
           <div class="gl-modes" role="radiogroup" aria-label="名单放什么">
             <button type="button" class="gl-mode" role="radio" :aria-checked="!manual" @click="pickAuto">
-              <b><Icon name="i-bolt" />自动：本场收到的</b>
-              <span>直播时收到的礼物自动加进来，下次开播清空</span>
+              <b><Icon name="i-bolt" />自动：收到的礼物</b>
+              <span>收到的礼物自动加进来，可以选本场、今天、本周、本月或者从某个时间起</span>
             </button>
             <button type="button" class="gl-mode" role="radio" :aria-checked="manual" @click="pickManual">
               <b><Icon name="i-pin" />手动：我挑的记录</b>
@@ -232,6 +338,41 @@ async function move(i: number, d: -1 | 1): Promise<void> {
           </div>
 
           <div v-if="!manual" class="srows">
+            <div class="srow">
+              <span class="lb">时间范围</span>
+              <div class="ctl">
+                <span class="seg wrap" role="group" aria-label="时间范围">
+                  <button v-for="r in RANGES" :key="r.value" :aria-pressed="range === r.value" @click="setRange(r.value)">{{ r.label }}</button>
+                </span>
+                <div v-if="range === 'since'" class="line">
+                  <input class="inp dt" type="datetime-local" aria-label="开始时间" :value="sinceValue" :max="inputDateTime(Date.now())" @change="setSince(($event.target as HTMLInputElement).value)" />
+                  <button class="btn sm" type="button" @click="sinceNow">从现在开始算</button>
+                </div>
+                <span class="hint">{{ RANGES.find((r) => r.value === range)?.hint }}</span>
+                <span v-if="tooOld" class="hint warn">事件记录只保留 {{ tooOld }} 天，更早的礼物已经删掉了，算不进来（可以在「设置」里改保留天数）</span>
+              </div>
+            </div>
+            <div class="srow">
+              <span class="lb">显示方式</span>
+              <div class="ctl">
+                <span class="seg" role="group" aria-label="显示方式">
+                  <button :aria-pressed="view === 'item'" @click="setView('item')">一份一条</button>
+                  <button :aria-pressed="view === 'viewer'" @click="setView('viewer')">按人合计（感谢榜）</button>
+                </span>
+                <div v-if="view === 'item'" class="line">
+                  <span class="seg" role="group" aria-label="排序">
+                    <button :aria-pressed="f.sort !== 'value'" @click="f.sort === 'value' && setFilter({ sort: 'time' }, '名单按时间先后排')">按时间</button>
+                    <button :aria-pressed="f.sort === 'value'" @click="f.sort !== 'value' && setFilter({ sort: 'value' }, '名单按金额排，大的在上面')">按金额</button>
+                  </span>
+                  <span class="gap" />
+                  <Switch :model-value="Boolean(f.merge)" label="合并同一个人的同一种礼物" @change="(v) => setFilter({ merge: v }, v ? '同一个人的同一种礼物合成一条' : '每送一次一条')" /><span>合并同一个人的同一种礼物</span>
+                </div>
+                <div v-else class="line">
+                  <Switch :model-value="f.amount !== false" label="显示总金额" @change="(v) => setFilter({ amount: v }, v ? '名单显示每人的总金额（电池）' : '名单不显示金额，只排名次')" /><span>显示总金额（电池）</span>
+                </div>
+                <span class="hint">{{ view === 'viewer' ? '每人一条，按这段时间送的总价值从多到少排，前三名有金银铜标记；有人再送，数字往上涨、名次跟着变' : f.sort === 'value' ? '大礼物排在上面；一屏放不下又不滚动时，留下最大的几条' : '旧的在上、新的在下' }}{{ view === 'item' && f.merge ? '；同一个人分几次送的同一种礼物合成一条，数量加起来' : '' }}</span>
+              </div>
+            </div>
             <div class="srow">
               <span class="lb">哪些礼物</span>
               <div class="ctl">
@@ -254,13 +395,47 @@ async function move(i: number, d: -1 | 1): Promise<void> {
                 <Switch :model-value="f.sc" label="也显示醒目留言" @change="(v) => setFilter({ sc: v }, v ? '名单也显示醒目留言' : '名单不再显示醒目留言')" /><span>醒目留言</span>
               </div></div>
             </div>
+            <div class="srow">
+              <span class="lb">置顶</span>
+              <div class="ctl">
+                <div class="line"><Switch :model-value="Boolean(f.pinTop)" label="置顶我挑的记录" @change="(v) => setFilter({ pinTop: v }, v ? '挑好的记录固定在名单最上面' : '不再置顶')" /><span>把我挑的记录固定在最上面</span></div>
+                <span class="hint">在下面的送礼记录里挑，固定在名单最上面不滚动，下面接着放自动名单；最多占一屏少一条</span>
+              </div>
+            </div>
           </div>
 
           <div class="gl-sum" :class="{ bad: summary.bad }"><Icon :name="summary.bad ? 'i-info' : 'i-check'" /><span><b>现在画面上显示：</b>{{ summary.text }}</span></div>
         </div>
-        <template v-if="manual">
+        <template v-if="showRecords">
         <div class="card">
-          <div class="card-h"><h2>送礼记录</h2><span class="aside">点「加入名单」</span></div>
+          <div class="card-h"><h2>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
+          <div v-if="!pins.length" class="inline-hint">还没有。在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」。</div>
+          <div v-else class="gl-recs">
+            <div
+              v-for="(p, i) in pins"
+              :key="p.id"
+              class="gl-rec pin"
+              :class="{ dragging: dragFrom === i, dropto: dragOver === i && dragFrom !== i }"
+              @dragover.prevent="dragFrom !== null && (dragOver = i)"
+              @dragleave="dragOver === i && (dragOver = null)"
+              @drop.prevent="onDrop(i)"
+            >
+              <span class="rl-no grab" draggable="true" title="按住拖动调整顺序" @dragstart="(e) => onDragStart(e, i)" @dragend="(dragFrom = null), (dragOver = null)"><Icon name="i-grip" class="grip" />{{ i + 1 }}</span>
+              <span class="t num">{{ dateTime(p.item.ts) }}</span>
+              <Avatar :name="p.item.viewer.name" :face="p.item.viewer.face" :guard="p.item.viewer.guard" :size="30" />
+              <span class="who"><b>{{ p.item.viewer.name }}</b><span>{{ what(p.item) }}</span></span>
+              <img v-if="p.item.gift?.img" class="gimg" :src="p.item.gift.img" alt="" referrerpolicy="no-referrer" /><span v-else class="gimg" />
+              <span class="ord">
+                <button class="icon-btn" type="button" aria-label="往上挪" :disabled="i === 0" @click="move(i, -1)"><Icon name="i-chev" style="transform: rotate(180deg)" /></button>
+                <button class="icon-btn" type="button" aria-label="往下挪" :disabled="i === pins.length - 1" @click="move(i, 1)"><Icon name="i-chev" /></button>
+              </span>
+              <button class="btn sm" type="button" @click="remove(p.id, p.item.viewer.name)"><Icon name="i-x" />移出</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h"><h2>送礼记录</h2><span class="aside">{{ manual ? '点「加入名单」' : '点「加入名单」就会置顶' }}</span></div>
           <div class="gl-tools">
             <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
             <input v-model.trim="q" class="inp" placeholder="观众名、UID、礼物名" aria-label="搜观众名、UID、礼物名" />
@@ -282,24 +457,6 @@ async function move(i: number, d: -1 | 1): Promise<void> {
           </div>
           <p v-if="more" class="inline-hint" style="margin: 10px 0 0">只列出了最新的 {{ records.length }} 条，更早的请加上观众名或金额缩小范围。</p>
         </div>
-
-        <div class="card">
-          <div class="card-h"><h2>名单里的记录 {{ pins.length }} 条</h2><span class="aside">最多 {{ pinMax }} 条 · 一直保留到移出</span></div>
-          <div v-if="!pins.length" class="inline-hint">还没有。在左边的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」。</div>
-          <div v-else class="gl-recs">
-            <div v-for="(p, i) in pins" :key="p.id" class="gl-rec pin">
-              <span class="t num">{{ dateTime(p.item.ts) }}</span>
-              <Avatar :name="p.item.viewer.name" :face="p.item.viewer.face" :guard="p.item.viewer.guard" :size="30" />
-              <span class="who"><b>{{ p.item.viewer.name }}</b><span>{{ what(p.item) }}</span></span>
-              <img v-if="p.item.gift?.img" class="gimg" :src="p.item.gift.img" alt="" referrerpolicy="no-referrer" /><span v-else class="gimg" />
-              <span class="ord">
-                <button class="icon-btn" type="button" aria-label="往上挪" :disabled="i === 0" @click="move(i, -1)"><Icon name="i-chev" style="transform: rotate(180deg)" /></button>
-                <button class="icon-btn" type="button" aria-label="往下挪" :disabled="i === pins.length - 1" @click="move(i, 1)"><Icon name="i-chev" /></button>
-              </span>
-              <button class="btn sm" type="button" @click="remove(p.id, p.item.viewer.name)"><Icon name="i-x" />移出</button>
-            </div>
-          </div>
-        </div>
         </template>
       </div>
 
@@ -307,16 +464,55 @@ async function move(i: number, d: -1 | 1): Promise<void> {
       <div class="card">
         <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示</span></div>
         <div class="gl-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
-        <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled || manual" :title="manual ? '手动时只显示名单里的记录' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
+        <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled" :title="manual ? '在名单最后加一条测试记录，看看新加一条时的样子' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
         <h3 class="gl-sub">外观<small>改完点「保存」才到直播画面</small></h3>
         <div class="srows">
           <div class="srow">
-            <span class="lb">滚动</span>
+            <span class="lb">样式</span>
             <div class="ctl">
-              <span class="seg" role="group" aria-label="滚动">
+              <span class="seg wrap" role="group" aria-label="样式">
+                <button v-for="x in LOOKS" :key="x.value" :aria-pressed="v.giftsLook === x.value" @click="look.set({ giftsLook: x.value })">{{ x.label }}</button>
+              </span>
+              <span class="hint">{{ LOOKS.find((x) => x.value === v.giftsLook)?.hint }}</span>
+            </div>
+          </div>
+          <div v-if="v.giftsLook === 'diffuse'" class="srow">
+            <span class="lb">透明度</span>
+            <div class="ctl">
+              <div class="line">
+                <input id="gl-alpha" class="alpha" type="range" :min="GIFTS_ALPHA_MIN" :max="GIFTS_ALPHA_MAX" step="5" :value="v.giftsAlpha" aria-label="弥散卡片的透明度" @input="look.set({ giftsAlpha: Number(($event.target as HTMLInputElement).value) })" />
+                <output for="gl-alpha" class="alpha-v">{{ v.giftsAlpha }}%</output>
+              </div>
+              <span class="hint">越透越能看到后面的直播画面；画面很亮或很花时调低一点，字更清楚</span>
+            </div>
+          </div>
+          <div class="srow">
+            <span class="lb">滚法</span>
+            <div class="ctl">
+              <span class="seg wrap" role="group" aria-label="滚法">
+                <button v-for="x in MOTIONS" :key="x.value" :aria-pressed="v.giftsMotion === x.value" @click="look.set({ giftsMotion: x.value })">{{ x.label }}</button>
+              </span>
+              <span class="hint">{{ MOTIONS.find((x) => x.value === v.giftsMotion)?.hint }}<template v-if="v.giftsMotion === 'marquee'">；浏览器源宽高填 {{ whOf(v) }}</template></span>
+              <span v-if="v.giftsMotion === 'marquee' && f.pinTop && !manual" class="hint warn">跑马灯只有一行：置顶的记录不会单独固定在前面</span>
+            </div>
+          </div>
+          <div class="srow">
+            <span class="lb">标题</span>
+            <div class="ctl">
+              <div class="line">
+                <input :key="`t${o.id}`" class="inp title" :value="v.giftsTitle" :maxlength="GIFTS_TITLE_MAX" placeholder="不加标题就留空" aria-label="名单标题" @input="look.set({ giftsTitle: ($event.target as HTMLInputElement).value })" />
+                <button v-for="t in titleIdeas.filter((x) => x !== v.giftsTitle)" :key="t" class="btn sm" type="button" @click="look.set({ giftsTitle: t })">用「{{ t }}」</button>
+              </div>
+              <span class="hint">显示在名单最上面</span>
+            </div>
+          </div>
+          <div class="srow">
+            <span class="lb">速度</span>
+            <div class="ctl">
+              <span class="seg" role="group" aria-label="速度">
                 <button v-for="s in SPEED" :key="s.value" :aria-pressed="v.giftsSpeed === s.value" @click="look.set({ giftsSpeed: s.value })">{{ s.label }}</button>
               </span>
-              <span class="hint">{{ SPEED.find((s) => s.value === v.giftsSpeed)?.hint }}</span>
+              <span class="hint">{{ speedHint(v.giftsMotion, v.giftsSpeed) }}</span>
             </div>
           </div>
           <div class="srow">
@@ -338,7 +534,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
               </span>
             </div></div>
           </div>
-          <div class="srow">
+          <div v-if="v.giftsMotion !== 'marquee'" class="srow">
             <span class="lb">一屏几条</span>
             <div class="ctl"><div class="line">
               <span class="stepper">
@@ -388,6 +584,13 @@ async function move(i: number, d: -1 | 1): Promise<void> {
 .gl-tools .inp { width: 180px; height: 32px; }
 .gl-tools .sel { height: 32px; min-width: 240px; max-width: 100%; }
 .gl-tools .sel.amt { min-width: 0; width: 120px; }
+.seg.wrap { flex-wrap: wrap; }
+.alpha { width: min(240px, 100%); accent-color: var(--accent); }
+.alpha-v { min-width: 3em; font-family: var(--font-mono); font-size: 12.5px; color: var(--t1); }
+.inp.dt { width: 200px; height: 32px; }
+/* 手动时有两个标题建议：输入框先缩一点，一行放得下 */
+.inp.title { flex: 1 1 120px; max-width: 200px; height: 32px; }
+.hint.warn { color: var(--gov); }
 .gl-recs.all .gl-rec { grid-template-columns: 112px 30px minmax(0, 1fr) 34px 96px 100px; }
 .gl-recs { display: flex; flex-direction: column; max-height: 560px; overflow: auto; margin: 0 -6px; }
 .gl-rec { display: grid; grid-template-columns: 62px 30px minmax(0, 1fr) 34px 96px 100px; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; font-size: 13px; }
@@ -403,5 +606,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
 .gl-rec .ord { display: flex; gap: 2px; }
 .gl-rec .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; justify-content: center; }
 .gl-rec .btn.on { color: var(--accent); }
-.gl-recs .gl-rec.pin { grid-template-columns: 112px 30px minmax(0, 1fr) 34px 64px 72px; }
+.gl-recs .gl-rec.pin { grid-template-columns: 44px 112px 30px minmax(0, 1fr) 34px 64px 72px; }
+.gl-rec.pin.dragging { opacity: .45; }
+.gl-rec.pin.dropto { box-shadow: inset 0 2px 0 0 var(--accent); }
 </style>

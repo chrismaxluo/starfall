@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_ALPHA_DEFAULT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -162,6 +162,11 @@ const OutputPart = OutputInputSchema.extend({
   giftsMax: OutputInputSchema.shape.giftsMax.default(GIFTS_MAX_DEFAULT),
   giftsSpeed: OutputInputSchema.shape.giftsSpeed.default('normal'),
   giftsFilter: OutputInputSchema.shape.giftsFilter.default(GIFTS_FILTER_DEFAULT),
+  // 名单标题、外观、滚法是 v1.8 加的
+  giftsTitle: OutputInputSchema.shape.giftsTitle.default(''),
+  giftsLook: OutputInputSchema.shape.giftsLook.default('jingcai'),
+  giftsMotion: OutputInputSchema.shape.giftsMotion.default('credits'),
+  giftsAlpha: OutputInputSchema.shape.giftsAlpha.default(GIFTS_ALPHA_DEFAULT),
 });
 
 export const ConfigFileSchema = z.object({
@@ -368,7 +373,7 @@ export class ConfigIO {
         return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
       }),
       ...(this.d.music ? { music: this.d.music.cfg() } : {}),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha })),
     };
   }
 

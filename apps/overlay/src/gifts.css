@@ -1,58 +1,340 @@
-/* 送礼名单：和礼物特效（晶礼）同一套样子的小号横条，一屏放不下时从下往上循环滚动。尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍（--k）。
-   颜色按价值分档（--c1 主色、--c2 渐变色、--c3 亮色），上舰按舰长蓝、提督紫、总督红金 */
+/* 送礼名单。尺寸按 640 宽的浏览器源设计（跑马灯按 1080 × 150），字号「大」整体放大 1.25 倍（--k）。
+   每条的结构都一样（.gl-row > .gl-bar > .gl-fx 装饰层、.gl-rank 名次、.gl-avw 头像、.gl-tx 名字和内容、.gl-pic 礼物图、.gl-num 数量），
+   七种外观（.look-*）各自一套样子；颜色按价值分档（--c1 主色、--c2 渐变色、--c3 亮色），上舰按舰长蓝、提督紫、总督红金。
+   上面不滚动的部分（.gl-head）放标题和置顶的记录，下面是滚动窗口（.gl-view，两头淡出）。
+   直播软件的旧内核不认 color-mix()、单独的 translate / scale / rotate 属性，这里都不用 */
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-cond: "Barlow Condensed", "Geist Sans", sans-serif;
+  --font-hand: "LXGW WenKai", "Noto Serif SC", serif;
+  --font-pixel: "Fusion Pixel 12px Proportional SC", "Geist Mono", monospace;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: transparent; color: #fff; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
 /* 在浏览器里查看：深色背景 */
-html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%, rgba(255,170,90,.3), transparent 70%), radial-gradient(60% 40% at 85% 70%, rgba(90,160,255,.3), transparent 70%), #121320; }
+html.gl-view-page, html.gl-view-page body { background: radial-gradient(60% 40% at 25% 40%, rgba(255,170,90,.3), transparent 70%), radial-gradient(60% 40% at 85% 70%, rgba(90,160,255,.3), transparent 70%), #121320; }
 
-.gl-root { position: fixed; inset: 0; overflow: hidden; --k: 1; }
+.gl-root { position: fixed; inset: 0; overflow: hidden; display: flex; flex-direction: column; --k: 1; line-height: 1.25; }
 .gl-root.large { --k: 1.25; }
-.gl-root.off .gl { display: none; }
-.gl { position: absolute; left: 0; right: 0; top: 0; padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; zoom: var(--k); will-change: transform; }
-/* 循环滚动：上下两头淡出 */
-.gl-root { -webkit-mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); }
-.side-left .gl { align-items: flex-start; }
-.side-right .gl { align-items: flex-end; }
+.gl-root.off .gl, .gl-root.off .gl-head, .gl-root.off .gl-dots { display: none; }
+.gl-head { flex: none; padding: 20px 18px 0; display: flex; flex-direction: column; gap: 10px; zoom: var(--k); }
+.gl-head[hidden] { display: none; }
+.gl-pins { display: flex; flex-direction: column; gap: var(--gap, 10px); align-items: inherit; }
+.gl-view { position: relative; flex: none; overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); }
+.gl { position: absolute; left: 0; right: 0; top: 0; padding: 20px 18px; display: flex; flex-direction: column; gap: var(--gap, 10px); zoom: var(--k); will-change: transform; }
+.side-left .gl, .side-left .gl-head { align-items: flex-start; }
+.side-right .gl, .side-right .gl-head { align-items: flex-end; }
+/* 翻页：第几页的小点，在名单下面 */
+.gl-dots { flex: none; display: flex; gap: 7px; padding: 2px 26px; zoom: var(--k); }
+.side-right .gl-dots { justify-content: flex-end; }
+.gl-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.4); box-shadow: 0 0 0 1px rgba(0,0,0,.28); transition: background .3s, transform .3s; }
+.gl-dots i.on { background: #fff; transform: scale(1.25); }
+/* 横向跑马灯：标题在左边，名单排成一行从右往左走 */
+.gl-root.motion-marquee { flex-direction: row; align-items: center; }
+.gl-root.motion-marquee .gl-head { padding: 0 0 0 20px; align-items: flex-start; z-index: 2; }
+.gl-root.motion-marquee .gl-view { flex: 1; align-self: stretch; min-width: 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 96%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 96%, transparent); }
+.gl-root.motion-marquee .gl { top: 0; bottom: 0; right: auto; width: max-content; flex-direction: row; align-items: center; padding: 0 20px; gap: var(--mgap, 18px); }
+.gl-root.motion-marquee .gl-dots { display: none; }
 
-.gl-row { position: relative; padding-top: 14px; }
-.gl-bar { position: relative; display: flex; align-items: center; gap: 14px; height: 72px; width: min(580px, calc(100vw / var(--k) - 36px)); padding: 0 168px 0 9px; border-radius: 36px; color: #fff;
+/* ---------- 每种外观共用的结构 ---------- */
+.gl-row { position: relative; flex: none; }
+.gl-row[hidden] { display: none; }
+.gl-bar { position: relative; display: flex; align-items: center; color: #fff; }
+.gl-fx { position: absolute; pointer-events: none; }
+.gl-avw { display: contents; }
+.gl-root .av { position: relative; flex: none; border-radius: 50%; display: grid; place-items: center; overflow: hidden; font-size: 22px; font-weight: 600; color: #fff; }
+.gl-root .av img { width: 100%; height: 100%; object-fit: cover; }
+.gl-root .av-framed { position: relative; display: inline-grid; flex: none; }
+.gl-root .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
+.gl-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gl-root .nm, .gl-root .say { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gl-root .nm { max-width: 8em; }
+.gl-root .say { max-width: 15em; }
+.gl-root .say .times { opacity: .8; }
+.gl-pic { flex: none; display: grid; place-items: center; }
+.gl-img { width: 100%; height: 100%; object-fit: contain; }
+.gl-badge { width: 86%; height: 86%; object-fit: contain; }
+.gl-num { flex: none; white-space: nowrap; }
+.gl-num small { font-size: .6em; }
+.kind-gift .gl-num .unit { display: none; }
+.gl-rank { flex: none; display: grid; place-items: center; }
+.gl-title { white-space: nowrap; }
+.gl-title span { display: block; max-width: calc(100vw / var(--k) - 90px); overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 晶彩：和礼物特效（晶礼）同一套样子的彩色横条（以前就是这个样子） ---------- */
+.look-jingcai .gl-row { padding-top: 14px; }
+.look-jingcai .gl-bar { gap: 14px; height: 72px; width: min(580px, calc(100vw / var(--k) - 36px)); padding: 0 168px 0 9px; border-radius: 36px;
   background:
     repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 12px, transparent 12px 26px),
     linear-gradient(100deg, var(--c1-94), var(--c2-78) 58%, var(--c2-end)),
     rgba(16,14,32,.55);
   box-shadow: inset 0 1.5px 0 rgba(255,255,255,.5), inset 0 0 0 1.5px rgba(255,255,255,.2), 0 0 30px -8px var(--c1-75), 0 14px 30px -14px rgba(0,0,0,.6); }
-.gl-row.no-pic .gl-bar { padding-right: 96px; }
-.gl-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
-.gl-sheen { position: absolute; top: -30%; bottom: -30%; left: -30%; width: 22%; transform: skewX(-20deg); opacity: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); }
-
-/* 头像（大航海套 B站头像框） */
-.gl .av { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; font-size: 23px; font-weight: 600;
-  box-shadow: 0 0 0 2.5px #fff, 0 0 0 5.5px var(--c3-70), 0 4px 12px -3px rgba(0,0,0,.5); }
-.gl .av img { width: 100%; height: 100%; object-fit: cover; }
-.gl .av-framed { position: relative; display: inline-grid; flex: none; }
-.gl .av-framed .av { box-shadow: 0 4px 12px -3px rgba(0,0,0,.5); }
-.gl .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
-
-.gl-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.gl .nm { font-size: 24px; font-weight: 700; max-width: 8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 8px rgba(0,0,0,.3); }
-.gl .say { font-size: 18px; color: rgba(255,255,255,.88); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 15em; text-shadow: 0 1px 6px rgba(0,0,0,.25); }
-.gl .say b { color: #fff; font-weight: 700; }
-
-/* 右边：礼物图（上舰是船锚，醒目留言是 SC 标），数量 */
-.gl-pic { position: absolute; right: 74px; top: 0; width: 88px; height: 88px; display: grid; place-items: center; filter: drop-shadow(0 8px 12px rgba(0,0,0,.45)); }
-.gl-img { width: 100%; height: 100%; object-fit: contain; }
-.gl-badge { width: 70px; height: 70px; object-fit: contain; }
-.gl-sc { padding: 4px 12px; border-radius: 10px; background: #fff; color: var(--c1-dark); font: italic 800 26px/1 var(--font-mono); letter-spacing: .02em; box-shadow: 0 0 0 3px var(--c3-70); }
-.gl-num { position: absolute; right: 10px; top: calc(14px + 36px); transform: translateY(-50%); padding: 0 .14em .05em .04em; font-family: var(--font-mono); font-weight: 800; font-style: italic; font-size: 36px; line-height: 1; letter-spacing: -.03em;
+.look-jingcai .no-pic .gl-bar { padding-right: 96px; }
+.look-jingcai .gl-fx { inset: 0; border-radius: inherit; overflow: hidden; }
+.look-jingcai .gl-fx::after { content: ""; position: absolute; top: -30%; bottom: -30%; left: -30%; width: 22%; transform: skewX(-20deg); opacity: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); }
+.look-jingcai .av { width: 54px; height: 54px; font-size: 23px; box-shadow: 0 0 0 2.5px #fff, 0 0 0 5.5px var(--c3-70), 0 4px 12px -3px rgba(0,0,0,.5); }
+.look-jingcai .av-framed .av { box-shadow: 0 4px 12px -3px rgba(0,0,0,.5); }
+.look-jingcai .nm { font-size: 24px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.look-jingcai .say { font-size: 18px; color: rgba(255,255,255,.88); text-shadow: 0 1px 6px rgba(0,0,0,.25); }
+.look-jingcai .say b { color: #fff; font-weight: 700; }
+.look-jingcai .gl-pic { position: absolute; right: 74px; top: -14px; width: 88px; height: 88px; filter: drop-shadow(0 8px 12px rgba(0,0,0,.45)); }
+.look-jingcai .gl-badge { width: 70px; height: 70px; }
+.look-jingcai .gl-sc { padding: 4px 12px; border-radius: 10px; background: #fff; color: var(--c1-dark); font: italic 800 26px/1 var(--font-mono); letter-spacing: .02em; box-shadow: 0 0 0 3px var(--c3-70); }
+.look-jingcai .gl-num { position: absolute; right: 10px; top: 36px; transform: translateY(-50%); padding: 0 .14em .05em .04em; font-family: var(--font-mono); font-weight: 800; font-style: italic; font-size: 36px; line-height: 1; letter-spacing: -.03em;
   background: linear-gradient(180deg, #fff 35%, var(--c3) 70%, var(--c2)); -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 2px 0 var(--c1-dark)); }
-.gl-num small { font-size: 22px; margin-right: 1px; }
-.gl-num.months small:last-child, .gl-num.yuan small { font-size: 16px; font-style: normal; margin-left: 2px; }
-.gl-row.no-pic .gl-num { right: 18px; }
+.look-jingcai .gl-num .x { font-size: 22px; margin-right: 1px; }
+.look-jingcai .gl-num .unit { font-size: 16px; font-style: normal; margin-left: 2px; }
+.look-jingcai .no-pic .gl-num { right: 18px; }
+.look-jingcai .gl-rank { width: 34px; height: 34px; margin: 0 0 0 2px; border-radius: 50%; font: italic 800 19px/1 var(--font-mono); color: #fff; background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.35); text-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.look-jingcai .gl-rank.small { font-size: 14px; }
+.look-jingcai .gl-rank.r1, .look-jingcai .gl-rank.r2, .look-jingcai .gl-rank.r3 { width: 38px; height: 38px; font-size: 21px; text-shadow: none; }
+.look-jingcai .gl-rank.r1 { color: #6B3A00; background: radial-gradient(circle at 35% 30%, #FFF6C8, #FFD54A 45%, #E8A000); box-shadow: 0 0 0 2px #FFF1B0, 0 0 16px rgba(255,200,40,.8); }
+.look-jingcai .gl-rank.r2 { color: #3B4656; background: radial-gradient(circle at 35% 30%, #FFFFFF, #D6DEE8 45%, #9AA8BA); box-shadow: 0 0 0 2px #F2F5F9, 0 0 14px rgba(210,225,245,.7); }
+.look-jingcai .gl-rank.r3 { color: #5A2A10; background: radial-gradient(circle at 35% 30%, #FFE2C4, #E9A06A 45%, #B8642F); box-shadow: 0 0 0 2px #FFD9B8, 0 0 14px rgba(230,140,80,.7); }
+.look-jingcai .kind-viewer .gl-bar { padding-right: 222px; }
+.look-jingcai .kind-viewer.no-pic .gl-bar { padding-right: 150px; }
+.look-jingcai .kind-viewer.no-num .gl-bar { padding-right: 96px; }
+.look-jingcai .kind-viewer.no-pic.no-num .gl-bar { padding-right: 24px; }
+.look-jingcai .kind-viewer .gl-pic { width: 72px; height: 72px; top: 0; right: 142px; }
+.look-jingcai .kind-viewer .gl-badge { width: 60px; height: 60px; }
+.look-jingcai .kind-viewer.no-num .gl-pic { right: 14px; }
+.look-jingcai .kind-viewer .gl-num { font-size: 32px; }
+.look-jingcai .kind-viewer .gl-num .unit { font-size: 15px; margin: 0 0 0 3px; }
+.look-jingcai .kind-viewer .gl-sc { font-size: 22px; }
+/* 字号大时放不下：不显示礼物图，给名字让出位置 */
+.large.look-jingcai .kind-viewer .gl-pic { display: none; }
+.large.look-jingcai .kind-viewer .gl-bar { padding-right: 150px; }
+.large.look-jingcai .kind-viewer.no-num .gl-bar { padding-right: 24px; }
+.look-jingcai .gl-title { display: inline-flex; align-items: center; gap: 10px; padding: 9px 22px 9px 16px; border-radius: 999px; color: #fff; font-size: 24px; font-weight: 800; letter-spacing: .08em; line-height: 1.2;
+  background: linear-gradient(100deg, rgba(255,177,61,.96), rgba(255,94,138,.92) 70%, rgba(184,92,255,.9));
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 0 0 1.5px rgba(255,255,255,.22), 0 0 26px -8px rgba(255,140,90,.8), 0 12px 26px -14px rgba(0,0,0,.6); text-shadow: 0 2px 6px rgba(120,30,40,.35); }
+.look-jingcai .gl-title::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.3), 0 0 12px #fff; }
+.motion-marquee.look-jingcai .gl-bar { width: auto; padding-right: 22px; }
+.motion-marquee.look-jingcai .gl-pic { position: relative; right: auto; top: -10px; width: 76px; height: 76px; margin: 0 -4px 0 4px; }
+.motion-marquee.look-jingcai .gl-num { position: static; transform: none; }
 
-.notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; }
+/* ---------- 流光：深色毛玻璃，礼物颜色化成背后一团慢慢游动的光（配点歌窗口「流光」） ---------- */
+.look-glass .gl { --gap: 12px; }
+.look-glass .gl-bar { width: min(556px, calc(100vw / var(--k) - 36px)); height: 78px; padding: 0 20px 0 13px; gap: 14px; border-radius: 26px; overflow: hidden; isolation: isolate;
+  background: linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.03) 60%), rgba(14,16,28,.6);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 0 0 1px rgba(255,255,255,.12), 0 20px 40px -24px rgba(0,0,0,.75); }
+.look-glass .gl-fx { inset: -20px; z-index: -1; opacity: .72; filter: blur(8px); animation: gl-glass-drift 9s ease-in-out infinite alternate;
+  background: radial-gradient(110px 70px at 70px 50%, var(--c1-80), transparent 72%), radial-gradient(170px 80px at calc(100% - 110px) 50%, var(--c2-75), transparent 72%); }
+@keyframes gl-glass-drift { to { transform: translateX(18px) scaleY(1.1); } }
+.look-glass .av { width: 52px; height: 52px; box-shadow: 0 0 0 1.5px rgba(255,255,255,.6), 0 6px 16px -6px rgba(0,0,0,.6); }
+.look-glass .nm { font-size: 21px; font-weight: 600; letter-spacing: .01em; text-shadow: 0 1px 10px rgba(0,0,0,.45); }
+.look-glass .say { font-size: 16px; color: rgba(255,255,255,.72); }
+.look-glass .say b { color: var(--c3); font-weight: 600; }
+.look-glass .kind-sc .say { color: rgba(255,255,255,.9); }
+.look-glass .gl-pic { margin-left: auto; width: 60px; height: 60px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
+.look-glass .gl-num { min-width: 70px; text-align: right; font: 600 29px/1 var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; text-shadow: 0 0 18px var(--c1-70); }
+.look-glass .gl-num .x { font-size: 15px; color: rgba(255,255,255,.6); margin-right: 2px; }
+.look-glass .gl-num .unit { font-size: 15px; margin-left: 3px; }
+.look-glass .gl-sc { padding: 5px 9px; border-radius: 9px; font: 700 17px/1 var(--font-mono); color: #fff; background: linear-gradient(135deg, var(--c1-80), var(--c2-75)); box-shadow: inset 0 1px 0 rgba(255,255,255,.4); }
+.look-glass .gl-rank { width: 30px; font: 600 22px/1 var(--font-mono); color: rgba(255,255,255,.62); }
+.look-glass .gl-rank.r1, .look-glass .gl-rank.r2, .look-glass .gl-rank.r3 { font-size: 26px; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 8px rgba(255,255,255,.25)); }
+.look-glass .gl-rank.r1 { background-image: linear-gradient(180deg, #FFF7CF, #FFC83D 60%, #E59B00); }
+.look-glass .gl-rank.r2 { background-image: linear-gradient(180deg, #FFFFFF, #CBD5E3 60%, #93A2B8); }
+.look-glass .gl-rank.r3 { background-image: linear-gradient(180deg, #FFE6CC, #E8A066 60%, #B5652E); }
+.look-glass .kind-viewer .gl-num { font-size: 26px; }
+.look-glass .kind-viewer .gl-num .unit { font-size: 13px; color: rgba(255,255,255,.6); }
+.look-glass .gl-title { display: inline-flex; align-items: center; gap: 12px; padding: 10px 22px 10px 16px; border-radius: 999px; font-size: 21px; font-weight: 600; letter-spacing: .14em;
+  background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04)), rgba(14,16,28,.6); -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 0 0 1px rgba(255,255,255,.12), 0 16px 34px -22px rgba(0,0,0,.75); }
+.look-glass .gl-title::before { content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%; background: conic-gradient(from 0deg, #FF8A5B, #FF5FA2, #8A7BFF, #4FC3FF, #FF8A5B); box-shadow: 0 0 12px rgba(255,140,200,.8); animation: gl-spin 4s linear infinite; }
+@keyframes gl-spin { to { transform: rotate(1turn); } }
+.motion-marquee.look-glass .gl-bar { width: auto; height: 70px; }
+.motion-marquee.look-glass .gl-pic { margin-left: 6px; width: 54px; height: 54px; }
+
+/* ---------- 手帐：点点纸条、和纸胶带、手写字，礼物图是贴纸，数量用彩笔圈出来（配点歌窗口「手帐」） ---------- */
+.look-journal .gl { --gap: 16px; }
+.look-journal .gl-bar { width: min(536px, calc(100vw / var(--k) - 40px)); height: 78px; padding: 0 22px 0 14px; gap: 14px; color: #3A3128; border-radius: 3px; transform: rotate(var(--rot));
+  background: radial-gradient(circle, rgba(90,70,45,.16) 1.1px, transparent 1.5px) 7px 7px / 14px 14px, linear-gradient(180deg, #FFFDF6, #FBF6E9);
+  box-shadow: 0 1px 1px rgba(60,40,20,.08), 0 12px 20px -12px rgba(40,25,10,.55), 0 3px 6px rgba(40,25,10,.12); }
+.look-journal .gl-fx { left: var(--tape); top: -12px; width: 86px; height: 24px; transform: rotate(var(--trot)); transform-origin: left center; opacity: .88;
+  background: repeating-linear-gradient(-45deg, rgba(255,255,255,.38) 0 5px, transparent 5px 10px), var(--c2-75);
+  -webkit-clip-path: polygon(0 0, 100% 0, 97% 22%, 100% 44%, 97% 66%, 100% 88%, 98% 100%, 0 100%, 3% 80%, 0 58%, 3% 36%, 0 14%); clip-path: polygon(0 0, 100% 0, 97% 22%, 100% 44%, 97% 66%, 100% 88%, 98% 100%, 0 100%, 3% 80%, 0 58%, 3% 36%, 0 14%); }
+.look-journal .av { width: 54px; height: 54px; border: 3.5px solid #fff; box-shadow: 0 3px 8px rgba(40,25,10,.3); transform: rotate(var(--arot)); }
+.look-journal .nm { font: 400 25px/1.2 var(--font-hand); color: #2E261E; }
+.look-journal .say { font: 400 18px/1.3 var(--font-hand); color: #7A6A58; }
+.look-journal .say b { font-weight: 400; color: #3A3128; padding: 0 3px; background: linear-gradient(transparent 54%, var(--c2-45) 54%, var(--c2-45) 90%, transparent 90%); }
+.look-journal .kind-sc .say { color: #3A3128; }
+.look-journal .gl-pic { margin-left: auto; width: 58px; height: 58px; transform: rotate(6deg); filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff) drop-shadow(0 4px 5px rgba(40,25,10,.3)); }
+.look-journal .gl-num { position: relative; margin-left: 8px; padding: 0 6px; font: 400 32px/1 var(--font-hand); color: var(--c1-dark); }
+.look-journal .gl-num::after { content: ""; position: absolute; inset: -9px -8px -7px -8px; border: 2.5px solid var(--c1); border-radius: 56% 44% 52% 48% / 46% 58% 42% 54%; transform: rotate(-6deg); opacity: .85; }
+.look-journal .gl-num .x { font-size: 20px; }
+.look-journal .gl-num .unit { font-size: 17px; margin-left: 2px; }
+.look-journal .gl-sc { padding: 3px 7px; border: 2.5px solid #D2483C; border-radius: 5px; color: #D2483C; font: 700 18px/1 var(--font-mono); transform: rotate(-10deg); opacity: .9; }
+.look-journal .gl-rank { width: 40px; height: 40px; font: 400 22px/1 var(--font-hand); color: #8A7A66; }
+.look-journal .gl-rank.r1, .look-journal .gl-rank.r2, .look-journal .gl-rank.r3 { width: 46px; height: 46px; color: #fff; font-size: 20px; padding-top: 3px; text-shadow: 0 1px 1px rgba(0,0,0,.25); transform: rotate(-8deg);
+  -webkit-clip-path: polygon(50% 0, 61% 34%, 98% 35%, 68% 56%, 79% 91%, 50% 70%, 21% 91%, 32% 56%, 2% 35%, 39% 34%); clip-path: polygon(50% 0, 61% 34%, 98% 35%, 68% 56%, 79% 91%, 50% 70%, 21% 91%, 32% 56%, 2% 35%, 39% 34%); }
+.look-journal .gl-rank.r1 { background: linear-gradient(160deg, #FFD95A, #F2A900); }
+.look-journal .gl-rank.r2 { background: linear-gradient(160deg, #D9E1EA, #9BA9BC); }
+.look-journal .gl-rank.r3 { background: linear-gradient(160deg, #F2B98A, #C9733A); }
+.look-journal .kind-viewer .gl-num { font-size: 27px; }
+.look-journal .kind-viewer .gl-num .unit { font-size: 15px; }
+.look-journal .gl-title { padding: 9px 30px 10px; font: 400 26px/1.1 var(--font-hand); color: #5A4126; transform: rotate(-2deg); letter-spacing: .06em;
+  background: repeating-linear-gradient(90deg, rgba(120,80,30,.07) 0 2px, transparent 2px 6px), #E6CF9F; filter: drop-shadow(0 6px 8px rgba(40,25,10,.35));
+  -webkit-clip-path: polygon(0 6%, 2% 0, 100% 0, 98% 30%, 100% 62%, 98% 100%, 0 100%, 2% 70%, 0 38%); clip-path: polygon(0 6%, 2% 0, 100% 0, 98% 30%, 100% 62%, 98% 100%, 0 100%, 2% 70%, 0 38%); }
+.motion-marquee.look-journal .gl-bar { width: auto; height: 70px; }
+.motion-marquee.look-journal .gl-pic { margin-left: 4px; width: 50px; height: 50px; }
+
+/* ---------- 灵动岛：黑色胶囊，一行写完，最省地方（配点歌窗口「灵动岛」） ---------- */
+.look-island .gl { --gap: 10px; }
+.look-island .gl-bar { height: 64px; min-width: 330px; max-width: min(604px, calc(100vw / var(--k) - 36px)); padding: 0 24px 0 10px; gap: 12px; border-radius: 32px; background: #000;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 12px 24px -14px rgba(0,0,0,.7), 0 10px 28px -16px var(--c1); }
+.look-island .av { width: 44px; height: 44px; font-size: 19px; box-shadow: 0 0 0 2px #000, 0 0 0 3.5px var(--c1); }
+.look-island .gl-tx { flex-direction: row; align-items: baseline; gap: 9px; }
+.look-island .nm { font-size: 19px; font-weight: 600; max-width: 7em; }
+.look-island .say { font-size: 17px; color: rgba(255,255,255,.52); max-width: 12em; }
+.look-island .say b { color: #fff; font-weight: 500; }
+.look-island .kind-sc .say { color: rgba(255,255,255,.85); max-width: 11em; }
+.look-island .gl-pic { width: 42px; height: 42px; margin-left: 4px; }
+.look-island .gl-num { font: 600 21px/1 var(--font-mono); color: var(--c3); font-variant-numeric: tabular-nums; }
+.look-island .gl-num .x { font-size: 14px; opacity: .65; margin-right: 1px; }
+.look-island .gl-num .unit { font-size: 13px; margin-left: 2px; }
+.look-island .gl-sc { padding: 4px 7px; border-radius: 7px; font: 700 14px/1 var(--font-mono); color: #000; background: var(--c3); }
+.look-island .gl-rank { width: 28px; height: 28px; border-radius: 50%; font: 600 15px/1 var(--font-mono); color: rgba(255,255,255,.7); background: #1C1C1E; }
+.look-island .gl-rank.r1 { color: #000; background: linear-gradient(160deg, #FFE27A, #F5B400); }
+.look-island .gl-rank.r2 { color: #000; background: linear-gradient(160deg, #F1F4F8, #AAB6C6); }
+.look-island .gl-rank.r3 { color: #000; background: linear-gradient(160deg, #F7C9A0, #CD7F45); }
+.look-island .gl-title { display: inline-flex; align-items: center; gap: 10px; height: 46px; padding: 0 20px 0 16px; border-radius: 23px; background: #000; font-size: 18px; font-weight: 600; letter-spacing: .06em; box-shadow: 0 0 0 1px rgba(255,255,255,.07); }
+.look-island .gl-title::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: #34D163; box-shadow: 0 0 10px #34D163; animation: gl-live 1.6s ease-in-out infinite; }
+@keyframes gl-live { 50% { opacity: .35; } }
+.motion-marquee.look-island .gl-bar { min-width: 0; }
+
+/* ---------- 电竞：比赛直播的记分牌。左边碳纤维纹的深色斜切面板放头像和名字，右边带网点的亮青色比分框放数量；每条一样 ---------- */
+.look-esports { --acc: #2AE5FF; --acc2: #8CF4FF; --ink: #06101C;
+  --carbon: linear-gradient(90deg, rgba(8,12,26,.62), rgba(18,24,46,.5)),
+    linear-gradient(27deg, #070A16 3.5px, transparent 3.5px) 0 3.5px / 14px 14px,
+    linear-gradient(207deg, #070A16 3.5px, transparent 3.5px) 7px 0 / 14px 14px,
+    linear-gradient(27deg, #1A2140 3.5px, transparent 3.5px) 0 7px / 14px 14px,
+    linear-gradient(207deg, #1A2140 3.5px, transparent 3.5px) 7px 3.5px / 14px 14px,
+    linear-gradient(90deg, #0E1328 7px, transparent 7px) 0 0 / 14px 14px,
+    linear-gradient(#121830 25%, #0D1225 25% 50%, transparent 50% 75%, #1A2244 75%) 0 0 / 14px 14px,
+    #0C1022; }
+.look-esports .gl { --gap: 10px; padding-right: 30px; }
+.look-esports .gl-bar { width: min(560px, calc(100vw / var(--k) - 48px)); height: 70px; padding: 0 0 0 22px; gap: 14px; isolation: isolate; }
+.look-esports .gl-bar::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; right: 100px; z-index: -2; transform: skewX(-14deg); border-radius: 2px; background: var(--carbon);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 12px 22px -12px rgba(0,0,0,.8); }
+.look-esports .gl-bar::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 6px; z-index: -1; transform: skewX(-14deg); background: var(--acc); box-shadow: 0 0 14px rgba(42,229,255,.6); }
+.look-esports .gl-fx { top: 0; bottom: 0; left: 0; right: 100px; z-index: 3; transform: skewX(-14deg); background: #fff; opacity: 0; mix-blend-mode: overlay; }
+.look-esports .gl-avw { display: block; flex: none; padding: 2px; background: rgba(255,255,255,.9); -webkit-clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+.look-esports .av { width: 44px; height: 44px; font-size: 19px; border-radius: 0; -webkit-clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+.look-esports .av-frame { display: none; }
+.look-esports .nm { font-size: 21px; font-weight: 900; font-style: italic; letter-spacing: .02em; }
+.look-esports .say { font-size: 14px; font-weight: 700; color: #8E99B8; letter-spacing: .06em; }
+.look-esports .say b { color: var(--acc); }
+.look-esports .kind-sc .say { color: #E2E7F5; }
+.look-esports .gl-pic { margin-left: auto; margin-right: 112px; width: 54px; height: 54px; filter: drop-shadow(0 0 10px rgba(42,229,255,.35)); }
+.look-esports .gl-num { position: absolute; right: 0; top: 0; bottom: 0; width: 96px; z-index: 0; display: flex; flex-wrap: wrap; align-content: center; align-items: baseline; justify-content: center;
+  font: italic 800 40px/1 var(--font-cond); color: var(--ink); letter-spacing: .01em; }
+.look-esports .gl-num::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: skewX(-14deg); border-radius: 2px;
+  background: radial-gradient(circle, rgba(6,16,28,.2) 1.1px, transparent 1.7px) 0 0 / 6px 6px, linear-gradient(180deg, var(--acc2), var(--acc)); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 0 24px -6px rgba(42,229,255,.8); }
+.look-esports .gl-num .x { font-size: 22px; margin-right: 1px; }
+.look-esports .gl-num .unit { font-size: 15px; margin-left: 2px; letter-spacing: .04em; }
+.look-esports .no-num .gl-pic { margin-right: 24px; }
+.look-esports .no-num .gl-bar::before, .look-esports .no-num .gl-fx { right: 0; }
+.look-esports .gl-sc { padding: 4px 8px; font: italic 800 20px/1 var(--font-cond); color: var(--ink); background: var(--acc); transform: skewX(-14deg); }
+.look-esports .gl-rank { position: relative; z-index: 0; width: 56px; height: 70px; margin: 0 -2px 0 -22px; font: italic 800 30px/1 var(--font-cond); color: #fff; }
+.look-esports .gl-rank::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: skewX(-14deg); background: #262C44; border-radius: 2px 0 0 2px; }
+.look-esports .gl-rank.r1 { color: #2A1B00; }
+.look-esports .gl-rank.r1::before { background: linear-gradient(180deg, #FFE37A, #FFB800); }
+.look-esports .gl-rank.r2 { color: #1B2230; }
+.look-esports .gl-rank.r2::before { background: linear-gradient(180deg, #F3F6FA, #B4C0D0); }
+.look-esports .gl-rank.r3 { color: #2A1406; }
+.look-esports .gl-rank.r3::before { background: linear-gradient(180deg, #FFC79A, #DE7E3E); }
+.look-esports .kind-viewer .gl-bar::after { display: none; }
+.look-esports .kind-viewer .gl-bar::before, .look-esports .kind-viewer .gl-fx { right: 128px; }
+.look-esports .kind-viewer .gl-pic { margin-right: 140px; }
+.look-esports .kind-viewer .gl-num { width: 124px; font-size: 32px; }
+.look-esports .kind-viewer.no-num .gl-bar::before, .look-esports .kind-viewer.no-num .gl-fx { right: 0; }
+.look-esports .kind-viewer.no-num .gl-pic { margin-right: 24px; }
+.look-esports .gl-title { position: relative; display: inline-flex; align-items: center; gap: 12px; padding: 8px 24px 8px 22px; font-size: 22px; font-weight: 900; font-style: italic; letter-spacing: .06em; isolation: isolate; }
+.look-esports .gl-title::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: skewX(-14deg); border-radius: 2px; box-shadow: inset 5px 0 0 var(--acc); background: var(--carbon); }
+.look-esports .gl-title::after { content: "LIVE"; flex: none; padding: 4px 7px 3px; font: italic 800 15px/1 var(--font-cond); letter-spacing: .08em; color: #fff; background: #FF2D55; transform: skewX(-14deg); }
+.motion-marquee.look-esports .gl-bar { width: auto; }
+
+/* ---------- 弥散：半透明的雾面卡片，淡雾色的光在里面慢慢飘，卡片下漫出一团柔光，细颗粒；每条一样。透明度在后台调（--dif-a） ---------- */
+.look-diffuse { --dif-a: .5; --ink: #241F33;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='1 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.look-diffuse .gl { --gap: 16px; }
+.look-diffuse .gl-row::before { content: ""; position: absolute; left: 10%; right: 8%; top: 40%; bottom: -18%; z-index: -1; border-radius: 40px; pointer-events: none;
+  background: linear-gradient(90deg, #F2B9A7, #C8BDF2 50%, #A9D2EC); filter: blur(30px); opacity: .45; }
+.look-diffuse .gl-bar { width: min(556px, calc(100vw / var(--k) - 36px)); height: 76px; padding: 0 24px 0 12px; gap: 14px; border-radius: 24px; overflow: hidden; isolation: isolate; color: var(--ink);
+  background: rgba(255,255,255,var(--dif-a)); -webkit-backdrop-filter: blur(32px) saturate(1.5); backdrop-filter: blur(32px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.5), 0 1px 2px rgba(60,40,90,.08), 0 20px 40px -24px rgba(90,70,140,.5); }
+/* 旧内核不支持背景模糊：卡片不那么透，字才看得清 */
+.lite.look-diffuse .gl-bar, .lite.look-diffuse .gl-title { background: rgba(255,255,255,max(var(--dif-a), .78)); }
+.look-diffuse .gl-fx { inset: -40px; z-index: -1; filter: blur(22px); opacity: .9; animation: gl-diffuse-drift 14s ease-in-out infinite alternate; animation-delay: var(--dd);
+  background:
+    radial-gradient(160px 110px at calc(14% + var(--dx)) 44%, #F6BCA8, transparent 70%),
+    radial-gradient(200px 120px at calc(48% - var(--dx)) 80%, #C9BFF5, transparent 70%),
+    radial-gradient(180px 110px at calc(84% + var(--dx)) 36%, #A8D4F0, transparent 70%),
+    radial-gradient(140px 90px at calc(64% + var(--dx)) 4%, #F4DDB0, transparent 70%); }
+@keyframes gl-diffuse-drift { to { transform: translateX(30px) scale(1.06); } }
+.look-diffuse .gl-bar::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit; background: var(--grain); opacity: .16; mix-blend-mode: overlay; }
+/* 半透明时字外面一圈淡淡的白光，深色、花的画面上也看得清 */
+.look-diffuse .nm, .look-diffuse .say, .look-diffuse .gl-num, .look-diffuse .gl-title { text-shadow: 0 0 10px rgba(255,255,255,.7), 0 0 2px rgba(255,255,255,.5); }
+.look-diffuse .av { width: 48px; height: 48px; font-size: 20px; box-shadow: 0 0 0 2px rgba(255,255,255,.95), 0 4px 12px -4px rgba(60,40,90,.35); }
+.look-diffuse .nm { font-size: 19px; font-weight: 600; letter-spacing: .01em; }
+.look-diffuse .say { font-size: 14px; color: rgba(36,31,51,.55); letter-spacing: .03em; }
+.look-diffuse .say b { color: var(--ink); font-weight: 500; }
+.look-diffuse .kind-sc .say { color: rgba(36,31,51,.82); }
+.look-diffuse .gl-pic { margin-left: auto; width: 56px; height: 56px; filter: drop-shadow(0 6px 10px rgba(90,70,140,.25)); }
+.look-diffuse .gl-num { min-width: 60px; text-align: right; font: 600 28px/1 var(--font-sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.look-diffuse .gl-num .x { font-size: 17px; margin-right: 1px; color: rgba(36,31,51,.42); }
+.look-diffuse .gl-num .unit { font-size: 12px; font-weight: 500; margin-left: 3px; color: rgba(36,31,51,.5); }
+.look-diffuse .gl-sc { padding: 4px 9px; border-radius: 999px; font: 600 12px/1 var(--font-sans); letter-spacing: .1em; color: var(--ink); box-shadow: inset 0 0 0 1px rgba(36,31,51,.28); }
+.look-diffuse .gl-rank { width: 28px; height: 28px; border-radius: 50%; font: 600 14px/1 var(--font-sans); color: var(--ink); background: rgba(255,255,255,.85); box-shadow: inset 0 0 0 1px rgba(36,31,51,.14); }
+.look-diffuse .gl-rank.r1, .look-diffuse .gl-rank.r2, .look-diffuse .gl-rank.r3 { color: #fff; background: var(--ink); box-shadow: 0 4px 10px -4px rgba(36,31,51,.6); }
+.look-diffuse .kind-viewer .gl-num { font-size: 24px; }
+.look-diffuse .gl-title { position: relative; display: inline-flex; align-items: center; gap: 12px; padding: 10px 22px 10px 16px; border-radius: 999px; font-size: 16px; font-weight: 600; letter-spacing: .24em; color: var(--ink);
+  background: rgba(255,255,255,var(--dif-a)); -webkit-backdrop-filter: blur(32px); backdrop-filter: blur(32px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 14px 30px -18px rgba(90,70,140,.5); }
+.look-diffuse .gl-title span { margin-right: -.24em; }
+.look-diffuse .gl-title::after { content: ""; position: absolute; left: 10%; right: 10%; top: 40%; bottom: -30%; z-index: -1; border-radius: 30px; background: linear-gradient(90deg, #F2B9A7, #C8BDF2, #A9D2EC); filter: blur(18px); opacity: .5; }
+.look-diffuse .gl-title::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: linear-gradient(135deg, #F2B9A7, #C8BDF2, #A9D2EC); box-shadow: 0 0 0 3px rgba(255,255,255,.7); }
+.motion-marquee.look-diffuse .gl-bar { width: auto; }
+.motion-marquee.look-diffuse .gl-pic { margin-left: 6px; }
+
+/* ---------- 像素：复古游戏对话框，像素字体，礼物名像道具一样用【】括起来；最新一条有闪烁的小箭头 ---------- */
+.look-pixel { font-family: var(--font-pixel); -webkit-font-smoothing: none; }
+.look-pixel .gl { --gap: 18px; padding-right: 24px; }
+.look-pixel .gl-bar { width: min(556px, calc(100vw / var(--k) - 44px)); height: 80px; padding: 0 22px 0 14px; gap: 14px; background: #14163A;
+  box-shadow: 0 -4px 0 #F2F2F2, 0 4px 0 #F2F2F2, -4px 0 0 #F2F2F2, 4px 0 0 #F2F2F2, inset 0 0 0 4px #14163A, inset 0 0 0 6px #5A6BFF, 8px 8px 0 rgba(0,0,0,.4); }
+.look-pixel .av { width: 48px; height: 48px; border-radius: 0; font-size: 24px; font-weight: 400;
+  -webkit-clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px); }
+.look-pixel .av-frame { display: none; }
+.look-pixel .gl-tx { gap: 4px; }
+.look-pixel .nm { font-size: 24px; line-height: 1; }
+.look-pixel .say { font-size: 24px; line-height: 1; color: #B9BCE6; max-width: 13em; }
+.look-pixel .say b { font-weight: 400; color: #7FE3FF; }
+.look-pixel .say b::before { content: "【"; }
+.look-pixel .say b::after { content: "】"; }
+.look-pixel .kind-sc .say { color: #fff; }
+.look-pixel .gl-pic { margin-left: auto; width: 52px; height: 52px; }
+.look-pixel .gl-num { font-size: 36px; line-height: 1; color: #FFE45C; }
+.look-pixel .gl-num .x, .look-pixel .gl-num .unit { font-size: 24px; }
+.look-pixel .gl-num .unit { margin-left: 2px; }
+.look-pixel .gl-sc { padding: 4px 6px 2px; font-size: 24px; line-height: 1; background: #5A6BFF; }
+.look-pixel .gl-fx { right: 14px; bottom: 7px; width: 12px; height: 8px; background: #fff; opacity: 0;
+  -webkit-clip-path: polygon(0 0, 100% 0, 100% 25%, 83% 25%, 83% 50%, 67% 50%, 67% 75%, 58% 75%, 58% 100%, 42% 100%, 42% 75%, 33% 75%, 33% 50%, 17% 50%, 17% 25%, 0 25%);
+  clip-path: polygon(0 0, 100% 0, 100% 25%, 83% 25%, 83% 50%, 67% 50%, 67% 75%, 58% 75%, 58% 100%, 42% 100%, 42% 75%, 33% 75%, 33% 50%, 17% 50%, 17% 25%, 0 25%); }
+.look-pixel .gl-row.cur .gl-fx { animation: gl-blink 1s steps(1) infinite; }
+@keyframes gl-blink { 0% { opacity: 1; } 50% { opacity: 0; } }
+.look-pixel .gl-rank { width: 44px; height: 44px; font-size: 24px; background: #2A2D5C;
+  -webkit-clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px); }
+.look-pixel .gl-rank.r1, .look-pixel .gl-rank.r2, .look-pixel .gl-rank.r3 { color: #14163A; background: #FFE45C; }
+.look-pixel .gl-title { margin: 4px 4px 0 0; padding: 10px 18px 8px; font-size: 24px; line-height: 1; color: #FFE45C; background: #14163A; box-shadow: 0 -4px 0 #F2F2F2, 0 4px 0 #F2F2F2, -4px 0 0 #F2F2F2, 4px 0 0 #F2F2F2, 8px 8px 0 rgba(0,0,0,.4); }
+.look-pixel .gl-title span { display: inline; }
+.look-pixel .gl-title::before { content: "▶ "; color: #fff; animation: gl-blink 1s steps(1) infinite; }
+.motion-marquee.look-pixel .gl { padding-right: 20px; }
+.motion-marquee.look-pixel .gl-bar { width: auto; }
+
+.notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; font-family: var(--font-sans); }
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }

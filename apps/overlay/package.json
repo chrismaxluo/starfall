@@ -1,6 +1,6 @@
 {
   "name": "@starfall/overlay",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "description": "星临特效页（作为浏览器源放进 OBS / B站直播姬）",
   "license": "GPL-3.0-only",
@@ -12,6 +12,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/barlow-condensed": "5.3.0",
+    "@fontsource/fusion-pixel-12px-proportional-sc": "5.3.0",
     "@fontsource/geist-mono": "^5.3.0",
     "@fontsource/geist-sans": "^5.3.0",
     "@fontsource/noto-sans-sc": "^5.3.0",

@@ -2,6 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { GIFTS_ALPHA_DEFAULT, GIFTS_LOOKS, GIFTS_MOTIONS } from '@starfall/shared';
 import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, MusicSource, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
 
@@ -199,6 +200,11 @@ export const outputs = sqliteTable('outputs', {
   giftsMax: integer('gifts_max').notNull().default(6),
   giftsSpeed: text('gifts_speed', { enum: ['off', 'slow', 'normal', 'fast'] }).notNull().default('normal'),
   giftsFilter: text('gifts_filter', { mode: 'json' }).$type<GiftsFilter>().notNull().default({ mode: 'all', gifts: [], guard: true, sc: true }),
+  giftsTitle: text('gifts_title').notNull().default(''),
+  // 外观、滚法、弥散外观的透明度（%）；默认和以前一样：晶彩、片尾字幕
+  giftsLook: text('gifts_look', { enum: GIFTS_LOOKS }).notNull().default('jingcai'),
+  giftsMotion: text('gifts_motion', { enum: GIFTS_MOTIONS }).notNull().default('credits'),
+  giftsAlpha: integer('gifts_alpha').notNull().default(GIFTS_ALPHA_DEFAULT),
   key: text('key').notNull().unique(),
   createdAt: integer('created_at').notNull().default(now),
 });

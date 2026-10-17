@@ -242,6 +242,12 @@ importers:
 
   apps/overlay:
     dependencies:
+      '@fontsource/barlow-condensed':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/fusion-pixel-12px-proportional-sc':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource/geist-mono':
         specifier: ^5.3.0
         version: 5.3.0
@@ -948,6 +954,12 @@ packages:
 
   '@fastify/websocket@11.3.1':
     resolution: {integrity: sha512-3117Fteg0MC9zRl0ilNAQelRb+PNDvNuWe0yJ+jnLthaPPZnlml+GraGpesNUEQvLl8+3C+W4aKZz10XmQ10Mg==}
+
+  '@fontsource/barlow-condensed@5.3.0':
+    resolution: {integrity: sha512-RA7MmIx0v3eQ6Gcf74qLVLOwLB0GpPOzx+eU9iG/AmCnSJGcIWYeU8y6CEMGZ210MGwGg5CZhzLkkvyZdTTk1g==}
+
+  '@fontsource/fusion-pixel-12px-proportional-sc@5.3.0':
+    resolution: {integrity: sha512-PDgfCunZbVgPM5/HSaP29KjQaxLUsVAng6urpSQXww87e9AOfA7j/PDzWYO/Q8yhPyaw6oUGh5s2eGln1HSgPw==}
 
   '@fontsource/geist-mono@5.3.0':
     resolution: {integrity: sha512-UtJ1BBBCVpMYdIcW7nEB45UAoAw5M53ZXs2t0ciPW+IokuAAIc56M8+kW5tXbRJCTpDw4XTtU7proT6NdQAHTg==}
@@ -2831,6 +2843,10 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@fontsource/barlow-condensed@5.3.0': {}
+
+  '@fontsource/fusion-pixel-12px-proportional-sc@5.3.0': {}
 
   '@fontsource/geist-mono@5.3.0': {}
 

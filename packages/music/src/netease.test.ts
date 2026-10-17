@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { Netease, NeteaseError, mergeSetCookie, songFromRaw, weapi } from './netease.ts';
+import { Netease, NeteaseError, mergeSetCookie, songFromRaw, vipFromRaw, weapi } from './netease.ts';
 
 /** 假的网易云：按路径返回内容，记下请求 */
 function fake(routes: Record<string, { body: unknown; setCookie?: string[]; status?: number }>) {
@@ -115,5 +115,25 @@ describe('网易云接口', () => {
     expect(await new Netease({}, { fetch: vip.f }).account()).toEqual({ uid: 9, name: '星临', avatar: 'https://a.jpg', vip: true });
     const anon = fake({ '/weapi/w/nuser/account/get': { body: { code: 200, account: null, profile: null } } });
     expect(await new Netease({}, { fetch: anon.f }).account()).toBeNull();
+  });
+
+  it('会员：取到期最晚的那种，一样晚取档次高的；到期了也给上次的到期时间', () => {
+    const now = Date.UTC(2026, 9, 17);
+    const dec = Date.UTC(2026, 11, 3);
+    expect(vipFromRaw({ associator: { vipCode: 100, expireTime: dec }, musicPackage: { expireTime: 0 }, redplus: null }, now)).toEqual({ kind: '黑胶VIP', until: dec, active: true });
+    expect(vipFromRaw({ associator: { expireTime: dec }, redplus: { expireTime: dec } }, now)).toEqual({ kind: '黑胶SVIP', until: dec, active: true });
+    expect(vipFromRaw({ redplus: { expireTime: now - 86400_000 }, associator: { expireTime: dec } }, now).kind).toBe('黑胶VIP');
+    expect(vipFromRaw({ associator: { expireTime: now - 5 * 86400_000 } }, now)).toEqual({ kind: '黑胶VIP', until: now - 5 * 86400_000, active: false });
+    // 给的是秒
+    expect(vipFromRaw({ musicPackage: { expireTime: dec / 1000 } }, now)).toEqual({ kind: '音乐包', until: dec, active: true });
+    expect(vipFromRaw({ redVipLevel: 0 }, now)).toEqual({ kind: null, until: null, active: false });
+    expect(vipFromRaw(undefined, now)).toEqual({ kind: null, until: null, active: false });
+  });
+
+  it('会员接口：没登录时说明原因', async () => {
+    const ok = fake({ '/weapi/music-vip-membership/client/vip/info': { body: { code: 200, data: { associator: { expireTime: 2_000_000_000_000 } } } } });
+    expect(await new Netease({ MUSIC_U: 'u' }, { fetch: ok.f }).vipInfo(1_000)).toEqual({ kind: '黑胶VIP', until: 2_000_000_000_000, active: true });
+    const anon = fake({ '/weapi/music-vip-membership/client/vip/info': { body: { code: 301, message: '用户未登录' } } });
+    await expect(new Netease({}, { fetch: anon.f }).vipInfo()).rejects.toThrow('查询网易云会员失败（网易云返回 301：用户未登录）');
   });
 });

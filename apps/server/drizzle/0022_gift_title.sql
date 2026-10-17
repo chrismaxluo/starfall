@@ -1,0 +1,1 @@
+ALTER TABLE `outputs` ADD `gifts_title` text DEFAULT '' NOT NULL;

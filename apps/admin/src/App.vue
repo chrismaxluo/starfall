@@ -24,12 +24,14 @@ import SettingsPage from './pages/Settings.vue';
 import About from './pages/About.vue';
 import { pauseOnly, togglePause } from './lib/actions.ts';
 import { get, post, setUnauthorizedHandler } from './lib/api.ts';
+import { desktop } from './lib/desktop.ts';
+import type { FxHint } from './lib/desktop.ts';
 import { duration } from './lib/format.ts';
 import { startLive, stopLive } from './lib/live.ts';
 import { go, route } from './lib/route.ts';
 import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
-import { loadMusic, music } from './lib/music.ts';
+import { loadMusic, neteaseIssues } from './lib/music.ts';
 import { toggleTheme } from './lib/theme.ts';
 import { attempt, runAction, toast, toasts } from './lib/toast.ts';
 
@@ -142,6 +144,13 @@ watch(
   { immediate: true },
 );
 
+// 桌面版：直播软件开着但特效页一直没连上、这次端口变了时，桌面版告诉后台怎么办（apps/desktop/src/main.ts watchFx）
+const fxHint = ref<FxHint | null>(null);
+void desktop?.fxHint?.().then((h) => (fxHint.value = h), () => undefined);
+const offFxHint = desktop?.onFxHint?.((h) => (fxHint.value = h));
+onBeforeUnmount(() => offFxHint?.());
+const portMoved = computed(() => (fxHint.value && fxHint.value.port !== fxHint.value.home ? fxHint.value : null));
+
 /** 顶部提醒条：会让特效播不出来的情况 */
 type Alert = { key: string; level: 'red' | 'amber'; title: string; text: string; action?: { label: string; run: () => void } };
 const dismissed = ref<string[]>([]);
@@ -160,10 +169,23 @@ const alerts = computed((): Alert[] => {
   else if (days !== null && days < 0) out.push({ key: 'login', level: 'red', title: 'B站登录已过期', text: '收不到直播间的消息，特效不会播放。扫码重新登录就能恢复。', action: rescan });
   else if (s.room && !a.loggedIn && s.live.live) out.push({ key: 'login', level: 'red', title: '还没登录 B站', text: '收不到直播间的消息，特效不会播放。', action: { label: '扫码登录', run: () => (ui.qr = true) } });
   else if (days !== null && days <= 3) out.push({ key: `expire${days}`, level: 'amber', title: `B站登录还剩 ${days} 天`, text: '到期后收不到直播间的消息，建议现在就重新扫码。', action: rescan });
-  if (music.settings?.enabled && music.settings.sourceNetease && music.account?.invalid) out.push({ key: 'netease', level: 'amber', title: '网易云登录失效了', text: '点歌时会员歌放不了，免费歌照常。重新扫码就能恢复。', action: { label: '去扫码', run: () => go('music', 'rules') } });
-  if (fxDownLong.value) out.push({ key: 'fx', level: 'red', title: '正在直播，但特效页没连上', text: '直播软件里的特效页不在线，观众看不到特效。', action: { label: '去检查', run: () => go('obs') } });
+  // 点歌页自己会提醒
+  if (route.value.page !== 'music' && neteaseIssues(now.value).some((x) => x.key === 'invalid')) out.push({ key: 'netease', level: 'amber', title: '网易云登录失效了', text: '点歌时会员歌放不了，免费歌照常。重新扫码就能恢复。', action: { label: '去看看', run: () => go('music') } });
+  const h = fxHint.value;
+  const toObs = { label: portMoved.value ? '去复制新地址' : '去检查', run: () => go('obs') };
+  if (fxDownLong.value) out.push({ key: 'fx', level: 'red', title: '正在直播，但特效页没连上', text: `直播软件里的特效页不在线，观众看不到特效。${h?.fix ?? '可以在直播软件里右键特效源，点「刷新」。'}`, action: toObs });
+  else if (h?.app && !fxOnline.value) out.push({ key: 'fxapp', level: 'amber', title: `${h.app}已经打开，但特效页没连上`, text: h.fix, action: portMoved.value ? toObs : undefined });
+  else if (portMoved.value && !fxOnline.value) {
+    const p = portMoved.value;
+    out.push({ key: 'port', level: 'amber', title: `这次星临改用 ${p.port} 端口`, text: `${p.home} 被别的程序占用。特效页连不上的话，到「直播软件输出」复制新地址换上，以后新旧地址都能用。`, action: toObs });
+  }
   return out.filter((x) => x.level === 'red' || !dismissed.value.includes(x.key));
 });
+
+/** 导航「弹幕点歌」旁的小圆点：网易云快到期（橙）、出问题（红） */
+const musicIssues = computed(() => neteaseIssues(now.value));
+const musicDot = computed(() => musicIssues.value[0]?.level ?? null);
+const musicIssue = computed(() => musicIssues.value.map((x) => x.short).join('；'));
 
 const liveText = computed(() => {
   const l = state.status?.live;
@@ -247,7 +269,7 @@ function reloadPage(): void {
         <div>
           <div class="nav-label">工作台</div>
           <nav class="nav" aria-label="主导航">
-            <a v-for="n in NAV" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ n.name }}</a>
+            <a v-for="n in NAV" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ n.name }}<span v-if="n.page === 'music' && musicDot" class="ndot" :class="musicDot" :title="musicIssue" /></a>
           </nav>
         </div>
         <div>

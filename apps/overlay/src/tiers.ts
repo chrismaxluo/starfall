@@ -36,6 +36,7 @@ export const tierVars = (t: Tier) => ({
   '--c1-dark': mix(t.c1, 85, '#000'),
   '--c2-78': mix(t.c2, 78),
   '--c2-75': mix(t.c2, 75),
+  '--c2-45': mix(t.c2, 45),
   '--c2-end': mix(t.c2, 18, 'rgba(16,14,32,.4)'),
   '--c3-70': mix(t.c3, 70),
 });

@@ -1,22 +1,19 @@
 <script setup lang="ts">
-// 点歌 · 规则：指令、谁能点、限制、谁能切歌、下播暂停；歌从哪里找（网易云账号、本地歌库）；不收的歌、不让点歌的观众。改了立即保存
+// 点歌 · 规则：指令、谁能点、限制、谁能切歌、下播暂停；歌从哪里找（网易云、本地歌库；网易云账号在主页管理，这里只显示一行）；不收的歌、不让点歌的观众。改了立即保存
 import { computed, onMounted, ref, watch } from 'vue';
 import { MUSIC_BANNED_MAX, MUSIC_WORDS_MAX } from '@starfall/shared';
 import type { MusicSettings } from '@starfall/shared';
 import Avatar from './Avatar.vue';
-import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
-import NeteaseQr from './NeteaseQr.vue';
 import Switch from './Switch.vue';
 import WhoPick from './WhoPick.vue';
-import { del, get } from '../lib/api.ts';
+import { get } from '../lib/api.ts';
 import type { DanmuPerson } from '../lib/danmu-who.ts';
-import { music, saveMusic } from '../lib/music.ts';
+import { daysLeft, music, neteaseState, saveMusic } from '../lib/music.ts';
 import { go } from '../lib/route.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { toast } from '../lib/toast.ts';
 
 const s = computed(() => music.settings!);
-const qr = ref(false);
 
 // ---------- 指令 ----------
 const cmds = ref({ cmdRequest: '', cmdSkip: '', cmdCancel: '', cmdMine: '' });
@@ -59,12 +56,18 @@ const REPEAT_OPTIONS = [0, 10, 30, 60, 120, 240];
 const repeatText = (v: number) => (v === 0 ? '不限' : v < 60 ? `${v} 分钟` : `${v / 60} 小时`);
 const cdText = (v: number) => (v === 0 ? '不限' : v < 60 ? `${v} 秒` : `${v / 60} 分钟`);
 
-// ---------- 网易云账号 ----------
+// ---------- 网易云账号（在主页管理） ----------
 const acct = computed(() => music.account);
-async function logout(): Promise<void> {
-  const r = await attempt(() => del('/api/music/account'), '已退出网易云账号');
-  if (r) music.account = { loggedIn: false };
-}
+const acctSay = computed(() => {
+  const a = acct.value;
+  const st = neteaseState(a);
+  if (!a?.loggedIn || st === 'none') return { cls: '', text: '没登录网易云：只放免费歌' };
+  if (st === 'invalid') return { cls: 'bad', text: '登录失效了' };
+  if (st === 'expired') return { cls: 'bad', text: '会员已到期，会员歌放不了' };
+  if (st === 'free') return { cls: '', text: '不是会员：会员歌放不了' };
+  const left = a.vipUntil !== undefined ? ` · 还剩 ${daysLeft(a.vipUntil)} 天` : '';
+  return { cls: st === 'soon' ? 'warn' : '', text: `${a.vipKind || '会员'}${left}` };
+});
 
 // ---------- 不收的歌、不让点歌的观众 ----------
 const wordIn = ref('');
@@ -184,22 +187,10 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
             <span class="lb">网易云音乐</span>
             <div class="ctl">
               <div class="line"><Switch :model-value="s.sourceNetease" label="从网易云找歌" @change="(v) => set({ sourceNetease: v })" /><span class="hint">{{ s.sourceNetease ? '搜得到的免费歌都能放' : '不从网易云找' }}</span></div>
-              <div v-if="s.sourceNetease" class="mr-acct">
-                <template v-if="acct?.loggedIn">
-                  <Avatar :name="acct.name || '网易云'" :face="acct.avatar" :size="34" />
-                  <span class="mr-ai">
-                    <b>{{ acct.name || '网易云账号' }}<span v-if="acct.vip && !acct.invalid" class="mr-vip">会员</span></b>
-                    <span :class="{ bad: acct.invalid }">{{ acct.invalid ? '登录失效了，请重新扫码' : acct.vip ? '会员歌也能完整播放' : '不是会员：会员歌放不了' }}</span>
-                  </span>
-                  <span class="mr-aa">
-                    <button class="btn sm" @click="qr = true"><Icon name="i-qr" />{{ acct.invalid ? '重新扫码' : '换个账号' }}</button>
-                    <ConfirmButton label="退出" confirm-label="确认退出？" cls="btn sm" @confirm="logout" />
-                  </span>
-                </template>
-                <template v-else>
-                  <span class="mr-ai"><b>没有登录</b><span>免费歌照常放；登录网易云会员后，会员歌也能放</span></span>
-                  <span class="mr-aa"><button class="btn sm primary" @click="qr = true"><Icon name="i-qr" />扫码登录</button></span>
-                </template>
+              <div v-if="s.sourceNetease" class="mr-acc" :class="acctSay.cls">
+                <template v-if="acct?.loggedIn"><Avatar :name="acct.name || '网易云'" :face="acct.avatar" :size="20" /><b>{{ acct.name || '网易云账号' }}</b></template>
+                <span>{{ acctSay.text }}</span>
+                <a class="linkish" href="#music" @click.prevent="go('music')">{{ !acct?.loggedIn || acct.invalid ? '去主页扫码 →' : '在主页管理 →' }}</a>
               </div>
             </div>
           </div>
@@ -245,7 +236,6 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
         </div>
       </div>
     </div>
-    <NeteaseQr v-if="qr" @close="qr = false" />
   </div>
 </template>
 
@@ -259,13 +249,12 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
 .mr-ex b { color: var(--t1); font-weight: 600; }
 .srow .line .gap { width: 12px; }
 .srow .line > span:not(.seg):not(.hint):not(.gap):not(.stepper) { font-size: 13px; color: var(--t2); }
-.mr-acct { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--hover); }
-.mr-ai { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12.5px; color: var(--t2); }
-.mr-ai b { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--t1); font-weight: 600; }
-.mr-ai .bad { color: #D64545; }
-.mr-vip { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #E5484D; color: #fff; font-weight: 600; }
-.mr-aa { display: flex; gap: 6px; margin-left: auto; flex: none; }
-.mr-aa .btn.sm, .mr-aa :deep(.btn.sm) { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.mr-acc { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 12px; border-radius: 10px; background: var(--hover); font-size: 12.5px; color: var(--t2); }
+.mr-acc b { color: var(--t1); font-weight: 600; white-space: nowrap; flex: none; }
+.mr-acc > span:not(.avatar) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mr-acc .linkish { margin-left: auto; flex: none; }
+.mr-acc.warn { background: var(--gov-soft); }
+.mr-acc.bad { background: var(--bad-soft); }
 .mr-add { display: flex; gap: 8px; }
 .mr-add .inp { flex: 1; min-width: 0; }
 .mr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }

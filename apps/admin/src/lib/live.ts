@@ -1,19 +1,19 @@
 // 管理后台的实时连接：事件、队列、连接状态、特效页上下线
 import { setTimeZone } from './format.ts';
-import { CHAT_MAX_LIMIT, GIFTS_KEEP, OVERLAY_BUILD_RE } from '@starfall/shared/overlay';
-import type { ChatItem, GiftListItem } from '@starfall/shared/overlay';
+import { CHAT_MAX_LIMIT, OVERLAY_BUILD_RE, giftRowsSorted } from '@starfall/shared/overlay';
+import type { ChatItem, GiftListItem, GiftRow } from '@starfall/shared/overlay';
 import { loadMusic, music, onMusicMessage } from './music.ts';
 import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshQuick, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
-  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[]; gifts?: GiftListItem[]; pins?: GiftListItem[] }
+  | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[]; gifts?: Record<number, GiftRow[]>; pins?: GiftListItem[] }
   /** 弹幕列表：新的一条、换直播间清空 */
   | { type: 'chat'; item: ChatItem }
   | { type: 'chat_clear' }
-  /** 送礼名单：新的一条、新开一场清空 */
-  | { type: 'gift_item'; item: GiftListItem }
-  | { type: 'gifts_clear' }
+  /** 送礼名单（按输出）：新的一行或者变了的一行、整份重新发 */
+  | { type: 'gift_row'; outputId: number; row: GiftRow }
+  | { type: 'gifts_set'; outputId: number; rows: GiftRow[] }
   | { type: 'gift_pins'; items: GiftListItem[] }
   /** 服务端的后台重新构建了 */
   | { type: 'version'; build: string }
@@ -43,14 +43,14 @@ export function onLiveEventStatus(fn: (id: number, s: PlayStatus) => void): () =
   return () => statusListeners.delete(fn);
 }
 
-/** 订阅新弹幕（弹幕列表预览）；null 表示清空 */
-const giftListeners = new Set<(item: GiftListItem | null) => void>();
-/** 送礼名单新的一条（null 为清空） */
-export function onGiftItem(fn: (item: GiftListItem | null) => void): () => void {
+const giftListeners = new Set<(outputId: number, row: GiftRow | null) => void>();
+/** 送礼名单（送礼名单预览）：某个输出新的一行或者变了的一行；row 为 null 表示整份重新发了（新的在 state.giftBoards 里） */
+export function onGiftRow(fn: (outputId: number, row: GiftRow | null) => void): () => void {
   giftListeners.add(fn);
   return () => giftListeners.delete(fn);
 }
 
+/** 订阅新弹幕（弹幕列表预览）；null 表示清空 */
 export function onChat(fn: (item: ChatItem | null) => void): () => void {
   chatListeners.add(fn);
   return () => chatListeners.delete(fn);
@@ -84,7 +84,7 @@ function handle(m: Msg): void {
       state.overlays = m.overlays;
       state.roomInfo = m.roomInfo;
       state.chat = m.chat ?? [];
-      state.gifts = m.gifts ?? [];
+      state.giftBoards = m.gifts ?? {};
       state.giftPins = m.pins ?? [];
       // 重连：断开期间的事件和别处的修改都补回来
       if (hellos++ > 0) {
@@ -138,13 +138,17 @@ function handle(m: Msg): void {
       state.chat = [];
       for (const fn of chatListeners) fn(null);
       break;
-    case 'gift_item':
-      state.gifts = [...state.gifts, m.item].slice(-GIFTS_KEEP);
-      for (const fn of giftListeners) fn(m.item);
+    case 'gift_row': {
+      const rows = new Map((state.giftBoards[m.outputId] ?? []).map((r) => [r.id, r]));
+      rows.set(m.row.id, m.row);
+      const o = state.outputs.find((x) => x.id === m.outputId);
+      state.giftBoards[m.outputId] = o ? giftRowsSorted(rows.values(), o.giftsFilter) : [...rows.values()];
+      for (const fn of giftListeners) fn(m.outputId, m.row);
       break;
-    case 'gifts_clear':
-      state.gifts = [];
-      for (const fn of giftListeners) fn(null);
+    }
+    case 'gifts_set':
+      state.giftBoards[m.outputId] = m.rows;
+      for (const fn of giftListeners) fn(m.outputId, null);
       break;
     case 'gift_pins':
       state.giftPins = m.items;

@@ -1,6 +1,6 @@
 // 在线的特效页和管理后台（方案设计 9.3）。这里不关心 WebSocket 细节，只管"发给谁"。
-import { CHAT_MAX_LIMIT, GIFTS_KEEP, OVERLAY_CLOSE } from '@starfall/shared';
-import type { ChatItem, GiftListItem, OverlayConfig, ServerToOverlay } from '@starfall/shared';
+import { CHAT_MAX_LIMIT, OVERLAY_CLOSE } from '@starfall/shared';
+import type { ChatItem, GiftListItem, GiftRow, OverlayConfig, ServerToOverlay } from '@starfall/shared';
 import type { OutputRow } from './outputs.ts';
 
 export interface Sock {
@@ -61,6 +61,10 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   giftsMax: o.giftsMax,
   giftsSpeed: o.giftsSpeed,
   giftsFilter: o.giftsFilter,
+  giftsTitle: o.giftsTitle,
+  giftsLook: o.giftsLook,
+  giftsMotion: o.giftsMotion,
+  giftsAlpha: o.giftsAlpha,
 });
 
 export class Hub {
@@ -71,8 +75,8 @@ export class Hub {
   private readonly overlayListeners = new Set<() => void>();
   /** 最近的几条弹幕（按能设的最多条数记）：弹幕列表刚打开（或刷新）时先显示这些，页面按自己的条数取最后几条 */
   private chatRecent: ChatItem[] = [];
-  /** 本场（没开播时是上一场）的送礼名单，最多记 GIFTS_KEEP 条：送礼名单打开时先显示这些，页面按自己的筛选和条数取 */
-  private giftsRecent: GiftListItem[] = [];
+  /** 某个输出现在的送礼名单（送礼名单页刚连上时先显示这些）：由事件调度里的送礼名单提供 */
+  private giftSource: (outputId: number) => GiftRow[] = () => [];
   /** 送礼名单挂上的记录（按顺序） */
   private giftPins: GiftListItem[] = [];
 
@@ -94,7 +98,7 @@ export class Hub {
     const c: OverlayClient = { sock, outputId: output.id, role, view, since: now, env: null, lastError: null, pending: new Map() };
     this.overlays.add(c);
     if (role === 'chat') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), chat: this.chatRecent });
-    else if (role === 'gifts') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), gifts: this.giftsRecent, pins: this.giftPins });
+    else if (role === 'gifts') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build(), gifts: this.giftSource(output.id), pins: this.giftPins });
     // 点歌窗口：点歌的状态由点歌服务在「上下线」通知里发
     else if (role === 'music') send(sock, { type: 'hello', config: overlayConfig(output), preload: [], build: this.build() });
     else send(sock, { type: 'hello', config: overlayConfig(output), preload, build: this.build() });
@@ -172,18 +176,25 @@ export class Hub {
     return this.chatRecent;
   }
 
-  /** 送礼名单新的一条：发给所有送礼名单和管理后台 */
-  toGifts(item: GiftListItem): void {
-    this.giftsRecent = [...this.giftsRecent, item].slice(-GIFTS_KEEP);
-    for (const c of this.overlays) if (c.role === 'gifts') send(c.sock, { type: 'gift_item', item });
-    this.toAdmins({ type: 'gift_item', item });
+  setGiftSource(fn: (outputId: number) => GiftRow[]): void {
+    this.giftSource = fn;
   }
 
-  /** 新开了一场直播、换了直播间：清空送礼名单；items 是重新装进来的记录（服务启动时从事件记录恢复，那时还没有页面连着） */
-  resetGifts(items: GiftListItem[] = []): void {
-    this.giftsRecent = items.slice(-GIFTS_KEEP);
-    for (const c of this.overlays) if (c.role === 'gifts') send(c.sock, { type: 'gifts_clear' });
-    this.toAdmins({ type: 'gifts_clear' });
+  /** 送礼名单新的一行，或者已有的一行变了：发给这个输出的送礼名单和管理后台（后台的预览用） */
+  giftRow(outputId: number, row: GiftRow): void {
+    for (const c of this.overlays) if (c.role === 'gifts' && c.outputId === outputId) send(c.sock, { type: 'gift_row', row });
+    this.toAdmins({ type: 'gift_row', outputId, row });
+  }
+
+  /** 送礼名单整份重新发（换了时间范围、显示方式，新开一场，换了直播间） */
+  giftRows(outputId: number, rows: GiftRow[]): void {
+    for (const c of this.overlays) if (c.role === 'gifts' && c.outputId === outputId) send(c.sock, { type: 'gifts_set', rows });
+    this.toAdmins({ type: 'gifts_set', outputId, rows });
+  }
+
+  /** 某个输出现在的送礼名单（管理后台打开时用） */
+  giftBoard(outputId: number): GiftRow[] {
+    return this.giftSource(outputId);
   }
 
   /** 挂上的记录变了：发给所有送礼名单和管理后台 */
@@ -195,11 +206,6 @@ export class Hub {
 
   pins(): GiftListItem[] {
     return this.giftPins;
-  }
-
-  /** 本场的送礼名单（管理后台打开时用） */
-  recentGifts(): GiftListItem[] {
-    return this.giftsRecent;
   }
 
   /** 特效页回了"开始播放"：返回这次播放的说明和延迟；不是等待中的播放时返回 null */

@@ -8,6 +8,7 @@ import { HttpError, parseBody } from '../http.ts';
 import { assetDto } from '../services/assets.ts';
 import { EffectPatchSchema, playDuration } from '../services/effects.ts';
 import type { TriggerEvent, Vars } from '../services/pipeline.ts';
+import { dayStart } from '../time.ts';
 
 const SimViewerSchema = z
   .object({
@@ -21,16 +22,6 @@ const SimViewerSchema = z
     honor: z.number().int().min(0).max(HONOR_LEVEL_MAX).default(0),
   })
   .strict();
-
-/** 某个时区里某一天 0 点的时间戳 */
-export function dayStart(day: string, timeZone: string): number {
-  const utc = Date.parse(`${day}T00:00:00Z`);
-  // 算出这个时区在那一刻相对 UTC 的偏移
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(utc);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
-  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
-  return utc - (asUtc - utc);
-}
 
 export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/playback', async () => ({ paused: ctx.settings.get('paused'), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList() }));

@@ -3,7 +3,7 @@ import { reactive } from 'vue';
 import { get } from './api.ts';
 import { setTimeZone } from './format.ts';
 import type { PreviewRequest } from './preview.ts';
-import type { ChatItem, GiftListItem } from '@starfall/shared/overlay';
+import type { ChatItem, GiftListItem, GiftRow } from '@starfall/shared/overlay';
 import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, QuickButton, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
 
 /** 实时动态在内存里留多少条（总览按类型筛选时从这里挑） */
@@ -31,8 +31,8 @@ export const state = reactive({
   overlays: [] as OverlayInfo[],
   /** 最近的几条弹幕（弹幕列表的预览用） */
   chat: [] as ChatItem[],
-  /** 本场的送礼名单（送礼名单的预览用） */
-  gifts: [] as GiftListItem[],
+  /** 每个输出现在的送礼名单（按输出编号；送礼名单的预览用） */
+  giftBoards: {} as Record<number, GiftRow[]>,
   /** 送礼名单挂上的记录（按顺序） */
   giftPins: [] as GiftListItem[],
   queue: { playing: null, items: [] } as QueueSnapshot,
@@ -55,7 +55,7 @@ export const isFxView = (x: OverlayInfo) => x.role !== 'chat' && x.role !== 'gif
 
 /** 输出的设置换成特效页、弹幕列表收到的格式（预览用）；嵌套的设置复制一份（发给预览页时不能带响应式代理） */
 export function overlayConfigOf(o: OutputDto): OverlayConfig {
-  return { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: JSON.parse(JSON.stringify(o.giftsFilter)) as OverlayConfig['giftsFilter'] };
+  return { outputId: o.id, name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: JSON.parse(JSON.stringify(o.giftsFilter)) as OverlayConfig['giftsFilter'], giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha };
 }
 
 export async function refreshStatus(): Promise<void> {

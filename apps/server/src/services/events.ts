@@ -259,16 +259,28 @@ export class EventLog {
     );
   }
 
-  /** 某一场的礼物、上舰、醒目留言（服务重启后恢复送礼名单用）：按时间先后，只取最近 limit 条 */
-  giftListEvents(sessionId: number, limit: number): Array<{ id: number; ts: number; kind: string; viewer: unknown; payload: unknown }> {
-    return this.db
-      .select({ id: events.id, ts: events.ts, kind: events.kind, viewer: events.viewer, payload: events.payload })
-      .from(events)
-      .where(and(eq(events.sessionId, sessionId), inArray(events.kind, ['gift', 'guard', 'sc'])))
-      .orderBy(desc(events.id))
-      .limit(limit)
-      .all()
-      .reverse();
+  /**
+   * 送礼名单装一段时间的记录：本直播间某一场（sessionId）或者 from 起（到 to 为止）的付费礼物、上舰、醒目留言，按时间先后。
+   * 最多取最近 limit 条（按人合计、合并时要全部算进来，这个上限只防止内存撑爆）
+   */
+  giftListRange(o: { roomId: number; sessionId?: number; from?: number; to?: number | null; limit?: number }): Array<{ id: number; ts: number; kind: string; viewer: unknown; payload: unknown }> {
+    const where = ["kind in ('gift', 'guard', 'sc')", 'room_id = ?', "not (kind = 'gift' and coalesce(json_extract(payload, '$.paid'), 1) = 0)"];
+    const args: unknown[] = [o.roomId];
+    if (o.sessionId !== undefined) {
+      where.push('session_id = ?');
+      args.push(o.sessionId);
+    } else {
+      where.push('ts >= ?');
+      args.push(o.from ?? 0);
+      if (o.to != null) {
+        where.push('ts < ?');
+        args.push(o.to);
+      }
+    }
+    const rows = this.db.$client
+      .prepare(`select id, ts, kind, viewer, payload from events where ${where.join(' and ')} order by id desc limit ?`)
+      .all(...args, o.limit ?? 50_000) as Array<{ id: number; ts: number; kind: string; viewer: string; payload: string | null }>;
+    return rows.reverse().map((r) => ({ ...r, viewer: JSON.parse(r.viewer), payload: r.payload ? JSON.parse(r.payload) : null }));
   }
 
   /**

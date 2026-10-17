@@ -532,6 +532,13 @@ function upsert(row: GiftRow): void {
   updateScrolling();
 }
 
+/** 刚挂上的一条：在置顶里、或者在名单上看得到（不在别的页、没滚出去、没被挤掉）时播进场 */
+function enterPin(id: string): void {
+  const el = els.get(id) ?? head.querySelector<HTMLElement>(`.gl-row[data-id="${id}"]`);
+  if (!el?.isConnected || el.hidden) return;
+  if (head.contains(el) || (pos(el) + len(el) - gap > offset && pos(el) < offset + viewLen())) enter(el);
+}
+
 /** 按现在的设置重新画一遍（不要动画） */
 function redraw(): void {
   drawHead();
@@ -599,10 +606,15 @@ function onMessage(m: ServerToOverlay): void {
       setRows(m.rows);
       redraw();
       break;
-    case 'gift_pins':
+    case 'gift_pins': {
+      const had = new Set(pins.map((p) => p.id));
       pins = m.items;
-      if (pinnedOnly() || f().pinTop) redraw();
+      if (!pinnedOnly() && !f().pinTop) break;
+      redraw();
+      // 新挂上的：画面上看得到时播进场（别的行不动）
+      for (const p of pins) if (!had.has(p.id)) enterPin(p.id);
       break;
+    }
     case 'version':
       onBuild(m.build);
       break;

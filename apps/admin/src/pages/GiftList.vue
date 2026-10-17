@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 送礼名单：先选「名单放什么」（自动：收到的礼物，可以选时间范围、一份一条还是按人合计 / 手动：我挑的记录），一行大白话写出画面上现在会显示什么；
-// 右边是预览和外观（样式、滚法、标题、速度、对齐、字号、条数）；选了手动或者自动里打开了置顶时，左边接着出现送礼记录（按场次）和挑好的记录。
+// 右边是预览和外观（样式、滚法、标题、速度、对齐、字号、条数）；选了手动或者自动里打开了置顶时，左边接着出现挑好的记录（可以拖动排顺序）和送礼记录（按场次，从这里挑）。
 // 开关、复制地址也在这里，不用跳到「直播软件输出」页
 import { computed, onMounted, ref, watch } from 'vue';
 import { GIFTS_ALPHA_MAX, GIFTS_ALPHA_MIN, GIFTS_KEEP, GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_PAGE_HOLD, GIFTS_STEP_HOLD, GIFTS_TITLE_MAX, giftsRange, giftsSourceSize, giftsView } from '@starfall/shared/overlay';
@@ -155,10 +155,11 @@ const summary = computed<{ text: string; bad: boolean }>(() => {
 });
 
 // ---------- 外观 ----------
-/** 标题建议：按时间范围和显示方式 */
-const titleIdea = computed(() => {
+/** 标题建议：手动时是一直挂着的记录；自动时按时间范围和显示方式 */
+const titleIdeas = computed(() => {
+  if (manual.value) return ['感谢墙', '荣誉榜'];
   const rank = view.value === 'viewer';
-  return { live: rank ? '本场感谢榜' : '本场礼物', today: rank ? '今日感谢榜' : '今日礼物', week: rank ? '本周榜单' : '本周礼物', month: rank ? '本月榜单' : '本月礼物', since: rank ? '活动榜单' : '活动礼物' }[range.value];
+  return [{ live: rank ? '本场感谢榜' : '本场礼物', today: rank ? '今日感谢榜' : '今日礼物', week: rank ? '本周榜单' : '本周礼物', month: rank ? '本月榜单' : '本月礼物', since: rank ? '活动榜单' : '活动礼物' }[range.value]];
 });
 function setMax(x: number): void {
   if (!o.value) return;
@@ -280,13 +281,31 @@ async function remove(id: number, name: string): Promise<void> {
   const res = await attempt(() => del<{ pins: Pin[] }>(`/api/gift-list/pins/${id}`), `已移出名单：${name}`);
   if (res) pins.value = res.pins;
 }
-async function move(i: number, d: -1 | 1): Promise<void> {
-  const ids = pins.value.map((p) => p.id);
-  const j = i + d;
-  if (j < 0 || j >= ids.length) return;
-  [ids[i], ids[j]] = [ids[j]!, ids[i]!];
-  const res = await attempt(() => put<{ pins: Pin[] }>('/api/gift-list/pins/order', { ids }));
+/** 把第 from 条挪到第 to 个位置：页面上先挪好再保存，保存失败时取回原来的顺序 */
+async function reorder(from: number, to: number): Promise<void> {
+  if (from === to || to < 0 || to >= pins.value.length) return;
+  const next = [...pins.value];
+  const [p] = next.splice(from, 1);
+  next.splice(to, 0, p!);
+  pins.value = next;
+  const res = await attempt(() => put<{ pins: Pin[] }>('/api/gift-list/pins/order', { ids: next.map((x) => x.id) }));
   if (res) pins.value = res.pins;
+  else await loadPins();
+}
+const move = (i: number, d: -1 | 1) => void reorder(i, i + d);
+
+// 拖动排序
+const dragFrom = ref<number | null>(null);
+const dragOver = ref<number | null>(null);
+function onDragStart(e: DragEvent, i: number): void {
+  dragFrom.value = i;
+  e.dataTransfer?.setData('text/plain', String(i));
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+}
+function onDrop(to: number): void {
+  const from = dragFrom.value;
+  dragFrom.value = dragOver.value = null;
+  if (from !== null) void reorder(from, to);
 }
 </script>
 
@@ -389,6 +408,33 @@ async function move(i: number, d: -1 | 1): Promise<void> {
         </div>
         <template v-if="showRecords">
         <div class="card">
+          <div class="card-h"><h2>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
+          <div v-if="!pins.length" class="inline-hint">还没有。在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」。</div>
+          <div v-else class="gl-recs">
+            <div
+              v-for="(p, i) in pins"
+              :key="p.id"
+              class="gl-rec pin"
+              :class="{ dragging: dragFrom === i, dropto: dragOver === i && dragFrom !== i }"
+              @dragover.prevent="dragFrom !== null && (dragOver = i)"
+              @dragleave="dragOver === i && (dragOver = null)"
+              @drop.prevent="onDrop(i)"
+            >
+              <span class="rl-no grab" draggable="true" title="按住拖动调整顺序" @dragstart="(e) => onDragStart(e, i)" @dragend="(dragFrom = null), (dragOver = null)"><Icon name="i-grip" class="grip" />{{ i + 1 }}</span>
+              <span class="t num">{{ dateTime(p.item.ts) }}</span>
+              <Avatar :name="p.item.viewer.name" :face="p.item.viewer.face" :guard="p.item.viewer.guard" :size="30" />
+              <span class="who"><b>{{ p.item.viewer.name }}</b><span>{{ what(p.item) }}</span></span>
+              <img v-if="p.item.gift?.img" class="gimg" :src="p.item.gift.img" alt="" referrerpolicy="no-referrer" /><span v-else class="gimg" />
+              <span class="ord">
+                <button class="icon-btn" type="button" aria-label="往上挪" :disabled="i === 0" @click="move(i, -1)"><Icon name="i-chev" style="transform: rotate(180deg)" /></button>
+                <button class="icon-btn" type="button" aria-label="往下挪" :disabled="i === pins.length - 1" @click="move(i, 1)"><Icon name="i-chev" /></button>
+              </span>
+              <button class="btn sm" type="button" @click="remove(p.id, p.item.viewer.name)"><Icon name="i-x" />移出</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
           <div class="card-h"><h2>送礼记录</h2><span class="aside">{{ manual ? '点「加入名单」' : '点「加入名单」就会置顶' }}</span></div>
           <div class="gl-tools">
             <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
@@ -411,24 +457,6 @@ async function move(i: number, d: -1 | 1): Promise<void> {
           </div>
           <p v-if="more" class="inline-hint" style="margin: 10px 0 0">只列出了最新的 {{ records.length }} 条，更早的请加上观众名或金额缩小范围。</p>
         </div>
-
-        <div class="card">
-          <div class="card-h"><h2>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `最多 ${pinMax} 条 · 一直保留到移出` : `一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条 · 一直保留到移出` }}</span></div>
-          <div v-if="!pins.length" class="inline-hint">还没有。在左边的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」。</div>
-          <div v-else class="gl-recs">
-            <div v-for="(p, i) in pins" :key="p.id" class="gl-rec pin">
-              <span class="t num">{{ dateTime(p.item.ts) }}</span>
-              <Avatar :name="p.item.viewer.name" :face="p.item.viewer.face" :guard="p.item.viewer.guard" :size="30" />
-              <span class="who"><b>{{ p.item.viewer.name }}</b><span>{{ what(p.item) }}</span></span>
-              <img v-if="p.item.gift?.img" class="gimg" :src="p.item.gift.img" alt="" referrerpolicy="no-referrer" /><span v-else class="gimg" />
-              <span class="ord">
-                <button class="icon-btn" type="button" aria-label="往上挪" :disabled="i === 0" @click="move(i, -1)"><Icon name="i-chev" style="transform: rotate(180deg)" /></button>
-                <button class="icon-btn" type="button" aria-label="往下挪" :disabled="i === pins.length - 1" @click="move(i, 1)"><Icon name="i-chev" /></button>
-              </span>
-              <button class="btn sm" type="button" @click="remove(p.id, p.item.viewer.name)"><Icon name="i-x" />移出</button>
-            </div>
-          </div>
-        </div>
         </template>
       </div>
 
@@ -436,7 +464,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
       <div class="card">
         <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示</span></div>
         <div class="gl-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
-        <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled || manual" :title="manual ? '手动时只显示名单里的记录' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
+        <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled" :title="manual ? '在名单最后加一条测试记录，看看新加一条时的样子' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
         <h3 class="gl-sub">外观<small>改完点「保存」才到直播画面</small></h3>
         <div class="srows">
           <div class="srow">
@@ -473,7 +501,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
             <div class="ctl">
               <div class="line">
                 <input :key="`t${o.id}`" class="inp title" :value="v.giftsTitle" :maxlength="GIFTS_TITLE_MAX" placeholder="不加标题就留空" aria-label="名单标题" @input="look.set({ giftsTitle: ($event.target as HTMLInputElement).value })" />
-                <button v-if="titleIdea !== v.giftsTitle" class="btn sm" type="button" @click="look.set({ giftsTitle: titleIdea })">用「{{ titleIdea }}」</button>
+                <button v-for="t in titleIdeas.filter((x) => x !== v.giftsTitle)" :key="t" class="btn sm" type="button" @click="look.set({ giftsTitle: t })">用「{{ t }}」</button>
               </div>
               <span class="hint">显示在名单最上面</span>
             </div>
@@ -560,7 +588,8 @@ async function move(i: number, d: -1 | 1): Promise<void> {
 .alpha { width: min(240px, 100%); accent-color: var(--accent); }
 .alpha-v { min-width: 3em; font-family: var(--font-mono); font-size: 12.5px; color: var(--t1); }
 .inp.dt { width: 200px; height: 32px; }
-.inp.title { width: 200px; height: 32px; }
+/* 手动时有两个标题建议：输入框先缩一点，一行放得下 */
+.inp.title { flex: 1 1 120px; max-width: 200px; height: 32px; }
 .hint.warn { color: var(--gov); }
 .gl-recs.all .gl-rec { grid-template-columns: 112px 30px minmax(0, 1fr) 34px 96px 100px; }
 .gl-recs { display: flex; flex-direction: column; max-height: 560px; overflow: auto; margin: 0 -6px; }
@@ -577,5 +606,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
 .gl-rec .ord { display: flex; gap: 2px; }
 .gl-rec .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; justify-content: center; }
 .gl-rec .btn.on { color: var(--accent); }
-.gl-recs .gl-rec.pin { grid-template-columns: 112px 30px minmax(0, 1fr) 34px 64px 72px; }
+.gl-recs .gl-rec.pin { grid-template-columns: 44px 112px 30px minmax(0, 1fr) 34px 64px 72px; }
+.gl-rec.pin.dragging { opacity: .45; }
+.gl-rec.pin.dropto { box-shadow: inset 0 2px 0 0 var(--accent); }
 </style>

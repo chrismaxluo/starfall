@@ -1,19 +1,49 @@
 // 弹幕点歌的后台状态：打开「弹幕点歌」页时读一次，之后由实时连接（music、music_notice、music_account）保持最新
 import { reactive } from 'vue';
 import type { MusicSettings } from '@starfall/shared';
+import { MUSIC_HEIGHT, MUSIC_WIDTH } from '@starfall/shared/overlay';
 import type { MusicItem, MusicNotice, MusicSong, MusicState } from '@starfall/shared/overlay';
 import { del, get, post, put } from './api.ts';
-import { state } from './store.ts';
+import { monthDay } from './format.ts';
+import { output, state } from './store.ts';
 import { attempt, toast, undoable } from './toast.ts';
+
+/** 最近拿网易云播放地址的情况 */
+export interface MusicUrlHealth {
+  /** 连着几首没拿到 */
+  fails: number;
+  okAt?: number;
+  okName?: string;
+  failAt?: number;
+  failText?: string;
+}
 
 export interface MusicAccountStatus {
   loggedIn: boolean;
   uid?: number;
   name?: string;
   avatar?: string;
+  /** 现在能放会员歌（到期、失效都不算） */
   vip?: boolean;
+  /** 黑胶VIP 等 */
+  vipKind?: string;
+  /** 会员到期时间（已经到期的是那次的到期时间）；查不到时没有 */
+  vipUntil?: number;
   invalid?: boolean;
   checkedAt?: number;
+  urls: MusicUrlHealth;
+}
+
+/** 本场（或上一场）的点歌情况 */
+export interface MusicSessionStats {
+  live: boolean;
+  startedAt: number;
+  endedAt: number | null;
+  requested: number;
+  played: number;
+  people: number;
+  topSong: { song: MusicSong; count: number } | null;
+  topPerson: { uid: number; name: string; face: string; count: number } | null;
 }
 
 export interface LocalSong {
@@ -138,6 +168,66 @@ export async function blockSong(it: MusicItem): Promise<void> {
     await saveMusic({ blockWords: prev });
     if (same.length) await post('/api/music/queue/restore', { ids: same.map((x) => x.id) });
   });
+}
+
+/** 点歌窗口的样式叫什么（「画面」里选） */
+export const MUSIC_STYLE_NAMES: Record<MusicSettings['style'], string> = { card: '玻璃卡片', vinyl: '黑胶唱片', capsule: '细长胶囊', glass: '流光', journal: '手帐', minimal: '灵动岛' };
+
+/** 复制点歌窗口地址（加到直播软件里） */
+export async function copyMusicUrl(): Promise<void> {
+  const o = output();
+  if (!o) return toast('还没有输出，请到「直播软件输出」页看看', 'info');
+  try {
+    await navigator.clipboard.writeText(`${location.origin}${o.musicPath}`);
+    toast(`已复制点歌窗口地址：在直播软件里加一个浏览器源，宽高填 ${MUSIC_WIDTH} × ${MUSIC_HEIGHT}`);
+  } catch {
+    toast('浏览器不允许自动复制，请到「直播软件输出」页手动复制', 'info');
+  }
+}
+
+// ---------- 网易云账号的情况 ----------
+
+/** 会员还剩几天以内开始提醒 */
+export const VIP_SOON_DAYS = 7;
+/** 连着几首拿不到播放地址算出问题了 */
+export const URL_BAD_FAILS = 3;
+
+/** 还剩几天（不满一天算一天） */
+export const daysLeft = (until: number, now = Date.now()) => Math.ceil((until - now) / 86400_000);
+
+/** none 没登录，invalid 登录失效，expired 会员到期了，soon 会员快到期，vip 会员，free 不是会员 */
+export type NeteaseState = 'none' | 'invalid' | 'expired' | 'soon' | 'vip' | 'free';
+export function neteaseState(a: MusicAccountStatus | null, now = Date.now()): NeteaseState {
+  if (!a?.loggedIn) return 'none';
+  if (a.invalid) return 'invalid';
+  if (a.vip) return a.vipUntil !== undefined && daysLeft(a.vipUntil, now) <= VIP_SOON_DAYS ? 'soon' : 'vip';
+  return a.vipUntil !== undefined && a.vipUntil <= now ? 'expired' : 'free';
+}
+
+export interface NeteaseIssue {
+  key: string;
+  level: 'warn' | 'bad';
+  /** 总览小卡片上的一句 */
+  short: string;
+  /** 点歌页提醒条 */
+  text: string;
+}
+
+/** 网易云要提醒的事（点歌开着、从网易云找歌时才算），严重的在前 */
+export function neteaseIssues(now = Date.now()): NeteaseIssue[] {
+  const s = music.settings;
+  const a = music.account;
+  if (!s?.enabled || !s.sourceNetease || !a) return [];
+  const out: NeteaseIssue[] = [];
+  const st = neteaseState(a, now);
+  if (st === 'invalid') out.push({ key: 'invalid', level: 'bad', short: '网易云登录失效', text: '网易云登录失效了：会员歌放不了，免费歌照常。重新扫码就能恢复。' });
+  if (st === 'expired') out.push({ key: 'expired', level: 'bad', short: '网易云会员已到期', text: `网易云会员 ${monthDay(a.vipUntil!)} 到期了：会员歌放不了，免费歌照常。续费后在点歌主页点刷新。` });
+  if (a.urls.fails >= URL_BAD_FAILS) out.push({ key: 'urls', level: 'bad', short: '网易云拿不到歌', text: `网易云的歌连着 ${a.urls.fails} 首拿不到播放地址：网易云可能改了限制，网易云的歌暂时放不了，本地歌库照常。下一首会自动再试。` });
+  if (st === 'soon') {
+    const d = daysLeft(a.vipUntil!, now);
+    out.push({ key: 'soon', level: 'warn', short: `网易云会员还剩 ${d} 天`, text: `网易云会员还剩 ${d} 天（${monthDay(a.vipUntil!)}到期）：到期后会员歌放不了，免费歌照常。` });
+  }
+  return out;
 }
 
 /** 切歌、暂停 / 继续（总览卡片、命令面板用） */

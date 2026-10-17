@@ -1,11 +1,15 @@
 <script setup lang="ts">
-// 点歌 · 播放：正在放的歌（暂停、切歌、音量）、列表（拖动排序、置顶、删除、清空）；右边加歌（搜本地歌库和网易云）、模拟点歌、最近的点歌消息
+// 点歌 · 主页：上面一排是网易云账号、本场、点歌窗口三张卡片；
+// 下面是正在放的歌（歌词、暂停、切歌、音量）、列表（拖动排序、置顶、删除、清空）；右边加歌（搜本地歌库和网易云）、模拟点歌、最近的点歌消息
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { MusicItem, MusicSong } from '@starfall/shared/overlay';
 import Avatar from './Avatar.vue';
 import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
+import MusicNetease from './MusicNetease.vue';
+import MusicSession from './MusicSession.vue';
 import MusicSwap from './MusicSwap.vue';
+import MusicWindow from './MusicWindow.vue';
 import RowMenu from './RowMenu.vue';
 import type { MenuItem } from './RowMenu.vue';
 import { get, post, put } from '../lib/api.ts';
@@ -31,6 +35,22 @@ const pos = computed(() => {
   return n.paused ? n.posMs : n.posMs + (tickNow.value - music.gotAt);
 });
 const pct = computed(() => (now.value?.item.song.durationMs ? Math.min(100, (pos.value / now.value.item.song.durationMs) * 100) : 0));
+
+// 歌词：唱到的那句（字随着唱亮起来）和下一句
+const lyric = computed(() => {
+  const lines = now.value?.lyric;
+  if (!lines?.length) return null;
+  const p = pos.value;
+  let i = -1;
+  while (i + 1 < lines.length && lines[i + 1]!.t <= p) i++;
+  const cur = lines[i];
+  const next = lines.slice(i + 1).find((l) => l.text.trim());
+  if (!cur || !cur.text.trim()) return { i, text: i < 0 ? '（前奏）' : '（间奏）', fill: 0, next: next?.text ?? '', dim: true };
+  const end = lines[i + 1]?.t ?? now.value!.item.song.durationMs;
+  // 一句唱到大约八成整句就亮完
+  const fill = Math.min(1, Math.max(0, (p - cur.t) / Math.max(1, (end - cur.t) * 0.8)));
+  return { i, text: cur.text, fill, next: next?.text ?? '', dim: false };
+});
 
 async function togglePause(): Promise<void> {
   await attempt(() => post('/api/music/pause', { paused: !paused.value }), paused.value ? '继续放歌' : '已暂停：正在放的歌停在这里');
@@ -161,6 +181,11 @@ async function simulate(): Promise<void> {
 </script>
 
 <template>
+  <div class="mh-top">
+    <MusicNetease />
+    <MusicSession />
+    <MusicWindow />
+  </div>
   <div class="mp-grid">
     <div class="mp-col">
       <div class="card">
@@ -179,6 +204,14 @@ async function simulate(): Promise<void> {
         <div v-else class="mp-empty">
           <Icon name="i-music" />
           <span>{{ queue.length ? '列表里有歌，等能放的时候自动开始' : `还没有人点歌。观众发弹幕「${music.settings?.cmdRequest} 歌名」就能点，也可以在右边直接加歌。` }}</span>
+        </div>
+        <div v-if="now" class="ly" :class="{ paused: now.paused }">
+          <Icon name="i-music" />
+          <template v-if="lyric">
+            <span :key="`c${lyric.i}`" class="ly-cur" :class="{ dim: lyric.dim }" :data-t="lyric.dim ? '' : lyric.text" :style="{ '--k': `${(lyric.fill * 100).toFixed(1)}%` }">{{ lyric.text }}</span>
+            <span v-if="lyric.next" :key="`n${lyric.i}`" class="ly-next">{{ lyric.next }}</span>
+          </template>
+          <span v-else class="ly-cur dim">这首没有歌词</span>
         </div>
         <div class="mp-ctl">
           <button class="btn" :disabled="!music.settings?.enabled" @click="togglePause"><Icon :name="paused ? 'i-play' : 'i-pause'" />{{ paused ? '继续' : '暂停' }}</button>
@@ -290,6 +323,9 @@ async function simulate(): Promise<void> {
 </template>
 
 <style scoped>
+.mh-top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: stretch; }
+@media (max-width: 1280px) { .mh-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .mh-top > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .mh-top { grid-template-columns: 1fr; } }
 .mp-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .mp-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @media (max-width: 1100px) { .mp-grid { grid-template-columns: 1fr; } }
@@ -309,6 +345,17 @@ async function simulate(): Promise<void> {
 .mp-time { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--t3); }
 .mp-empty { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; background: var(--hover); font-size: 13px; color: var(--t2); line-height: 1.6; }
 .mp-empty svg { width: 24px; height: 24px; flex: none; color: var(--accent); }
+/* 歌词：唱到哪里，字就亮到哪里（和直播画面上的一样） */
+.ly { position: relative; margin-top: 14px; padding: 12px 16px 12px 40px; border-radius: 12px; background: var(--hover); overflow: hidden; }
+.ly > svg { position: absolute; left: 14px; top: 15px; width: 15px; height: 15px; color: var(--accent); }
+.ly.paused { opacity: .6; }
+.ly-cur { position: relative; display: block; font-size: 15px; font-weight: 600; line-height: 1.5; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ly-cur::after { content: attr(data-t); position: absolute; left: 0; top: 0; white-space: nowrap; color: var(--t1); clip-path: inset(0 calc(100% - var(--k, 0%)) 0 0); transition: clip-path .5s linear; }
+.ly-cur.dim { font-weight: 500; }
+.ly-next { display: block; margin-top: 2px; font-size: 12.5px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ly-cur, .ly-next { animation: ly-in .35s cubic-bezier(.2, .8, .2, 1); }
+@keyframes ly-in { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ly-cur, .ly-next { animation: none; } .ly-cur::after { transition: none; } }
 .mp-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .mp-vol { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 12.5px; color: var(--t2); }
 .mp-vol input { width: 140px; accent-color: var(--accent); }

@@ -116,10 +116,14 @@ export function musicRoutes(app: FastifyInstance, ctx: AppContext): void {
     return music.stats(days);
   });
 
+  app.get('/api/music/session', async () => ({ session: music.session() }));
+
   // ---------- 网易云账号 ----------
 
   app.get('/api/music/account', async () => account.status());
   app.post('/api/music/account/check', async () => account.check());
+  // 拿不到播放地址时「现在重试」
+  app.post('/api/music/account/retry', async () => account.retryUrl());
   app.delete('/api/music/account', async () => {
     await account.logout();
     return { ok: true };

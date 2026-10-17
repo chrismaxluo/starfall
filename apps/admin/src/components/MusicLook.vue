@@ -8,7 +8,7 @@ import DraftBar from './DraftBar.vue';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
 import { useDraft } from '../lib/draft.ts';
-import { music, saveMusic } from '../lib/music.ts';
+import { MUSIC_STYLE_NAMES, music, saveMusic } from '../lib/music.ts';
 import { state } from '../lib/store.ts';
 import { toast } from '../lib/toast.ts';
 
@@ -74,17 +74,17 @@ const STYLE_GROUPS = [
   {
     name: '常规',
     list: [
-      { value: 'card', label: '玻璃卡片', desc: '封面、歌名和点歌人，衬一圈封面颜色的柔光' },
-      { value: 'vinyl', label: '黑胶唱片', desc: '封面印在转动的唱片上，暂停时唱臂抬起' },
-      { value: 'capsule', label: '细长胶囊', desc: '一行显示，占地方最少' },
+      { value: 'card', label: MUSIC_STYLE_NAMES.card, desc: '封面、歌名和点歌人，衬一圈封面颜色的柔光' },
+      { value: 'vinyl', label: MUSIC_STYLE_NAMES.vinyl, desc: '封面印在转动的唱片上，暂停时唱臂抬起' },
+      { value: 'capsule', label: MUSIC_STYLE_NAMES.capsule, desc: '一行显示，占地方最少' },
     ],
   },
   {
     name: '风格',
     list: [
-      { value: 'glass', label: '流光', desc: '封面的颜色铺满整张卡片，像音乐 App 的播放页' },
-      { value: 'journal', label: '手帐', desc: '日系手帐：方格纸、和纸胶带、拍立得、手写字' },
-      { value: 'minimal', label: '灵动岛', desc: '玻璃小胶囊，换歌、有人点歌时弹性展开' },
+      { value: 'glass', label: MUSIC_STYLE_NAMES.glass, desc: '封面的颜色铺满整张卡片，像音乐 App 的播放页' },
+      { value: 'journal', label: MUSIC_STYLE_NAMES.journal, desc: '日系手帐：方格纸、和纸胶带、拍立得、手写字' },
+      { value: 'minimal', label: MUSIC_STYLE_NAMES.minimal, desc: '玻璃小胶囊，换歌、有人点歌时弹性展开' },
     ],
   },
 ] as const;

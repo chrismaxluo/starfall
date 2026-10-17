@@ -87,3 +87,18 @@ export function hms(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 3600)}:${pad2(Math.floor(s / 60) % 60)}:${pad2(s % 60)}`;
 }
+
+/** 某一天：12月3日（按主播所在时区） */
+export function monthDay(ts: number): string {
+  const p = parts(ts);
+  return `${Number(p.slice(5, 7))}月${Number(p.slice(8, 10))}日`;
+}
+
+/** 多久以前：刚刚、5 分钟前、3 小时前，再早就写哪天 */
+export function ago(ts: number, now = Date.now()): string {
+  const m = Math.floor((now - ts) / 60_000);
+  if (m < 1) return '刚刚';
+  if (m < 60) return `${m} 分钟前`;
+  if (m < 24 * 60) return `${Math.floor(m / 60)} 小时前`;
+  return when(ts, now);
+}

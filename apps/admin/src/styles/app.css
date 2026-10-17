@@ -34,6 +34,11 @@
   --mod: #0E8C7A;  --mod-soft: rgba(14, 140, 122, 0.10);
   --nor: #6B7080;  --nor-soft: rgba(107, 112, 128, 0.10);
 
+  /* 出问题（失效、到期、拿不到） */
+  --bad: #D64545; --bad-soft: rgba(214, 69, 69, 0.09);
+  /* 会员标签：深底金字 */
+  --vip-bg: #1D1C22; --vip-fg: #EBCB8E;
+
   --shadow-card: 0 1px 2px rgba(16, 20, 40, 0.04), 0 2px 8px rgba(16, 20, 40, 0.03);
   --shadow-pop: 0 1px 1px rgba(16, 20, 40, 0.04), 0 12px 32px -4px rgba(16, 20, 40, 0.16), 0 32px 64px -12px rgba(16, 20, 40, 0.18);
   --glow: 0 0 0 rgba(0, 0, 0, 0);
@@ -69,6 +74,9 @@
   --cap: #6FA8FF;  --cap-soft: rgba(111, 168, 255, 0.13);
   --mod: #4FD1BC;  --mod-soft: rgba(79, 209, 188, 0.12);
   --nor: #9A9DAA;  --nor-soft: rgba(154, 157, 170, 0.12);
+
+  --bad: #FF7A7A; --bad-soft: rgba(255, 122, 122, 0.11);
+  --vip-bg: rgba(235, 203, 142, 0.13); --vip-fg: #EBCB8E;
 
   --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.02);
   --shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 24px 64px -12px rgba(0, 0, 0, 0.7);
@@ -121,6 +129,8 @@ svg.i { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: n
 .nav a[aria-current="page"] svg { color: var(--accent); }
 .nav .kbd-hint { margin-left: auto; }
 .nav .ext { margin-left: auto; width: 13px; height: 13px; color: var(--t3); }
+.nav .ndot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--gov); flex: none; }
+.nav .ndot.bad { background: var(--bad); }
 
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
 .acct {

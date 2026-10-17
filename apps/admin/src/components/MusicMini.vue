@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// 总览上的点歌小卡片：正在放的歌、进度、暂停 / 继续、切歌、列表还有几首。直播时不用切到「弹幕点歌」页
+// 总览上的点歌小卡片：正在放的歌、进度、暂停 / 继续、切歌、列表还有几首；网易云出问题（登录失效、会员快到期等）时右上角提醒。直播时不用切到「弹幕点歌」页
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
-import { HOLD_TEXT, mmss, music, skipSong, toggleMusicPause } from '../lib/music.ts';
+import { HOLD_TEXT, mmss, music, neteaseIssues, skipSong, toggleMusicPause } from '../lib/music.ts';
 
 const now = computed(() => music.state?.now ?? null);
 const hold = computed(() => music.state?.hold ?? null);
@@ -16,6 +16,7 @@ const pos = computed(() => {
   if (!n) return 0;
   return n.paused ? n.posMs : n.posMs + (tick.value - music.gotAt);
 });
+const issue = computed(() => neteaseIssues()[0] ?? null);
 const pct = computed(() => (now.value?.item.song.durationMs ? Math.min(100, (pos.value / now.value.item.song.durationMs) * 100) : 0));
 </script>
 
@@ -24,6 +25,7 @@ const pct = computed(() => (now.value?.item.song.durationMs ? Math.min(100, (pos
     <div class="card-h">
       <h2>弹幕点歌</h2>
       <span class="aside">
+        <a v-if="issue" class="mm-warn" :class="issue.level" href="#music"><Icon name="i-info" />{{ issue.short }}</a>
         <span v-if="hold && hold !== 'disabled'" class="mm-hold">{{ HOLD_TEXT[hold] }}</span>
         <a class="linkish" href="#music">列表 {{ music.state?.total ?? 0 }} 首 →</a>
       </span>
@@ -67,4 +69,7 @@ const pct = computed(() => (now.value?.item.song.durationMs ? Math.min(100, (pos
 .mm-acts { display: flex; gap: 6px; flex: none; }
 .mm-acts .btn.sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .mm-hold { color: var(--gov); }
+.mm-warn { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px; background: var(--gov-soft); color: var(--gov); font-weight: 500; }
+.mm-warn.bad { background: var(--bad-soft); color: var(--bad); }
+.mm-warn svg { width: 13px; height: 13px; }
 </style>

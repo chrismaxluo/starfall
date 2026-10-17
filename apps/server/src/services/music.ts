@@ -4,7 +4,7 @@
 // 只有一个窗口（最早加到直播软件里的那个）出声音，别的只显示。出声的窗口报「开始了」「放到哪了」「放完了」「放不了」。
 // 不放的情况（hold）：点歌关着、后台暂停、没开播（下播自动暂停）、没有点歌窗口。这时正在放的歌停在原处，恢复后接着放。
 // 有带声音的特效在播时，让出声的窗口把音乐调小。
-import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, ne, sql } from 'drizzle-orm';
 import { whoOk } from '@starfall/core/danmu';
 import { NeteaseError, pick, rank, splitNth } from '@starfall/music';
 import type { NeteaseSong, PickResult } from '@starfall/music';
@@ -70,13 +70,31 @@ export interface MusicHistoryRow {
   endedAt: number | null;
 }
 
+/** 本场（或上一场）点歌的情况：点歌主页上的「本场」卡片 */
+export interface MusicSessionStats {
+  /** 正在直播（本场）；否则是上一场 */
+  live: boolean;
+  startedAt: number;
+  endedAt: number | null;
+  /** 点了几首（取消的、放不了的也算） */
+  requested: number;
+  /** 放完的 */
+  played: number;
+  /** 几个人点歌 */
+  people: number;
+  /** 点得最多的歌（被点两次以上才算） */
+  topSong: { song: MusicSong; count: number } | null;
+  /** 点歌最多的观众 */
+  topPerson: { uid: number; name: string; face: string; count: number } | null;
+}
+
 export interface MusicDeps {
   db: Db;
   settings: SettingsStore;
-  account: Pick<MusicAccount, 'client' | 'vip'>;
+  account: Pick<MusicAccount, 'client' | 'vip' | 'urlResult'>;
   library: MusicLibrary;
   hub: Hub;
-  live: Pick<LiveService, 'status' | 'onStatus' | 'onEvent'>;
+  live: Pick<LiveService, 'status' | 'onStatus' | 'onEvent' | 'lastSession'>;
   room: RoomStore;
   viewers?: Pick<ViewerStore, 'cached'>;
   /** 正在播的特效（有声音时把音乐调小）；测试里可以不传 */
@@ -704,13 +722,17 @@ export class MusicService {
     }
     const n = this.d.account.client();
     const id = Number(r.songId);
+    const song = { id, name: r.name };
     let url: { url: string } | null;
     try {
       url = await n.songUrl(id);
     } catch (e) {
       console.warn('[点歌] 获取网易云播放地址失败：', (e as Error).message);
+      this.d.account.urlResult(false, song, '网易云暂时连不上');
       return `《${r.name}》获取播放地址失败（网易云暂时连不上）`;
     }
+    // 点得进来的歌按说都能完整放（搜歌时看过），拿不到多半是网易云改了限制或者会员到期了
+    this.d.account.urlResult(url !== null, song, url ? '' : '只拿到试听片段，或者没有地址');
     if (!url) return `《${r.name}》放不了（可能需要会员，或者暂时没有版权）`;
     const ly = await n.lyric(id).catch(() => null);
     const lyric = ly ? parseLrc(ly.lrc, ly.trans) : null;
@@ -852,6 +874,45 @@ export class MusicService {
       songs: songs.map((x) => ({ song: { source: x.source, id: x.songId, name: x.name, artists: x.artists, ...(x.cover ? { cover: x.cover } : {}), durationMs: x.durationMs }, count: x.count })),
       people,
       total,
+    };
+  }
+
+  /** 本场（正在直播时）或上一场的点歌情况；还没有直播记录时返回 null。观众不算主播自己（后台加的歌）和模拟点歌的测试观众 */
+  session(): MusicSessionStats | null {
+    const st = this.d.live.status();
+    const roomId = this.d.room.get()?.roomId;
+    let range: { live: boolean; startedAt: number; endedAt: number | null } | null = null;
+    if (st.live && st.liveSince) range = { live: true, startedAt: st.liveSince, endedAt: null };
+    else {
+      const last = roomId ? this.d.live.lastSession(roomId) : null;
+      if (last) range = { live: false, startedAt: last.startedAt, endedAt: last.endedAt };
+    }
+    if (!range) return null;
+    const inRange = range.endedAt === null ? gte(musicRequests.createdAt, range.startedAt) : and(gte(musicRequests.createdAt, range.startedAt), lte(musicRequests.createdAt, range.endedAt));
+    const viewers = and(inRange, gt(musicRequests.uid, 1), ne(musicRequests.uid, this.d.room.get()?.anchorUid ?? 0));
+    const count = (where: ReturnType<typeof and>) => this.d.db.select({ n: sql<number>`count(*)` }).from(musicRequests).where(where).get()?.n ?? 0;
+    const top = this.d.db
+      .select({ source: musicRequests.source, songId: musicRequests.songId, name: sql<string>`max(${musicRequests.name})`, artists: sql<string>`max(${musicRequests.artists})`, cover: sql<string>`max(${musicRequests.cover})`, durationMs: sql<number>`max(${musicRequests.durationMs})`, count: sql<number>`count(*)` })
+      .from(musicRequests)
+      .where(inRange)
+      .groupBy(musicRequests.source, musicRequests.songId)
+      .having(sql`count(*) >= 2`)
+      .orderBy(desc(sql`count(*)`), desc(sql`max(${musicRequests.id})`))
+      .get();
+    const person = this.d.db
+      .select({ uid: musicRequests.uid, name: sql<string>`max(${musicRequests.uname})`, face: sql<string>`max(${musicRequests.face})`, count: sql<number>`count(*)` })
+      .from(musicRequests)
+      .where(viewers)
+      .groupBy(musicRequests.uid)
+      .orderBy(desc(sql`count(*)`), asc(sql`min(${musicRequests.id})`))
+      .get();
+    return {
+      ...range,
+      requested: count(inRange),
+      played: count(and(inRange, eq(musicRequests.status, 'played'))),
+      people: this.d.db.select({ n: sql<number>`count(distinct ${musicRequests.uid})` }).from(musicRequests).where(viewers).get()?.n ?? 0,
+      topSong: top ? { song: { source: top.source, id: top.songId, name: top.name, artists: top.artists, ...(top.cover ? { cover: top.cover } : {}), durationMs: top.durationMs }, count: top.count } : null,
+      topPerson: person ?? null,
     };
   }
 

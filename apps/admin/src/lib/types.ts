@@ -1,5 +1,5 @@
 // 接口返回的数据格式（与服务端 apps/server 的返回值一致）
-import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GiftsFilter, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GiftsFilter, GiftsLook, GiftsMotion, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
 
 export type { Tier, TierRule, HonorBand, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules, QuickButton };
 
@@ -76,6 +76,9 @@ export interface OutputDto {
   giftsFilter: GiftsFilter;
   /** 名单上方的标题（空为不显示） */
   giftsTitle: string;
+  giftsLook: GiftsLook;
+  giftsMotion: GiftsMotion;
+  giftsAlpha: number;
   key: string;
   path: string;
   /** 弹幕列表地址 */

@@ -28,7 +28,7 @@ export class GiftPinStore {
       .from(giftPins)
       .orderBy(asc(giftPins.sort), asc(giftPins.id))
       .all()
-      .map((r) => ({ id: r.id, eventId: r.eventId, item: { ...r.item, id: `pin-${r.id}` } }));
+      .map((r) => ({ id: r.id, eventId: r.eventId, item: { ...r.item, id: `pin-${r.id}`, ref: `log-${r.eventId}` } }));
   }
 
   /** 送礼名单收到的格式（按顺序） */

@@ -169,7 +169,7 @@ const showMusicKey = ref(false);
 const shownMusicUrl = computed(() => mask(musicUrl.value, showMusicKey.value));
 const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 /** 送礼名单浏览器源的建议宽高 */
-const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize) } : { w: GIFTS_WIDTH, h: 650 }));
+const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize, Boolean(o.value.giftsTitle)) } : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
 function setChatMax(x: number): void {
@@ -366,7 +366,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
           <div class="srcbox" :class="{ off: !o.giftsEnabled }">
             <div class="src-h">
               <span class="src-ic gf"><Icon name="i-gift" /></span>
-              <span class="src-t"><b>送礼名单</b><span>本场收到的礼物、上舰、醒目留言，一屏 {{ o.giftsMax }} 条，放不下时循环往上滚 · 拖到画面一侧</span></span>
+              <span class="src-t"><b>送礼名单</b><span>收到的礼物、上舰、醒目留言（本场、今天、本月或按人合计，在「送礼名单」页选），一屏 {{ o.giftsMax }} 条，放不下时循环往上滚 · 拖到画面一侧</span></span>
               <span class="right">
                 <span class="live" :class="o.giftsEnabled && giftLists.length ? '' : 'off'"><i />{{ o.giftsEnabled ? liveText(giftLists) : '已关闭' }}</span>
                 <button class="switch" role="switch" type="button" :aria-checked="o.giftsEnabled" aria-label="启用送礼名单" @click="save({ giftsEnabled: !o.giftsEnabled }, o.giftsEnabled ? '已关闭送礼名单：直播画面上不再显示' : '已打开送礼名单')" />

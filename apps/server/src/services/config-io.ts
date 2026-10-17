@@ -162,6 +162,8 @@ const OutputPart = OutputInputSchema.extend({
   giftsMax: OutputInputSchema.shape.giftsMax.default(GIFTS_MAX_DEFAULT),
   giftsSpeed: OutputInputSchema.shape.giftsSpeed.default('normal'),
   giftsFilter: OutputInputSchema.shape.giftsFilter.default(GIFTS_FILTER_DEFAULT),
+  // 名单标题是 v1.8 加的
+  giftsTitle: OutputInputSchema.shape.giftsTitle.default(''),
 });
 
 export const ConfigFileSchema = z.object({
@@ -368,7 +370,7 @@ export class ConfigIO {
         return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
       }),
       ...(this.d.music ? { music: this.d.music.cfg() } : {}),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle })),
     };
   }
 

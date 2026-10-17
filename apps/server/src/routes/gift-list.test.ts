@@ -58,6 +58,8 @@ describe('送礼名单：挑记录、挂上', () => {
     const r = (await pin(ids.flower)).json();
     expect(r.pins.map((p: { eventId: number }) => p.eventId)).toEqual([ids.flower, ids.sc]);
     expect(ctx.hub.pins().map((p) => p.kind)).toEqual(['gift', 'sc']);
+    // 带上原来那一条的编号：置顶时自动名单里同一条不再重复显示
+    expect(ctx.hub.pins().map((p) => p.ref)).toEqual([`log-${ids.flower}`, `log-${ids.sc}`]);
     expect((await pin(ids.free)).statusCode).toBe(404);
     expect((await pin(99_999)).statusCode).toBe(404);
 

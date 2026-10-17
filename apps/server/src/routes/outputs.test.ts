@@ -62,6 +62,16 @@ describe('直播软件输出', () => {
     expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsTitle: '一二三四五六七八九十一二三四五六七八九十一' } })).statusCode).toBe(400);
   });
 
+  it('送礼名单：外观、滚法、弥散的透明度（升级后是以前的样子：晶彩、片尾字幕）', async () => {
+    const { req } = await setup();
+    const [o] = (await req({ method: 'GET', url: '/api/outputs' })).json().outputs;
+    expect(o).toMatchObject({ giftsLook: 'jingcai', giftsMotion: 'credits', giftsAlpha: 50 });
+    for (const giftsLook of ['glass', 'journal', 'island', 'esports', 'diffuse', 'pixel']) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsLook } })).json()).toMatchObject({ giftsLook });
+    for (const giftsMotion of ['step', 'page', 'marquee']) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsMotion } })).json()).toMatchObject({ giftsMotion });
+    expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { giftsAlpha: 30 } })).json()).toMatchObject({ giftsAlpha: 30 });
+    for (const bad of [{ giftsLook: 'jinbang' }, { giftsMotion: 'spin' }, { giftsAlpha: 5 }, { giftsAlpha: 90 }, { giftsAlpha: 50.5 }]) expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: bad })).statusCode).toBe(400);
+  });
+
   it('新建（未填的用默认值）、修改、参数校验', async () => {
     const { req } = await setup();
     const o = (await req({ method: 'POST', url: '/api/outputs', payload: { name: '横屏录播', app: 'obs', orient: 'landscape', width: 1920, height: 1080 } })).json();

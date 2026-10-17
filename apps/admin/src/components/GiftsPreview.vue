@@ -2,19 +2,19 @@
 // 送礼名单预览：在 iframe 里运行真正的送礼名单页面（预览模式，不连服务端），礼物从后台的实时连接转过去。
 // 「测试」只在这里显示，不上直播
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { GIFTS_WIDTH, giftsHeight, giftsView } from '@starfall/shared/overlay';
+import { giftsSourceSize, giftsView } from '@starfall/shared/overlay';
 import type { GiftListItem, GiftRankRow, OverlayConfig } from '@starfall/shared/overlay';
 import { onGiftRow } from '../lib/live.ts';
 import { state } from '../lib/store.ts';
 
 const props = defineProps<{ config: OverlayConfig; alpha?: boolean }>();
 const frame = ref<HTMLIFrameElement | null>(null);
-/** 按建议的浏览器源大小（640 宽，高度随条数、字号变）缩小显示，最高 520 */
-const H = computed(() => giftsHeight(props.config.giftsMax, props.config.giftsSize, Boolean(props.config.giftsTitle)));
+/** 按建议的浏览器源大小（640 宽，高度随条数、字号变；跑马灯 1080 × 150）缩小显示，最高 520 */
+const size = computed(() => giftsSourceSize(props.config));
 /** 这个输出现在的名单 */
 const board = computed(() => state.giftBoards[props.config.outputId] ?? []);
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
-const K = computed(() => Math.min(0.5, 520 / H.value));
+const K = computed(() => Math.min(0.5, 520 / size.value.h, 400 / size.value.w));
 let ready = false;
 
 function send(msg: unknown): void {
@@ -75,8 +75,8 @@ defineExpose({ test });
 </script>
 
 <template>
-  <div class="chatpv" :class="{ alpha }" :style="{ width: `${GIFTS_WIDTH * K}px`, height: `${H * K}px` }">
-    <iframe ref="frame" src="/overlay/?preview=1&gifts=1" title="送礼名单预览" :style="{ width: `${GIFTS_WIDTH}px`, height: `${H}px`, transform: `scale(${K})` }" />
+  <div class="chatpv" :class="{ alpha }" :style="{ width: `${size.w * K}px`, height: `${size.h * K}px` }">
+    <iframe ref="frame" src="/overlay/?preview=1&gifts=1" title="送礼名单预览" :style="{ width: `${size.w}px`, height: `${size.h}px`, transform: `scale(${K})` }" />
     <div v-if="!config.giftsEnabled" class="chatpv-off">送礼名单已关闭</div>
     <div v-else-if="config.giftsFilter.mode === 'pinned' && !state.giftPins.length" class="chatpv-empty">名单是空的<br />在下面的送礼记录里点「加入名单」</div>
     <div v-else-if="config.giftsFilter.mode !== 'pinned' && !board.length && !tested && !(config.giftsFilter.pinTop && state.giftPins.length)" class="chatpv-empty">这段时间还没有收到礼物<br />点下面的「测试」看看效果</div>

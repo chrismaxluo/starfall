@@ -10,7 +10,7 @@ import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsHeight } from '@starfall/shared/overlay';
+import { CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsSourceSize } from '@starfall/shared/overlay';
 import { useDraft } from '../lib/draft.ts';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
@@ -169,7 +169,7 @@ const showMusicKey = ref(false);
 const shownMusicUrl = computed(() => mask(musicUrl.value, showMusicKey.value));
 const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 /** 送礼名单浏览器源的建议宽高 */
-const giftsWh = computed(() => (o.value ? { w: GIFTS_WIDTH, h: giftsHeight(o.value.giftsMax, o.value.giftsSize, Boolean(o.value.giftsTitle)) } : { w: GIFTS_WIDTH, h: 650 }));
+const giftsWh = computed(() => (o.value ? giftsSourceSize(o.value) : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize) } : { w: CHAT_WIDTH, h: 900 }));
 function setChatMax(x: number): void {

@@ -8,6 +8,27 @@ import type { GuardLevel } from './events.ts';
 export type GiftsSpeed = 'off' | 'slow' | 'normal' | 'fast';
 export const GIFTS_SPEED_PX: Record<GiftsSpeed, number> = { off: 0, slow: 20, normal: 32, fast: 50 };
 
+/**
+ * 送礼名单的外观：晶彩（彩色横条，和礼物特效同一套）、流光（深色毛玻璃）、手帐（纸条、胶带、手写字）、灵动岛（黑色胶囊）、
+ * 电竞（记分牌）、弥散（半透明雾面卡片、柔光）、像素（复古游戏对话框）
+ */
+export const GIFTS_LOOKS = ['jingcai', 'glass', 'journal', 'island', 'esports', 'diffuse', 'pixel'] as const;
+export type GiftsLook = (typeof GIFTS_LOOKS)[number];
+/**
+ * 送礼名单怎么滚：片尾字幕（一直慢慢往上走）、逐条上移（停一下挪一条）、翻页（一屏停几秒整屏换）、横向跑马灯（排成一行从右往左走）。
+ * 速度（GiftsSpeed）对四种都管用；不滚动时都固定挂着
+ */
+export const GIFTS_MOTIONS = ['credits', 'step', 'page', 'marquee'] as const;
+export type GiftsMotion = (typeof GIFTS_MOTIONS)[number];
+/** 逐条上移：每条停几秒；翻页：每页停几秒；跑马灯：每秒多少像素 */
+export const GIFTS_STEP_HOLD: Record<GiftsSpeed, number> = { off: 0, slow: 4, normal: 2.6, fast: 1.6 };
+export const GIFTS_PAGE_HOLD: Record<GiftsSpeed, number> = { off: 0, slow: 8, normal: 5.5, fast: 3.5 };
+export const GIFTS_MARQUEE_PX: Record<GiftsSpeed, number> = { off: 0, slow: 45, normal: 70, fast: 100 };
+/** 弥散外观卡片的透明度（%）：默认一半，太透字会看不清 */
+export const GIFTS_ALPHA_DEFAULT = 50;
+export const GIFTS_ALPHA_MIN = 10;
+export const GIFTS_ALPHA_MAX = 80;
+
 /** 自动名单算哪段时间收到的：本场直播（没开播时是上一场）、今天、本周（周一起）、本月（1 号起）、从某个时间起 */
 export type GiftsRange = 'live' | 'today' | 'week' | 'month' | 'since';
 /** 名单怎么显示：一份礼物一条 / 按人合计（每人一条，按总价值排） */
@@ -51,6 +72,14 @@ export const GIFTS_WIDTH = 640;
 export function giftsHeight(max: number, size: 'normal' | 'large', title = false): number {
   const k = size === 'large' ? 1.25 : 1;
   return Math.max(300, Math.ceil((40 + max * 96 * k + (title ? 64 * k : 0)) / 50) * 50);
+}
+/** 横向跑马灯：一整行放在竖屏画面最上面或最下面，标题在左边，高度只跟字号走 */
+export const GIFTS_MARQUEE_WIDTH = 1080;
+export const giftsMarqueeHeight = (size: 'normal' | 'large'): number => (size === 'large' ? 190 : 150);
+/** 浏览器源建议的宽高（按滚法） */
+export function giftsSourceSize(c: { giftsMax: number; giftsSize: 'normal' | 'large'; giftsTitle: string; giftsMotion: GiftsMotion }): { w: number; h: number } {
+  if (c.giftsMotion === 'marquee') return { w: GIFTS_MARQUEE_WIDTH, h: giftsMarqueeHeight(c.giftsSize) };
+  return { w: GIFTS_WIDTH, h: giftsHeight(c.giftsMax, c.giftsSize, Boolean(c.giftsTitle)) };
 }
 
 /** 送礼名单里的一条：礼物（连击合成一条）、上舰、醒目留言 */

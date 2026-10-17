@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // 送礼名单：先选「名单放什么」（自动：收到的礼物，可以选时间范围、一份一条还是按人合计 / 手动：我挑的记录），一行大白话写出画面上现在会显示什么；
-// 右边是预览和外观（标题、滚动、对齐、字号、条数）；选了手动或者自动里打开了置顶时，左边接着出现送礼记录（按场次）和挑好的记录。
+// 右边是预览和外观（样式、滚法、标题、速度、对齐、字号、条数）；选了手动或者自动里打开了置顶时，左边接着出现送礼记录（按场次）和挑好的记录。
 // 开关、复制地址也在这里，不用跳到「直播软件输出」页
 import { computed, onMounted, ref, watch } from 'vue';
-import { GIFTS_KEEP, GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_TITLE_MAX, GIFTS_WIDTH, giftsHeight, giftsRange, giftsView } from '@starfall/shared/overlay';
-import type { GiftListItem, GiftsFilter, GiftsRange } from '@starfall/shared/overlay';
+import { GIFTS_ALPHA_MAX, GIFTS_ALPHA_MIN, GIFTS_KEEP, GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_PAGE_HOLD, GIFTS_STEP_HOLD, GIFTS_TITLE_MAX, giftsRange, giftsSourceSize, giftsView } from '@starfall/shared/overlay';
+import type { GiftListItem, GiftsFilter, GiftsLook, GiftsMotion, GiftsRange, GiftsSpeed } from '@starfall/shared/overlay';
 import Avatar from '../components/Avatar.vue';
 import DraftBar from '../components/DraftBar.vue';
 import GiftsFilterPick from '../components/GiftsFilterPick.vue';
@@ -23,8 +23,8 @@ import type { OutputDto } from '../lib/types.ts';
 // ---------- 输出（只有一个输出时不显示切换） ----------
 const selId = ref<number | null>(null);
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
-// 外观（标题、滚动、对齐、字号、条数）先改草稿，点「保存」才到直播画面；预览照着草稿显示
-const look = useDraft(() => o.value, ['giftsTitle', 'giftsSpeed', 'giftsSide', 'giftsSize', 'giftsMax'] as const, (p): Promise<boolean> =>
+// 外观（样式、滚法、透明度、标题、速度、对齐、字号、条数）先改草稿，点「保存」才到直播画面；预览照着草稿显示
+const look = useDraft(() => o.value, ['giftsLook', 'giftsMotion', 'giftsAlpha', 'giftsTitle', 'giftsSpeed', 'giftsSide', 'giftsSize', 'giftsMax'] as const, (p): Promise<boolean> =>
   save(p, whOf({ ...o.value!, ...p }) !== whOf(o.value!) ? `已保存：浏览器源宽高建议填 ${whOf({ ...o.value!, ...p })}` : '已保存，直播画面已更新'),
 );
 /** 已保存 + 外观草稿（模板里只在有输出时用） */
@@ -32,7 +32,10 @@ const v = computed(() => ({ ...o.value!, ...look.pending.value }));
 const cfg = computed(() => (o.value ? overlayConfigOf(v.value) : null));
 const online = computed(() => state.overlays.filter((x) => x.outputId === o.value?.id && x.role === 'gifts').length);
 const pv = ref<InstanceType<typeof GiftsPreview> | null>(null);
-const whOf = (x: OutputDto) => `${GIFTS_WIDTH} × ${giftsHeight(x.giftsMax, x.giftsSize, Boolean(x.giftsTitle))}`;
+const whOf = (x: OutputDto) => {
+  const s = giftsSourceSize(x);
+  return `${s.w} × ${s.h}`;
+};
 const wh = computed(() => (o.value ? whOf(o.value) : ''));
 /** 换输出：草稿是上一个输出的，先问再丢掉 */
 function pickOutput(e: Event): void {
@@ -163,12 +166,35 @@ function setMax(x: number): void {
   if (!(n >= 1 && n <= GIFTS_MAX_LIMIT)) return toast(`条数要在 1 – ${GIFTS_MAX_LIMIT} 之间`, 'err');
   look.set({ giftsMax: n });
 }
-const SPEED: Array<{ value: OutputDto['giftsSpeed']; label: string; hint: string }> = [
-  { value: 'off', label: '不滚动', hint: '固定挂着，放不下时只留最新的几条' },
-  { value: 'slow', label: '慢', hint: '一屏放不下时从下往上循环滚动，约 5 秒一条' },
-  { value: 'normal', label: '中', hint: '一屏放不下时从下往上循环滚动，约 3 秒一条' },
-  { value: 'fast', label: '快', hint: '一屏放不下时从下往上循环滚动，约 2 秒一条' },
+const LOOKS: Array<{ value: GiftsLook; label: string; hint: string }> = [
+  { value: 'jingcai', label: '晶彩', hint: '彩色横条，和礼物特效同一套，颜色按礼物价值分档' },
+  { value: 'glass', label: '流光', hint: '深色毛玻璃，礼物的颜色化成背后一团光；和点歌窗口「流光」是一套' },
+  { value: 'journal', label: '手帐', hint: '点点纸条、和纸胶带、手写字，数量用彩笔圈出来；和点歌窗口「手帐」是一套' },
+  { value: 'island', label: '灵动岛', hint: '黑色胶囊，一行写完，最省地方；和点歌窗口「灵动岛」是一套' },
+  { value: 'esports', label: '电竞', hint: '比赛直播的记分牌：碳纤维纹面板、青色比分框，每条一样' },
+  { value: 'diffuse', label: '弥散', hint: '半透明的雾面卡片，里面有淡淡的柔光，每条一样；透明度可以调' },
+  { value: 'pixel', label: '像素', hint: '复古游戏对话框、像素字，新礼物一个字一个字打出来' },
 ];
+const MOTIONS: Array<{ value: GiftsMotion; label: string; hint: string }> = [
+  { value: 'credits', label: '片尾字幕', hint: '一直慢慢往上走，像片尾字幕' },
+  { value: 'step', label: '逐条上移', hint: '停一会儿往上挪一条，每条都看得清' },
+  { value: 'page', label: '翻页', hint: '一屏停几秒，整屏换成下一屏' },
+  { value: 'marquee', label: '横向跑马灯', hint: '排成一行从右往左走，放在画面最上面或最下面' },
+];
+const SPEED: Array<{ value: GiftsSpeed; label: string }> = [
+  { value: 'off', label: '不滚动' },
+  { value: 'slow', label: '慢' },
+  { value: 'normal', label: '中' },
+  { value: 'fast', label: '快' },
+];
+/** 速度的说明：每种滚法的「快慢」说法不一样 */
+function speedHint(m: GiftsMotion, s: GiftsSpeed): string {
+  if (s === 'off') return m === 'marquee' ? '固定挂着，一行放不下时只留最新的几条' : '固定挂着，放不下时只留最新的几条';
+  if (m === 'step') return `一屏放不下时每条停 ${GIFTS_STEP_HOLD[s]} 秒，再往上挪一条`;
+  if (m === 'page') return `一屏放不下时每页停 ${GIFTS_PAGE_HOLD[s]} 秒，再换下一页`;
+  if (m === 'marquee') return `一行放不下时从右往左循环走（${s === 'slow' ? '慢慢走' : s === 'normal' ? '正常' : '走得快'}）`;
+  return `一屏放不下时从下往上循环滚动，约 ${s === 'slow' ? 5 : s === 'normal' ? 3 : 2} 秒一条`;
+}
 
 // ---------- 送礼记录（按场次，手动时用） ----------
 type Rec = GiftListItem & { eventId: number };
@@ -414,6 +440,35 @@ async function move(i: number, d: -1 | 1): Promise<void> {
         <h3 class="gl-sub">外观<small>改完点「保存」才到直播画面</small></h3>
         <div class="srows">
           <div class="srow">
+            <span class="lb">样式</span>
+            <div class="ctl">
+              <span class="seg wrap" role="group" aria-label="样式">
+                <button v-for="x in LOOKS" :key="x.value" :aria-pressed="v.giftsLook === x.value" @click="look.set({ giftsLook: x.value })">{{ x.label }}</button>
+              </span>
+              <span class="hint">{{ LOOKS.find((x) => x.value === v.giftsLook)?.hint }}</span>
+            </div>
+          </div>
+          <div v-if="v.giftsLook === 'diffuse'" class="srow">
+            <span class="lb">透明度</span>
+            <div class="ctl">
+              <div class="line">
+                <input id="gl-alpha" class="alpha" type="range" :min="GIFTS_ALPHA_MIN" :max="GIFTS_ALPHA_MAX" step="5" :value="v.giftsAlpha" aria-label="弥散卡片的透明度" @input="look.set({ giftsAlpha: Number(($event.target as HTMLInputElement).value) })" />
+                <output for="gl-alpha" class="alpha-v">{{ v.giftsAlpha }}%</output>
+              </div>
+              <span class="hint">越透越能看到后面的直播画面；画面很亮或很花时调低一点，字更清楚</span>
+            </div>
+          </div>
+          <div class="srow">
+            <span class="lb">滚法</span>
+            <div class="ctl">
+              <span class="seg wrap" role="group" aria-label="滚法">
+                <button v-for="x in MOTIONS" :key="x.value" :aria-pressed="v.giftsMotion === x.value" @click="look.set({ giftsMotion: x.value })">{{ x.label }}</button>
+              </span>
+              <span class="hint">{{ MOTIONS.find((x) => x.value === v.giftsMotion)?.hint }}<template v-if="v.giftsMotion === 'marquee'">；浏览器源宽高填 {{ whOf(v) }}</template></span>
+              <span v-if="v.giftsMotion === 'marquee' && f.pinTop && !manual" class="hint warn">跑马灯只有一行：置顶的记录不会单独固定在前面</span>
+            </div>
+          </div>
+          <div class="srow">
             <span class="lb">标题</span>
             <div class="ctl">
               <div class="line">
@@ -424,12 +479,12 @@ async function move(i: number, d: -1 | 1): Promise<void> {
             </div>
           </div>
           <div class="srow">
-            <span class="lb">滚动</span>
+            <span class="lb">速度</span>
             <div class="ctl">
-              <span class="seg" role="group" aria-label="滚动">
+              <span class="seg" role="group" aria-label="速度">
                 <button v-for="s in SPEED" :key="s.value" :aria-pressed="v.giftsSpeed === s.value" @click="look.set({ giftsSpeed: s.value })">{{ s.label }}</button>
               </span>
-              <span class="hint">{{ SPEED.find((s) => s.value === v.giftsSpeed)?.hint }}</span>
+              <span class="hint">{{ speedHint(v.giftsMotion, v.giftsSpeed) }}</span>
             </div>
           </div>
           <div class="srow">
@@ -451,7 +506,7 @@ async function move(i: number, d: -1 | 1): Promise<void> {
               </span>
             </div></div>
           </div>
-          <div class="srow">
+          <div v-if="v.giftsMotion !== 'marquee'" class="srow">
             <span class="lb">一屏几条</span>
             <div class="ctl"><div class="line">
               <span class="stepper">
@@ -502,6 +557,8 @@ async function move(i: number, d: -1 | 1): Promise<void> {
 .gl-tools .sel { height: 32px; min-width: 240px; max-width: 100%; }
 .gl-tools .sel.amt { min-width: 0; width: 120px; }
 .seg.wrap { flex-wrap: wrap; }
+.alpha { width: min(240px, 100%); accent-color: var(--accent); }
+.alpha-v { min-width: 3em; font-family: var(--font-mono); font-size: 12.5px; color: var(--t1); }
 .inp.dt { width: 200px; height: 32px; }
 .inp.title { width: 200px; height: 32px; }
 .hint.warn { color: var(--gov); }

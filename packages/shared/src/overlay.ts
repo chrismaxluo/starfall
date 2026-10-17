@@ -2,7 +2,7 @@
 import type { GuardLevel, TriggerKind } from './events.ts';
 import type { Position } from './rules.ts';
 import type { MusicNotice, MusicState } from './music.ts';
-import type { GiftListItem, GiftRow, GiftsFilter, GiftsSpeed } from './gift-list.ts';
+import type { GiftListItem, GiftRow, GiftsFilter, GiftsLook, GiftsMotion, GiftsSpeed } from './gift-list.ts';
 
 export * from './music.ts';
 export * from './gift-list.ts';
@@ -58,6 +58,10 @@ export interface OverlayConfig {
   giftsFilter: GiftsFilter;
   /** 名单上方的标题（空为不显示） */
   giftsTitle: string;
+  /** 外观、滚法；弥散外观卡片的透明度（%） */
+  giftsLook: GiftsLook;
+  giftsMotion: GiftsMotion;
+  giftsAlpha: number;
 }
 
 /** 弹幕列表条数：默认 8 条，最多能设 CHAT_MAX_LIMIT 条（服务端也最多记住这么多条） */

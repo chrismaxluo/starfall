@@ -62,6 +62,9 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   giftsSpeed: o.giftsSpeed,
   giftsFilter: o.giftsFilter,
   giftsTitle: o.giftsTitle,
+  giftsLook: o.giftsLook,
+  giftsMotion: o.giftsMotion,
+  giftsAlpha: o.giftsAlpha,
 });
 
 export class Hub {

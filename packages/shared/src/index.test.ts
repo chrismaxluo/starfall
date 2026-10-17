@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chatHeight, DANMU_WHO_DEFAULT, DanmuWhoSchema, giftBoardAdd, giftListShows, giftRowsSorted, giftRowsTrim, giftsHeight, goldToYuan } from './index.ts';
+import { chatHeight, DANMU_WHO_DEFAULT, DanmuWhoSchema, giftBoardAdd, giftListShows, giftRowsSorted, giftRowsTrim, giftsHeight, giftsSourceSize, goldToYuan } from './index.ts';
 import type { GiftListItem, GiftRankRow, GiftRow, GiftsFilter } from './index.ts';
 
 describe('goldToYuan', () => {
@@ -90,6 +90,13 @@ describe('送礼名单：合并、按人合计、排序', () => {
   it('浏览器源高度：有标题时多出一行', () => {
     expect(giftsHeight(6, 'normal')).toBe(650);
     expect(giftsHeight(6, 'normal', true)).toBeGreaterThan(giftsHeight(6, 'normal'));
+  });
+
+  it('浏览器源大小按滚法：竖着 640 宽，跑马灯一整行 1080 宽、高度只跟字号走', () => {
+    const c = { giftsMax: 6, giftsSize: 'normal' as const, giftsTitle: '' };
+    for (const giftsMotion of ['credits', 'step', 'page'] as const) expect(giftsSourceSize({ ...c, giftsMotion })).toEqual({ w: 640, h: 650 });
+    expect(giftsSourceSize({ ...c, giftsMotion: 'marquee' })).toEqual({ w: 1080, h: 150 });
+    expect(giftsSourceSize({ ...c, giftsMax: 12, giftsTitle: '本场礼物', giftsSize: 'large', giftsMotion: 'marquee' })).toEqual({ w: 1080, h: 190 });
   });
 });
 

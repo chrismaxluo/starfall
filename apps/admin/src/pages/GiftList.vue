@@ -63,11 +63,18 @@ async function copyUrl(): Promise<void> {
 // ---------- 名单放什么 ----------
 const f = computed(() => o.value!.giftsFilter);
 const manual = computed(() => f.value.mode === 'pinned');
+/** 最后一次改的名单设置（还在保存中时）：前面几次的保存回来得晚，页面上也还是显示这一次的 */
+let filterNext: { id: number; f: GiftsFilter } | null = null;
 /** 先在页面上改好再保存：连着点几项时，后一项在前一项的基础上改，不会被还没保存完的旧设置盖掉（保存失败时 save 会取回原来的） */
 function setFilter(patch: Partial<GiftsFilter>, msg: string): void {
+  const target = o.value!;
   const giftsFilter = { ...f.value, ...patch };
-  o.value!.giftsFilter = giftsFilter;
-  void save({ giftsFilter }, msg);
+  const mine = (filterNext = { id: target.id, f: giftsFilter });
+  target.giftsFilter = giftsFilter;
+  void save({ giftsFilter }, msg).then((ok) => {
+    if (filterNext === mine) filterNext = null;
+    else if (ok && filterNext && filterNext.id === target.id) target.giftsFilter = filterNext.f;
+  });
 }
 /** 全部礼物时的最低金额（金瓜子；0 为不限） */
 const listMin = computed(() => f.value.minGold ?? 0);

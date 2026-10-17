@@ -16,6 +16,8 @@ const board = computed(() => state.giftBoards[props.config.outputId] ?? []);
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 const K = computed(() => Math.min(0.5, 520 / size.value.h, 400 / size.value.w));
 let ready = false;
+/** 手动时测试加的一条（只有一条，每次测试换成下一条） */
+const testPin = ref<GiftListItem | null>(null);
 
 function send(msg: unknown): void {
   if (ready) frame.value?.contentWindow?.postMessage(msg, location.origin);
@@ -32,8 +34,17 @@ watch(() => props.config, (c) => send({ type: 'config', config: clone(c) }), { d
 const off = onGiftRow((id, row) => {
   if (id === props.config.outputId) send(row ? { type: 'gift_row', row: clone(row) } : { type: 'gifts_set', rows: clone(board.value) });
 });
-// 挂上的记录变了：整份发过去
-watch(() => state.giftPins, (items) => send({ type: 'gift_pins', items: clone(items) }), { deep: true });
+// 挂上的记录变了：整份发过去（之前测试加的那一条不要了）
+watch(() => state.giftPins, (items) => {
+  testPin.value = null;
+  send({ type: 'gift_pins', items: clone(items) });
+}, { deep: true });
+// 手动和自动换了：测试加的那一条也去掉（自动里打开置顶时不显示它）
+watch(() => props.config.giftsFilter.mode === 'pinned', () => {
+  if (!testPin.value) return;
+  testPin.value = null;
+  send({ type: 'gift_pins', items: clone(state.giftPins) });
+});
 
 onMounted(() => addEventListener('message', onMessage));
 onBeforeUnmount(() => {
@@ -63,7 +74,12 @@ const tested = ref(false);
 function test(): void {
   const i = n % SAMPLES.length;
   n++;
-  if (giftsView(props.config.giftsFilter) === 'viewer') {
+  if (props.config.giftsFilter.mode === 'pinned') {
+    // 手动：加在名单最后（和真的加入名单一样）；名单已经占满一屏时加在最前面，免得看不到
+    const t = (testPin.value = { ...SAMPLES[i]!, id: `tp${n}`, ts: Date.now() });
+    const full = props.config.giftsMotion === 'marquee' || state.giftPins.length >= props.config.giftsMax;
+    send({ type: 'gift_pins', items: clone(full ? [t, ...state.giftPins] : [...state.giftPins, t]) });
+  } else if (giftsView(props.config.giftsFilter) === 'viewer') {
     const { step, ...s } = RANK_SAMPLES[i]!;
     const times = (rankTotals.get(i) ?? 0) + 1;
     rankTotals.set(i, times);
@@ -78,7 +94,7 @@ defineExpose({ test });
   <div class="chatpv" :class="{ alpha }" :style="{ width: `${size.w * K}px`, height: `${size.h * K}px` }">
     <iframe ref="frame" src="/overlay/?preview=1&gifts=1" title="送礼名单预览" :style="{ width: `${size.w}px`, height: `${size.h}px`, transform: `scale(${K})` }" />
     <div v-if="!config.giftsEnabled" class="chatpv-off">送礼名单已关闭</div>
-    <div v-else-if="config.giftsFilter.mode === 'pinned' && !state.giftPins.length" class="chatpv-empty">名单是空的<br />在下面的送礼记录里点「加入名单」</div>
+    <div v-else-if="config.giftsFilter.mode === 'pinned' && !state.giftPins.length && !testPin" class="chatpv-empty">名单是空的<br />在送礼记录里点「加入名单」，或者点下面的「测试」看看效果</div>
     <div v-else-if="config.giftsFilter.mode !== 'pinned' && !board.length && !tested && !(config.giftsFilter.pinTop && state.giftPins.length)" class="chatpv-empty">这段时间还没有收到礼物<br />点下面的「测试」看看效果</div>
   </div>
 </template>

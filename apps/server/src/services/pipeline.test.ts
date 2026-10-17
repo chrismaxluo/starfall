@@ -1,7 +1,7 @@
 import type { GiftConfig } from '@starfall/bili';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DANMU_WHO_ALL } from '@starfall/shared';
-import type { EnterEvent, ScEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
+import type { EnterEvent, GiftsFilter, ScEvent, ServerToOverlay, StdEvent, Viewer } from '@starfall/shared';
 import { room } from '../db/schema.ts';
 import { testApp } from '../testing.ts';
 import { Hub, PLAY_ACK_MS } from './hub.ts';
@@ -693,8 +693,14 @@ describe('弹幕列表', () => {
 });
 
 describe('送礼名单', () => {
-  const giftItems = (sock: ReturnType<typeof fakeSock>) => sock.sent.filter((m) => m.type === 'gift_item').map((m) => (m as Extract<ServerToOverlay, { type: 'gift_item' }>).item);
+  const giftRows = (sock: ReturnType<typeof fakeSock>) => sock.sent.filter((m) => m.type === 'gift_row').map((m) => (m as Extract<ServerToOverlay, { type: 'gift_row' }>).row);
+  const sets = (sock: ReturnType<typeof fakeSock>) => sock.sent.filter((m) => m.type === 'gifts_set').map((m) => (m as Extract<ServerToOverlay, { type: 'gifts_set' }>).rows);
   const sc = (p: Partial<ScEvent> = {}, vp: Partial<Viewer> = {}): ScEvent => ({ kind: 'sc', id: `s${++seq}`, ts: Date.now(), viewer: v(vp), text: '主播唱首歌吧', priceYuan: 30, scId: `sc${seq}`, ...p });
+  const oid = (t: { ctx: { outputs: { list(): Array<{ id: number }> } } }) => t.ctx.outputs.list()[0]!.id;
+  const setFilter = (t: Awaited<ReturnType<typeof setup>>, patch: Partial<GiftsFilter>) => {
+    const o = t.ctx.outputs.list()[0]!;
+    t.ctx.outputs.update(o.id, { giftsFilter: { ...o.giftsFilter, ...patch } });
+  };
 
   it('付费礼物（连击合成后的）、上舰、醒目留言推给送礼名单（不看规则）；免费礼物不推；特效页收不到', async () => {
     const t = await setup();
@@ -706,13 +712,16 @@ describe('送礼名单', () => {
     t.live.emit(gd({ level: 2, months: 3, op: 'renew', priceGold: 1_998_000 }));
     vi.advanceTimersByTime(3000);
     t.live.emit(sc());
-    expect(giftItems(gifts)).toMatchObject([
-      { kind: 'gift', value: 6600, viewer: { name: '小星', guard: 3 }, gift: { id: 31036, name: '小花花', count: 66, img: 'https://i0.hdslb.com/gift/flower.webp' } },
+    expect(giftRows(gifts)).toMatchObject([
+      { kind: 'gift', value: 6600, viewer: { uid: 10001, name: '小星', guard: 3 }, gift: { id: 31036, name: '小花花', count: 66, img: 'https://i0.hdslb.com/gift/flower.webp' } },
       { kind: 'guard', value: 1_998_000, guard: { level: 2, months: 3, op: 'renew' } },
       { kind: 'sc', value: 30_000, sc: { text: '主播唱首歌吧', price: 30 } },
     ]);
-    expect(t.sock.sent.some((m) => m.type === 'gift_item')).toBe(false);
-    expect(t.hub.recentGifts()).toHaveLength(3);
+    // 编号就是事件记录的编号（服务重启后从记录里装回来的一样）
+    const ids = t.events().map((e) => `log-${e.id}`);
+    for (const r of giftRows(gifts)) expect(ids).toContain(r.id);
+    expect(t.sock.sent.some((m) => m.type === 'gift_row')).toBe(false);
+    expect(t.hub.giftBoard(oid(t))).toHaveLength(3);
   });
 
   it('直播中重启服务：启动时还不知道场次，接上本场后把本场的送礼名单装回来（不会清空）', async () => {
@@ -726,11 +735,11 @@ describe('送礼名单', () => {
     const p2 = new Pipeline({ ...t.ctx, live: live2, hub: hub2, gifts: { find: (id: number) => GIFTS[id] }, timeZone: 'Asia/Shanghai' });
     p2.start();
     cleanup.push(() => p2.stop());
-    expect(hub2.recentGifts()).toEqual([]);
+    expect(hub2.giftBoard(oid(t))).toEqual([]);
     // 接上了还没结束的本场
     s2 = 1;
     vi.advanceTimersByTime(500);
-    expect(hub2.recentGifts()).toMatchObject([{ kind: 'gift', value: 2000 }]);
+    expect(hub2.giftBoard(oid(t))).toMatchObject([{ kind: 'gift', value: 2000 }]);
   });
 
   it('新开一场直播时清空（没开播时保留上一场的）；服务重启后从事件记录恢复本场的', async () => {
@@ -745,15 +754,83 @@ describe('送礼名单', () => {
     const p2 = new Pipeline({ ...t.ctx, live: t.live, hub: hub2, gifts: { find: (id: number) => GIFTS[id] }, timeZone: 'Asia/Shanghai' });
     p2.start();
     cleanup.push(() => p2.stop());
-    expect(hub2.recentGifts()).toMatchObject([{ kind: 'gift', value: 2000, gift: { name: '小花花', count: 2 } }, { kind: 'sc', sc: { price: 50 } }]);
+    expect(hub2.giftBoard(oid(t))).toMatchObject([{ kind: 'gift', value: 2000, gift: { name: '小花花', count: 2 } }, { kind: 'sc', sc: { price: 50 } }]);
+    expect(hub2.giftBoard(oid(t)).map((r) => r.id)).toEqual(t.hub.giftBoard(oid(t)).map((r) => r.id));
     // 下播：保留
     t.live.state.sessionId = null;
     vi.advanceTimersByTime(500);
-    expect(t.hub.recentGifts()).toHaveLength(2);
+    expect(t.hub.giftBoard(oid(t))).toHaveLength(2);
     // 新开一场：清空
     t.live.state.sessionId = 2;
     vi.advanceTimersByTime(500);
-    expect(t.hub.recentGifts()).toEqual([]);
-    expect(gifts.sent.some((m) => m.type === 'gifts_clear')).toBe(true);
+    expect(t.hub.giftBoard(oid(t))).toEqual([]);
+    expect(sets(gifts).at(-1)).toEqual([]);
+  });
+
+  it('时间范围：今天 / 本周 / 从某个时间起从事件记录装（跨场次）；改了设置整份重新发；过了 0 点「今天」自动清空', async () => {
+    const t = await setup();
+    const gifts = fakeSock();
+    t.hub.addOverlay(gifts, t.ctx.outputs.list()[0]!, [], Date.now(), 'gifts');
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    vi.setSystemTime(new Date('2026-09-24T23:00:00+08:00'));
+    t.live.emit(gf({ unitPrice: 1000 }));
+    vi.setSystemTime(new Date('2026-09-25T12:00:00+08:00'));
+    t.live.state.sessionId = 2;
+    t.live.emit(gf({ unitPrice: 2000 }));
+    // 本场：只有第二场的
+    expect(t.hub.giftBoard(oid(t)).map((r) => r.value)).toEqual([2000]);
+    setFilter(t, { range: 'week' });
+    expect(sets(gifts).at(-1)!.map((r) => r.value)).toEqual([1000, 2000]);
+    setFilter(t, { range: 'since', since: Date.parse('2026-09-25T11:00:00+08:00') });
+    expect(sets(gifts).at(-1)!.map((r) => r.value)).toEqual([2000]);
+    setFilter(t, { range: 'today' });
+    expect(sets(gifts).at(-1)!.map((r) => r.value)).toEqual([2000]);
+    // 只改了外观（置顶、显示金额、别的设置）：不重新发
+    const n = sets(gifts).length;
+    setFilter(t, { pinTop: true });
+    t.ctx.outputs.update(oid(t), { giftsSide: 'left' });
+    expect(sets(gifts)).toHaveLength(n);
+    // 过了 0 点
+    vi.setSystemTime(new Date('2026-09-26T00:00:01+08:00'));
+    vi.advanceTimersByTime(300);
+    expect(sets(gifts).at(-1)).toEqual([]);
+    t.live.emit(gf({ unitPrice: 3000 }));
+    expect(t.hub.giftBoard(oid(t)).map((r) => r.value)).toEqual([3000]);
+  });
+
+  it('按人合计、合并同人同礼物：同一行接着加，发出的是加上之后的那一行', async () => {
+    const t = await setup();
+    const gifts = fakeSock();
+    t.hub.addOverlay(gifts, t.ctx.outputs.list()[0]!, [], Date.now(), 'gifts');
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    setFilter(t, { view: 'viewer' });
+    t.live.emit(gf({ unitPrice: 1000 }));
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }));
+    t.live.emit(gf({ unitPrice: 1000 }, { uid: 10002, name: '小月' }));
+    expect(giftRows(gifts).map((r) => [r.id, r.value])).toEqual([['v:10001', 1000], ['v:10001', 101_000], ['v:10002', 1000]]);
+    expect(t.hub.giftBoard(oid(t))[0]).toMatchObject({ kind: 'viewer', times: 2, top: { name: '极速超跑' } });
+    setFilter(t, { view: 'item', merge: true });
+    expect(sets(gifts).at(-1)!.map((r) => r.id)).toEqual(['m:10001:31036', 'm:10001:32089', 'm:10002:31036']);
+    t.live.emit(gf({ unitPrice: 1000, count: 2 }));
+    expect(giftRows(gifts).at(-1)).toMatchObject({ id: 'm:10001:31036', value: 3000, times: 2, gift: { count: 3 } });
+  });
+
+  it('每个输出按自己的设置：设置一样的共用，新建的输出第一次用到时再装', async () => {
+    const t = await setup();
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    t.live.emit(gf({ unitPrice: 1000 }));
+    const o2 = t.ctx.outputs.create({ name: '横屏', giftsFilter: { mode: 'all', gifts: [], guard: true, sc: true, view: 'viewer' } });
+    const a = fakeSock();
+    const b = fakeSock();
+    t.hub.addOverlay(a, t.ctx.outputs.list()[0]!, [], Date.now(), 'gifts');
+    t.hub.addOverlay(b, o2, [], Date.now(), 'gifts');
+    expect((b.sent[0] as Extract<ServerToOverlay, { type: 'hello' }>).gifts).toMatchObject([{ kind: 'viewer', value: 1000 }]);
+    t.live.emit(gf({ unitPrice: 1000 }));
+    expect(giftRows(a)).toMatchObject([{ kind: 'gift', value: 1000 }]);
+    expect(giftRows(b)).toMatchObject([{ kind: 'viewer', value: 2000 }]);
+    // 删掉的输出不再管
+    t.ctx.outputs.remove(o2.id);
+    t.live.emit(gf({ unitPrice: 1000 }));
+    expect(giftRows(b)).toHaveLength(1);
   });
 });

@@ -262,10 +262,4 @@ describe('预览与统计', () => {
     const s = (await t.req({ method: 'GET', url: '/api/stats?scope=live' })).json();
     expect(s).toMatchObject({ from: now - 7200_000, to: now - 3600_000, live: false, lastSession: { startedAt: now - 7200_000, endedAt: now - 3600_000 }, enterUnique: 1 });
   });
-
-  it('按时区算当天 0 点', async () => {
-    const { dayStart } = await import('./playback.ts');
-    expect(dayStart('2026-09-25', 'Asia/Shanghai')).toBe(Date.parse('2026-09-25T00:00:00+08:00'));
-    expect(dayStart('2026-09-25', 'UTC')).toBe(Date.parse('2026-09-25T00:00:00Z'));
-  });
 });

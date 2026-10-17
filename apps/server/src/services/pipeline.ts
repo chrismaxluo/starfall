@@ -4,7 +4,7 @@
 // 四种事件共用同一套判断（黑名单 → 匹配规则 → 暂停 → 开播 → 冷却 → 特效页在线），只有匹配规则、冷却、欢迎语变量、是否插队不同。
 import { Cooldowns, EnterMerger, GiftComboMerger, GuardDeduper, OncePerLive, PlayQueue, decide, enterRuleKey, fillText, matchDanmu, matchEnter, matchGift, matchGuard, pickText } from '@starfall/core';
 import type { QueueItem, TextVars } from '@starfall/core';
-import { BIG_GIFT_GOLD, BILI_GIFT_STYLE, GIFTS_KEEP, GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD, isOwnMedal } from '@starfall/shared';
+import { BIG_GIFT_GOLD, BILI_GIFT_STYLE, GUARD_BADGES, GUARD_FRAMES, GUARD_NAMES, JUMP_GOLD, isOwnMedal } from '@starfall/shared';
 import type { ChatItem, DanmuEvent, GiftEvent, GiftListItem, GuardEvent, PlayItem, ScEvent, PlayStatus, StdEvent, SvgaDyn, TriggerKind, Viewer } from '@starfall/shared';
 import { HttpError } from '../http.ts';
 import type { BlacklistStore } from './blacklist.ts';
@@ -13,7 +13,9 @@ import type { DanmuRuleStore, GiftRuleStore, GuardRuleStore } from './event-rule
 import type { EventLog } from './events.ts';
 import type { Hub } from './hub.ts';
 import type { LiveService } from './live.ts';
+import type { OutputStore } from './outputs.ts';
 import type { GiftEffects, GiftFxHit } from './gift-fx.ts';
+import { GiftBoards } from './gift-board.ts';
 import type { GiftCatalog } from './gifts.ts';
 import type { HonorMedals } from './honor.ts';
 import type { RoomStore } from './room.ts';
@@ -145,6 +147,8 @@ export interface PipelineDeps {
   viewers: ViewerStore;
   log: EventLog;
   hub: Hub;
+  /** 送礼名单按每个输出的设置装 */
+  outputs: Pick<OutputStore, 'list' | 'onChange'>;
   timeZone: string;
   now?: () => number;
   rng?: () => number;
@@ -168,8 +172,9 @@ export class Pipeline {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: (() => void) | null = null;
   private onceSession: number | null = null;
-  /** 送礼名单现在装的是哪一场（没开播时是上一场；新开一场时清空） */
-  private giftsSession: number | null = null;
+  /** 送礼名单：每个输出按自己的设置装 */
+  readonly giftBoards: GiftBoards;
+  private unsubscribeOutputs: (() => void) | null = null;
   private seq = 0;
   private readonly dayFmt: Intl.DateTimeFormat;
 
@@ -179,11 +184,26 @@ export class Pipeline {
     this.rng = deps.rng ?? Math.random;
     // sv-SE 的日期格式就是 YYYY-MM-DD
     this.dayFmt = new Intl.DateTimeFormat('sv-SE', { timeZone: deps.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    this.giftBoards = new GiftBoards({
+      log: deps.log,
+      live: deps.live,
+      room: deps.room,
+      outputs: deps.outputs,
+      hub: deps.hub,
+      timeZone: deps.timeZone,
+      now: this.now,
+      itemOf: (r) => {
+        const ev = eventFromLog(r);
+        return ev ? this.giftListItem(ev) : null;
+      },
+    });
+    deps.hub.setGiftSource((id) => this.giftBoards.rows(id));
   }
 
   start(): void {
     this.d.log.clearStaleQueued();
-    this.guard('恢复送礼名单', () => this.restoreGifts());
+    this.guard('恢复送礼名单', () => this.giftBoards.restore());
+    this.unsubscribeOutputs = this.d.outputs.onChange((o, change) => this.guard('更新送礼名单', () => this.giftBoards.outputChanged(o, change)));
     this.unsubscribe = this.d.live.onEvent((ev, raw) => this.handle(ev, raw));
     // 换了直播间：还在合并中（等待中的进场、连击中的礼物、等待确认的上舰）属于上一个直播间，丢掉，不要记到新直播间名下
     this.unsubscribeRoom = this.d.room.onChange(() => {
@@ -191,8 +211,7 @@ export class Pipeline {
       this.combo = new GiftComboMerger();
       this.guards = new GuardDeduper();
       this.d.hub.clearChat();
-      this.giftsSession = null;
-      this.d.hub.resetGifts();
+      this.guard('清空送礼名单', () => this.giftBoards.reset());
     });
     this.flushTimer = setInterval(() => this.guard('取出合并中的事件', () => this.flush()), FLUSH_MS);
   }
@@ -210,6 +229,8 @@ export class Pipeline {
     this.unsubscribe?.();
     this.unsubscribeRoom?.();
     this.unsubscribeRoom = null;
+    this.unsubscribeOutputs?.();
+    this.unsubscribeOutputs = null;
     if (this.flushTimer) clearInterval(this.flushTimer);
     this.flushTimer = null;
     if (this.current) clearTimeout(this.current.timer);
@@ -261,8 +282,7 @@ export class Pipeline {
           break;
         }
         this.scSeen.set(ev.scId, now);
-        this.record(ev, null, 'no_rule');
-        this.pushGift(ev);
+        this.pushGift(ev, this.record(ev, null, 'no_rule'));
         break;
       }
     }
@@ -275,7 +295,7 @@ export class Pipeline {
     for (const e of this.merger.flush(now)) this.process(e);
     for (const e of this.combo.flush(now)) this.process(e);
     for (const e of this.guards.flush(now)) this.process(e);
-    this.syncGiftsSession();
+    this.giftBoards.sync();
     for (const [id, r] of this.raws) if (now - r.at > RAW_TTL_MS) this.raws.delete(id);
   }
 
@@ -286,7 +306,7 @@ export class Pipeline {
   giftListItem(ev: GiftEvent | GuardEvent | ScEvent): GiftListItem | null {
     const v = ev.viewer;
     const face = v.face || this.d.viewers.cached(v.uid)?.face || '';
-    const base = { id: ev.id, ts: ev.ts, viewer: { name: v.name, ...(face ? { face } : {}), guard: v.guard } };
+    const base = { id: ev.id, ts: ev.ts, viewer: { uid: v.uid, name: v.name, ...(face ? { face } : {}), guard: v.guard } };
     if (ev.kind === 'gift') {
       const value = ev.unitPrice * ev.count;
       if (!ev.paid || value <= 0) return null;
@@ -297,42 +317,12 @@ export class Pipeline {
     return { ...base, kind: 'sc', value: Math.round(ev.priceYuan * 1000), sc: { text: ev.text, price: ev.priceYuan } };
   }
 
-  private pushGift(ev: GiftEvent | GuardEvent | ScEvent): void {
+  /** 推给送礼名单：编号用事件记录的编号（和服务重启后从记录里装回来的一样，挂上的记录也认得） */
+  private pushGift(ev: GiftEvent | GuardEvent | ScEvent, eventId: number): void {
     this.guard('推送送礼名单', () => {
-      this.syncGiftsSession();
       const item = this.giftListItem(ev);
-      if (item) this.d.hub.toGifts(item);
+      if (item) this.giftBoards.push({ ...item, id: `log-${eventId}` });
     });
-  }
-
-  /**
-   * 换了场次：按事件记录装这一场的送礼名单。新开的一场记录是空的，等于清空；
-   * 服务在直播中重启后接上的还是同一场（启动时还不知道场次，先装了上一场），这时把本场已有的装回来。没开播时保留上一场的
-   */
-  private syncGiftsSession(): void {
-    const sid = this.d.live.status().sessionId;
-    if (sid === null || sid === this.giftsSession) return;
-    this.giftsSession = sid;
-    this.d.hub.resetGifts(this.sessionGifts(sid));
-  }
-
-  /** 服务启动时：先装上一场的（直播中重启时，接上本场后 syncGiftsSession 会换成本场的） */
-  private restoreGifts(): void {
-    const room = this.d.room.get();
-    const sid = this.d.live.status().sessionId ?? (room ? (this.d.live.lastSession?.(room.roomId)?.id ?? null) : null);
-    this.giftsSession = sid;
-    this.d.hub.resetGifts(sid === null ? [] : this.sessionGifts(sid));
-  }
-
-  /** 某一场事件记录里的礼物、上舰、醒目留言，变成送礼名单的条目 */
-  private sessionGifts(sid: number): GiftListItem[] {
-    const items: GiftListItem[] = [];
-    for (const r of this.d.log.giftListEvents(sid, GIFTS_KEEP)) {
-      const ev = eventFromLog(r);
-      const item = ev ? this.giftListItem(ev) : null;
-      if (item) items.push(item);
-    }
-    return items;
   }
 
   chatItem(ev: DanmuEvent): ChatItem {
@@ -483,7 +473,7 @@ export class Pipeline {
     }
     const j = this.judge(ev);
     const eventId = this.record(ev, j.hit, j.status);
-    if (ev.kind === 'gift' || ev.kind === 'guard') this.pushGift(ev);
+    if (ev.kind === 'gift' || ev.kind === 'guard') this.pushGift(ev, eventId);
     if (j.status !== 'queued' || !j.hit || !j.effect) return;
     const undo = j.commit();
     this.enqueue(this.playItem(j.effect, ev.viewer, ev.kind, j.vars), eventId, j.jump, queueDetail(ev, j.hit.label), undo);

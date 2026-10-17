@@ -1,7 +1,7 @@
 // 输出（需求 F-OU-01 ~ 06）：每个输出是一个特效页地址 + 一套画布设置。密钥只用于特效页，无法登录后台。
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { CHAT_FADE_MAX, CHAT_FADE_MIN, CHAT_MAX_DEFAULT, CHAT_MAX_LIMIT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, GIFTS_MAX_LIMIT } from '@starfall/shared';
+import { CHAT_FADE_MAX, CHAT_FADE_MIN, CHAT_MAX_DEFAULT, CHAT_MAX_LIMIT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, GIFTS_MAX_LIMIT, GIFTS_TITLE_MAX } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
 import { outputs } from '../db/schema.ts';
@@ -9,7 +9,7 @@ import { HttpError } from '../http.ts';
 
 export type OutputRow = typeof outputs.$inferSelect;
 
-/** 送礼名单显示哪些：所有付费礼物 / 只显示勾选的礼物；上舰、醒目留言单独勾 */
+/** 送礼名单显示哪些：所有付费礼物 / 只显示勾选的礼物；上舰、醒目留言单独勾；时间范围、显示方式（各项的意思见 GiftsFilter） */
 export const GiftsFilterSchema = z
   .object({
     mode: z.enum(['all', 'only', 'pinned']),
@@ -17,6 +17,13 @@ export const GiftsFilterSchema = z
     guard: z.boolean(),
     sc: z.boolean(),
     minGold: z.number().int().min(0).max(10_000_000).optional(),
+    range: z.enum(['live', 'today', 'week', 'month', 'since']).optional(),
+    since: z.number().int().min(0).max(8_640_000_000_000).optional(),
+    view: z.enum(['item', 'viewer']).optional(),
+    sort: z.enum(['time', 'value']).optional(),
+    merge: z.boolean().optional(),
+    pinTop: z.boolean().optional(),
+    amount: z.boolean().optional(),
   })
   .strict();
 
@@ -44,13 +51,14 @@ export const OutputInputSchema = z
     giftsMax: z.number().int().min(1).max(GIFTS_MAX_LIMIT),
     giftsSpeed: z.enum(['off', 'slow', 'normal', 'fast']),
     giftsFilter: GiftsFilterSchema,
+    giftsTitle: z.string().trim().max(GIFTS_TITLE_MAX),
   })
   .strict();
 export type OutputInput = z.infer<typeof OutputInputSchema>;
 export const OutputPatchSchema = OutputInputSchema.partial().strict();
 
 /** 新建输出的默认值：竖屏 1080×1920，安全区按手机竖屏实测（P0 报告） */
-const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT, chatFadeSec: 0, giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: GIFTS_MAX_DEFAULT, giftsSpeed: 'normal', giftsFilter: GIFTS_FILTER_DEFAULT };
+const DEFAULTS: Omit<OutputInput, 'name'> = { app: 'livehime', orient: 'portrait', width: 1080, height: 1920, safeTop: 12, safeBottom: 40, marginX: 9, scale: 100, liteMode: 'auto', chatEnabled: true, chatSide: 'left', chatSize: 'normal', chatMedal: 'own', chatMax: CHAT_MAX_DEFAULT, chatFadeSec: 0, giftsEnabled: true, giftsSide: 'right', giftsSize: 'normal', giftsMax: GIFTS_MAX_DEFAULT, giftsSpeed: 'normal', giftsFilter: GIFTS_FILTER_DEFAULT, giftsTitle: '' };
 
 const newKey = () => crypto.randomBytes(16).toString('base64url');
 
@@ -71,7 +79,7 @@ export class OutputStore {
     this.db = db;
   }
 
-  /** 设置变化时通知在线的特效页（重置密钥、删除时断开旧连接） */
+  /** 新建、设置变化时通知在线的特效页（重置密钥、删除时断开旧连接） */
   onChange(fn: (o: OutputRow, change: 'update' | 'key' | 'delete') => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -101,7 +109,10 @@ export class OutputStore {
   }
 
   create(input: Partial<OutputInput> & { name: string }): OutputRow {
-    return this.db.insert(outputs).values({ ...DEFAULTS, ...input, key: newKey() }).returning().get();
+    const o = this.db.insert(outputs).values({ ...DEFAULTS, ...input, key: newKey() }).returning().get();
+    // 新建的也通知一下：送礼名单马上按它的设置装好，管理后台的预览能看到
+    this.emit(o, 'update');
+    return o;
   }
 
   update(id: number, patch: Partial<OutputInput>): OutputRow {

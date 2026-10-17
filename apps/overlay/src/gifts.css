@@ -1,5 +1,6 @@
 /* 送礼名单：和礼物特效（晶礼）同一套样子的小号横条，一屏放不下时从下往上循环滚动。尺寸按 640 宽的浏览器源设计，字号「大」整体放大 1.25 倍（--k）。
-   颜色按价值分档（--c1 主色、--c2 渐变色、--c3 亮色），上舰按舰长蓝、提督紫、总督红金 */
+   颜色按价值分档（--c1 主色、--c2 渐变色、--c3 亮色），上舰按舰长蓝、提督紫、总督红金。
+   上面不滚动的部分（.gl-head）放标题和置顶的记录，下面是滚动窗口（.gl-view，上下两头淡出） */
 :root {
   --font-sans: "Geist Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
@@ -7,16 +8,25 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: transparent; color: #fff; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
 /* 在浏览器里查看：深色背景 */
-html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%, rgba(255,170,90,.3), transparent 70%), radial-gradient(60% 40% at 85% 70%, rgba(90,160,255,.3), transparent 70%), #121320; }
+html.gl-view-page, html.gl-view-page body { background: radial-gradient(60% 40% at 25% 40%, rgba(255,170,90,.3), transparent 70%), radial-gradient(60% 40% at 85% 70%, rgba(90,160,255,.3), transparent 70%), #121320; }
 
-.gl-root { position: fixed; inset: 0; overflow: hidden; --k: 1; }
+.gl-root { position: fixed; inset: 0; overflow: hidden; display: flex; flex-direction: column; --k: 1; }
 .gl-root.large { --k: 1.25; }
-.gl-root.off .gl { display: none; }
+.gl-root.off .gl, .gl-root.off .gl-head { display: none; }
+.gl-head { flex: none; padding: 20px 18px 0; display: flex; flex-direction: column; gap: 10px; zoom: var(--k); }
+.gl-head[hidden] { display: none; }
+.gl-pins { display: flex; flex-direction: column; gap: 10px; align-items: inherit; }
+.gl-view { position: relative; flex: none; overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); }
 .gl { position: absolute; left: 0; right: 0; top: 0; padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; zoom: var(--k); will-change: transform; }
-/* 循环滚动：上下两头淡出 */
-.gl-root { -webkit-mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(transparent, #000 5%, #000 95%, transparent); }
-.side-left .gl { align-items: flex-start; }
-.side-right .gl { align-items: flex-end; }
+.side-left .gl, .side-left .gl-head { align-items: flex-start; }
+.side-right .gl, .side-right .gl-head { align-items: flex-end; }
+
+/* 标题：一颗暖色胶囊，前面一个发光的小圆点 */
+.gl-title { display: inline-flex; align-items: center; gap: 10px; max-width: calc(100vw / var(--k) - 36px); padding: 9px 22px 9px 16px; border-radius: 999px; color: #fff; font-size: 24px; font-weight: 800; letter-spacing: .08em; line-height: 1.2;
+  background: linear-gradient(100deg, rgba(255,177,61,.96), rgba(255,94,138,.92) 70%, rgba(184,92,255,.9));
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 0 0 1.5px rgba(255,255,255,.22), 0 0 26px -8px rgba(255,140,90,.8), 0 12px 26px -14px rgba(0,0,0,.6); text-shadow: 0 2px 6px rgba(120,30,40,.35); }
+.gl-title::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.3), 0 0 12px #fff; }
+.gl-title span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .gl-row { position: relative; padding-top: 14px; }
 .gl-bar { position: relative; display: flex; align-items: center; gap: 14px; height: 72px; width: min(580px, calc(100vw / var(--k) - 36px)); padding: 0 168px 0 9px; border-radius: 36px; color: #fff;
@@ -30,17 +40,17 @@ html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%
 .gl-sheen { position: absolute; top: -30%; bottom: -30%; left: -30%; width: 22%; transform: skewX(-20deg); opacity: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); }
 
 /* 头像（大航海套 B站头像框） */
-.gl .av { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; font-size: 23px; font-weight: 600;
+.gl-root .av { position: relative; flex: none; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; font-size: 23px; font-weight: 600;
   box-shadow: 0 0 0 2.5px #fff, 0 0 0 5.5px var(--c3-70), 0 4px 12px -3px rgba(0,0,0,.5); }
-.gl .av img { width: 100%; height: 100%; object-fit: cover; }
-.gl .av-framed { position: relative; display: inline-grid; flex: none; }
-.gl .av-framed .av { box-shadow: 0 4px 12px -3px rgba(0,0,0,.5); }
-.gl .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
+.gl-root .av img { width: 100%; height: 100%; object-fit: cover; }
+.gl-root .av-framed { position: relative; display: inline-grid; flex: none; }
+.gl-root .av-framed .av { box-shadow: 0 4px 12px -3px rgba(0,0,0,.5); }
+.gl-root .av-frame { position: absolute; left: -20%; top: -20%; width: 140%; height: 140%; pointer-events: none; }
 
 .gl-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.gl .nm { font-size: 24px; font-weight: 700; max-width: 8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 8px rgba(0,0,0,.3); }
-.gl .say { font-size: 18px; color: rgba(255,255,255,.88); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 15em; text-shadow: 0 1px 6px rgba(0,0,0,.25); }
-.gl .say b { color: #fff; font-weight: 700; }
+.gl-root .nm { font-size: 24px; font-weight: 700; max-width: 8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.gl-root .say { font-size: 18px; color: rgba(255,255,255,.88); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 15em; text-shadow: 0 1px 6px rgba(0,0,0,.25); }
+.gl-root .say b { color: #fff; font-weight: 700; }
 
 /* 右边：礼物图（上舰是船锚，醒目留言是 SC 标），数量 */
 .gl-pic { position: absolute; right: 74px; top: 0; width: 88px; height: 88px; display: grid; place-items: center; filter: drop-shadow(0 8px 12px rgba(0,0,0,.45)); }
@@ -53,6 +63,30 @@ html.gl-view, html.gl-view body { background: radial-gradient(60% 40% at 25% 40%
 .gl-num small { font-size: 22px; margin-right: 1px; }
 .gl-num.months small:last-child, .gl-num.yuan small { font-size: 16px; font-style: normal; margin-left: 2px; }
 .gl-row.no-pic .gl-num { right: 18px; }
+
+/* 按人合计：名次（前三名金银铜），右边是总数（电池），礼物图小一点让出位置 */
+.gl-rank { flex: none; width: 34px; height: 34px; margin: 0 0 0 2px; border-radius: 50%; display: grid; place-items: center; font: italic 800 19px/1 var(--font-mono); color: #fff; background: rgba(255,255,255,.16); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.35); text-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.gl-rank.small { font-size: 14px; }
+.gl-rank.r1, .gl-rank.r2, .gl-rank.r3 { width: 38px; height: 38px; font-size: 21px; text-shadow: none; }
+.gl-rank.r1 { color: #6B3A00; background: radial-gradient(circle at 35% 30%, #FFF6C8, #FFD54A 45%, #E8A000); box-shadow: 0 0 0 2px #FFF1B0, 0 0 16px rgba(255,200,40,.8); }
+.gl-rank.r2 { color: #3B4656; background: radial-gradient(circle at 35% 30%, #FFFFFF, #D6DEE8 45%, #9AA8BA); box-shadow: 0 0 0 2px #F2F5F9, 0 0 14px rgba(210,225,245,.7); }
+.gl-rank.r3 { color: #5A2A10; background: radial-gradient(circle at 35% 30%, #FFE2C4, #E9A06A 45%, #B8642F); box-shadow: 0 0 0 2px #FFD9B8, 0 0 14px rgba(230,140,80,.7); }
+.kind-viewer .gl-bar { padding-right: 222px; }
+.kind-viewer.no-pic .gl-bar { padding-right: 150px; }
+.kind-viewer.no-num .gl-bar { padding-right: 96px; }
+.kind-viewer.no-pic.no-num .gl-bar { padding-right: 24px; }
+.kind-viewer .gl-pic { width: 72px; height: 72px; top: 14px; right: 142px; }
+.kind-viewer .gl-badge { width: 60px; height: 60px; }
+.kind-viewer.no-num .gl-pic { right: 14px; }
+.gl-num.amt { font-size: 32px; }
+.gl-num.amt small { font-size: 15px; font-style: normal; margin: 0 0 0 3px; }
+.kind-viewer .gl-sc { font-size: 22px; }
+/* 字号大时放不下：不显示礼物图，给名字让出位置 */
+.large .kind-viewer .gl-pic { display: none; }
+.large .kind-viewer .gl-bar { padding-right: 150px; }
+.large .kind-viewer.no-num .gl-bar { padding-right: 24px; }
+/* 合并同人同礼物：合了几次 */
+.gl-root .say .times { color: rgba(255,255,255,.75); }
 
 .notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; }
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }

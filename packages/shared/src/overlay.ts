@@ -2,8 +2,10 @@
 import type { GuardLevel, TriggerKind } from './events.ts';
 import type { Position } from './rules.ts';
 import type { MusicNotice, MusicState } from './music.ts';
+import type { GiftListItem, GiftRow, GiftsFilter, GiftsSpeed } from './gift-list.ts';
 
 export * from './music.ts';
+export * from './gift-list.ts';
 
 /**
  * B 站的大航海头像框（200×200 透明 PNG，1 总督、2 提督、3 舰长）。版权归 B 站：只在运行时从 B 站加载，不打包；
@@ -54,63 +56,8 @@ export interface OverlayConfig {
   /** 循环滚动的速度 */
   giftsSpeed: GiftsSpeed;
   giftsFilter: GiftsFilter;
-}
-
-/**
- * 送礼名单滚动速度：每秒多少像素（按 1080 宽设计的尺寸）；慢约 5 秒一条、中约 3 秒、快约 2 秒。
- * off 为不滚动：固定挂着，放不下时只留最新的几条（配合「只显示选中的礼物」把特定礼物挂在画面上）
- */
-export type GiftsSpeed = 'off' | 'slow' | 'normal' | 'fast';
-export const GIFTS_SPEED_PX: Record<GiftsSpeed, number> = { off: 0, slow: 20, normal: 32, fast: 50 };
-
-/**
- * 送礼名单显示哪些：all 为所有付费礼物；only 为只显示 gifts 里勾选的礼物（按礼物编号，名字只用来在后台显示）；
- * pinned 为只显示后台挂上的记录（谁送的哪一次，可以是以前场次的），本场新收到的不进来。
- * 上舰、醒目留言单独勾选，all、only 两种方式看这两项。
- * minGold：all 方式下礼物的最低金额（金瓜子，按连击合起来的总价值算；没有或 0 为不限），只管礼物，不管上舰、醒目留言
- */
-export interface GiftsFilter {
-  mode: 'all' | 'only' | 'pinned';
-  gifts: Array<{ id: number; name: string }>;
-  guard: boolean;
-  sc: boolean;
-  minGold?: number;
-}
-/** 送礼名单最低金额的选项（金瓜子，1 元 = 1000）：不限、1、5、10、50、100 元 */
-export const GIFTS_MIN_OPTIONS = [0, 1000, 5000, 10_000, 50_000, 100_000];
-export const GIFTS_FILTER_DEFAULT: GiftsFilter = { mode: 'all', gifts: [], guard: true, sc: true };
-/** 送礼名单一屏显示几条：默认 6 条，最多 GIFTS_MAX_LIMIT 条；本场最近 GIFTS_KEEP 条都在循环滚动里（服务端也记这么多） */
-export const GIFTS_MAX_DEFAULT = 6;
-export const GIFTS_MAX_LIMIT = 20;
-export const GIFTS_KEEP = 200;
-/** 送礼名单浏览器源的建议宽度、高度（每条约 96，字号大时 1.25 倍） */
-export const GIFTS_WIDTH = 640;
-export function giftsHeight(max: number, size: 'normal' | 'large'): number {
-  const row = size === 'large' ? 120 : 96;
-  return Math.max(300, Math.ceil((40 + max * row) / 50) * 50);
-}
-
-/** 送礼名单里的一条：礼物（连击合成一条）、上舰、醒目留言 */
-export interface GiftListItem {
-  id: string;
-  ts: number;
-  kind: 'gift' | 'guard' | 'sc';
-  viewer: { name: string; face?: string; guard: GuardLevel };
-  /** 总价值（金瓜子），决定颜色 */
-  value: number;
-  gift?: { id: number; name: string; count: number; img?: string };
-  guard?: { level: 1 | 2 | 3; months: number; op: 'open' | 'renew' };
-  /** 醒目留言：内容、金额（元） */
-  sc?: { text: string; price: number };
-}
-
-/** 这一条在不在送礼名单里显示（本场收到的；只显示挂上的记录时都不显示） */
-export function giftListShows(f: GiftsFilter, it: GiftListItem): boolean {
-  if (f.mode === 'pinned') return false;
-  if (it.kind === 'guard') return f.guard;
-  if (it.kind === 'sc') return f.sc;
-  if (f.mode === 'all') return it.value >= (f.minGold ?? 0);
-  return f.gifts.some((g) => g.id === it.gift?.id);
+  /** 名单上方的标题（空为不显示） */
+  giftsTitle: string;
 }
 
 /** 弹幕列表条数：默认 8 条，最多能设 CHAT_MAX_LIMIT 条（服务端也最多记住这么多条） */
@@ -221,7 +168,7 @@ export const OVERLAY_BUILD_RE = /index-[\w-]+\.js/;
 
 export type ServerToOverlay =
   /** build：服务端现在的特效页版本；和页面自己的不一样时，页面会在空闲时自动刷新 */
-  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null; chat?: ChatItem[]; gifts?: GiftListItem[]; pins?: GiftListItem[] }
+  | { type: 'hello'; config: OverlayConfig; preload: string[]; build: string | null; chat?: ChatItem[]; gifts?: GiftRow[]; pins?: GiftListItem[] }
   /** 特效页重新构建了（不用重启服务） */
   | { type: 'version'; build: string }
   | { type: 'config'; config: OverlayConfig }
@@ -232,10 +179,10 @@ export type ServerToOverlay =
   | { type: 'chat'; item: ChatItem }
   /** 弹幕列表：换了直播间，清空 */
   | { type: 'chat_clear' }
-  /** 送礼名单：新的一条 */
-  | { type: 'gift_item'; item: GiftListItem }
-  /** 送礼名单：新开了一场直播或换了直播间，清空 */
-  | { type: 'gifts_clear' }
+  /** 送礼名单：新的一行，或者已有的一行变了（合并、按人合计时同一行编号不变） */
+  | { type: 'gift_row'; row: GiftRow }
+  /** 送礼名单：整份重新发（换了时间范围、显示方式，新开了一场直播，到了新的一天 / 周 / 月，换了直播间） */
+  | { type: 'gifts_set'; rows: GiftRow[] }
   /** 送礼名单：挂上的记录变了（整份发过来，按顺序） */
   | { type: 'gift_pins'; items: GiftListItem[] }
   /** 点歌窗口：全部状态（有变化就整份发）；player 为 true 的那个窗口负责出声音，别的只显示 */

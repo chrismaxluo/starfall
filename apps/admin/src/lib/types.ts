@@ -74,6 +74,8 @@ export interface OutputDto {
   giftsMax: number;
   giftsSpeed: 'off' | 'slow' | 'normal' | 'fast';
   giftsFilter: GiftsFilter;
+  /** 名单上方的标题（空为不显示） */
+  giftsTitle: string;
   key: string;
   path: string;
   /** 弹幕列表地址 */

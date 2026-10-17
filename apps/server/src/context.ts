@@ -113,7 +113,7 @@ export function createContext(config: Config, opts: { dbFile?: string; liveDeps?
   const overlayBuild = new BuildVersion(config.overlayDist);
   const adminBuild = new BuildVersion(config.adminDist);
   const hub = new Hub({ build: () => overlayBuild.current() });
-  const pipeline = new Pipeline({ live, gifts, giftFx, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, timeZone: config.timeZone });
+  const pipeline = new Pipeline({ live, gifts, giftFx, honor, room, settings, enterRules, danmuRules, giftRules, guardRules, effects, blacklist, viewers, log, hub, outputs, timeZone: config.timeZone });
   const giftPins = new GiftPinStore(db);
   hub.setPins(giftPins.items());
   const musicAccount = new MusicAccount(settings, secret, opts.netease);

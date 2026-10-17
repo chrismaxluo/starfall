@@ -27,6 +27,19 @@ export function dateTime(ts: number): string {
   return `${parts(ts).slice(5, 10)} ${clock(ts)}`;
 }
 
+/** 日期时间输入框的值：YYYY-MM-DDTHH:mm（按主播时区） */
+export const inputDateTime = (ts: number): string => parts(ts).slice(0, 16).replace(' ', 'T');
+
+/** 日期时间输入框的值换成时间戳（按主播时区）；格式不对时为 NaN */
+export function parseInputDateTime(v: string): number {
+  const asUtc = Date.parse(`${v}:00Z`);
+  if (!Number.isFinite(asUtc)) return Number.NaN;
+  // 先当成 UTC，再减去这个时区那一刻的偏移（算两次，夏令时切换前后也对）
+  let t = asUtc;
+  for (let i = 0; i < 2; i++) t = asUtc - (Date.parse(`${parts(t).replace(' ', 'T')}Z`) - t);
+  return t;
+}
+
 export function duration(ms: number): string {
   const m = Math.floor(ms / 60000);
   const h = Math.floor(m / 60);

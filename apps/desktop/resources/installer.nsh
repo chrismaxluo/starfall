@@ -21,6 +21,11 @@
 ; 卸载时问要不要连数据一起删（素材、规则、设置、登录信息，在 %APPDATA%\Starfall，见 main.ts），默认不删。
 ; 升级和覆盖安装时旧版本也会被「卸载」一次（带 --updated），这时不问、不删；静默卸载（/S）也不删
 !macro customUnInstall
+  ; 开机自动启动写在当前用户的启动项里（名字是 appId，main.ts 的 setAppUserModelId），卸载后去掉；升级时保留
+  ${ifNot} ${isUpdated}
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "io.github.chrismaxluo.starfall"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "io.github.chrismaxluo.starfall"
+  ${endif}
   ${ifNot} ${isUpdated}
   ${andIfNot} ${Silent}
     ${if} ${Cmd} `MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "是否同时删除星临的数据？$\r$\n$\r$\n包括素材、规则、设置和 B站登录信息。$\r$\n选「否」会保留，重新安装后可以接着用；$\r$\n选「是」会彻底删除，不能恢复。" IDYES`

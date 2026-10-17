@@ -7,13 +7,15 @@ import { autoUpdater, CancellationToken } from 'electron-updater';
 import type { ProgressInfo } from 'electron-updater';
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider.js';
 import type { ResolvedUpdateFileInfo } from 'electron-updater/out/types.js';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { fixText, HOME_PORT, planPorts } from './ports.ts';
 import { downloadSources, normalizeMirror, sourceName, SpeedWatch, viaMirror } from './sources.ts';
+import { findStreamApp } from './stream-apps.ts';
 
 const NAME = '星临';
-const DEFAULT_PORT = 17520;
 /** 开机自动启动时带上这个参数：只在托盘里运行，不弹出窗口 */
 const HIDDEN_ARG = '--hidden';
 
@@ -52,7 +54,10 @@ process.on('unhandledRejection', (e) => log('未处理的异步错误', e));
 // ---------- 小设置（端口、是否提示过缩到托盘、自己填的备用下载地址） ----------
 
 interface DesktopState {
+  /** 上次用的端口（旧版本只记这一个） */
   port?: number;
+  /** 用过的端口，新的在前（ports.ts） */
+  usedPorts?: number[];
   trayTipShown?: boolean;
   /** 下载新版本时，GitHub 直连不行先试这个地址（加速站），再试内置的 */
   updateMirror?: string | null;
@@ -84,7 +89,9 @@ if (!app.requestSingleInstanceLock()) {
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let server: UtilityProcess | null = null;
-let port = DEFAULT_PORT;
+let port = HOME_PORT;
+/** 同时接收连接的以前用过的端口 */
+let extraPorts: number[] = [];
 let quitting = false;
 const base = () => `http://127.0.0.1:${port}`;
 
@@ -93,14 +100,18 @@ async function start(): Promise<void> {
   log(`启动 ${NAME} ${app.getVersion()}`);
   setupIpc();
   createTray();
+  // 第一次运行（新安装）：还没有小设置文件
+  const fresh = !fs.existsSync(STATE_FILE);
   try {
     const state = readState();
-    port = await freePort(state.port ?? DEFAULT_PORT);
+    const plan = await planPorts(state.usedPorts ?? (state.port ? [state.port] : []), canListen);
+    port = plan.port;
+    extraPorts = plan.extra;
+    fxHint = hintFor(null);
     await startServer();
-    if (state.port && state.port !== port) {
-      void dialog.showMessageBox({ type: 'warning', title: NAME, message: `端口 ${state.port} 被别的软件占用，这次改用 ${port}`, detail: '直播软件里的特效地址要换成新的：打开星临后台 →「直播软件输出」复制。' });
-    }
-    writeState({ port });
+    // 端口变了不弹窗：直播软件里的特效页连不上时，后台顶部和托盘会说怎么办（watchFx）
+    if (port !== HOME_PORT) log(`端口 ${HOME_PORT} 用不了，这次改用 ${port}`);
+    writeState({ port, usedPorts: plan.used });
   } catch (e) {
     log('服务启动失败', e);
     await dialog.showMessageBox({ type: 'error', title: NAME, message: '星临服务启动失败', detail: `${(e as Error).message}\n\n日志在：${LOG_DIR}` });
@@ -108,19 +119,19 @@ async function start(): Promise<void> {
     app.quit();
     return;
   }
+  // 新安装默认开机自动启动：开机后星临先在托盘里运行，直播软件里的特效页一打开就能连上
+  if (fresh && app.isPackaged) setAutoStart(true);
   createWindow(!process.argv.includes(HIDDEN_ARG));
   void registerHotkeys(true);
   setInterval(() => void registerHotkeys(), 30_000);
+  startedAt = Date.now();
+  setInterval(() => void watchFx(), WATCH_MS);
   if (app.isPackaged) setupUpdates();
 }
 
 // ---------- 本机服务（独立进程） ----------
 
-/** 从 preferred 开始找一个能用的端口（一般就是上次用的那个，特效地址不变） */
-async function freePort(preferred: number): Promise<number> {
-  for (let p = preferred; p < preferred + 20; p++) if (await canListen(p)) return p;
-  throw new Error(`端口 ${preferred}–${preferred + 19} 都被占用了`);
-}
+/** 这个端口现在能不能用（被别的程序占用、或者被 Windows 保留时不能用） */
 function canListen(p: number): Promise<boolean> {
   return new Promise((resolve) => {
     const s = net.createServer();
@@ -139,6 +150,7 @@ function startServer(): Promise<void> {
     // 打包后服务找不到 apps/server/package.json，版本号从这里告诉它（「关于」页显示）
     STARFALL_VERSION: app.getVersion(),
     STARFALL_PORT: String(port),
+    STARFALL_EXTRA_PORTS: extraPorts.join(','),
     STARFALL_DATA: DATA_DIR,
     STARFALL_ADMIN_DIST: path.join(RES, 'admin'),
     STARFALL_OVERLAY_DIST: path.join(RES, 'overlay'),
@@ -296,6 +308,75 @@ function pauseHotkeys(): void {
   // 编辑到一半关了窗口也不会一直停着：10 分钟后自己恢复
   clearTimeout(pauseTimer);
   pauseTimer = setTimeout(() => void registerHotkeys(true), 10 * 60_000);
+}
+
+// ---------- 特效页没连上的提醒 ----------
+// 直播软件比星临先打开时，特效页（浏览器源）第一次没打开，直播软件不会自己再试。新版特效页会自动连上（overlay/public/sw.js）；
+// 万一这个直播软件不支持：发现直播软件开着、特效页却一直没连上，就在后台顶部和托盘提醒怎么办。
+// 特效页在线时不去列正在运行的程序
+
+/** 推给后台页面：顶部提醒条用 */
+interface FxHint {
+  /** 开着、但特效页一直没连上的直播软件；没有为 null */
+  app: string | null;
+  /** 这次用的端口，和平时的端口 */
+  port: number;
+  home: number;
+  /** 特效页没连上时怎么办 */
+  fix: string;
+}
+
+const WATCH_MS = 10_000;
+/** 直播软件开着这么久、特效页还没连上才提醒（刚打开时特效页正在加载） */
+const GRACE_MS = 15_000;
+let startedAt = 0;
+const hintFor = (appName: string | null): FxHint => ({ app: appName, port, home: HOME_PORT, fix: fixText(appName ?? '直播软件', port) });
+let fxHint: FxHint = hintFor(null);
+/** 什么时候开始看到这个直播软件开着 */
+let appSeen: { name: string; since: number } | null = null;
+/** 这次打开直播软件后已经弹过托盘通知（关掉直播软件或特效页连上后重新算） */
+let notified = false;
+let watching = false;
+
+function setHint(h: FxHint): void {
+  if (JSON.stringify(h) === JSON.stringify(fxHint)) return;
+  fxHint = h;
+  win?.webContents.send('sf:fx-hint', h);
+}
+
+/** 正在运行的直播软件（直播姬、OBS），都没开为 null */
+function runningStreamApp(): Promise<string | null> {
+  if (process.platform !== 'win32') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    execFile('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true, timeout: 5000, maxBuffer: 8 * 1024 * 1024 }, (err, out) => resolve(err ? null : findStreamApp(String(out))));
+  });
+}
+
+async function watchFx(): Promise<void> {
+  if (watching || !server) return;
+  watching = true;
+  try {
+    const status = await api<{ overlays?: number }>('/api/status').catch(() => null);
+    if (!status) return;
+    const name = (status.overlays ?? 0) > 0 ? null : await runningStreamApp();
+    if (!name) {
+      appSeen = null;
+      notified = false;
+      return setHint(hintFor(null));
+    }
+    const now = Date.now();
+    if (appSeen?.name !== name) appSeen = { name, since: now };
+    if (now - appSeen.since < GRACE_MS || now - startedAt < GRACE_MS) return;
+    // 还没把特效页加到直播软件过：新手引导会带着加，不用提醒刷新
+    const seen = await api<{ overlaySeen?: boolean }>('/api/settings').then((x) => x.overlaySeen === true, () => true);
+    if (!seen) return;
+    setHint(hintFor(name));
+    if (notified) return;
+    notified = true;
+    tray?.displayBalloon({ iconType: 'warning', title: `${name}已经打开，但特效页没连上`, content: fxHint.fix });
+  } finally {
+    watching = false;
+  }
 }
 
 // ---------- 窗口 ----------
@@ -628,6 +709,7 @@ function setupIpc(): void {
   });
   handle('sf:check-update', () => void checkUpdate(true));
   handle('sf:update-state', () => updateState);
+  handle('sf:fx-hint', () => fxHint);
   handle('sf:install-update', () => {
     if (updateState.phase === 'downloaded') installNow();
   });

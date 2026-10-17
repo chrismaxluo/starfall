@@ -3,6 +3,7 @@
 import { buildApp } from '../../server/src/app.ts';
 import { loadConfig } from '../../server/src/config.ts';
 import { createContext, startBackground } from '../../server/src/context.ts';
+import { listenExtra, parseExtraPorts } from '../../server/src/extra-ports.ts';
 
 const parent = process.parentPort;
 
@@ -17,9 +18,11 @@ async function main(): Promise<void> {
   const ctx = createContext(config);
   const app = await buildApp(ctx, { logger: true });
   const stopBackground = await startBackground(ctx);
+  let closeExtra: () => void = () => undefined;
   parent.on('message', (e: { data?: { type?: string } }) => {
     if (e.data?.type !== 'stop') return;
     app.log.info('桌面版退出，服务收尾');
+    closeExtra();
     stopBackground();
     void app.close().then(() => {
       ctx.db.$client.close();
@@ -27,6 +30,10 @@ async function main(): Promise<void> {
     });
   });
   await app.listen({ port: config.port, host: config.host });
+  // 以前用过的端口也接收连接（主进程选好传进来）：直播软件里填的是旧地址也能连上
+  const extra = parseExtraPorts(process.env.STARFALL_EXTRA_PORTS, config.port);
+  closeExtra = listenExtra(app.server, extra, config.host, (p, err) => app.log.warn(`端口 ${p} 这次没能同时使用：${err.message}`));
+  if (extra.length) app.log.info(`同时使用以前的端口：${extra.join('、')}`);
   parent.postMessage({ type: 'ready' });
 }
 

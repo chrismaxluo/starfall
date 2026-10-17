@@ -243,7 +243,10 @@ const CAP_HINT: Record<string, { name: string; tip: string }> = {
 };
 function capIssues(env: Record<string, unknown> | null): Array<{ name: string; tip: string }> {
   if (!env) return [];
-  return Object.keys(CAP_HINT).filter((k) => !env[k]).map((k) => CAP_HINT[k]!);
+  const out = Object.keys(CAP_HINT).filter((k) => !env[k]).map((k) => CAP_HINT[k]!);
+  // 桌面版才用得上（服务器版一直开着）；旧版特效页不报这一项（undefined），还在检测时是 null，都不算
+  if (state.desktop && env.recover === false) out.push({ name: '自动连接', tip: '这个直播软件比星临先打开时，特效页不会自己连上：先打开星临再开直播软件，或者在直播软件里右键特效源点「刷新」' });
+  return out;
 }
 /** 特效页报的错误翻成大白话，写上怎么办 */
 function plainError(msg: string): string {

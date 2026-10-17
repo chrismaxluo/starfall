@@ -135,6 +135,8 @@ export class LiveService {
       void this.poll();
     });
     await this.poll();
+    // 第一次查询期间服务已经在退出
+    if (this.stopped) return;
     this.pollTimer = setInterval(() => void this.poll(), POLL_MS);
   }
 

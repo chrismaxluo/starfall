@@ -1,4 +1,6 @@
 // 运行环境检测：给自检页显示，也上报给服务端（F-OU-08、F-OU-11）
+import { recoverState } from './recover.ts';
+
 export type Level = 'ok' | 'mid' | 'bad';
 
 export interface EnvReport {
@@ -11,6 +13,8 @@ export interface EnvReport {
   audio: boolean;
   websocket: boolean;
   viewport: string;
+  /** 直播软件比星临先打开时能不能自动连上（recover.ts）：null 为还不知道 */
+  recover: boolean | null;
 }
 
 export function detect(): EnvReport {
@@ -29,6 +33,7 @@ export function detect(): EnvReport {
     audio: 'AudioContext' in window || Boolean(w.webkitAudioContext),
     websocket: 'WebSocket' in window,
     viewport: `${innerWidth}×${innerHeight}`,
+    recover: recoverState(),
   };
 }
 

@@ -181,7 +181,9 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
   const stopBuild = ctx.overlayBuild.watch((build) => ctx.hub.toOverlays({ type: 'version', build }));
   // 重新构建了后台（不用重启服务）：打开着的旧后台页面顶部提示刷新
   const stopAdminBuild = ctx.adminBuild.watch((build) => ctx.hub.toAdmins({ type: 'version', build }));
-  await ctx.live.start();
+  // 不等查完开播状态（要问 B 站，网络不好时要等十几秒）：服务先开始接收特效页和后台的连接，
+  // 桌面版开机后先开了直播软件时，特效页能尽快连上
+  void ctx.live.start().catch((e: Error) => console.error('启动直播连接失败', e.message));
   void ctx.roomInfo.start().catch((e: Error) => console.error('查询直播间信息失败', e.message));
   return () => {
     clearInterval(timer);

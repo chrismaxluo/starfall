@@ -8,7 +8,7 @@
 
 识别每一位进场的观众，在弹幕、礼物、上舰的时刻，于直播画面上播放专属的动画、欢迎语与音效。
 
-[![Version](https://img.shields.io/badge/version-1.7.0-5451D6?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.8.0-5451D6?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-2F6FEB?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24-3C873A?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -250,6 +250,7 @@ pnpm build        # 构建管理后台与特效页
 - [x] Windows 桌面版（v1.5.0 起为正式版）：在主播电脑上直接运行，界面与服务器版一致（[说明](docs/desktop.md)）
 - [x] **v1.6.0**：国内下载更新更容易（GitHub 连不上或太慢时自动换加速站）；送礼名单最低金额；内置素材统一命名；新安装的默认设置调整；桌面版卸载时可以选择是否删除数据
 - [x] **v1.7.0**：弹幕点歌（网易云 + 本地歌库，点歌窗口带滚动歌词，六种样子，音量均衡）；外观设置点「保存」才更新到直播画面；修复旧内核直播软件里彩色底条不显示
+- [x] **v1.8.0**：送礼名单可选时间范围（本场、今天、本周、本月、从某时起）、感谢榜、置顶和标题、七种样式和三种滚法；点歌主页（网易云会员到期提醒、本场点歌数据、歌词）；桌面版直播软件先打开时特效页自动连上
 - [ ] 第二期：醒目留言、关注、点赞触发；直播数据统计；观众档案
 
 ## 声明

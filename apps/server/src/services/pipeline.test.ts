@@ -377,7 +377,10 @@ describe('播放队列', () => {
     expect(t.events().find((e) => e.uid === 2)?.status).toBe('cleared');
     // 跳过正在播的：马上播下一个
     const before = t.plays().length;
-    expect(t.p.skip()).toBe(true);
+    const playingId = t.p.snapshot().playing!.id;
+    expect(t.p.skip(playingId)).toBe(true);
+    // 双击「跳过」的第二下还带着刚才那一个：不会把刚开始播的下一个也跳掉
+    expect(t.p.skip(playingId)).toBe(false);
     expect(t.sock.sent.at(-2)).toMatchObject({ type: 'stop' });
     expect(t.plays()).toHaveLength(before + 1);
     expect(t.p.snapshot()).toMatchObject({ playing: { detail: '小花花 ×2' }, items: [] });

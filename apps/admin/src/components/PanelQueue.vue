@@ -7,7 +7,7 @@ import EvIcon from './EvIcon.vue';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
 import { del, post, put } from '../lib/api.ts';
-import { refreshSettings, state } from '../lib/store.ts';
+import { refreshSettings, skipPlaying, state } from '../lib/store.ts';
 import { attempt } from '../lib/toast.ts';
 
 const PLAY_GAP_MS = 300;
@@ -31,9 +31,7 @@ const upcoming = computed(() => {
   });
 });
 const eta = (ms: number) => (ms < 1000 ? '马上' : `约 ${Math.round(ms / 1000)} 秒后`);
-async function skip(): Promise<void> {
-  await attempt(() => post('/api/playback/skip'), '已跳过，开始播下一个');
-}
+const skip = skipPlaying;
 async function clearQueue(): Promise<void> {
   await attempt(() => post<{ cleared: number }>('/api/playback/clear'), '已清空排队');
 }

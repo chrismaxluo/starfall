@@ -1,7 +1,8 @@
 // 全局状态：登录后加载一次，之后由实时连接（/ws/admin）和各页面的修改保持最新
 import { reactive } from 'vue';
-import { get } from './api.ts';
+import { get, post } from './api.ts';
 import { setTimeZone } from './format.ts';
+import { attempt, toast } from './toast.ts';
 import type { PreviewRequest } from './preview.ts';
 import type { ChatItem, GiftListItem, GiftRow } from '@starfall/shared/overlay';
 import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, QuickButton, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
@@ -120,3 +121,17 @@ export const ui = reactive({
   newVersion: null as string | null,
   dismissedVersion: null as string | null,
 });
+
+/** 跳过正在播的：带上是哪一个，请求还没回来时不重复发（双击不会把下一个也跳掉） */
+let skipping = false;
+export async function skipPlaying(): Promise<void> {
+  const id = state.queue.playing?.id;
+  if (!id || skipping) return;
+  skipping = true;
+  try {
+    const r = await attempt(() => post<{ skipped: boolean }>('/api/playback/skip', { id }));
+    if (r) toast(r.skipped ? '已跳过，开始播下一个' : '这一个已经播完了', r.skipped ? 'ok' : 'info');
+  } finally {
+    skipping = false;
+  }
+}

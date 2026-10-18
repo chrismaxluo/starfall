@@ -662,8 +662,9 @@ export class Pipeline {
   }
 
   /** 跳过正在播的特效，马上播下一个 */
-  skip(): boolean {
-    if (!this.current) return false;
+  /** 跳过正在播的；带 id 时只在正在播的还是这一个时才跳（双击「跳过」不会把下一个也跳掉） */
+  skip(id?: string): boolean {
+    if (!this.current || (id !== undefined && this.current.q.id !== id)) return false;
     this.stopCurrent();
     this.pump();
     this.emitQueue();

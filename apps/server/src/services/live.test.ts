@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { BiliApiError } from '@starfall/bili';
 import type { LiveClientOptions } from '@starfall/bili';
 import type { StdEvent } from '@starfall/shared';
 import { openDb } from '../db/index.ts';
@@ -18,12 +19,13 @@ function setup(opts: { loggedIn?: boolean; room?: boolean; live?: boolean } = {}
   const secret = new Secret(crypto.randomBytes(32));
   if (opts.loggedIn ?? true) db.insert(account).values({ id: 1, uid: 10001, cookiesEnc: secret.encrypt(JSON.stringify({ SESSDATA: 's', DedeUserID: '10001', bili_jct: 'c', buvid3: 'B3' })) }).run();
   if (opts.room ?? true) db.insert(room).values({ id: 1, roomId: 30000, anchorUid: 20000 }).run();
-  const state = { live: opts.live ?? false, liveSince: null as number | null, pollCookies: [] as string[], clients: [] as Array<{ opts: LiveClientOptions; stopped: boolean }> };
+  const state = { live: opts.live ?? false, liveSince: null as number | null, loginOk: true, initError: null as Error | null, pollCookies: [] as string[], clients: [] as Array<{ opts: LiveClientOptions; stopped: boolean }> };
   let t = 1_000_000;
   const deps: LiveDeps = {
-    getRoomInit: async (http) => { state.pollCookies.push(JSON.stringify(http.cookies)); return { roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus: state.live ? 1 : 0, isPortrait: true, liveSince: state.liveSince }; },
+    getRoomInit: async (http) => { if (state.initError) throw state.initError; state.pollCookies.push(JSON.stringify(http.cookies)); return { roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus: state.live ? 1 : 0, isPortrait: true, liveSince: state.liveSince }; },
     getRoomAdmins: async () => [{ uid: 555, name: '房管', face: '' }],
     getDanmuInfo: async () => ({ token: 't', hosts: [{ host: 'h', wssPort: 443 }] }),
+    checkLogin: async () => state.loginOk,
     createClient: (o) => { const c = { opts: o, stopped: false }; state.clients.push(c); return { start: () => {}, stop: () => { c.stopped = true; }, state: 'connected' as const }; },
     now: () => (t += 1000),
   };
@@ -34,7 +36,8 @@ function setup(opts: { loggedIn?: boolean; room?: boolean; live?: boolean } = {}
   const events: StdEvent[] = [];
   svc.onEvent((e) => events.push(e));
   const active = () => state.clients.filter((c) => !c.stopped);
-  return { db, svc, state, settings, events, active, roomStore, acc, deps };
+  const advance = (ms: number) => (t += ms);
+  return { db, svc, state, settings, events, active, roomStore, acc, deps, advance };
 }
 
 describe('只在开播时连接（F-BL-10）', () => {
@@ -170,6 +173,42 @@ describe('只在开播时连接（F-BL-10）', () => {
     svc.stop();
     expect(db.select().from(liveSessions).all()).toMatchObject([{ id: 1, roomId: 30000, endedAt: null }]);
     expect(roomStore.get()?.anchorName).toBe('新昵称');
+  });
+
+  it('查开播状态一直失败（例如被 B 站风控）：状态里写明从什么时候开始、原因；查到了就清掉；第一次失败也照常定时再查', async () => {
+    const { svc, state } = setup({ live: false });
+    state.initError = new BiliApiError(-352, '风控校验失败');
+    await svc.start();
+    expect(svc.status().checkError).toMatchObject({ text: 'B 站返回 -352：风控校验失败' });
+    const since = svc.status().checkError!.since;
+    await svc.poll();
+    expect(svc.status().checkError!.since).toBe(since);
+    state.initError = null;
+    state.live = true;
+    await svc.poll();
+    expect(svc.status()).toMatchObject({ checkError: null, live: true });
+    svc.stop();
+  });
+
+  it('B 站登录失效：没开播时也会定时确认、提醒；下播后提醒还在；换了账号才清掉', async () => {
+    const { svc, state, acc, advance } = setup({ live: false });
+    state.loginOk = false;
+    await svc.start();
+    expect(svc.status().loginInvalid).toBe(true);
+    // 开播又下播（连接时 B 站同样说没登录），提醒一直在
+    state.live = true;
+    await svc.poll();
+    state.live = false;
+    await svc.poll();
+    expect(svc.status().loginInvalid).toBe(true);
+    await acc.save({ SESSDATA: 's2', DedeUserID: '10002', bili_jct: 'c2' }, '', null);
+    expect(svc.status().loginInvalid).toBe(false);
+    // 新账号有效：一小时后再确认一次，还是好的
+    state.loginOk = true;
+    advance(3600_000);
+    await svc.poll();
+    expect(svc.status().loginInvalid).toBe(false);
+    svc.stop();
   });
 
   it('重新扫码换了登录信息：断开，用新的登录信息重连', async () => {

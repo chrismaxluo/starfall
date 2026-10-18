@@ -76,6 +76,7 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
       getRoomInit: async () => ({ roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus, isPortrait: true }),
       getRoomAdmins: async () => [],
       getDanmuInfo: async () => ({ token: 'test-token', hosts: [{ host: '127.0.0.1', wssPort: bili.port }] }),
+      checkLogin: async () => true,
       createClient: (o) => new LiveClient({ ...o, urlFor: (h) => `ws://${h.host}:${h.wssPort}/sub` }),
       now: Date.now,
     },

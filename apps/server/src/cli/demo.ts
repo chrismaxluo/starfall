@@ -55,6 +55,7 @@ const ctx = createContext(config, {
     getRoomInit: async () => ({ roomId: ROOM, shortId: 0, anchorUid: ANCHOR, liveStatus: 1, isPortrait: true, liveSince: LIVE_SINCE }),
     getRoomAdmins: async () => [{ uid: 109, name: '青柠汽水', face: '' }, { uid: 102, name: '月下独酌', face: '' }],
     getDanmuInfo: async () => ({ token: 'demo', hosts: [{ host: '127.0.0.1', wssPort: 1 }] }),
+    checkLogin: async () => true,
     // 假的弹幕连接：一连上就推几条直播间数据（看过、高能榜、点赞、粉丝）
     createClient: (o) => {
       let state: ClientState = 'idle';

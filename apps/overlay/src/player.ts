@@ -179,8 +179,9 @@ export class Player {
 }
 
 /** 上传的素材：在位置的基础上挪动（画面宽、高的百分比，正数往右、往下） */
+// 用 transform 写：单独的 translate 属性要 Chrome 104 起才认，直播姬（Chrome 95）里不起作用。.slot 本身没有别的 transform
 function place(slot: HTMLElement, x: number, y: number, m: StageMetrics): void {
-  slot.style.translate = x || y ? `${(m.width * x) / 100}px ${(m.height * y) / 100}px` : '';
+  slot.style.transform = x || y ? `translate(${(m.width * x) / 100}px, ${(m.height * y) / 100}px)` : '';
 }
 
 /** 上传的素材：按自动大小的百分比显示 */

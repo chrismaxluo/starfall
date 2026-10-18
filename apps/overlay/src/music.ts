@@ -319,6 +319,8 @@ function applyTint(t: Tint): void {
 
 let lastLine = -2;
 let lastLang = '';
+/** 有没有汉字 */
+const HAN = /\p{Script=Han}/u;
 let lyCur: HTMLElement | null = null;
 /** 当前这句的文字（染色、滑动都在它身上）；放不下时多出来多少像素 */
 let lyIn: HTMLElement | null = null;
@@ -342,7 +344,8 @@ function renderLyric(s: MusicState, pos: number): void {
     // 还没唱到第一句（前奏）：先把第一句摆出来，不填色
     const cur = lines[Math.max(0, i)] ?? null;
     const next = lines[Math.max(0, i) + 1] ?? null;
-    const say = (l: LyricLine | null) => (l ? (lang === 'translation' && l.tr ? l.tr : l.text) : '');
+    // 只显示中文：这一句的原文和翻译里挑带中文的那一行（外文歌显示翻译，中文歌配了英文翻译的照样显示中文原文）
+    const say = (l: LyricLine | null) => (l ? (lang === 'translation' && l.tr && (HAN.test(l.tr) || !HAN.test(l.text)) ? l.tr : l.text) : '');
     const inner = h('span', { class: 'ly-in' }, say(cur));
     const line = h('div', { class: 'ly-cur' }, inner);
     lyIn = inner;

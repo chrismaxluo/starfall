@@ -31,9 +31,9 @@ const SAMPLE: Omit<MusicState, 'display' | 'cmd' | 'volume' | 'normalize' | 'ena
     posMs: 52_000,
     paused: false,
     lyric: [
-      { t: 0, text: '这是一句示例歌词', tr: 'This is a sample lyric' },
-      { t: 48_000, text: '真的点歌时显示歌的歌词', tr: 'Real songs show their own lyrics' },
-      { t: 60_000, text: '下一句' },
+      { t: 0, text: 'This is a sample lyric', tr: '这是一句示例歌词' },
+      { t: 48_000, text: 'Real songs show their own lyrics', tr: '真的点歌时显示歌的歌词' },
+      { t: 60_000, text: 'Here comes the next line', tr: '下一句' },
     ],
     load: 1,
   },

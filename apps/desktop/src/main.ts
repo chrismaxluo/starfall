@@ -32,18 +32,28 @@ const ICON = path.join(__dirname, 'icon.ico');
 // ---------- 日志 ----------
 
 fs.mkdirSync(LOG_DIR, { recursive: true });
-/** 超过 10MB 换新文件，旧的留一份 */
-function openLog(name: string): fs.WriteStream {
-  const file = path.join(LOG_DIR, `${name}.log`);
-  try {
-    if (fs.statSync(file).size > 10 * 1024 * 1024) fs.renameSync(file, path.join(LOG_DIR, `${name}.old.log`));
-  } catch {
-    // 文件还不存在
+const LOG_MAX = 10 * 1024 * 1024;
+const openLog = (name: string) => fs.createWriteStream(path.join(LOG_DIR, `${name}.log`), { flags: 'a' });
+let mainLog = openLog('main');
+let serverLog = openLog('server');
+/**
+ * 超过 10MB 换新文件，旧的留一份。启动后（拿到「只运行一个」之后）查一次，之后每小时查一次：
+ * 开机自启后可能连着运行好几周；第二次双击打开的那个进程不能动正在写的日志
+ */
+function rotateLogs(): void {
+  for (const name of ['main', 'server'] as const) {
+    const file = path.join(LOG_DIR, `${name}.log`);
+    try {
+      if (fs.statSync(file).size <= LOG_MAX) continue;
+      (name === 'main' ? mainLog : serverLog).end();
+      fs.renameSync(file, path.join(LOG_DIR, `${name}.old.log`));
+    } catch {
+      continue;
+    }
+    if (name === 'main') mainLog = openLog('main');
+    else serverLog = openLog('server');
   }
-  return fs.createWriteStream(file, { flags: 'a' });
 }
-const mainLog = openLog('main');
-const serverLog = openLog('server');
 function log(...parts: unknown[]): void {
   const text = parts.map((p) => (p instanceof Error ? (p.stack ?? p.message) : typeof p === 'string' ? p : JSON.stringify(p))).join(' ');
   mainLog.write(`${new Date().toISOString()} ${text}\n`);
@@ -83,6 +93,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => showWindow());
+  rotateLogs();
+  setInterval(rotateLogs, 3600_000).unref();
   void app.whenReady().then(start);
 }
 
@@ -122,7 +134,10 @@ async function start(): Promise<void> {
   // 新安装默认开机自动启动：开机后星临先在托盘里运行，直播软件里的特效页一打开就能连上
   if (fresh && app.isPackaged) setAutoStart(true);
   createWindow(!process.argv.includes(HIDDEN_ARG));
-  void registerHotkeys(true);
+  // 开机时有快捷键被别的软件占着：托盘提示一下（以前只写日志，主播不知道）
+  void registerHotkeys(true).then(({ failed }) => {
+    if (failed.length) tray?.displayBalloon({ iconType: 'warning', title: NAME, content: `全局快捷键 ${failed.join('、')} 被别的软件占用了，暂时按了没反应；对方关掉后会自动恢复。` });
+  });
   setInterval(() => void registerHotkeys(), 30_000);
   startedAt = Date.now();
   setInterval(() => void watchFx(), WATCH_MS);
@@ -242,6 +257,8 @@ async function api<T>(url: string): Promise<T> {
 let hotkeysPaused = false;
 /** 现在注册着的快捷键（排好序拼起来，用来判断按钮有没有变） */
 let hotkeysNow = '';
+/** 被别的软件占着、没注册上的全局快捷键：每 30 秒再试一次 */
+const retryKeys = new Map<string, () => void>();
 
 async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
   if (hotkeysPaused && !force) return { failed: [] };
@@ -264,9 +281,25 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     log('读取点歌快捷键失败', e);
   }
   const sig = [...keys, ...Object.entries(music).map(([k, v]) => `${k}=${v}`)].sort().join(' ');
-  if (!force && sig === hotkeysNow) return { failed: [] };
+  if (!force && sig === hotkeysNow) {
+    // 没变：上次被别的软件占着的再试一次（对方关了就能用上了）
+    for (const [hotkey, fn] of retryKeys) {
+      let ok = false;
+      try {
+        ok = globalShortcut.register(hotkey, fn);
+      } catch {
+        /* 写法不对的不会好，下次还是失败 */
+      }
+      if (ok) {
+        retryKeys.delete(hotkey);
+        log(`全局快捷键 ${hotkey} 现在能用了`);
+      }
+    }
+    return { failed: [...retryKeys.keys()] };
+  }
   globalShortcut.unregisterAll();
   hotkeysNow = sig;
+  retryKeys.clear();
   const failed: string[] = [];
   for (const hotkey of keys) {
     // 修改类接口只接受 JSON
@@ -280,7 +313,10 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     } catch (e) {
       log(`全局快捷键 ${hotkey} 写法不对`, e);
     }
-    if (!ok) failed.push(hotkey);
+    if (!ok) {
+      failed.push(hotkey);
+      retryKeys.set(hotkey, play);
+    }
   }
   for (const [hotkey, url] of Object.entries(music)) {
     const run = () =>
@@ -293,7 +329,10 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     } catch (e) {
       log(`点歌快捷键 ${hotkey} 写法不对`, e);
     }
-    if (!ok) failed.push(hotkey);
+    if (!ok) {
+      failed.push(hotkey);
+      retryKeys.set(hotkey, run);
+    }
   }
   const total = keys.length + Object.keys(music).length;
   log(`全局快捷键：注册了 ${total - failed.length} 个${failed.length ? `；被别的软件占用：${failed.join('、')}` : ''}`);
@@ -304,6 +343,7 @@ let pauseTimer: ReturnType<typeof setTimeout> | undefined;
 function pauseHotkeys(): void {
   hotkeysPaused = true;
   hotkeysNow = '';
+  retryKeys.clear();
   globalShortcut.unregisterAll();
   // 编辑到一半关了窗口也不会一直停着：10 分钟后自己恢复
   clearTimeout(pauseTimer);

@@ -25,6 +25,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 不把有写权限的令牌留在 .git 里（安装依赖时运行的脚本读不到；上传发布时单独传进去）
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -58,7 +61,8 @@ jobs:
 
       - name: 安装运行时依赖
         working-directory: apps/desktop/stage
-        run: npm install --omit=dev --no-package-lock --no-audit --no-fund
+        # 按 apps/desktop/package-lock.json 锁定的版本装（准备打包文件时复制过来了）
+        run: npm install --omit=dev --no-audit --no-fund
 
       - name: 打包
         working-directory: apps/desktop

@@ -62,6 +62,9 @@ fs.writeFileSync(
   ),
 );
 
+// 锁定文件一起放进去：装运行时依赖时间接依赖也用锁定的版本（不在打包那一刻临时选最新的）
+fs.copyFileSync(path.join(DESKTOP, 'package-lock.json'), path.join(STAGE, 'package-lock.json'));
+
 const copy = (from, to) => fs.cpSync(path.join(ROOT, from), path.join(RES, to), { recursive: true });
 copy('apps/admin/dist', 'admin');
 copy('apps/overlay/dist', 'overlay');

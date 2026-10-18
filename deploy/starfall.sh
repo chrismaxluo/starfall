@@ -241,13 +241,17 @@ EOF
   backup_db() {
     local tag=$1 db=$DIR/data/starfall.db out
     [[ -f $db ]] || return 0
+    # data 目录归服务账号所有：这里用 root 写文件、改所有者，不能跟着里面的符号链接走到别处
+    if [[ -L $DIR/data/backups ]]; then warn "data/backups 是一个链接，为了安全不在这里备份"; return 1; fi
     mkdir -p "$DIR/data/backups"
     out=$DIR/data/backups/update-$(date +%Y%m%d-%H%M%S)-$tag.db
+    if [[ -e $out || -L $out ]]; then warn "$out 已经存在，跳过这次备份"; return 1; fi
     (cd "$DIR/apps/server" && node -e '
       const D = require("better-sqlite3");
       const db = new D(process.argv[1], { readonly: true, fileMustExist: true });
       db.backup(process.argv[2]).then(() => db.close(), (e) => { console.error(e.message); process.exit(1); });' "$db" "$out") || return 1
-    chown starfall:starfall "$out" 2>/dev/null || true
+    [[ -L $out ]] && { rm -f -- "$out"; return 1; }
+    chown -h starfall:starfall "$out" 2>/dev/null || true
     chmod 600 "$out"
     # 退回要用的那一份（上一次更新前的备份）一直留着，不算在里面
     local keep='' f n=0

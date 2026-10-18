@@ -78,6 +78,13 @@ async function readMeta(file: string): Promise<IAudioMetadata> {
   }
 }
 
+/** 比较签名：用固定时间的比较，不让人按响应快慢一位一位地猜 */
+function sameText(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
 export class MusicLibrary {
   private readonly db: Db;
   readonly dir: string;
@@ -132,7 +139,7 @@ export class MusicLibrary {
   /** 签名对不上、文件不在了时返回 null */
   file(id: number, sig: string, what: 'audio' | 'cover'): { dir: string; name: string } | null {
     const r = this.get(id);
-    if (!r || sig !== this.sig(r)) return null;
+    if (!r || !sameText(sig, this.sig(r))) return null;
     if (what === 'cover') return r.cover ? { dir: this.dir, name: r.cover } : null;
     const full = r.path ?? path.join(this.dir, `${r.sha256}.${r.ext}`);
     if (!fs.existsSync(full)) return null;

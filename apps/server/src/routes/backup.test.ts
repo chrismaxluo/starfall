@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import { KEEP_BACKUPS, KEEP_MANUAL } from '../services/backup.ts';
 import { formFile, media, testApp } from '../testing.ts';
@@ -308,6 +308,35 @@ describe('自动备份', () => {
     expect(list.filter((x) => x.manual)[0]!.stamp).toBe('20260903-120007-m');
     await b.run(at(4, 2), true);
     expect(await b.tick(at(4, 5))).toBe(true);
+  });
+});
+
+describe('备份时磁盘不够', () => {
+  it('剩余空间不够放一份数据库：不备份，说明原因，不留半截文件', async () => {
+    const t = await setup();
+    const spy = vi.spyOn(fs, 'statfsSync').mockReturnValue({ bavail: 10, bsize: 4096 } as fs.StatsFs);
+    try {
+      await expect(t.ctx.backups.run(Date.now(), true)).rejects.toThrow('磁盘剩余空间不够');
+    } finally {
+      spy.mockRestore();
+    }
+    expect(t.ctx.backups.list()).toEqual([]);
+  });
+
+  it('备份写到一半出错（例如磁盘满）：删掉半截的 .part，不占着空间', async () => {
+    const t = await setup();
+    const client = t.ctx.db.$client;
+    const spy = vi.spyOn(client, 'backup').mockImplementation(async (file: string) => {
+      fs.writeFileSync(file, 'half');
+      throw new Error('SQLITE_FULL');
+    });
+    try {
+      await expect(t.ctx.backups.run(Date.now(), true)).rejects.toThrow('SQLITE_FULL');
+    } finally {
+      spy.mockRestore();
+    }
+    const dir = path.join(t.ctx.config.dataDir, 'backups');
+    expect(fs.existsSync(dir) ? fs.readdirSync(dir) : []).toEqual([]);
   });
 });
 

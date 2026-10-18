@@ -176,6 +176,7 @@ export class Pipeline {
   readonly giftBoards: GiftBoards;
   private unsubscribeOutputs: (() => void) | null = null;
   private seq = 0;
+  private recordWarnAt = 0;
   private readonly dayFmt: Intl.DateTimeFormat;
 
   constructor(deps: PipelineDeps) {
@@ -261,7 +262,8 @@ export class Pipeline {
     if (ev.kind === 'live') return;
     const now = this.now();
     if (raw !== undefined) this.raws.set(ev.id, { raw, at: now });
-    this.remember(ev.viewer);
+    // 写数据库出错（例如磁盘满）时只写日志：不能拦住特效、弹幕列表和送礼名单
+    this.guard('记住观众', () => this.remember(ev.viewer));
     switch (ev.kind) {
       case 'enter':
         for (const e of this.merger.push(ev, now)) this.process(e);
@@ -325,10 +327,10 @@ export class Pipeline {
   }
 
   /** 推给送礼名单：编号用事件记录的编号（和服务重启后从记录里装回来的一样，挂上的记录也认得） */
-  private pushGift(ev: GiftEvent | GuardEvent | ScEvent, eventId: number): void {
+  private pushGift(ev: GiftEvent | GuardEvent | ScEvent, eventId: number | null): void {
     this.guard('推送送礼名单', () => {
       const item = this.giftListItem(ev);
-      if (item) this.giftBoards.push({ ...item, id: `log-${eventId}` });
+      if (item) this.giftBoards.push({ ...item, id: eventId ? `log-${eventId}` : `ev-${ev.id}` });
     });
   }
 
@@ -365,10 +367,20 @@ export class Pipeline {
     this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '', ...(v.honor ? { honor: v.honor } : {}) }, roomId ? { level: v.guard, roomId } : undefined);
   }
 
-  private record(ev: TriggerEvent | Extract<StdEvent, { kind: 'sc' }>, hit: Judgement['hit'], status: PlayStatus): number {
+  /** 写事件记录；写不进（例如磁盘满）时返回 null，照样往下播（每分钟最多写一次日志） */
+  private record(ev: TriggerEvent | Extract<StdEvent, { kind: 'sc' }>, hit: Judgement['hit'], status: PlayStatus): number | null {
     const raw = this.raws.get(ev.id)?.raw;
     this.raws.delete(ev.id);
-    return this.d.log.record(ev, { roomId: this.d.room.get()?.roomId ?? null, sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
+    try {
+      return this.d.log.record(ev, { roomId: this.d.room.get()?.roomId ?? null, sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
+    } catch (e) {
+      const now = this.now();
+      if (now - this.recordWarnAt > 60_000) {
+        this.recordWarnAt = now;
+        console.error('[播放调度] 写事件记录出错（特效照常播）：', e);
+      }
+      return null;
+    }
   }
 
   // ---------- 判断 ----------
@@ -618,7 +630,7 @@ export class Pipeline {
   private play(q: QueueItem<Queued>): void {
     const { item, eventId } = q.payload;
     this.d.hub.toOverlays({ type: 'play', item });
-    if (eventId) this.d.log.setStatus(eventId, 'played');
+    if (eventId) this.guard('更新事件记录', () => this.d.log.setStatus(eventId, 'played'));
     const timer = setTimeout(() => {
       this.current = null;
       this.guard('播放下一个', () => {
@@ -632,7 +644,8 @@ export class Pipeline {
   /** 排队的特效没播出来：写明原因，并撤销冷却 / 每场一次的记录（下次还能播） */
   private unplayed(q: QueueItem<Queued>, status: PlayStatus): void {
     q.payload.undo?.();
-    if (q.payload.eventId) this.d.log.setStatus(q.payload.eventId, status);
+    const eventId = q.payload.eventId;
+    if (eventId) this.guard('更新事件记录', () => this.d.log.setStatus(eventId, status));
   }
 
   /** 紧急暂停：立即停止画面、清空队列；暂停期间的事件照常记录（F-PL-05） */

@@ -3,7 +3,7 @@ import { setTimeZone } from './format.ts';
 import { CHAT_MAX_LIMIT, OVERLAY_BUILD_RE, giftRowsSorted } from '@starfall/shared/overlay';
 import type { ChatItem, GiftListItem, GiftRow } from '@starfall/shared/overlay';
 import { loadMusic, music, onMusicMessage } from './music.ts';
-import { FEED_KEEP, isFxLive, refreshEffects, refreshFeed, refreshOutputs, refreshQuick, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
+import { FEED_KEEP, isFxLive, loadAll, refreshEffects, refreshFeed, refreshOutputs, refreshQuick, refreshRules, refreshSettings, refreshStatus, state, ui } from './store.ts';
 import type { EventDto, LiveStatus, OverlayInfo, PlayStatus, QueueSnapshot, RoomInfo, StatusSnapshot } from './types.ts';
 
 type Msg =
@@ -95,8 +95,12 @@ function handle(m: Msg): void {
       state.giftPins = m.pins ?? [];
       // 重连：断开期间的事件和别处的修改都补回来
       if (hellos++ > 0) {
-        void Promise.all([refreshFeed(), refreshRules(), refreshEffects(), refreshSettings(), refreshOutputs(), refreshQuick(), ...(music.loaded ? [loadMusic()] : [])]).catch(() => undefined);
+        void loadAll(['feed', 'rules', 'effects', 'settings', 'outputs', 'quick', ...state.loadFailed]).catch(() => undefined);
+        if (music.loaded) void loadMusic().catch(() => undefined);
         for (const fn of resyncListeners) fn();
+      } else if (state.loadFailed.length) {
+        // 打开后台时有数据没读到：连上了就再读一次
+        void loadAll([...state.loadFailed]).catch(() => undefined);
       }
       break;
     case 'music':

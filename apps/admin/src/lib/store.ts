@@ -43,6 +43,8 @@ export const state = reactive({
   wsOnline: false,
   /** 荣耀等级勋章：等级 → B站的图（读不到时是空的，界面上改成显示文字） */
   honorMedals: {} as Record<number, string>,
+  /** 打开后台时没读到的数据（过一会儿自动再读）：没读到的页面不能当作「空的」来编辑保存 */
+  loadFailed: [] as string[],
   /** 从别的页面跳到"添加专属用户"时预填的 UID */
   pendingExclusive: null as number | null,
 });
@@ -101,8 +103,19 @@ export async function refreshHonorMedals(): Promise<void> {
   if (r) state.honorMedals = Object.fromEntries(r.medals.map((m) => [m.level, m.url]));
 }
 
-export async function loadAll(): Promise<void> {
-  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshQuick(), refreshFeed(), refreshHonorMedals()]);
+const LOADERS: Record<string, () => Promise<void>> = { status: refreshStatus, settings: refreshSettings, effects: refreshEffects, rules: refreshRules, outputs: refreshOutputs, quick: refreshQuick, feed: refreshFeed, honor: refreshHonorMedals };
+let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 读后台要用的数据；没读到的记在 state.loadFailed，15 秒后自动再读（出错时抛出第一个错误，用来提示） */
+export async function loadAll(names: string[] = Object.keys(LOADERS)): Promise<void> {
+  const rs = await Promise.allSettled(names.map((n) => LOADERS[n]!()));
+  const failed = names.filter((_, i) => rs[i]!.status === 'rejected');
+  state.loadFailed = [...new Set([...state.loadFailed.filter((n) => !names.includes(n)), ...failed])];
+  if (reloadTimer) clearTimeout(reloadTimer);
+  reloadTimer = null;
+  if (!state.loadFailed.length) return;
+  reloadTimer = setTimeout(() => void loadAll([...state.loadFailed]).catch(() => undefined), 15_000);
+  throw (rs.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason;
 }
 
 /** 全局弹窗：素材设置、快捷设置专属、新手引导、命令面板 */

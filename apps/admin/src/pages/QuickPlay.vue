@@ -8,7 +8,7 @@ import QuickPad from '../components/QuickPad.vue';
 import { put } from '../lib/api.ts';
 import { desktop, reloadHotkeys } from '../lib/desktop.ts';
 import { keyOf, quickName, useQuickHotkeys } from '../lib/quick.ts';
-import { effectById, state } from '../lib/store.ts';
+import { effectById, loadAll, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import { QUICK_GLOBAL_RE } from '@starfall/shared';
 import type { QuickButton } from '../lib/types.ts';
@@ -23,7 +23,14 @@ const saving = ref(false);
 let seq = 0;
 useQuickHotkeys(() => !editing.value);
 
+/** 打开后台时按钮列表没读到：不能编辑（不然会当作没有按钮，保存时把原来的全部覆盖） */
+const quickMissing = computed(() => state.loadFailed.includes('quick'));
+async function retryQuick(): Promise<void> {
+  await attempt(() => loadAll(['quick']), '已读到按钮列表');
+}
+
 function startEdit(): void {
+  if (quickMissing.value) return;
   rows.value = state.quick.map((b) => ({ key: ++seq, effectId: b.effectId, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }));
   editing.value = true;
   // 编辑时先停掉全局快捷键：录快捷键时不会被系统拦走，也不会误播
@@ -175,11 +182,12 @@ onBeforeUnmount(() => {
           <button class="btn" @click="cancel">取消</button>
           <button class="btn primary" :disabled="saving || !changed" @click="save"><Icon name="i-check" />保存</button>
         </template>
-        <button v-else class="btn" @click="startEdit"><Icon name="i-pen" />编辑按钮</button>
+        <button v-else class="btn" :disabled="quickMissing" :title="quickMissing ? '按钮列表还没读到，读到后才能编辑（不然保存会把原来的按钮覆盖掉）' : undefined" @click="startEdit"><Icon name="i-pen" />编辑按钮</button>
       </div>
     </div>
 
-    <template v-if="!editing">
+    <div v-if="quickMissing" class="card qp-miss"><Icon name="i-info" /><span>按钮列表没读到（网络或服务出错），正在自动重试。</span><button class="btn sm" @click="retryQuick">现在重试</button></div>
+    <template v-else-if="!editing">
       <div v-if="state.quick.length" class="card">
         <QuickPad big />
         <p class="qp-tip">快捷键只在这个页面或「总览」是当前窗口时有用；在输入框里打字时不会触发。</p>

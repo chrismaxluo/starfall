@@ -381,7 +381,31 @@ describe('弹幕点歌', () => {
     await t.say('点歌 也不存在', { uid: 2, name: '阿二' });
     const shown = t.sock.sent.filter((x) => x.type === 'music_notice').map((x) => (x as { notice: { text: string } }).notice.text);
     expect(shown).toEqual(['点了《起风了》，马上播放', '没有找到「不存在的歌」']);
-    expect(t.m.snapshot().notices.filter((n) => n.quiet).map((n) => n.text)).toEqual(['没有找到「也不存在」', '点得太快了，60 秒后再点']);
+    // 刚点过没找到：几秒内再点不去搜（不然反复点找不到的歌会被网易云限流）
+    expect(t.m.snapshot().notices.filter((n) => n.quiet).map((n) => n.text)).toEqual(['点得太快了，过几秒再点', '点得太快了，60 秒后再点']);
+    const searches = t.ne.calls.url;
+    vi.advanceTimersByTime(8000);
+    await t.say('点歌 还是不存在', { uid: 2, name: '阿二' });
+    expect(t.m.snapshot().notices[0]!.text).toBe('没有找到「还是不存在」');
+    expect(t.ne.calls.url).toBe(searches);
+  });
+
+  it('指令后面没有空格：歌名对得上才算点歌，聊天里带「点歌」两个字的不算', async () => {
+    const t = await setup({ settings: { perUser: 3 } });
+    await t.say('点歌的人好多');
+    await t.say('点歌起风了');
+    expect(t.queue().length + (t.m.state().now ? 1 : 0)).toBe(1);
+    expect(t.m.state().now?.item.song.name).toBe('起风了');
+    expect(t.m.snapshot().notices.map((n) => n.text)).toEqual(['点了《起风了》，马上播放']);
+  });
+
+  it('被拉黑、没有点歌权限的观众：「我的歌」不理，「没有权限」只在后台显示', async () => {
+    const t = await setup({ settings: { bannedUids: [7] } });
+    await t.say('我的歌', { uid: 7, name: '捣乱的' });
+    await t.say('点歌 起风了', { uid: 7, name: '捣乱的' });
+    const shown = t.sock.sent.filter((x) => x.type === 'music_notice');
+    expect(shown).toHaveLength(0);
+    expect(t.m.snapshot().notices.map((n) => [n.text, n.quiet ?? false])).toEqual([['没有点歌的权限', true]]);
   });
 
   it('撤销：刚删掉、清空的歌放回列表，顺序不变', async () => {

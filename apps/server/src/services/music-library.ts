@@ -7,7 +7,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
 import type { Readable } from 'node:stream';
-import { asc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { asc, eq, getTableColumns, isNotNull, isNull, sql } from 'drizzle-orm';
 import { parseFile } from 'music-metadata';
 import type { IAudioMetadata } from 'music-metadata';
 import type { Candidate } from '@starfall/music';
@@ -113,7 +113,7 @@ export class MusicLibrary {
   }
 
   count(): number {
-    return this.rows().length;
+    return this.db.select({ n: sql<number>`count(*)` }).from(musicLocal).get()?.n ?? 0;
   }
 
   /** 给点歌窗口的文件地址：带签名，猜不出别的文件 */
@@ -157,7 +157,10 @@ export class MusicLibrary {
     const ws = words(query);
     if (!ws.length) return [];
     const scored: Array<{ r: LocalRow; n: number }> = [];
-    for (const r of this.rows()) {
+    // 不读歌词（每首最多 200KB）：每条点歌弹幕都要把整个歌库过一遍
+    const { lyric: _lyric, ...cols } = getTableColumns(musicLocal);
+    const rows = this.db.select(cols).from(musicLocal).orderBy(asc(musicLocal.id)).all().map((r) => ({ ...r, lyric: null }) as LocalRow);
+    for (const r of rows) {
       const text = norm([r.title, r.artist, r.album, path.basename(r.filename, path.extname(r.filename))].join('|'));
       const n = ws.filter((w) => text.includes(w)).length;
       if (n) scored.push({ r, n });

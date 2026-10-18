@@ -4,7 +4,7 @@
 // 只有一个窗口（最早加到直播软件里的那个）出声音，别的只显示。出声的窗口报「开始了」「放到哪了」「放完了」「放不了」。
 // 不放的情况（hold）：点歌关着、后台暂停、没开播（下播自动暂停）、没有点歌窗口。这时正在放的歌停在原处，恢复后接着放。
 // 有带声音的特效在播时，让出声的窗口把音乐调小。
-import { and, asc, desc, eq, gt, gte, inArray, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { whoOk } from '@starfall/core/danmu';
 import { NeteaseError, pick, rank, splitNth } from '@starfall/music';
 import type { NeteaseSong, PickResult } from '@starfall/music';
@@ -35,6 +35,24 @@ const TICK_MS = 2000;
 /** 网易云连不上时：第一次等 10 秒再试，之后每次翻倍；同一首试这么多次还不行才跳过（共约 2.5 分钟） */
 const NET_RETRY_MS = 10_000;
 const NET_RETRIES = 5;
+/** 点歌没找到后，同一个人这么久之内不再去搜 */
+const MISS_CD_MS = 8000;
+/** 「换个版本」换下来的那条记录（统计里不算，同一次点歌） */
+const notSwapped = or(isNull(musicRequests.note), ne(musicRequests.note, '换了版本'));
+
+/** 按观众记的时间：太多时把过期的删掉（长时间直播不会一直变大） */
+function pruneOld(m: Map<number, number>, now: number, ttl: number): void {
+  if (m.size < 2000) return;
+  for (const [k, t] of m) if (now - t >= ttl) m.delete(k);
+}
+
+/** 指令后面没有分隔时：观众写的要以歌名开头（后面可以跟歌手），去掉空格标点后比较 */
+function looseMatch(query: string, name: string): boolean {
+  const n = (x: string) => x.normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+  const q = n(query);
+  const s = n(name.replace(/[（(].*?[)）]/g, ''));
+  return s.length > 0 && q.startsWith(s);
+}
 
 type Row = typeof musicRequests.$inferSelect;
 export type MusicStatus = Row['status'];
@@ -142,6 +160,8 @@ export class MusicService {
   private readonly lastFail = new Map<number, number>();
   /** 每个人上一次查「我的歌」的时间（防刷屏） */
   private readonly mineAt = new Map<number, number>();
+  /** 点歌没找到的时间（几秒内不再去搜） */
+  private readonly missAt = new Map<number, number>();
   private notices: MusicNotice[] = [];
   private duckOn = false;
   /** 没开播时后台手动点了「继续」：这次下播之前不再自动暂停 */
@@ -242,6 +262,11 @@ export class MusicService {
     return c.posAt === null ? c.posMs : c.posMs + (this.now() - c.posAt);
   }
 
+  /** 正在拿播放地址、或者正在放的 */
+  private playingRows(): Row[] {
+    return this.d.db.select().from(musicRequests).where(eq(musicRequests.status, 'playing')).all();
+  }
+
   private queuedRows(): Row[] {
     return this.d.db.select().from(musicRequests).where(eq(musicRequests.status, 'queued')).orderBy(asc(musicRequests.sort), asc(musicRequests.id)).all();
   }
@@ -328,11 +353,14 @@ export class MusicService {
     if (t === s.cmdMine.normalize('NFKC')) return void this.mineBy(ev.viewer);
     const cmd = s.cmdRequest.normalize('NFKC');
     if (!t.startsWith(cmd)) return;
-    const q = cleanQuery(t.slice(cmd.length));
+    const rest = t.slice(cmd.length);
+    const q = cleanQuery(rest);
     if (!q) return;
     // 「点歌 晴天 2」：点第 2 个版本
     const { query, nth } = splitNth(q);
-    void this.request(ev.viewer, query, { nth }).catch((e: Error) => console.error('[点歌] 处理点歌出错：', e));
+    // 指令后面没有空格、冒号、书名号（「点歌的人好多」这种聊天）：只有歌名能对上时才算点歌，对不上就当普通弹幕
+    const loose = !/^[\s:：《]/.test(rest);
+    void this.request(ev.viewer, query, { nth, loose }).catch((e: Error) => console.error('[点歌] 处理点歌出错：', e));
   }
 
   private isAnchor(v: Pick<Viewer, 'uid'>): boolean {
@@ -349,11 +377,13 @@ export class MusicService {
    * 点歌：检查能不能点 → 找歌 → 排队。admin 为后台点的（不受规则限制，点歌关着也能加）。
    * 结果同时显示在点歌窗口和后台
    */
-  async request(viewer: Viewer, query: string, opts: { admin?: boolean; nth?: number } = {}): Promise<RequestResult> {
+  async request(viewer: Viewer, query: string, opts: { admin?: boolean; nth?: number; loose?: boolean } = {}): Promise<RequestResult> {
     const s = this.cfg();
     const exempt = opts.admin === true || this.isAnchor(viewer);
     // 失败提示：同一个人一分钟内又失败（多半在反复试），只在后台显示，不刷直播画面
     const fail = (text: string, quiet = false): RequestResult => {
+      // 指令后面没有分隔（可能只是聊天）：不提示
+      if (opts.loose) return { ok: false, text };
       const now = this.now();
       const last = this.lastFail.get(viewer.uid);
       const hide = quiet || (!opts.admin && last !== undefined && now - last < 60_000);
@@ -363,7 +393,8 @@ export class MusicService {
     };
     if (!s.enabled && !opts.admin) return fail('点歌没有打开');
     const anchorUid = this.d.room.get()?.anchorUid ?? 0;
-    if (!exempt && (s.bannedUids.includes(viewer.uid) || !whoOk(s.who, viewer, anchorUid))) return fail('没有点歌的权限');
+    // 没有权限的提示只在后台显示：被拉黑的观众不能借此让自己的昵称上直播画面
+    if (!exempt && (s.bannedUids.includes(viewer.uid) || !whoOk(s.who, viewer, anchorUid))) return fail('没有点歌的权限', true);
     const full = () => this.queuedRows().length >= s.queueMax;
     if (full()) return fail(`列表满了（${s.queueMax} 首），等放完几首再点`);
     if (!exempt) {
@@ -375,6 +406,10 @@ export class MusicService {
       if (wait > 0) return fail(`点得太快了，${Math.ceil(wait / 1000)} 秒后再点`, true);
       // 上一首还在找：不重复处理（同一个人连发两条）
       if (this.inflight.has(viewer.uid)) return fail('正在找你点的上一首', true);
+      // 刚点过没找到：几秒内不再去网易云搜（反复点找不到的歌会被网易云限流，大家都点不了）
+      const missAt = this.missAt.get(viewer.uid);
+      if (missAt !== undefined && this.now() - missAt < MISS_CD_MS) return fail('点得太快了，过几秒再点', true);
+      pruneOld(this.missAt, this.now(), MISS_CD_MS);
     }
     this.inflight.add(viewer.uid);
     let found: PickResult<MusicSong>;
@@ -383,10 +418,17 @@ export class MusicService {
     } finally {
       this.inflight.delete(viewer.uid);
     }
-    if (!found.ok) return fail(found.text);
+    if (!found.ok) {
+      if (opts.loose) return { ok: false, text: found.text };
+      this.missAt.set(viewer.uid, this.now());
+      return fail(found.text);
+    }
     const song = found.song;
+    // 指令后面没有分隔：歌名要能对上（「点歌晴天」算，「点歌的人好多」不算）
+    if (opts.loose && !looseMatch(query, song.name)) return { ok: false, text: '' };
     const same = (r: Row) => r.source === song.source && r.songId === song.id;
-    if ((this.cur && same(this.cur.row)) || this.queuedRows().some(same)) return fail(`《${song.name}》已经在列表里了`);
+    // 正在拿播放地址的那首（状态已经是 playing、还没开始放）也算在列表里
+    if ((this.cur && same(this.cur.row)) || this.queuedRows().some(same) || this.playingRows().some(same)) return fail(`《${song.name}》已经在列表里了`);
     // 刚放过的歌：一段时间内不能再点（防止同一首被反复点）
     if (!exempt && s.repeatMin > 0) {
       const until = this.playedUntil(song, s.repeatMin);
@@ -439,6 +481,10 @@ export class MusicService {
   private mineBy(v: Viewer): void {
     const now = this.now();
     if (now - (this.mineAt.get(v.uid) ?? 0) < 15_000) return;
+    // 被拉黑、没有点歌权限的观众：不理（不然能借此让自己的昵称一直上直播画面）
+    const s = this.cfg();
+    if (!this.isAnchor(v) && (s.bannedUids.includes(v.uid) || !whoOk(s.who, v, this.d.room.get()?.anchorUid ?? 0))) return;
+    pruneOld(this.mineAt, now, 15_000);
     this.mineAt.set(v.uid, now);
     const parts: string[] = [];
     if (this.cur && this.cur.row.uid === v.uid) parts.push(`《${this.cur.row.name}》正在放`);
@@ -880,7 +926,8 @@ export class MusicService {
   /** 最近 days 天点得最多的歌、点歌最多的观众（不算放不了、被取消的） */
   stats(days = 30): { songs: Array<{ song: MusicSong; count: number }>; people: Array<{ uid: number; name: string; face: string; count: number }>; total: number } {
     const since = this.now() - days * 86400_000;
-    const cond = and(gte(musicRequests.createdAt, since), inArray(musicRequests.status, ['played', 'skipped', 'playing', 'queued']));
+    // 「换个版本」换下来的那条不算（同一次点歌）
+    const cond = and(gte(musicRequests.createdAt, since), inArray(musicRequests.status, ['played', 'skipped', 'playing', 'queued']), notSwapped);
     const songs = this.d.db
       .select({ source: musicRequests.source, songId: musicRequests.songId, name: sql<string>`max(${musicRequests.name})`, artists: sql<string>`max(${musicRequests.artists})`, cover: sql<string>`max(${musicRequests.cover})`, durationMs: sql<number>`max(${musicRequests.durationMs})`, count: sql<number>`count(*)` })
       .from(musicRequests)
@@ -892,7 +939,8 @@ export class MusicService {
     const people = this.d.db
       .select({ uid: musicRequests.uid, name: sql<string>`max(${musicRequests.uname})`, face: sql<string>`max(${musicRequests.face})`, count: sql<number>`count(*)` })
       .from(musicRequests)
-      .where(cond)
+      // 和「本场」一样不算主播自己（后台加的歌）和模拟点歌的测试观众
+      .where(and(cond, gt(musicRequests.uid, 1), ne(musicRequests.uid, this.d.room.get()?.anchorUid ?? 0)))
       .groupBy(musicRequests.uid)
       .orderBy(desc(sql`count(*)`))
       .limit(10)
@@ -916,7 +964,7 @@ export class MusicService {
       if (last) range = { live: false, startedAt: last.startedAt, endedAt: last.endedAt };
     }
     if (!range) return null;
-    const inRange = range.endedAt === null ? gte(musicRequests.createdAt, range.startedAt) : and(gte(musicRequests.createdAt, range.startedAt), lte(musicRequests.createdAt, range.endedAt));
+    const inRange = and(range.endedAt === null ? gte(musicRequests.createdAt, range.startedAt) : and(gte(musicRequests.createdAt, range.startedAt), lte(musicRequests.createdAt, range.endedAt)), notSwapped);
     const viewers = and(inRange, gt(musicRequests.uid, 1), ne(musicRequests.uid, this.d.room.get()?.anchorUid ?? 0));
     const count = (where: ReturnType<typeof and>) => this.d.db.select({ n: sql<number>`count(*)` }).from(musicRequests).where(where).get()?.n ?? 0;
     const top = this.d.db

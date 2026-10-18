@@ -285,6 +285,7 @@ const MUSIC_NAMES: Record<string, string> = {
   showQueue: '显示后面几首',
   lyrics: '显示歌词',
   lyricsLang: '歌词语言',
+  liteMode: '点歌窗口精简模式',
   lyricsTrans: '歌词语言',
   blockWords: '不收的字',
   blockSongs: '不收的歌',

@@ -75,6 +75,11 @@ export class Leveler {
     }
   }
 
+  /** 有没有接着播放器（这首歌的声音正经过音频处理） */
+  active(): boolean {
+    return this.el !== null;
+  }
+
   detach(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;

@@ -56,6 +56,8 @@ export interface MusicDisplay {
   lyricsLang?: 'both' | 'original' | 'translation';
   /** 旧版本的点歌窗口用（还没刷新的页面）：显示不显示翻译 */
   lyricsTrans: boolean;
+  /** 精简模式：auto 卡顿时自动打开、on 一直开、off 不开 */
+  liteMode?: 'auto' | 'on' | 'off';
 }
 
 /** 为什么没在放：manual 后台暂停、offline 没开播（下播自动暂停）、no_player 没有加点歌窗口、disabled 点歌关着 */

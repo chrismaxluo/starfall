@@ -129,7 +129,12 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
         const r = ctx.hub.playStarted(client, msg.id);
         if (r) log.info(`特效页已播放：${r.label}（${r.ms} ms）`);
       }
-      else if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
+      else if (msg.type === 'report') {
+        // 点歌窗口发现自己卡（直播软件里的浏览器忙不过来，音乐像慢放）：记一笔，方便排查
+        const e = msg.env;
+        if (e.lag === true && client.env?.lag !== true) log.warn(`${what}卡顿：${typeof e.lagWhy === 'string' ? e.lagWhy : '页面被拖慢'}，已切到精简模式（${typeof e.host === 'string' ? e.host : '?'}，Chrome ${e.chrome ?? '?'}）`);
+        ctx.hub.report(client, { env: e });
+      }
       else if (msg.type === 'music_started') ctx.music.playerStarted(client, msg.id, msg.load);
       else if (msg.type === 'music_pos') ctx.music.playerPos(client, msg.id, msg.pos);
       else if (msg.type === 'music_blocked') ctx.music.playerBlocked(client, msg.id, msg.load);

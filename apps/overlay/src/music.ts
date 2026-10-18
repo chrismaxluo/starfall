@@ -24,6 +24,13 @@ const q = new URLSearchParams(location.search);
 const preview = q.get('preview') === '1';
 const browse = q.get('view') === '1' && !preview;
 const env = detect();
+/** 发现直播软件里的浏览器忙不过来了（音乐像慢放、页面变卡）：之后都用精简模式，直到页面刷新 */
+let lagging = false;
+/** 精简模式：不做模糊和复杂动画、刷新慢一点、不做音量均衡（直接原生播放） */
+function liteActive(): boolean {
+  const mode = state?.display.liteMode ?? 'auto';
+  return q.get('lite') === '1' || !env.blur || mode === 'on' || (mode === 'auto' && lagging);
+}
 
 document.getElementById('stage')?.remove();
 document.documentElement.classList.add('mu-page');
@@ -365,7 +372,7 @@ function renderLyric(s: MusicState, pos: number): void {
     const sub = h('div', { class: `ly-sub${tr ? ' tr' : ''}` }, tr ?? say(next));
     const box = h('div', { class: 'ly-box' }, lyCur, sub);
     lyric.replaceChildren(box);
-    if (!reduced()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 460, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    if (!reduced() && !liteActive()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 460, easing: 'cubic-bezier(.2,.8,.2,1)' });
   }
   // 这一句唱到哪：从这一句开始到下一句开始，颜色从左往右填过去
   if (lyCur && i < 0) lyCur.style.setProperty('--p', '0%');
@@ -434,7 +441,7 @@ function render(): void {
   const s = state;
   if (!s) return;
   const d = s.display;
-  const lite = q.get('lite') === '1' || !env.blur;
+  const lite = liteActive();
   root.className = `mu-root st-${d.style} side-${d.side}${d.size === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${s.enabled ? '' : ' off'}`;
   renderCard(s);
   renderQueue(s);
@@ -467,7 +474,8 @@ function tick(): void {
   const s = state;
   if (!s?.now) return;
   const now = performance.now();
-  if (now - lastPaint > 45) {
+  // 精简模式下进度条、歌词一秒刷新 4 次就够了（省下来给声音）
+  if (now - lastPaint > (liteActive() ? 250 : 45)) {
     lastPaint = now;
     const pos = position();
     const dur = s.now.item.song.durationMs || (player ? audio.duration * 1000 : 0) || 1;
@@ -587,7 +595,7 @@ function syncAudio(): void {
       startedSent = false;
       seekTo = next.posMs / 1000;
       vol = 0;
-      startAudio(url, Boolean(state?.normalize) && !corsBad.has(hostOf(url)));
+      startAudio(url, Boolean(state?.normalize) && !liteActive() && !corsBad.has(hostOf(url)));
       go();
     });
     return;
@@ -715,6 +723,46 @@ function makeAudio(cors: boolean): HTMLAudioElement {
 }
 
 // ---------- 连接 ----------
+
+// ---------- 卡顿检测 ----------
+// 直播软件里的浏览器忙不过来时，音乐像慢放、歌词变慢，播放器自己不会报错。每秒看一次：
+// 定时器晚了很多（页面被拖慢），或者正在出声的歌走得比真实时间慢很多（像慢放），10 秒里有 3 次就算卡顿
+const lagMarks: boolean[] = [];
+let lagAt = performance.now();
+let lagMedia = -1;
+setInterval(() => {
+  const wall = performance.now();
+  const dt = wall - lagAt;
+  const playing = player && !audio.paused && !audio.seeking && audio.readyState >= 3;
+  const media = playing ? audio.currentTime * 1000 : -1;
+  let why = '';
+  // 直播软件把看不见的源暂停时也会晚：那时不算
+  if (!document.hidden && dt > 1800) why = `页面被拖慢（本该 1 秒一次，隔了 ${(dt / 1000).toFixed(1)} 秒）`;
+  else if (playing && lagMedia >= 0 && media > lagMedia && media - lagMedia < dt * 0.8) why = `音乐像慢放（1 秒只放了 ${((media - lagMedia) / dt).toFixed(2)} 秒）`;
+  lagAt = wall;
+  lagMedia = media;
+  lagMarks.push(Boolean(why));
+  if (lagMarks.length > 10) lagMarks.shift();
+  if (lagging || lagMarks.filter(Boolean).length < 3) return;
+  lagging = true;
+  conn?.send({ type: 'report', env: { ...detect(), music: true, build: build0, lag: true, lagWhy: why || '页面被拖慢', ...(browse ? { view: true } : {}) } });
+  if (state?.display.liteMode === 'off') return;
+  render();
+  goNative();
+}, 1000);
+
+/** 正在出声、接着音量均衡的歌：在当前位置换成原生播放（声音不再经过浏览器的音频处理） */
+function goNative(): void {
+  if (!player || !loaded || !leveler.active() || !audio.src) return;
+  const at = audio.currentTime;
+  const playing = !audio.paused;
+  startAudio(audio.src, false);
+  seekTo = at;
+  if (playing) {
+    play();
+    rampVolume(0.25);
+  }
+}
 
 let conn: Conn | null = null;
 const build0 = pageBuild();

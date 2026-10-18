@@ -415,6 +415,10 @@ html.mu-view, html.mu-view body { background: radial-gradient(60% 40% at 20% 30%
 .notice { position: absolute; left: 16px; right: 16px; top: 40px; padding: 18px 22px; border-radius: 16px; background: rgba(40, 12, 16, .9); color: #FFD9D9; font-size: 22px; line-height: 1.5; box-shadow: inset 0 0 0 2px rgba(240,114,114,.5); text-align: center; }
 .notice small { display: block; font-size: 16px; opacity: .75; margin-top: 6px; }
 
+/* 精简模式（直播软件里卡顿时）：一直在动的装饰都停下，省下来给声音 */
+.lite :is(.mu-eq i, .mu-disc, .g-bg, .g-sheen, .j-doodle, .j-pencil, .mu-head, .mu-body), .lite .mu-idle .mu-note, .lite .mu-gl::before { animation: none !important; }
+.lite :is(.mu-body, .mu-queue, .mu-idle, .mu-toast, .ly-box) { box-shadow: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .mu-eq i, .mu-disc, .mu-gl::before, .g-bg, .g-sheen, .j-doodle, .mu-idle .mu-note, .mu-title.marq .mu-tin { animation: none !important; }
 }

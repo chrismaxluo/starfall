@@ -26,6 +26,8 @@ import type { ViewerStore } from './viewers.ts';
 /** 会触发特效的事件（醒目留言现在只记录） */
 export type TriggerEvent = Exclude<StdEvent, { kind: 'live' | 'sc' }>;
 /** 醒目留言编号记多久（同一条可能推送两次） */
+/** 有全屏动画、还没读到的礼物马上要播时，最多等多久把动画读好 */
+const FX_WAIT_MS = 2000;
 const SC_DEDUPE_MS = 10 * 60_000;
 /** 欢迎语变量（除观众以外） */
 export type Vars = Omit<TextVars, 'viewer'> & {
@@ -133,7 +135,7 @@ export interface PipelineDeps {
   /** 查礼物图；测试里可以不传 */
   gifts?: Pick<GiftCatalog, 'find'>;
   /** 查 B站礼物全屏动画；测试里可以不传 */
-  giftFx?: Pick<GiftEffects, 'forGift'>;
+  giftFx?: Pick<GiftEffects, 'forGift'> & Partial<Pick<GiftEffects, 'ready'>>;
   /** 查荣耀等级勋章图；测试里可以不传 */
   honor?: Pick<HonorMedals, 'urlFor'>;
   room: RoomStore;
@@ -273,7 +275,15 @@ export class Pipeline {
         const g = this.d.giftRules.get();
         this.combo.windowMs = g.comboSec * 1000;
         this.combo.enabled = g.comboEnabled;
-        for (const e of this.combo.push(ev, now)) this.process(e);
+        // 有 B 站全屏动画、还没读到的礼物（盲盒里爆出的权杖这类不在礼物面板上，启动时不会提前读）：一收到就开始读，
+        // 连击合并要等几秒，一般来得及；马上就要播的最多等 2 秒，第一次也能用上官方动画
+        const cfg = this.d.gifts?.find(ev.giftId);
+        const fx = this.d.giftFx;
+        const loading = cfg?.effectId && fx?.ready && !fx.forGift(cfg) ? fx.ready(cfg, FX_WAIT_MS) : null;
+        for (const e of this.combo.push(ev, now)) {
+          if (loading) void loading.then(() => this.guard('处理礼物', () => this.process(e)));
+          else this.process(e);
+        }
         break;
       }
       case 'guard':

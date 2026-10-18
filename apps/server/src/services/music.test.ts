@@ -390,6 +390,18 @@ describe('弹幕点歌', () => {
     expect(t.ne.calls.url).toBe(searches);
   });
 
+  it('歌词语言：以前关掉「显示歌词翻译」的升级后是「只显示原文」；导入以前导出的配置也认；点歌窗口收到语言', async () => {
+    const t = await setup();
+    expect(t.m.cfg().lyricsLang).toBe('both');
+    t.ctx.settings.setRaw('music', { ...t.m.cfg(), lyricsLang: undefined, lyricsTrans: false });
+    expect(t.m.cfg().lyricsLang).toBe('original');
+    expect('lyricsTrans' in t.m.cfg()).toBe(false);
+    t.m.updateSettings({ lyricsTrans: true });
+    expect(t.m.cfg().lyricsLang).toBe('both');
+    t.m.updateSettings({ lyricsLang: 'translation' });
+    expect(t.last().state.display).toMatchObject({ lyricsLang: 'translation', lyricsTrans: true });
+  });
+
   it('这首歌以后不收：只拦这一首（按编号），别的版本、名字相近的歌照常能点', async () => {
     const t = await setup({ settings: { perUser: 3, blockSongs: [{ source: 'netease', id: '1', name: '起风了' }] } });
     await t.say('点歌 起风了');

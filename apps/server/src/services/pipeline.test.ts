@@ -585,6 +585,34 @@ describe('礼物', () => {
     expect(t.plays().at(-1)!.gift?.img).toBe('https://i0.hdslb.com/gift/flower.png');
   });
 
+  it('面板上没有、动画还没读到的大礼物（盲盒里爆出的权杖）：一收到就去读，读好了再播，第一次也用官方动画', async () => {
+    const t = await setup();
+    const bili = t.ctx.effects.list().find((e) => e.name === 'B站·礼物动画')!.id;
+    const g = t.ctx.giftRules.get();
+    t.ctx.giftRules.set({ ...g, comboEnabled: false, bands: g.bands.map((b) => ({ ...b, effectId: bili, enabled: true })) });
+    let loaded = false;
+    const hub2 = new Hub();
+    const sock2 = fakeSock();
+    hub2.addOverlay(sock2, t.ctx.outputs.list()[0]!, []);
+    const p2 = new Pipeline({
+      ...t.ctx,
+      live: t.live,
+      hub: hub2,
+      gifts: { find: (id: number) => GIFTS[id] },
+      giftFx: { forGift: (x) => (loaded && x?.effectId === 699 ? { fx: CAR_FX, durationMs: 5700 } : undefined), ready: async () => void (loaded = true) },
+      timeZone: 'Asia/Shanghai',
+      rng: () => 0,
+    });
+    t.p.stop();
+    p2.start();
+    cleanup.push(() => p2.stop());
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
+    await Promise.resolve();
+    await Promise.resolve();
+    const play = sock2.sent.filter((m) => m.type === 'play').at(-1) as Extract<ServerToOverlay, { type: 'play' }> | undefined;
+    expect(play?.item).toMatchObject({ effect: { visual: { style: 'bili-gift' } }, gift: { name: '极速超跑', fx: CAR_FX } });
+  });
+
   it('「B站·礼物动画」：有官方全屏动画的礼物按动画长度播；没有动画时 100 元以上显示晶·大礼物、以下显示晶·礼物', async () => {
     const t = await setup();
     const bili = t.ctx.effects.list().find((e) => e.name === 'B站·礼物动画')!.id;

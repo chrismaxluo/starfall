@@ -784,3 +784,12 @@ body:has(.editor) .toasts { bottom: 92px; }
 .sim-found button:hover { background: var(--hover); }
 .sim-found button span { color: var(--t3); font-size: 12px; flex: none; }
 .sim-found .none { padding: 8px 10px; font-size: 12.5px; color: var(--t3); }
+/* 列表和整行一样宽（不跟着输入框窄），礼物名不换行 */
+.sim .sim-giftrow { position: relative; }
+.sim-gift { flex: 1; min-width: 0; }
+.sim-gift .inp { width: 100%; }
+.sim-gift .inp::placeholder { color: var(--t1); }
+.sim-gift .sim-found { position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 5; box-shadow: var(--shadow-pop); }
+.sim-gift .sim-found button { white-space: nowrap; }
+.sim-gift .sim-found button span { overflow: hidden; text-overflow: ellipsis; }
+.sim-found button.on { background: var(--accent-soft); }

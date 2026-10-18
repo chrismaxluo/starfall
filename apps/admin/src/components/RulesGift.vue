@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { JUMP_GOLD } from '@starfall/shared/labels';
 import { get, put } from '../lib/api.ts';
 import { useGiftCatalog } from '../lib/gift-catalog.ts';
+import { useGiftSearch } from '../lib/gift-search.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import { battery, batteryYuan, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
@@ -38,6 +39,8 @@ const bandMsg = ref<{ text: string; err: boolean }>({ text: '分出来的新一�
 const rules = computed(() => state.gift);
 const bands = computed(() => [...(rules.value?.bands ?? [])].sort((a, b) => b.fromGold - a.fromGold));
 const giftOf = (id: number) => catalog.value.find((g) => g.id === id);
+// 打字搜索时也在全站礼物里找（礼物面板上没有的，例如盲盒里爆出的权杖）
+const { extra: found, searching } = useGiftSearch(giftQ, () => catalog.value);
 const available = computed(() => catalog.value.filter((g) => g.paid && !rules.value?.specific.some((s) => s.giftId === g.id) && (!giftQ.value || g.name.includes(giftQ.value))));
 // 按礼物面板分页（礼物、粉丝团、航海……）、页内顺序列出；不在面板上显示的（包裹、活动等）按价格排在最后
 const groups = computed(() => {
@@ -47,6 +50,8 @@ const groups = computed(() => {
   for (const g of available.value) (g.tab ? tabs.get(g.tab)! : off).push(g);
   const out = [...tabs].filter(([, list]) => list.length).map(([tab, list]) => ({ title: `${tab}（${list.length}）`, list: list.sort((a, b) => a.panel! - b.panel!) }));
   if (off.length) out.push({ title: `面板上不显示的礼物（包裹、活动、特效版本等，${off.length}），按价格从低到高`, list: off.sort((a, b) => a.price - b.price) });
+  const more = found.value.filter((g) => !rules.value?.specific.some((s) => s.giftId === g.id));
+  if (more.length) out.push({ title: `礼物面板上没有、在全站礼物里找到的（盲盒里爆出的、活动礼物等，${more.length}）`, list: more });
   return out;
 });
 
@@ -92,6 +97,8 @@ async function save(msg?: string, undo?: () => Promise<unknown>): Promise<void> 
 }
 
 function addSpecific(g: GiftConfig): void {
+  // 从全站礼物里找到的：记进列表，规则里能显示礼物图
+  if (!catalog.value.some((x) => x.id === g.id)) catalog.value = [...catalog.value, g];
   if (!rules.value) return;
   const eff = state.effects.find((e) => e.builtin && e.visual.type === 'builtin_style' && e.visual.style === 'glass-gift')?.id ?? null;
   rules.value.specific.push({ giftId: g.id, giftName: g.name, effectId: eff, enabled: true });
@@ -201,13 +208,14 @@ function previewBand(i: number): void {
       </div>
     </div>
     <div v-if="picking" class="rl-gpick">
-      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致；点一下就加上，可以连着选几个</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
+      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致；打字搜索时也会在 B 站全站礼物里找（盲盒里爆出的、活动礼物等）。点一下就加上，可以连着选几个</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
       <div class="grid">
         <template v-for="grp in groups" :key="grp.title">
           <div class="sep">{{ grp.title }}</div>
           <button v-for="g in grp.list" :key="g.id" type="button" @click="addSpecific(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ battery(g.price) }}</span><i>{{ yuan(g.price) }}</i></button>
         </template>
-        <span v-if="!available.length" class="hint">没有可选的礼物</span>
+        <span v-if="searching" class="hint">正在全站礼物里找…</span>
+        <span v-else-if="!groups.length" class="hint">没有找到这个礼物</span>
       </div>
     </div>
 

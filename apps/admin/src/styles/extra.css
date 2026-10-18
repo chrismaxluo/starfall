@@ -777,3 +777,10 @@ body:has(.editor) .toasts { bottom: 92px; }
 .qp-miss, .out-miss { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--t2); }
 .qp-miss svg, .out-miss svg { width: 16px; height: 16px; color: var(--gov); flex: none; }
 .qp-miss .btn, .out-miss .btn { margin-left: auto; }
+/* 模拟送礼：在全站礼物里按名字找 */
+.sim-find { position: relative; }
+.sim-found { display: flex; flex-direction: column; margin-top: 6px; max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--l3); }
+.sim-found button { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 0; background: none; color: var(--t1); font-size: 13px; text-align: left; cursor: pointer; }
+.sim-found button:hover { background: var(--hover); }
+.sim-found button span { color: var(--t3); font-size: 12px; flex: none; }
+.sim-found .none { padding: 8px 10px; font-size: 12.5px; color: var(--t3); }

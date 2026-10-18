@@ -46,6 +46,11 @@ export function eventRuleRoutes(app: FastifyInstance, ctx: AppContext): void {
   /** 荣耀等级勋章（每级一张 B 站的图） */
   app.get('/api/honor-medals', async () => ctx.honor.list());
   app.get<{ Querystring: { refresh?: string } }>('/api/gifts', async (req) => ({ gifts: await ctx.gifts.list(req.query.refresh === '1') }));
+  // 在全站礼物里按名字找（模拟送礼时选面板上没有的礼物，例如盲盒里爆出来的）
+  app.get('/api/gifts/search', async (req) => {
+    const { q } = parseBody(z.object({ q: z.string().max(40).default('') }), req.query);
+    return { gifts: await ctx.gifts.search(q) };
+  });
 
   app.get('/api/rules/guard', async () => ctx.guardRules.get());
   app.put('/api/rules/guard', async (req) => ctx.guardRules.set(parseBody(GuardRulesInputSchema, req.body)));

@@ -246,7 +246,7 @@ export const events = sqliteTable(
     status: text('status').notNull(),
     raw: text('raw', { mode: 'json' }),
   },
-  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id)],
+  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id), index('events_room_status_id').on(t.roomId, t.status, t.id), index('events_session_kind').on(t.sessionId, t.kind), index('events_room_id_uname').on(t.roomId, t.id, t.uname)],
 );
 
 /** 素材快捷播放的按钮（按 sort 排列）。素材删除时按钮一起删掉 */

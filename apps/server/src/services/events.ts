@@ -1,5 +1,6 @@
 // 事件记录（需求 F-DA-01 ~ 02、F-UI-04）：每个事件一行，带命中规则和播放状态。
-import { and, desc, eq, gte, inArray, isNotNull, like, lt, or } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import type { EventKind, PlayStatus, StdEvent } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
 import { events } from '../db/schema.ts';
@@ -11,6 +12,9 @@ export type LoggedEvent = Exclude<StdEvent, { kind: 'live' }>;
 /** 原始消息只保留 7 天（用于排查协议问题） */
 const RAW_KEEP_MS = 7 * 24 * 3600_000;
 const DAY_MS = 24 * 3600_000;
+/** 清理时每批处理几条 */
+const PRUNE_BATCH = 500;
+const yieldLoop = () => new Promise<void>((r) => setImmediate(r));
 
 export interface EventDto {
   id: number;
@@ -82,6 +86,8 @@ export interface GuardVisit {
 export class EventLog {
   private readonly db: Db;
   private readonly listeners = new Set<(e: { type: 'event'; event: EventDto } | { type: 'event_status'; id: number; status: PlayStatus }) => void>();
+  /** 这个时间之前的原始消息已经清过了 */
+  private rawClearedTo = 0;
 
   constructor(db: Db) {
     this.db = db;
@@ -119,14 +125,27 @@ export class EventLog {
     if (f.from !== undefined) conds.push(gte(events.ts, f.from));
     if (f.to !== undefined) conds.push(lt(events.ts, f.to));
     const q = f.q?.trim();
+    // 先只取编号（按名字找时走 (room_id, id, uname) 索引，不用把每条记录连原始消息读出来），再按编号取整条。
+    // 数字同时按 UID 和名字找：分成两次查询各走各的索引（写成 or 会整表扫）
+    const ids = (extra?: SQL) =>
+      this.db
+        .select({ id: events.id })
+        .from(events)
+        .where(and(...conds, extra))
+        .orderBy(desc(events.id))
+        .limit(limit + 1)
+        .all()
+        .map((r) => r.id);
+    let picked: number[] | null = null;
     if (q) {
-      const esc = q.replace(/[\\%_]/g, (c) => `\\${c}`);
-      conds.push(/^\d+$/.test(q) ? or(eq(events.uid, Number(q)), like(events.uname, `%${esc}%`)) : like(events.uname, `%${esc}%`));
+      const pat = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      picked = ids(sql`${events.uname} like ${pat} escape '\\'`);
+      if (/^\d+$/.test(q)) picked = [...new Set([...picked, ...ids(eq(events.uid, Number(q)))])].sort((a, b) => b - a).slice(0, limit + 1);
     }
     const rows = this.db
       .select()
       .from(events)
-      .where(conds.length ? and(...conds) : undefined)
+      .where(picked ? inArray(events.id, picked.length ? picked : [0]) : conds.length ? and(...conds) : undefined)
       .orderBy(desc(events.id))
       .limit(limit + 1)
       .all();
@@ -277,8 +296,10 @@ export class EventLog {
         args.push(o.to);
       }
     }
+    // 按时间范围装时指定走 (room_id, kind, id)：只看礼物、上舰、醒目留言，不然会把这段时间的进场、弹幕全读一遍
+    const from = o.sessionId !== undefined ? 'events' : 'events indexed by events_room_kind_id';
     const rows = this.db.$client
-      .prepare(`select id, ts, kind, viewer, payload from events where ${where.join(' and ')} order by id desc limit ?`)
+      .prepare(`select id, ts, kind, viewer, payload from ${from} where ${where.join(' and ')} order by id desc limit ?`)
       .all(...args, o.limit ?? 50_000) as Array<{ id: number; ts: number; kind: string; viewer: string; payload: string | null }>;
     return rows.reverse().map((r) => ({ ...r, viewer: JSON.parse(r.viewer), payload: r.payload ? JSON.parse(r.payload) : null }));
   }
@@ -310,8 +331,10 @@ export class EventLog {
       }
       where.push(`(${conds.join(' or ')})`);
     }
+    // 找全部场次时指定走 (room_id, kind, id)：不然搜不到时要把整个直播间的记录（大部分是进场、弹幕）全读一遍
+    const from = o.sessionId !== null ? 'events' : 'events indexed by events_room_kind_id';
     const rows = this.db.$client
-      .prepare(`select id, ts, kind, viewer, payload, session_id as sessionId from events where ${where.join(' and ')} order by id desc limit ?`)
+      .prepare(`select id, ts, kind, viewer, payload, session_id as sessionId from ${from} where ${where.join(' and ')} order by id desc limit ?`)
       .all(...args, o.limit) as Array<{ id: number; ts: number; kind: string; viewer: string; payload: string | null; sessionId: number | null }>;
     return rows.map((r) => ({ ...r, viewer: JSON.parse(r.viewer), payload: r.payload ? JSON.parse(r.payload) : null }));
   }
@@ -321,10 +344,38 @@ export class EventLog {
     return this.db.update(events).set({ status: 'cleared' }).where(eq(events.status, 'queued')).run().changes;
   }
 
-  /** 清理：超过保留期的事件删除；超过 7 天的原始消息清空 */
-  prune(now: number, retentionDays: number): { deleted: number; rawCleared: number } {
-    const deleted = retentionDays > 0 ? this.db.delete(events).where(lt(events.ts, now - retentionDays * DAY_MS)).run().changes : 0;
-    const rawCleared = this.db.update(events).set({ raw: null }).where(and(lt(events.ts, now - RAW_KEEP_MS), isNotNull(events.raw))).run().changes;
+  /**
+   * 清理：超过保留期的事件删除；超过 7 天的原始消息清空。
+   * 分批做、批与批之间让出：把保留天数改小后一次要删几十万条，一条语句删完会让整个服务卡住好几秒。
+   * 直播中只清原始消息，过期的记录等没开播时再删
+   */
+  async prune(now: number, retentionDays: number, o: { live?: boolean } = {}): Promise<{ deleted: number; rawCleared: number }> {
+    const db = this.db.$client;
+    let deleted = 0;
+    // 直播中不删：这台机器写盘慢时一批也可能顿一两秒，等下播后（下一次定时清理）再删
+    if (retentionDays > 0 && !o.live) {
+      const del = db.prepare('delete from events where id in (select id from events where ts < ? limit ?)');
+      for (let n = PRUNE_BATCH; n === PRUNE_BATCH; await yieldLoop()) {
+        n = del.run(now - retentionDays * DAY_MS, PRUNE_BATCH).changes;
+        deleted += n;
+      }
+    }
+    // 原始消息：从上次清到的时间往后找，不用每次把 7 天前的记录全看一遍
+    const cut = now - RAW_KEEP_MS;
+    const pick = db.prepare('select id, ts from events where ts >= ? and ts < ? and raw is not null order by ts limit ?');
+    const clear = db.prepare('update events set raw = null where id = ?');
+    let rawCleared = 0;
+    for (;;) {
+      const rows = pick.all(this.rawClearedTo, cut, PRUNE_BATCH) as Array<{ id: number; ts: number }>;
+      db.transaction(() => {
+        for (const r of rows) clear.run(r.id);
+      })();
+      rawCleared += rows.length;
+      if (rows.length < PRUNE_BATCH) break;
+      this.rawClearedTo = rows[rows.length - 1]!.ts;
+      await yieldLoop();
+    }
+    this.rawClearedTo = cut;
     return { deleted, rawCleared };
   }
 }

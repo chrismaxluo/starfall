@@ -424,11 +424,19 @@ describe('其他', () => {
     expect(t.ctx.log.query({ status: ['no_rule'] }).events).toHaveLength(3);
     expect(t.ctx.log.query({ q: '3' }).events.map((e) => e.kind)).toEqual(['danmu', 'enter']);
     expect(t.ctx.log.query({ q: '%' }).events).toHaveLength(0);
+    // 名字里的 _ % 按原样找（以前搜不到）；数字同时按 UID 和名字找，还能和其他条件、分页一起用
+    t.live.emit(enter({ uid: 30, name: 'abc_d3', guard: 3 }));
+    expect(t.ctx.log.query({ q: 'c_d' }).events.map((e) => e.uid)).toEqual([30]);
+    expect(t.ctx.log.query({ q: 'cxd' }).events).toHaveLength(0);
+    expect(t.ctx.log.query({ q: '3' }).events.map((e) => e.uid)).toEqual([30, 3, 3]);
+    expect(t.ctx.log.query({ q: '3', kind: 'enter' }).events.map((e) => e.uid)).toEqual([30, 3]);
+    const q1 = t.ctx.log.query({ q: '3', limit: 2 });
+    expect(q1.events.map((e) => e.uid)).toEqual([30, 3]);
+    expect(t.ctx.log.query({ q: '3', limit: 2, cursor: q1.nextCursor! }).events.map((e) => e.kind)).toEqual(['enter']);
     const p1 = t.ctx.log.query({ limit: 4 });
     expect(p1.events).toHaveLength(4);
     const p2 = t.ctx.log.query({ limit: 4, cursor: p1.nextCursor! });
-    expect(p2).toMatchObject({ nextCursor: null });
-    expect(p2.events).toHaveLength(2);
+    expect(p2.events).toHaveLength(3);
   });
 
   it('清理：超过保留期的事件删除，7 天前的原始消息清空', async () => {
@@ -436,9 +444,24 @@ describe('其他', () => {
     t.live.emit(enter({ uid: 1, guard: 3 }), { cmd: 'X' });
     vi.advanceTimersByTime(8 * 24 * 3600_000);
     t.live.emit(enter({ uid: 2, guard: 3 }), { cmd: 'Y' });
-    expect(t.ctx.log.prune(Date.now(), 90)).toEqual({ deleted: 0, rawCleared: 1 });
-    expect(t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 0)).toEqual({ deleted: 0, rawCleared: 1 });
-    expect(t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 90)).toEqual({ deleted: 2, rawCleared: 0 });
+    expect(await t.ctx.log.prune(Date.now(), 90)).toEqual({ deleted: 0, rawCleared: 1 });
+    expect(await t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 0)).toEqual({ deleted: 0, rawCleared: 1 });
+    expect(await t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 90)).toEqual({ deleted: 2, rawCleared: 0 });
+  });
+
+  it('清理分批做：一次要删很多条时全部删完', async () => {
+    const t = await setup();
+    const db = t.ctx.db.$client;
+    const ins = db.prepare("insert into events (ts, room_id, kind, uid, uname, viewer, status, raw) values (?, 30000, 'enter', 1, 'x', '{}', 'no_rule', '{}')");
+    db.transaction(() => {
+      for (let i = 0; i < 4500; i++) ins.run(Date.now() - (i < 4200 ? 40 : 3) * 24 * 3600_000);
+    })();
+    expect(await t.ctx.log.prune(Date.now(), 30)).toEqual({ deleted: 4200, rawCleared: 0 });
+    expect(await t.ctx.log.prune(Date.now() + 5 * 24 * 3600_000, 30)).toEqual({ deleted: 0, rawCleared: 300 });
+    // 直播中不删过期的记录
+    db.prepare("update events set ts = ? where id = (select max(id) from events)").run(Date.now() - 40 * 24 * 3600_000);
+    expect(await t.ctx.log.prune(Date.now(), 30, { live: true })).toEqual({ deleted: 0, rawCleared: 0 });
+    expect(await t.ctx.log.prune(Date.now(), 30)).toMatchObject({ deleted: 1 });
   });
 });
 

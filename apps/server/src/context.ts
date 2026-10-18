@@ -143,14 +143,15 @@ const PRUNE_MS = 6 * 3600_000;
 
 /** 启动后台任务：直播连接、事件管道、定时清理事件记录。返回停止函数 */
 export async function startBackground(ctx: AppContext): Promise<() => void> {
-  const prune = () => {
+  const prune = async () => {
     try {
       const days = ctx.settings.get('retentionDays');
-      ctx.log.prune(Date.now(), days);
+      await ctx.log.prune(Date.now(), days, { live: ctx.live.status().live });
       ctx.viewers.prune(days);
       ctx.music.prune(days);
       // 导入包等待确认最多 30 分钟，超过 1 小时的临时文件都没用了
       ctx.assets.cleanTmp(3600_000);
+      ctx.db.$client.pragma('optimize');
     } catch (e) {
       console.error('清理事件记录失败', e);
     }
@@ -168,8 +169,8 @@ export async function startBackground(ctx: AppContext): Promise<() => void> {
     console.error('补上舰价格失败', (e as Error).message);
   }
   ctx.backups.cleanPartial();
-  prune();
-  const timer = setInterval(prune, PRUNE_MS);
+  void prune();
+  const timer = setInterval(() => void prune(), PRUNE_MS);
   ctx.gifts.start();
   ctx.giftFx.start(() => ctx.gifts.list());
   ctx.honor.start();

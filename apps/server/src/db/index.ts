@@ -23,6 +23,9 @@ export function openDb(file: string): Db {
   sqlite.pragma('busy_timeout = 5000');
   const db = drizzle(sqlite, { schema }) as Db;
   migrate(db, { migrationsFolder: MIGRATIONS });
+  // 让 SQLite 知道各索引的大致分布（只抽样，很快），不然有的查询会挑错索引、整表扫；之后定时清理时再更新
+  sqlite.pragma('analysis_limit = 400');
+  sqlite.pragma('optimize = 0x10002');
   return db;
 }
 

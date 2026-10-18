@@ -390,6 +390,12 @@ describe('弹幕点歌', () => {
     expect(t.ne.calls.url).toBe(searches);
   });
 
+  it('这首歌以后不收：只拦这一首（按编号），别的版本、名字相近的歌照常能点', async () => {
+    const t = await setup({ settings: { perUser: 3, blockSongs: [{ source: 'netease', id: '1', name: '起风了' }] } });
+    await t.say('点歌 起风了');
+    expect(t.m.state().now?.item.song).toMatchObject({ id: '6', name: '起风了' });
+  });
+
   it('指令后面没有空格：歌名对得上才算点歌，聊天里带「点歌」两个字的不算', async () => {
     const t = await setup({ settings: { perUser: 3 } });
     await t.say('点歌的人好多');

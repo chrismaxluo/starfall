@@ -518,7 +518,7 @@ export class MusicService {
       if (src === 'local') {
         if (!s.sourceLocal) continue;
         tried = true;
-        const r = pick(query, this.d.library.search(query), opts);
+        const r = pick(query, this.localSearch(query, s), opts);
         if (r.ok) return { ok: true, song: this.d.library.song(r.song.row) };
         // 本地没有很正常，不拿它当原因
         if (r.reason !== 'not_found' && r.reason !== 'no_version') failed ??= r;
@@ -527,7 +527,7 @@ export class MusicService {
         tried = true;
         let songs: NeteaseSong[];
         try {
-          songs = await this.d.account.client().search(query, 10);
+          songs = await this.neteaseSearch(query, 10, s);
         } catch (e) {
           console.warn('[点歌] 网易云搜歌失败：', (e as Error).message);
           failed = { ok: false, reason: 'not_found', text: '网易云暂时连不上，过一会儿再点' };
@@ -542,6 +542,14 @@ export class MusicService {
     return failed ?? { ok: false, reason: 'not_found', text: `没有找到「${query}」` };
   }
 
+  /** 找歌时去掉「这首歌以后不收」的那几首 */
+  private localSearch(query: string, s: MusicSettings): ReturnType<MusicLibrary['search']> {
+    return this.d.library.search(query).filter((c) => !s.blockSongs.some((b) => b.source === 'local' && b.id === String(c.row.id)));
+  }
+  private async neteaseSearch(query: string, limit: number, s: MusicSettings): Promise<NeteaseSong[]> {
+    return (await this.d.account.client().search(query, limit)).filter((x) => !s.blockSongs.some((b) => b.source === 'netease' && b.id === String(x.id)));
+  }
+
   /** 点第几个版本：本地歌库、网易云（按设置的先后）能放的版本排成一串，取第 nth 个 */
   private async findNth(query: string, s: MusicSettings, nth: number): Promise<PickResult<MusicSong>> {
     const opts = { maxMs: s.maxDurationSec * 1000, blockWords: s.blockWords };
@@ -550,11 +558,11 @@ export class MusicService {
     let failed: PickResult<MusicSong> | null = null;
     for (const src of order) {
       if (src === 'local' && s.sourceLocal) {
-        const r = rank(query, this.d.library.search(query), opts);
+        const r = rank(query, this.localSearch(query, s), opts);
         if (r.ok) all.push(...r.list.map((c) => this.d.library.song(c.row)));
       } else if (src === 'netease' && s.sourceNetease) {
         try {
-          const r = rank(query, await this.d.account.client().search(query, 20), opts);
+          const r = rank(query, await this.neteaseSearch(query, 20, s), opts);
           if (r.ok) all.push(...r.list.map(neteaseSong));
           else failed = r;
         } catch (e) {

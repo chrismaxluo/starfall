@@ -156,16 +156,17 @@ export async function banRequester(it: MusicItem): Promise<void> {
   });
 }
 
-/** 这首歌以后不收（歌名加进「不收的歌」）；还在列表里的一起删掉 */
+/** 这首歌以后不收（按这一首本身记，别的版本、名字相近的歌不受影响）；还在列表里的一起删掉 */
 export async function blockSong(it: MusicItem): Promise<void> {
   const s = music.settings;
   if (!s) return;
-  const prev = s.blockWords;
-  if (!prev.includes(it.song.name) && !(await saveMusic({ blockWords: [...prev, it.song.name] }))) return;
+  const prev = s.blockSongs;
+  const has = prev.some((b) => b.source === it.song.source && b.id === it.song.id);
+  if (!has && !(await saveMusic({ blockSongs: [...prev, { source: it.song.source, id: it.song.id, name: it.song.name.slice(0, 200) }] }))) return;
   const same = music.queue.filter((x) => x.song.source === it.song.source && x.song.id === it.song.id);
   for (const x of same) await attempt(() => del(`/api/music/queue/${x.id}`));
   undoable(`《${it.song.name}》以后不收了`, async () => {
-    await saveMusic({ blockWords: prev });
+    await saveMusic({ blockSongs: prev });
     if (same.length) await post('/api/music/queue/restore', { ids: same.map((x) => x.id) });
   });
 }

@@ -285,7 +285,8 @@ const MUSIC_NAMES: Record<string, string> = {
   showQueue: '显示后面几首',
   lyrics: '显示歌词',
   lyricsTrans: '显示歌词翻译',
-  blockWords: '不收的歌',
+  blockWords: '不收的字',
+  blockSongs: '不收的歌',
   bannedUids: '不让点歌的观众',
 };
 const clip = (xs: string[]) => (xs.length > 20 ? [...xs.slice(0, 20), `…… 还有 ${xs.length - 20} 条`] : xs);

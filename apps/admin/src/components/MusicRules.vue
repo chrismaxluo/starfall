@@ -221,6 +221,12 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
           <span v-for="w in s.blockWords" :key="w" class="mr-chip">{{ w }}<button type="button" :aria-label="`去掉 ${w}`" @click="set({ blockWords: s.blockWords.filter((x) => x !== w) }, `「${w}」去掉了`)"><Icon name="i-x" /></button></span>
           <span v-if="!s.blockWords.length" class="inline-hint">还没有。</span>
         </div>
+        <template v-if="s.blockSongs.length">
+          <div class="mr-sub">在列表、历史里点了「这首歌以后不收」的（只拦这一首，别的版本照常）</div>
+          <div class="mr-chips">
+            <span v-for="b in s.blockSongs" :key="`${b.source}:${b.id}`" class="mr-chip">《{{ b.name }}》<button type="button" :aria-label="`去掉 ${b.name}`" @click="set({ blockSongs: s.blockSongs.filter((x) => x !== b) }, `《${b.name}》又可以点了`)"><Icon name="i-x" /></button></span>
+          </div>
+        </template>
       </div>
 
       <div class="card">
@@ -258,6 +264,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
 .mr-add { display: flex; gap: 8px; }
 .mr-add .inp { flex: 1; min-width: 0; }
 .mr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.mr-sub { margin-top: 14px; font-size: 12px; color: var(--t3); }
 .mr-chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: 8px; background: var(--hover); font-size: 13px; }
 .mr-chip button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 6px; background: transparent; color: var(--t3); }
 .mr-chip button:hover { background: var(--press); color: var(--t1); }

@@ -23,6 +23,8 @@ import { attempt, toast } from '../lib/toast.ts';
 
 // ---------- 正在放 ----------
 const now = computed(() => music.state?.now ?? null);
+/** 正在放的歌的封面：「正在放」卡片背后铺一层模糊的封面，透出这首歌的颜色 */
+const cover = computed(() => now.value?.item.song.cover ?? '');
 const holding = computed(() => (music.state?.hold ?? null) !== null);
 const paused = computed(() => music.state?.hold === 'manual');
 const tickNow = ref(performance.now());
@@ -188,7 +190,11 @@ async function simulate(): Promise<void> {
   </div>
   <div class="mp-grid">
     <div class="mp-col">
-      <div class="card">
+      <div class="card mp-nowcard" :class="{ 'has-cover': cover }">
+        <!-- 背后是这首歌的封面（放大、模糊、调淡），换歌时新旧封面交叉淡入淡出 -->
+        <Transition name="mp-bgfade">
+          <div v-if="cover" :key="cover" class="mp-bg" aria-hidden="true"><img :src="cover" alt="" referrerpolicy="no-referrer" /></div>
+        </Transition>
         <div class="card-h"><h2>正在放</h2><span class="aside">{{ holding ? (paused ? '已暂停' : '没在放') : now ? '播放中' : '' }}</span></div>
         <div v-if="now" class="mp-now" :class="{ paused: now.paused }">
           <img v-if="now.item.song.cover" class="mp-cover" :src="now.item.song.cover" alt="" referrerpolicy="no-referrer" />
@@ -323,6 +329,17 @@ async function simulate(): Promise<void> {
 </template>
 
 <style scoped>
+/* 正在放：卡片背后铺一层模糊的封面，上面盖一层和卡片同色的半透明渐变，字照样清楚 */
+.mp-nowcard { overflow: hidden; isolation: isolate; }
+.mp-bg { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.mp-bg img { position: absolute; left: -15%; top: -35%; width: 130%; height: 170%; object-fit: cover; filter: blur(46px) saturate(1.6); opacity: .42; }
+.mp-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--l3) 40%, transparent) 0%, color-mix(in srgb, var(--l3) 72%, transparent) 55%, var(--l3) 100%); }
+[data-theme="dark"] .mp-bg img { opacity: .55; }
+.mp-nowcard.has-cover .mp-cover { box-shadow: 0 10px 28px -10px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .25); }
+.mp-nowcard.has-cover .ly { background: color-mix(in srgb, var(--l3) 55%, transparent); }
+.mp-bgfade-enter-active, .mp-bgfade-leave-active { transition: opacity .9s ease; }
+.mp-bgfade-enter-from, .mp-bgfade-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .mp-bgfade-enter-active, .mp-bgfade-leave-active { transition: none; } }
 .mh-top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: stretch; }
 @media (max-width: 1280px) { .mh-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .mh-top > :first-child { grid-column: 1 / -1; } }
 @media (max-width: 760px) { .mh-top { grid-template-columns: 1fr; } }

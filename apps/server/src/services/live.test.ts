@@ -159,6 +159,19 @@ describe('只在开播时连接（F-BL-10）', () => {
     expect(svc.lastSession(40000)).toBeNull();
   });
 
+  it('重新填一次同一个直播间（例如改了主播昵称）：不当作换直播间，本场不断开、不拆成两场', async () => {
+    const { svc, db, roomStore, active } = setup({ live: true });
+    await svc.start();
+    const conn = active()[0]!;
+    roomStore.save({ ...roomStore.get()!, anchorName: '新昵称' });
+    await svc.poll();
+    expect(conn.stopped).toBe(false);
+    expect(active()).toEqual([conn]);
+    svc.stop();
+    expect(db.select().from(liveSessions).all()).toMatchObject([{ id: 1, roomId: 30000, endedAt: null }]);
+    expect(roomStore.get()?.anchorName).toBe('新昵称');
+  });
+
   it('重新扫码换了登录信息：断开，用新的登录信息重连', async () => {
     const { svc, active, acc } = setup({ live: true });
     await svc.start();

@@ -38,6 +38,7 @@ let armTimer: ReturnType<typeof setTimeout> | null = null;
 async function setRoom(): Promise<void> {
   const id = Number(roomIn.value.trim());
   if (!Number.isInteger(id) || id <= 0) return toast('房间号只能是数字', 'err');
+  if (room.value && (id === room.value.roomId || id === room.value.shortId)) return toast(`现在就是直播间 ${room.value.roomId}，不用更换`, 'info');
   if (room.value && armedFor !== id) {
     armedFor = id;
     if (armTimer) clearTimeout(armTimer);

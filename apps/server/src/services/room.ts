@@ -42,11 +42,12 @@ export class RoomStore {
     return this.save({ roomId: init.roomId, shortId: init.shortId, anchorUid: init.anchorUid, anchorName });
   }
 
-  /** 保存直播间并通知（换直播间） */
+  /** 保存直播间；换了直播间时通知（重新填一次同一个直播间只更新主播昵称等，不当作换直播间：本场不会被拆成两场） */
   save(r: RoomRecord): RoomRecord {
+    const changed = this.get()?.roomId !== r.roomId;
     const values = { id: 1, ...r, updatedAt: Date.now() };
     this.db.insert(room).values(values).onConflictDoUpdate({ target: room.id, set: values }).run();
-    for (const fn of this.listeners) fn();
+    if (changed) for (const fn of this.listeners) fn();
     return this.get()!;
   }
 }

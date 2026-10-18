@@ -117,7 +117,7 @@ export class EventLog {
   /** 按时间倒序分页查询；cursor 是上一页最后一条的 id；roomId 只看这个直播间的 */
   query(f: { roomId?: number; kind?: EventKind; status?: PlayStatus[]; q?: string; cursor?: number; limit?: number; from?: number; to?: number }): { events: EventDto[]; nextCursor: number | null } {
     const limit = Math.min(200, Math.max(1, f.limit ?? 50));
-    const conds = [];
+    const conds: SQL[] = [];
     if (f.roomId !== undefined) conds.push(eq(events.roomId, f.roomId));
     if (f.kind) conds.push(eq(events.kind, f.kind));
     if (f.status?.length) conds.push(inArray(events.status, f.status));

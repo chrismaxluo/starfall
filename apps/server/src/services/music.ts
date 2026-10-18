@@ -826,7 +826,7 @@ export class MusicService {
       c.retried = true;
       const r = await this.resolve(c.row).catch(() => null);
       if (this.cur !== c) return;
-      if (r && typeof r !== 'string') {
+      if (r && typeof r !== 'string' && 'url' in r) {
         c.url = r.url;
         c.load++;
         c.started = false;

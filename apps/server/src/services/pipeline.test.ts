@@ -724,6 +724,25 @@ describe('送礼名单', () => {
     expect(t.hub.giftBoard(oid(t))).toHaveLength(3);
   });
 
+  it('服务停止时还在合并中的连击、上舰记进事件记录（不播），重启后送礼名单里有', async () => {
+    const t = await setup();
+    t.live.emit(gf({ unitPrice: 10_000, count: 2 }));
+    t.live.emit(gd({ source: 'guard_buy', dedupeKey: undefined, priceGold: 138_000 }));
+    expect(t.events()).toHaveLength(0);
+    t.p.stop();
+    expect(t.events().map((e) => [e.kind, e.status])).toEqual([
+      ['gift', 'cleared'],
+      ['guard', 'cleared'],
+    ]);
+    expect(t.plays()).toHaveLength(0);
+    const hub2 = new Hub();
+    const p2 = new Pipeline({ ...t.ctx, live: t.live, hub: hub2, gifts: { find: (id: number) => GIFTS[id] }, timeZone: 'Asia/Shanghai' });
+    p2.start();
+    cleanup.push(() => p2.stop());
+    vi.advanceTimersByTime(500);
+    expect(hub2.giftBoard(oid(t)).map((r) => r.kind).sort()).toEqual(['gift', 'guard']);
+  });
+
   it('直播中重启服务：启动时还不知道场次，接上本场后把本场的送礼名单装回来（不会清空）', async () => {
     const t = await setup();
     t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });

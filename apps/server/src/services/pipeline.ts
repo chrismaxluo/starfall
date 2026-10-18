@@ -235,6 +235,13 @@ export class Pipeline {
     this.flushTimer = null;
     if (this.current) clearTimeout(this.current.timer);
     this.current = null;
+    // 还在合并中的礼物连击、上舰、进场：记下来（不播），不然这份礼物不进事件记录和送礼名单
+    for (const e of [...this.combo.flush(Infinity), ...this.guards.flush(Infinity), ...this.merger.flush(Infinity)]) {
+      this.guard('记下合并中的事件', () => {
+        const j = this.judge(e);
+        this.record(e, j.hit, j.status === 'queued' ? 'cleared' : j.status);
+      });
+    }
     // 还在排队的没有播出来：写明原因（服务重启后不会被当作本场已播）
     for (const q of this.queue.clear()) this.unplayed(q, 'cleared');
   }

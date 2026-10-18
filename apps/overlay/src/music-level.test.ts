@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { LEVEL_MAX_DB, LEVEL_MIN_DB, levelGainDb, rmsOf } from './music-level.ts';
 
 describe('音量均衡', () => {
-  it('按响度算增益：太响调小、太轻调大，有上下限', () => {
+  it('按响度算增益：太响调小，太轻的不调大（调大会破音），最多调小 9 dB', () => {
     expect(levelGainDb(-14)).toBe(0);
     expect(levelGainDb(-8)).toBe(-6);
-    expect(levelGainDb(-18)).toBe(4);
+    expect(levelGainDb(-18)).toBe(0);
     expect(levelGainDb(0)).toBe(LEVEL_MIN_DB);
     expect(levelGainDb(-40)).toBe(LEVEL_MAX_DB);
   });

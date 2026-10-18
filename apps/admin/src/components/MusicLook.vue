@@ -201,7 +201,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
             <span class="lb">音量均衡</span>
             <div class="ctl"><div class="line">
               <Switch :model-value="s.normalize" label="音量均衡" @change="(v) => set({ normalize: v }, v ? '音量均衡已打开：从下一首开始生效' : '音量均衡已关闭')" />
-              <span class="hint">有的歌录得响、有的轻，打开后自动拉到差不多的音量，换歌时不会忽大忽小</span>
+              <span class="hint">有的歌录得特别响，打开后自动调小到差不多的音量，换歌时不会突然很大声（偏轻的歌保持原样，不会因为调大而破音）</span>
             </div></div>
           </div>
           <div class="srow">

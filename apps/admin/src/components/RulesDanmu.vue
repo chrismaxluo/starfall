@@ -25,7 +25,15 @@ const COLS = '34px 44px minmax(200px, 1.4fr) minmax(120px, 190px) minmax(170px, 
 const flash = ref<number | null>(null);
 const list = ref<HTMLElement | null>(null);
 
-async function patch(r: DanmuRuleDto, p: Partial<DanmuRule>, msg?: string): Promise<void> {
+/** 同一条规则的修改按顺序一个一个发（快速连删两个关键词时，后一个不会把前一个的改动盖回去） */
+const chains = new Map<number, Promise<void>>();
+function patch(r: DanmuRuleDto, p: Partial<DanmuRule>, msg?: string): Promise<void> {
+  const next = (chains.get(r.id) ?? Promise.resolve()).then(() => doPatch(r, p, msg));
+  chains.set(r.id, next);
+  void next.finally(() => chains.get(r.id) === next && chains.delete(r.id));
+  return next;
+}
+async function doPatch(r: DanmuRuleDto, p: Partial<DanmuRule>, msg?: string): Promise<void> {
   const res = await attempt(() => put<DanmuRuleDto>(`/api/rules/danmu/${r.id}`, p), msg);
   if (res) Object.assign(r, res);
   // 保存失败：开关、选择框已经在界面上改了，重新读回服务端的真实状态
@@ -124,7 +132,10 @@ async function addKeyword(r: DanmuRuleDto, e: Event): Promise<void> {
     el.value = fresh.join('，');
     return toast(`一条规则最多 ${KEYWORD_MAX} 个关键词，可以再新建一条规则`, 'info');
   }
-  await patch(r, { keywords: [...base, ...fresh] }, `已添加关键词「${fresh.join('」「')}」`);
+  const keywords = [...base, ...fresh];
+  // 先在界面上改好：紧接着再删、再加时按改好的算
+  r.keywords = keywords;
+  await patch(r, { keywords }, `已添加关键词「${fresh.join('」「')}」`);
   const dup = fresh.find((w) => state.danmu.some((x) => x.id !== r.id && x.keywords.includes(w)));
   if (dup) {
     const other = state.danmu.findIndex((x) => x.id !== r.id && x.keywords.includes(dup));
@@ -136,7 +147,9 @@ async function addKeyword(r: DanmuRuleDto, e: Event): Promise<void> {
 }
 function removeKeyword(r: DanmuRuleDto, k: string): void {
   if (r.keywords.length === 1) return toast('至少保留一个关键词，不需要可以删除整条规则', 'info');
-  void patch(r, { keywords: r.keywords.filter((x) => x !== k) });
+  const keywords = r.keywords.filter((x) => x !== k);
+  r.keywords = keywords;
+  void patch(r, { keywords });
 }
 function setCd(r: DanmuRuleDto, key: 'globalCdSec' | 'userCdMin', v: number): void {
   void patch(r, { [key]: v }, key === 'globalCdSec' ? (v ? `所有人合计 ${v} 秒内只播一次` : '所有人合计：每次都播') : v ? `同一个人 ${v} 分钟内只播一次` : '同一个人：每次都播');

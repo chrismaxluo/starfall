@@ -59,6 +59,9 @@ describe('素材快捷播放', () => {
     expect(await err([btn(a, { globalHotkey: '1' })])).toBeTruthy();
     expect(await err([btn(a, { globalHotkey: 'Ctrl+Ctrl+1' })])).toContain('重复');
     expect(await err([btn(9999)])).toContain('9999');
+    // 和弹幕点歌的切歌快捷键重复（以前能保存，点歌的那个会悄悄失效）
+    t.ctx.music.updateSettings({ hotkeySkip: 'Ctrl+Alt+9' });
+    expect(await err([btn(a, { globalHotkey: 'Ctrl+Alt+9' })])).toContain('切歌');
     // 出错时原来的按钮不变
     expect(await t.list()).toHaveLength(2);
   });

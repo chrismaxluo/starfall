@@ -206,6 +206,8 @@ export class MusicAccount {
           console.log(`[点歌] 网易云会员：${next.vip ? (next.vipKind ?? '会员') : '不是会员'}${next.vipUntil ? `，到期 ${day(next.vipUntil)}` : next.vip ? '，到期时间查不到' : ''}`);
         }
       } else next = { ...s, invalid: true, checkedAt: this.now() };
+      // 确认期间退出了、或者扫码换了账号：这次的结果是旧账号的，丢掉（不然会把旧账号写回去）
+      if (this.saved()?.cookiesEnc !== s.cookiesEnc) return this.status();
       this.settings.setRaw(KEY, next);
       this.scheduleExpiry();
       // 每次都发：后台显示「刚刚确认过」

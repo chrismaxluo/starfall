@@ -208,6 +208,8 @@ export type OverlayToServer =
   /** 点歌窗口（出声音的那个）：开始出声了、播放到哪里（每几秒报一次）、放完了、放不了 */
   | { type: 'music_started'; id: number; load: number }
   | { type: 'music_pos'; id: number; pos: number }
+  /** 浏览器拦住了声音（要先点一下页面）：不算放不了，等人点 */
+  | { type: 'music_blocked'; id: number; load: number }
   | { type: 'music_ended'; id: number }
   | { type: 'music_error'; id: number; load: number; message: string };
 

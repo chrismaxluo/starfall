@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { BiliApiError } from '@starfall/bili';
 import type { LiveClientOptions } from '@starfall/bili';
 import type { StdEvent } from '@starfall/shared';
 import { openDb } from '../db/index.ts';
@@ -18,12 +19,13 @@ function setup(opts: { loggedIn?: boolean; room?: boolean; live?: boolean } = {}
   const secret = new Secret(crypto.randomBytes(32));
   if (opts.loggedIn ?? true) db.insert(account).values({ id: 1, uid: 10001, cookiesEnc: secret.encrypt(JSON.stringify({ SESSDATA: 's', DedeUserID: '10001', bili_jct: 'c', buvid3: 'B3' })) }).run();
   if (opts.room ?? true) db.insert(room).values({ id: 1, roomId: 30000, anchorUid: 20000 }).run();
-  const state = { live: opts.live ?? false, liveSince: null as number | null, pollCookies: [] as string[], clients: [] as Array<{ opts: LiveClientOptions; stopped: boolean }> };
+  const state = { live: opts.live ?? false, liveSince: null as number | null, loginOk: true, initError: null as Error | null, pollCookies: [] as string[], clients: [] as Array<{ opts: LiveClientOptions; stopped: boolean }> };
   let t = 1_000_000;
   const deps: LiveDeps = {
-    getRoomInit: async (http) => { state.pollCookies.push(JSON.stringify(http.cookies)); return { roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus: state.live ? 1 : 0, isPortrait: true, liveSince: state.liveSince }; },
+    getRoomInit: async (http) => { if (state.initError) throw state.initError; state.pollCookies.push(JSON.stringify(http.cookies)); return { roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus: state.live ? 1 : 0, isPortrait: true, liveSince: state.liveSince }; },
     getRoomAdmins: async () => [{ uid: 555, name: '房管', face: '' }],
     getDanmuInfo: async () => ({ token: 't', hosts: [{ host: 'h', wssPort: 443 }] }),
+    checkLogin: async () => state.loginOk,
     createClient: (o) => { const c = { opts: o, stopped: false }; state.clients.push(c); return { start: () => {}, stop: () => { c.stopped = true; }, state: 'connected' as const }; },
     now: () => (t += 1000),
   };
@@ -34,7 +36,8 @@ function setup(opts: { loggedIn?: boolean; room?: boolean; live?: boolean } = {}
   const events: StdEvent[] = [];
   svc.onEvent((e) => events.push(e));
   const active = () => state.clients.filter((c) => !c.stopped);
-  return { db, svc, state, settings, events, active, roomStore, acc, deps };
+  const advance = (ms: number) => (t += ms);
+  return { db, svc, state, settings, events, active, roomStore, acc, deps, advance };
 }
 
 describe('只在开播时连接（F-BL-10）', () => {
@@ -157,6 +160,88 @@ describe('只在开播时连接（F-BL-10）', () => {
     expect(rows[0]!.endedAt).not.toBeNull();
     expect(svc.lastSession(30000)).toMatchObject({ id: 1 });
     expect(svc.lastSession(40000)).toBeNull();
+  });
+
+  it('重新填一次同一个直播间（例如改了主播昵称）：不当作换直播间，本场不断开、不拆成两场', async () => {
+    const { svc, db, roomStore, active } = setup({ live: true });
+    await svc.start();
+    const conn = active()[0]!;
+    roomStore.save({ ...roomStore.get()!, anchorName: '新昵称' });
+    await svc.poll();
+    expect(conn.stopped).toBe(false);
+    expect(active()).toEqual([conn]);
+    svc.stop();
+    expect(db.select().from(liveSessions).all()).toMatchObject([{ id: 1, roomId: 30000, endedAt: null }]);
+    expect(roomStore.get()?.anchorName).toBe('新昵称');
+  });
+
+  it('查开播状态一直失败（例如被 B 站风控）：状态里写明从什么时候开始、原因；查到了就清掉；第一次失败也照常定时再查', async () => {
+    const { svc, state } = setup({ live: false });
+    state.initError = new BiliApiError(-352, '风控校验失败');
+    await svc.start();
+    expect(svc.status().checkError).toMatchObject({ text: 'B 站返回 -352：风控校验失败' });
+    const since = svc.status().checkError!.since;
+    await svc.poll();
+    expect(svc.status().checkError!.since).toBe(since);
+    state.initError = null;
+    state.live = true;
+    await svc.poll();
+    expect(svc.status()).toMatchObject({ checkError: null, live: true });
+    svc.stop();
+  });
+
+  it('B 站登录失效：没开播时也会定时确认、提醒；下播后提醒还在；换了账号才清掉', async () => {
+    const { svc, state, acc, advance } = setup({ live: false });
+    state.loginOk = false;
+    await svc.start();
+    expect(svc.status().loginInvalid).toBe(true);
+    // 开播又下播（连接时 B 站同样说没登录），提醒一直在
+    state.live = true;
+    await svc.poll();
+    state.live = false;
+    await svc.poll();
+    expect(svc.status().loginInvalid).toBe(true);
+    await acc.save({ SESSDATA: 's2', DedeUserID: '10002', bili_jct: 'c2' }, '', null);
+    expect(svc.status().loginInvalid).toBe(false);
+    // 新账号有效：一小时后再确认一次，还是好的
+    state.loginOk = true;
+    advance(3600_000);
+    await svc.poll();
+    expect(svc.status().loginInvalid).toBe(false);
+    svc.stop();
+  });
+
+  it('别的直播间的下播消息（连麦、PK 时）不理；自己直播间的照常下播', async () => {
+    const { svc, active } = setup({ live: true });
+    await svc.start();
+    const send = active()[0]!.opts.onMessage;
+    send({ cmd: 'PREPARING', roomid: '99999' });
+    expect(svc.status().live).toBe(true);
+    send({ cmd: 'PREPARING', roomid: '30000' });
+    expect(svc.status().live).toBe(false);
+    svc.stop();
+  });
+
+  it('漏了下播消息、又开播了（B 站的开播时间比本场晚很多）：算新的一场，不把上一场的开始时间往后挪', async () => {
+    const { svc, db, state } = setup({ live: true });
+    state.liveSince = 1_000_000;
+    await svc.start();
+    state.liveSince = 1_000_000 + 3 * 3600_000;
+    await svc.poll();
+    svc.stop();
+    expect(db.select().from(liveSessions).all()).toMatchObject([
+      { id: 1, startedAt: 1_000_000, endedAt: 1_000_000 + 3 * 3600_000 },
+      { id: 2, startedAt: 1_000_000 + 3 * 3600_000, endedAt: null },
+    ]);
+  });
+
+  it('下播前就退出了（桌面版合盖、关机）：下次打开时上一场按最后一条事件的时间结束，不按打开的时间', async () => {
+    const { svc, db } = setup({ live: false });
+    db.insert(liveSessions).values({ roomId: 30000, startedAt: 500_000 }).run();
+    db.$client.prepare("insert into events (ts, room_id, session_id, kind, uid, uname, viewer, status) values (900000, 30000, 1, 'enter', 1, 'x', '{}', 'played')").run();
+    await svc.start();
+    svc.stop();
+    expect(db.select().from(liveSessions).all()).toMatchObject([{ id: 1, endedAt: 900_000 }]);
   });
 
   it('重新扫码换了登录信息：断开，用新的登录信息重连', async () => {

@@ -76,6 +76,7 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
       getRoomInit: async () => ({ roomId: 30000, shortId: 0, anchorUid: 20000, liveStatus, isPortrait: true }),
       getRoomAdmins: async () => [],
       getDanmuInfo: async () => ({ token: 'test-token', hosts: [{ host: '127.0.0.1', wssPort: bili.port }] }),
+      checkLogin: async () => true,
       createClient: (o) => new LiveClient({ ...o, urlFor: (h) => `ws://${h.host}:${h.wssPort}/sub` }),
       now: Date.now,
     },
@@ -131,7 +132,7 @@ it('舰长进场：B 站消息 → 合并 → 匹配 → 推送给特效页；�
     ['danmu', null, 'no_rule'],
     ['enter', '进场 · 舰长', 'played'],
   ]);
-  const raw = ctx.db.$client.prepare("select raw from events where kind = 'enter'").get() as { raw: string };
+  const raw = ctx.db.$client.prepare("select r.raw from event_raw r join events e on e.id = r.id where e.kind = 'enter'").get() as { raw: string };
   expect(JSON.parse(raw.raw)).toMatchObject({ cmd: 'INTERACT_WORD_V2' });
 
   // 下播：结束场次、断开连接；之后的进场记录为未开播（这里直接交给管道，因为连接已经断开）

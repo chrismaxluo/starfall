@@ -23,7 +23,9 @@ if (process.getuid?.() === 0) {
   const owner = fs.statSync(config.dataDir);
   if (owner.uid !== 0) {
     for (const f of [p.db, `${p.db}-wal`, `${p.db}-shm`, path.join(config.dataDir, 'initial-password.txt')]) {
-      if (fs.existsSync(f) && fs.statSync(f).uid !== owner.uid) fs.chownSync(f, owner.uid, owner.gid);
+      // 用 lstat、跳过符号链接：root 改所有者时不能跟着数据目录里的链接走到别处
+      const st = fs.lstatSync(f, { throwIfNoEntry: false });
+      if (st?.isFile() && st.uid !== owner.uid) fs.lchownSync(f, owner.uid, owner.gid);
     }
   }
 }

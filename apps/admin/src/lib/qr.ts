@@ -39,6 +39,8 @@ export function useQrLogin(onSuccess: () => void, auto = true, kind: keyof typeo
   let fails = 0;
   let key = '';
   let timer: ReturnType<typeof setInterval> | null = null;
+  /** 窗口已经关了：还没回来的二维码请求回来后不再开始查询 */
+  let closed = false;
   const stop = () => {
     if (timer) clearInterval(timer);
     timer = null;
@@ -48,6 +50,7 @@ export function useQrLogin(onSuccess: () => void, auto = true, kind: keyof typeo
     st.value = 'loading';
     try {
       const r = await post<{ key: string; image: string }>(api.start);
+      if (closed) return;
       key = r.key;
       img.value = r.image;
       st.value = 'waiting';
@@ -77,6 +80,9 @@ export function useQrLogin(onSuccess: () => void, auto = true, kind: keyof typeo
     }
   }
   onMounted(() => auto && void start());
-  onBeforeUnmount(stop);
+  onBeforeUnmount(() => {
+    closed = true;
+    stop();
+  });
   return { img, st, err, offline, start, stop };
 }

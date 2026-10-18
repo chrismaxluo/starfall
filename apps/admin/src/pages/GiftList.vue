@@ -226,11 +226,15 @@ async function loadSessions(): Promise<void> {
   // 默认全部场次一起找；之前选的那一场没有了也回到全部场次
   if (sessId.value === null || (sessId.value !== 'all' && !r.sessions.some((s) => s.id === sessId.value))) sessId.value = 'all';
 }
+// 请求序号：快速换场次、金额或打字时，只用最后一次的结果（晚到的旧结果不会盖掉新的）
+let recordsSeq = 0;
 async function loadRecords(): Promise<void> {
+  const seq = ++recordsSeq;
   if (sessId.value === null) return void (records.value = []);
   loading.value = true;
   const qs = new URLSearchParams({ session: String(sessId.value), q: q.value, min: String(minGold.value) });
   const r = await attempt(() => get<{ items: Rec[]; more: boolean }>(`/api/gift-list/records?${qs}`));
+  if (seq !== recordsSeq) return;
   loading.value = false;
   records.value = r?.items ?? [];
   more.value = r?.more ?? false;

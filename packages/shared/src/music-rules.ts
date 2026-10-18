@@ -63,6 +63,8 @@ export const MusicSettingsSchema = z
     lyricsTrans: z.boolean(),
     /** 不收的歌：歌名或歌手里有这些字 */
     blockWords: z.array(z.string().trim().min(1).max(30)).max(MUSIC_WORDS_MAX),
+    /** 不收的某一首歌（列表、历史里点「这首歌以后不收」）：按这一首本身记，别的版本、名字相近的歌不受影响 */
+    blockSongs: z.array(z.object({ source: z.enum(['netease', 'local']), id: z.string().min(1).max(40), name: z.string().max(200) }).strict()).max(MUSIC_WORDS_MAX),
     /** 不让点歌的观众 */
     bannedUids: z.array(z.number().int().positive()).max(MUSIC_BANNED_MAX),
     /** 桌面版的全局快捷键：切歌、暂停 / 继续（例如 Ctrl+Alt+N），不用时为 null */
@@ -103,6 +105,7 @@ export const MUSIC_DEFAULTS: MusicSettings = {
   lyrics: true,
   lyricsTrans: true,
   blockWords: [],
+  blockSongs: [],
   bannedUids: [],
   hotkeySkip: null,
   hotkeyPause: null,

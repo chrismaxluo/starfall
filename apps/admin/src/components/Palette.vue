@@ -40,7 +40,8 @@ const cmds = computed<Cmd[]>(() => {
     ...tiers.map((id): Cmd => ({ g: '特效测试', icon: 'i-play', label: `预览${IDENTITY[id].name}进场特效`, kw: '测试 播放', run: preview(id) })),
     { g: '特效测试', icon: 'i-demo', label: '打开特效页演示', kw: 'demo 测试', run: () => void open('/overlay/?demo=1', '_blank', 'noopener') },
     { g: '直播中', icon: 'i-pause', label: paused ? '恢复播放' : '暂停所有特效', kw: '暂停 恢复 紧急', kbd: 'Ctrl Shift P', run: () => void togglePause() },
-    { g: '直播中', icon: 'i-x', label: '清空播放队列', kw: '排队', run: () => void clearQueue() },
+    // 清空会把排队中的上舰、礼物特效都扔掉：命令面板里回车太容易误触，先确认
+    { g: '直播中', icon: 'i-x', label: '清空播放队列', kw: '排队', run: () => void (confirm('清空播放队列？排队中的特效都不会再播了。') && clearQueue()) },
     ...(music.settings?.enabled
       ? [
           { g: '直播中', icon: 'i-arrow', label: '切歌', kw: '点歌 下一首 跳过', run: () => void skipSong() } satisfies Cmd,

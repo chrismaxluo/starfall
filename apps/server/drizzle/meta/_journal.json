@@ -169,6 +169,20 @@
       "when": 1792245892023,
       "tag": "0023_gift_look",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792314075456,
+      "tag": "0024_event_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1792319577198,
+      "tag": "0025_event_raw",
+      "breakpoints": true
     }
   ]
 }

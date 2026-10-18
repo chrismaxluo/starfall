@@ -74,6 +74,8 @@ function build(item: ChatItem): HTMLElement {
 }
 
 const anim = (el: Element, kf: Keyframe[], o: KeyframeAnimationOptions) => el.animate(kf, { fill: 'both', ...o });
+/** 进场动画：只在开始前（延迟期间）保持起始样子，播完就放开，不然会一直压住「快被顶走的两条变淡」写的透明度 */
+const animIn = (el: Element, kf: Keyframe[], o: KeyframeAnimationOptions) => el.animate(kf, { fill: 'backwards', ...o });
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** 列表满了时，最上面两条淡一点（快要离开了）；透明度加在气泡和头像本身 */
@@ -93,19 +95,19 @@ function enter(el: HTMLElement, item: ChatItem): void {
   const g = el.querySelector<HTMLElement>(':scope > .g')!;
   const av = el.querySelector<HTMLElement>(':scope > .avw')!;
   // 头像先弹出来，气泡从头像那边展开，身份和内容跟着出现
-  anim(av, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1.12)', offset: 0.6 }, { opacity: 1, transform: 'scale(1)' }], { duration: 380, easing: 'ease-out' });
+  animIn(av, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1.12)', offset: 0.6 }, { opacity: 1, transform: 'scale(1)' }], { duration: 380, easing: 'ease-out' });
   g.style.transformOrigin = right ? '100% 0' : '0 0';
-  anim(g, [{ opacity: 0, transform: `translateX(${right ? 18 : -18}px) scale(.7)` }, { opacity: 1, transform: 'translateX(0) scale(1.02)', offset: 0.65 }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 70, easing: 'cubic-bezier(.2,.9,.3,1)' });
-  anim(g.querySelector('.who')!, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 200, easing: 'ease-out' });
+  animIn(g, [{ opacity: 0, transform: `translateX(${right ? 18 : -18}px) scale(.7)` }, { opacity: 1, transform: 'translateX(0) scale(1.02)', offset: 0.65 }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 70, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  animIn(g.querySelector('.who')!, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 200, easing: 'ease-out' });
   const body = g.querySelector('.tx, .sticker');
   if (body) {
     const st = body.classList.contains('sticker');
-    anim(body, [{ opacity: 0, transform: st ? 'scale(.5) rotate(-8deg)' : 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: st ? 480 : 320, delay: 260, easing: st ? 'cubic-bezier(.3,1.6,.5,1)' : 'ease-out' });
+    animIn(body, [{ opacity: 0, transform: st ? 'scale(.5) rotate(-8deg)' : 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: st ? 480 : 320, delay: 260, easing: st ? 'cubic-bezier(.3,1.6,.5,1)' : 'ease-out' });
   }
   // 大航海、主播：一道高光扫过
   if (item.viewer.guard || item.viewer.anchor) {
     const sweep = right ? ['translateX(420%) skewX(-18deg)', 'translateX(-120%) skewX(-18deg)'] : ['translateX(-120%) skewX(-18deg)', 'translateX(420%) skewX(-18deg)'];
-    anim(g.querySelector('.sheen')!, [{ opacity: 0, transform: sweep[0] }, { opacity: 1, offset: 0.25 }, { opacity: 0, transform: sweep[1] }], { duration: 900, delay: 360, easing: 'cubic-bezier(.45,0,.3,1)' });
+    animIn(g.querySelector('.sheen')!, [{ opacity: 0, transform: sweep[0] }, { opacity: 1, offset: 0.25 }, { opacity: 0, transform: sweep[1] }], { duration: 900, delay: 360, easing: 'cubic-bezier(.45,0,.3,1)' });
   }
 }
 

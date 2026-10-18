@@ -36,13 +36,17 @@ const ns = (id: number, name: string, artists: string[], p: Partial<NeteaseSong>
 function fakeNetease(catalog: NeteaseSong[]) {
   const calls = { url: 0 };
   const urls = new Map<number, string | null>();
+  /** 网易云连不上（断网、出错） */
+  const net = { down: false };
   return {
     calls,
     urls,
+    net,
     client: {
       search: async (q: string) => catalog.filter((s) => q.split(/\s+/).some((w) => s.name.includes(w) || s.artists.some((a) => a.includes(w)))),
       songUrl: async (id: number) => {
         calls.url++;
+        if (net.down) throw new Error('fetch failed');
         const u = urls.has(id) ? urls.get(id)! : `https://m701.music.126.net/${id}-${calls.url}.mp3`;
         return u ? { url: u, br: 320000 } : null;
       },
@@ -227,6 +231,42 @@ describe('弹幕点歌', () => {
     expect(t.m.state().now?.posMs).toBe(5000);
   });
 
+  it('网易云暂时连不上：这首放回最前面等一会儿再试，不会把列表里的歌一口气全跳过；一直连不上才跳过', async () => {
+    const t = await setup();
+    t.ne.net.down = true;
+    await t.say('点歌 起风了');
+    await t.say('点歌 孤勇者', { uid: 2 });
+    await t.say('点歌 平凡之路', { uid: 3 });
+    expect(t.m.state().now).toBeNull();
+    expect(t.queue()).toEqual(['起风了', '孤勇者', '平凡之路']);
+    // 恢复了：10 秒后接着放第一首
+    t.ne.net.down = false;
+    vi.advanceTimersByTime(10_000);
+    await settle();
+    expect(t.m.state().now?.item.song.name).toBe('起风了');
+    expect(t.queue()).toEqual(['孤勇者', '平凡之路']);
+    // 一直连不上：同一首试 5 次（约 2.5 分钟）才跳过，下一首接着试
+    t.m.skip();
+    t.ne.net.down = true;
+    vi.advanceTimersByTime(5000);
+    await settle();
+    for (const wait of [10_000, 20_000, 40_000, 80_000]) {
+      expect(t.queue()[0]).toBe('孤勇者');
+      vi.advanceTimersByTime(wait);
+      await settle();
+    }
+    expect(t.queue()).toEqual(['平凡之路']);
+    expect(t.notices().filter((n) => n.includes('网易云一直连不上'))).toEqual(['✗ 小星：《孤勇者》获取播放地址失败（网易云一直连不上），已跳过']);
+  });
+
+  it('出声的窗口断线重连：告诉它现在该不该调小（断线期间错过了「恢复」也不会一直小声）', async () => {
+    const t = await setup({ settings: { duckPct: 25 } });
+    t.hub.removeOverlay(t.client());
+    const sock2 = fakeSock();
+    t.hub.addOverlay(sock2, t.output, [], Date.now(), 'music');
+    expect(sock2.sent.filter((x) => x.type === 'music_duck')).toEqual([{ type: 'music_duck', on: false, pct: 25 }]);
+  });
+
   it('放不了：网易云的先重新拿一次地址，还不行就跳过；窗口一直不出声也算放不了', async () => {
     const t = await setup();
     await t.say('点歌 起风了');
@@ -290,7 +330,7 @@ describe('弹幕点歌', () => {
     t.setEffect(item);
     t.setEffect(item);
     t.setEffect(null);
-    expect(t.sock.sent.filter((x) => x.type === 'music_duck')).toEqual([{ type: 'music_duck', on: true, pct: 25 }, { type: 'music_duck', on: false, pct: 25 }]);
+    expect(t.sock.sent.filter((x) => x.type === 'music_duck')).toEqual([{ type: 'music_duck', on: false, pct: 25 }, { type: 'music_duck', on: true, pct: 25 }, { type: 'music_duck', on: false, pct: 25 }]);
     expect(effectHasSound(item)).toBe(true);
     expect(effectHasSound({ effect: { volume: 0, sound: { url: 'x' }, visual: { type: 'builtin_style', style: 'x' } } } as unknown as PlayItem)).toBe(false);
     expect(effectHasSound({ effect: { volume: 50, sound: null, visual: { type: 'asset', kind: 'video' } } } as unknown as PlayItem)).toBe(true);
@@ -341,7 +381,37 @@ describe('弹幕点歌', () => {
     await t.say('点歌 也不存在', { uid: 2, name: '阿二' });
     const shown = t.sock.sent.filter((x) => x.type === 'music_notice').map((x) => (x as { notice: { text: string } }).notice.text);
     expect(shown).toEqual(['点了《起风了》，马上播放', '没有找到「不存在的歌」']);
-    expect(t.m.snapshot().notices.filter((n) => n.quiet).map((n) => n.text)).toEqual(['没有找到「也不存在」', '点得太快了，60 秒后再点']);
+    // 刚点过没找到：几秒内再点不去搜（不然反复点找不到的歌会被网易云限流）
+    expect(t.m.snapshot().notices.filter((n) => n.quiet).map((n) => n.text)).toEqual(['点得太快了，过几秒再点', '点得太快了，60 秒后再点']);
+    const searches = t.ne.calls.url;
+    vi.advanceTimersByTime(8000);
+    await t.say('点歌 还是不存在', { uid: 2, name: '阿二' });
+    expect(t.m.snapshot().notices[0]!.text).toBe('没有找到「还是不存在」');
+    expect(t.ne.calls.url).toBe(searches);
+  });
+
+  it('这首歌以后不收：只拦这一首（按编号），别的版本、名字相近的歌照常能点', async () => {
+    const t = await setup({ settings: { perUser: 3, blockSongs: [{ source: 'netease', id: '1', name: '起风了' }] } });
+    await t.say('点歌 起风了');
+    expect(t.m.state().now?.item.song).toMatchObject({ id: '6', name: '起风了' });
+  });
+
+  it('指令后面没有空格：歌名对得上才算点歌，聊天里带「点歌」两个字的不算', async () => {
+    const t = await setup({ settings: { perUser: 3 } });
+    await t.say('点歌的人好多');
+    await t.say('点歌起风了');
+    expect(t.queue().length + (t.m.state().now ? 1 : 0)).toBe(1);
+    expect(t.m.state().now?.item.song.name).toBe('起风了');
+    expect(t.m.snapshot().notices.map((n) => n.text)).toEqual(['点了《起风了》，马上播放']);
+  });
+
+  it('被拉黑、没有点歌权限的观众：「我的歌」不理，「没有权限」只在后台显示', async () => {
+    const t = await setup({ settings: { bannedUids: [7] } });
+    await t.say('我的歌', { uid: 7, name: '捣乱的' });
+    await t.say('点歌 起风了', { uid: 7, name: '捣乱的' });
+    const shown = t.sock.sent.filter((x) => x.type === 'music_notice');
+    expect(shown).toHaveLength(0);
+    expect(t.m.snapshot().notices.map((n) => [n.text, n.quiet ?? false])).toEqual([['没有点歌的权限', true]]);
   });
 
   it('撤销：刚删掉、清空的歌放回列表，顺序不变', async () => {

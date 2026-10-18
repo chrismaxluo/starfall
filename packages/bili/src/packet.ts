@@ -1,6 +1,8 @@
 // 弹幕服务器数据包：16 字节包头 + 正文；版本 2 为 zlib 压缩、版本 3 为 brotli 压缩，解压后是若干个版本 0 的包。
 import zlib from 'node:zlib';
 
+/** 一个压缩包解压后最大多少 */
+const MAX_INFLATE = 8 * 1024 * 1024;
 export const OP = { HEARTBEAT: 2, HEARTBEAT_REPLY: 3, MESSAGE: 5, AUTH: 7, AUTH_REPLY: 8 } as const;
 
 export function encodePacket(op: number, body: string | Buffer): Buffer {
@@ -41,12 +43,14 @@ export function decodePackets(buf: Buffer, bad: { count: number } = { count: 0 }
     if (op === OP.MESSAGE && (ver === 2 || ver === 3) && depth < 2) {
       let inner: Buffer;
       try {
-        inner = ver === 2 ? zlib.inflateSync(body) : zlib.brotliDecompressSync(body);
+        // 解压后限制大小：B 站正常的一包只有几 KB，几 KB 就能解出几 GB 的坏包会把内存撑爆
+        inner = ver === 2 ? zlib.inflateSync(body, { maxOutputLength: MAX_INFLATE }) : zlib.brotliDecompressSync(body, { maxOutputLength: MAX_INFLATE });
       } catch {
         bad.count++;
         continue;
       }
-      out.push(...decodePackets(inner, bad, depth + 1));
+      // 逐个放进去：子包很多时用 ...展开会超出调用栈
+      for (const p of decodePackets(inner, bad, depth + 1)) out.push(p);
     } else out.push({ op, ver, body });
   }
   return out;

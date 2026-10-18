@@ -15,7 +15,7 @@ import { useDraft } from '../lib/draft.ts';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
-import { isFxLive, isFxView, overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
+import { isFxLive, isFxView, loadAll, overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
 import { loadMusic, music, saveMusic } from '../lib/music.ts';
 import { confirmLeave } from '../lib/route.ts';
 import { attempt, toast } from '../lib/toast.ts';
@@ -277,7 +277,10 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
 </script>
 
 <template>
-  <section v-if="o" class="page">
+  <section v-if="!o && state.loadFailed.includes('outputs')" class="page">
+    <div class="card out-miss"><Icon name="i-info" /><span>输出列表没读到（网络或服务出错），正在自动重试。</span><button class="btn sm" @click="attempt(() => loadAll(['outputs']), '已读到输出列表')">现在重试</button></div>
+  </section>
+  <section v-else-if="o" class="page">
     <div class="page-head">
       <div>
         <h1>直播软件输出</h1>

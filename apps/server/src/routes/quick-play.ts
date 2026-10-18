@@ -12,6 +12,11 @@ export function quickPlayRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.put('/api/quickplay/buttons', async (req) => {
     const { buttons } = parseBody(z.object({ buttons: QuickButtonsInputSchema }).strict(), req.body);
+    // 全局快捷键不能和点歌的切歌、暂停重复（反过来点歌那边也查）：不然点歌的那个会悄悄失效
+    const m = ctx.music.cfg();
+    for (const [key, what] of [[m.hotkeySkip, '切歌'], [m.hotkeyPause, '暂停 / 继续点歌']] as const) {
+      if (key && buttons.some((b) => b.globalHotkey === key)) throw new HttpError(409, 'hotkey_used', `全局快捷键 ${key} 已经给弹幕点歌的「${what}」用了`);
+    }
     return { buttons: ctx.quickPlay.save(buttons) };
   });
 

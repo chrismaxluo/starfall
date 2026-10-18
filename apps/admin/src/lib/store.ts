@@ -1,7 +1,8 @@
 // 全局状态：登录后加载一次，之后由实时连接（/ws/admin）和各页面的修改保持最新
 import { reactive } from 'vue';
-import { get } from './api.ts';
+import { get, post } from './api.ts';
 import { setTimeZone } from './format.ts';
+import { attempt, toast } from './toast.ts';
 import type { PreviewRequest } from './preview.ts';
 import type { ChatItem, GiftListItem, GiftRow } from '@starfall/shared/overlay';
 import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, QuickButton, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
@@ -42,6 +43,8 @@ export const state = reactive({
   wsOnline: false,
   /** 荣耀等级勋章：等级 → B站的图（读不到时是空的，界面上改成显示文字） */
   honorMedals: {} as Record<number, string>,
+  /** 打开后台时没读到的数据（过一会儿自动再读）：没读到的页面不能当作「空的」来编辑保存 */
+  loadFailed: [] as string[],
   /** 从别的页面跳到"添加专属用户"时预填的 UID */
   pendingExclusive: null as number | null,
 });
@@ -100,8 +103,19 @@ export async function refreshHonorMedals(): Promise<void> {
   if (r) state.honorMedals = Object.fromEntries(r.medals.map((m) => [m.level, m.url]));
 }
 
-export async function loadAll(): Promise<void> {
-  await Promise.all([refreshStatus(), refreshSettings(), refreshEffects(), refreshRules(), refreshOutputs(), refreshQuick(), refreshFeed(), refreshHonorMedals()]);
+const LOADERS: Record<string, () => Promise<void>> = { status: refreshStatus, settings: refreshSettings, effects: refreshEffects, rules: refreshRules, outputs: refreshOutputs, quick: refreshQuick, feed: refreshFeed, honor: refreshHonorMedals };
+let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 读后台要用的数据；没读到的记在 state.loadFailed，15 秒后自动再读（出错时抛出第一个错误，用来提示） */
+export async function loadAll(names: string[] = Object.keys(LOADERS)): Promise<void> {
+  const rs = await Promise.allSettled(names.map((n) => LOADERS[n]!()));
+  const failed = names.filter((_, i) => rs[i]!.status === 'rejected');
+  state.loadFailed = [...new Set([...state.loadFailed.filter((n) => !names.includes(n)), ...failed])];
+  if (reloadTimer) clearTimeout(reloadTimer);
+  reloadTimer = null;
+  if (!state.loadFailed.length) return;
+  reloadTimer = setTimeout(() => void loadAll([...state.loadFailed]).catch(() => undefined), 15_000);
+  throw (rs.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason;
 }
 
 /** 全局弹窗：素材设置、快捷设置专属、新手引导、命令面板 */
@@ -120,3 +134,17 @@ export const ui = reactive({
   newVersion: null as string | null,
   dismissedVersion: null as string | null,
 });
+
+/** 跳过正在播的：带上是哪一个，请求还没回来时不重复发（双击不会把下一个也跳掉） */
+let skipping = false;
+export async function skipPlaying(): Promise<void> {
+  const id = state.queue.playing?.id;
+  if (!id || skipping) return;
+  skipping = true;
+  try {
+    const r = await attempt(() => post<{ skipped: boolean }>('/api/playback/skip', { id }));
+    if (r) toast(r.skipped ? '已跳过，开始播下一个' : '这一个已经播完了', r.skipped ? 'ok' : 'info');
+  } finally {
+    skipping = false;
+  }
+}

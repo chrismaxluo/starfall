@@ -27,6 +27,15 @@ export async function getRoomInit(http: BiliHttp, id: number): Promise<RoomInit>
   return { roomId: d.room_id, shortId: d.short_id, anchorUid: d.uid, liveStatus: d.live_status, isPortrait: Boolean(d.is_portrait), liveSince: since };
 }
 
+/** 登录信息还有没有效：有效 true，已失效（在别处退出、过期）false；网络出错、被风控时抛错 */
+export async function checkLogin(http: BiliHttp): Promise<boolean> {
+  const res = await http.request('https://api.bilibili.com/x/web-interface/nav');
+  const json = (await res.json()) as { code?: number; message?: string; data?: { isLogin?: boolean } };
+  if (json.code === -101) return false;
+  if (json.code !== 0) throw new BiliApiError(json.code ?? -1, json.message ?? '确认 B 站登录失败');
+  return Boolean(json.data?.isLogin);
+}
+
 export interface RoomInfo {
   roomId: number;
   anchorUid: number;

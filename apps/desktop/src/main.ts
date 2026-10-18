@@ -32,18 +32,28 @@ const ICON = path.join(__dirname, 'icon.ico');
 // ---------- 日志 ----------
 
 fs.mkdirSync(LOG_DIR, { recursive: true });
-/** 超过 10MB 换新文件，旧的留一份 */
-function openLog(name: string): fs.WriteStream {
-  const file = path.join(LOG_DIR, `${name}.log`);
-  try {
-    if (fs.statSync(file).size > 10 * 1024 * 1024) fs.renameSync(file, path.join(LOG_DIR, `${name}.old.log`));
-  } catch {
-    // 文件还不存在
+const LOG_MAX = 10 * 1024 * 1024;
+const openLog = (name: string) => fs.createWriteStream(path.join(LOG_DIR, `${name}.log`), { flags: 'a' });
+let mainLog = openLog('main');
+let serverLog = openLog('server');
+/**
+ * 超过 10MB 换新文件，旧的留一份。启动后（拿到「只运行一个」之后）查一次，之后每小时查一次：
+ * 开机自启后可能连着运行好几周；第二次双击打开的那个进程不能动正在写的日志
+ */
+function rotateLogs(): void {
+  for (const name of ['main', 'server'] as const) {
+    const file = path.join(LOG_DIR, `${name}.log`);
+    try {
+      if (fs.statSync(file).size <= LOG_MAX) continue;
+      (name === 'main' ? mainLog : serverLog).end();
+      fs.renameSync(file, path.join(LOG_DIR, `${name}.old.log`));
+    } catch {
+      continue;
+    }
+    if (name === 'main') mainLog = openLog('main');
+    else serverLog = openLog('server');
   }
-  return fs.createWriteStream(file, { flags: 'a' });
 }
-const mainLog = openLog('main');
-const serverLog = openLog('server');
 function log(...parts: unknown[]): void {
   const text = parts.map((p) => (p instanceof Error ? (p.stack ?? p.message) : typeof p === 'string' ? p : JSON.stringify(p))).join(' ');
   mainLog.write(`${new Date().toISOString()} ${text}\n`);
@@ -83,6 +93,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => showWindow());
+  rotateLogs();
+  setInterval(rotateLogs, 3600_000).unref();
   void app.whenReady().then(start);
 }
 
@@ -122,7 +134,10 @@ async function start(): Promise<void> {
   // 新安装默认开机自动启动：开机后星临先在托盘里运行，直播软件里的特效页一打开就能连上
   if (fresh && app.isPackaged) setAutoStart(true);
   createWindow(!process.argv.includes(HIDDEN_ARG));
-  void registerHotkeys(true);
+  // 开机时有快捷键被别的软件占着：托盘提示一下（以前只写日志，主播不知道）
+  void registerHotkeys(true).then(({ failed }) => {
+    if (failed.length) tray?.displayBalloon({ iconType: 'warning', title: NAME, content: `全局快捷键 ${failed.join('、')} 被别的软件占用了，暂时按了没反应；对方关掉后会自动恢复。` });
+  });
   setInterval(() => void registerHotkeys(), 30_000);
   startedAt = Date.now();
   setInterval(() => void watchFx(), WATCH_MS);
@@ -242,6 +257,8 @@ async function api<T>(url: string): Promise<T> {
 let hotkeysPaused = false;
 /** 现在注册着的快捷键（排好序拼起来，用来判断按钮有没有变） */
 let hotkeysNow = '';
+/** 被别的软件占着、没注册上的全局快捷键：每 30 秒再试一次 */
+const retryKeys = new Map<string, () => void>();
 
 async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
   if (hotkeysPaused && !force) return { failed: [] };
@@ -264,9 +281,25 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     log('读取点歌快捷键失败', e);
   }
   const sig = [...keys, ...Object.entries(music).map(([k, v]) => `${k}=${v}`)].sort().join(' ');
-  if (!force && sig === hotkeysNow) return { failed: [] };
+  if (!force && sig === hotkeysNow) {
+    // 没变：上次被别的软件占着的再试一次（对方关了就能用上了）
+    for (const [hotkey, fn] of retryKeys) {
+      let ok = false;
+      try {
+        ok = globalShortcut.register(hotkey, fn);
+      } catch {
+        /* 写法不对的不会好，下次还是失败 */
+      }
+      if (ok) {
+        retryKeys.delete(hotkey);
+        log(`全局快捷键 ${hotkey} 现在能用了`);
+      }
+    }
+    return { failed: [...retryKeys.keys()] };
+  }
   globalShortcut.unregisterAll();
   hotkeysNow = sig;
+  retryKeys.clear();
   const failed: string[] = [];
   for (const hotkey of keys) {
     // 修改类接口只接受 JSON
@@ -280,7 +313,10 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     } catch (e) {
       log(`全局快捷键 ${hotkey} 写法不对`, e);
     }
-    if (!ok) failed.push(hotkey);
+    if (!ok) {
+      failed.push(hotkey);
+      retryKeys.set(hotkey, play);
+    }
   }
   for (const [hotkey, url] of Object.entries(music)) {
     const run = () =>
@@ -293,7 +329,10 @@ async function registerHotkeys(force = false): Promise<{ failed: string[] }> {
     } catch (e) {
       log(`点歌快捷键 ${hotkey} 写法不对`, e);
     }
-    if (!ok) failed.push(hotkey);
+    if (!ok) {
+      failed.push(hotkey);
+      retryKeys.set(hotkey, run);
+    }
   }
   const total = keys.length + Object.keys(music).length;
   log(`全局快捷键：注册了 ${total - failed.length} 个${failed.length ? `；被别的软件占用：${failed.join('、')}` : ''}`);
@@ -304,6 +343,7 @@ let pauseTimer: ReturnType<typeof setTimeout> | undefined;
 function pauseHotkeys(): void {
   hotkeysPaused = true;
   hotkeysNow = '';
+  retryKeys.clear();
   globalShortcut.unregisterAll();
   // 编辑到一半关了窗口也不会一直停着：10 分钟后自己恢复
   clearTimeout(pauseTimer);
@@ -406,6 +446,12 @@ function createWindow(show: boolean): void {
       writeState({ trayTipShown: true });
     }
   });
+  // 页面有没保存的修改时（刷新、退出）：Electron 默认悄悄取消，不弹提示。退出前已经确认过的直接放行，其余情况问一下
+  win.webContents.on('will-prevent-unload', (e) => {
+    if (allowUnload) return e.preventDefault();
+    const r = dialog.showMessageBoxSync(win!, { type: 'warning', title: NAME, message: '有修改还没保存', detail: '离开后这些修改会丢掉。', buttons: ['离开', '留下'], defaultId: 1, cancelId: 1 });
+    if (r === 0) e.preventDefault();
+  });
   // 外部链接（B 站主页、帮助文档等）用系统浏览器打开
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
@@ -477,13 +523,31 @@ function copyUrl(url: string): void {
   tray?.displayBalloon({ iconType: 'info', title: '已复制', content: url });
 }
 
-/** 正在直播时先确认：退出后直播画面上的特效会停 */
-async function quit(): Promise<void> {
+/** 后台页面已经确认过可以丢掉没保存的修改：关窗时不再拦 */
+let allowUnload = false;
+
+/**
+ * 退出、安装更新前先问：后台有没保存的修改、正在直播时各确认一次。返回 false 表示不退出。
+ * 页面有没保存的修改时 Electron 关窗会被悄悄取消（不弹提示），所以要先问清楚再停服务
+ */
+async function confirmExit(action: '退出星临' | '重启并安装'): Promise<boolean> {
+  const unsaved = await (win?.webContents.executeJavaScript('Boolean(window.__starfallUnsaved && window.__starfallUnsaved())') ?? Promise.resolve(false)).catch(() => false);
+  if (unsaved) {
+    const r = await dialog.showMessageBox({ type: 'warning', title: NAME, message: '后台还有没保存的修改', detail: `${action}后这些修改会丢掉。`, buttons: [`仍要${action}`, '取消'], defaultId: 1, cancelId: 1 });
+    if (r.response !== 0) return false;
+  }
   const live = await api<{ live?: { live?: boolean } }>('/api/status').then((s) => s.live?.live === true, () => false);
   if (live) {
-    const r = await dialog.showMessageBox({ type: 'warning', title: NAME, message: '正在直播，确定退出星临吗？', detail: '退出后直播画面上的特效和弹幕列表都会停止。', buttons: ['退出', '取消'], defaultId: 1, cancelId: 1 });
-    if (r.response !== 0) return;
+    const detail = action === '退出星临' ? '退出后直播画面上的特效和弹幕列表都会停止。' : '安装大约要半分钟，这期间直播画面上的特效和弹幕列表都会停止，建议下播后再装。';
+    const r = await dialog.showMessageBox({ type: 'warning', title: NAME, message: `正在直播，确定${action}吗？`, detail, buttons: [action, '取消'], defaultId: 1, cancelId: 1 });
+    if (r.response !== 0) return false;
   }
+  allowUnload = true;
+  return true;
+}
+
+async function quit(): Promise<void> {
+  if (!(await confirmExit('退出星临'))) return;
   quitting = true;
   app.quit();
 }
@@ -559,8 +623,9 @@ function setUpdateState(patch: Partial<UpdateState>): void {
   win?.webContents.send('sf:update-state', updateState);
 }
 
-/** 先让服务收尾，再交给安装程序 */
-function installNow(): void {
+/** 先确认，再让服务收尾，最后交给安装程序 */
+async function installNow(): Promise<void> {
+  if (!(await confirmExit('重启并安装'))) return;
   quitting = true;
   void stopServer().then(() => {
     stopped = true;
@@ -588,7 +653,7 @@ function setupUpdates(): void {
     void dialog
       .showMessageBox({ type: 'info', title: NAME, message: `新版本 ${info.version} 已下载好`, detail: '现在重启就会安装（大约半分钟），Windows 会问一次是否允许更改，点「是」。正在直播的话，建议下播后再装；选「以后」会在你退出星临时自动安装。', buttons: ['现在重启并安装', '以后'], defaultId: 0, cancelId: 1 })
       .then((r) => {
-        if (r.response === 0) installNow();
+        if (r.response === 0) void installNow();
       });
   });
   setTimeout(() => void checkUpdate(false), 10_000);
@@ -711,7 +776,7 @@ function setupIpc(): void {
   handle('sf:update-state', () => updateState);
   handle('sf:fx-hint', () => fxHint);
   handle('sf:install-update', () => {
-    if (updateState.phase === 'downloaded') installNow();
+    if (updateState.phase === 'downloaded') void installNow();
   });
   handle('sf:reload-hotkeys', () => registerHotkeys(true));
   handle('sf:pause-hotkeys', () => pauseHotkeys());

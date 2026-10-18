@@ -107,6 +107,8 @@ export interface LiveStatus {
   reason: 'ok' | 'no_room' | 'not_logged_in' | 'offline';
   /** B站说登录已失效，要重新扫码 */
   loginInvalid?: boolean;
+  /** 查开播状态一直失败（被 B 站风控、网络不通）：从什么时候开始、原因 */
+  checkError?: { since: number; text: string } | null;
   adminCount: number;
 }
 

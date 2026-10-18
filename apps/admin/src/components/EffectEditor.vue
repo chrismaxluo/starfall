@@ -12,6 +12,7 @@ import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
 import { builtinThumb, svgaLayerImages } from '../lib/thumbs.ts';
 import { effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
+import { unloadGuards } from '../lib/route.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import { checkFile } from '../lib/upload-check.ts';
 import type { AssetDto, EffectDto, SoundDto, TriggerKind } from '../lib/types.ts';
@@ -449,13 +450,11 @@ function onKey(e: KeyboardEvent): void {
   }
 }
 addEventListener('keydown', onKey);
-// 有没保存的修改时，刷新或关闭浏览器标签页前提醒
-const beforeUnload = (e: BeforeUnloadEvent) => {
-  if (dirty.value) e.preventDefault();
-};
-addEventListener('beforeunload', beforeUnload);
+// 有没保存的修改时，刷新或关闭浏览器标签页前提醒（桌面版退出前也会问）
+const unloadGuard = () => dirty.value;
+unloadGuards.add(unloadGuard);
 onBeforeUnmount(() => {
-  removeEventListener('beforeunload', beforeUnload);
+  unloadGuards.delete(unloadGuard);
   removeEventListener('keydown', onKey);
   // 不管怎么关掉的（保存、切换、复制），试听的音效都停掉
   audio?.pause();

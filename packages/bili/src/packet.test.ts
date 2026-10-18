@@ -31,6 +31,14 @@ describe('数据包编解码', () => {
     expect(decodePackets(packed).map((p) => p.body.toString())).toEqual(['{"cmd":"A"}', '{"cmd":"B"}']);
   });
 
+  it('解压后特别大的坏包丢掉（不会把内存撑爆）；解出几十万个子包也不会出错', () => {
+    const bad = { count: 0 };
+    expect(decodePackets(outer(3, zlib.brotliCompressSync(Buffer.alloc(50 * 1024 * 1024))), bad)).toEqual([]);
+    expect(bad.count).toBe(1);
+    const many = decodePackets(outer(3, zlib.brotliCompressSync(Buffer.concat(Array.from({ length: 300_000 }, () => inner(''))))));
+    expect(many).toHaveLength(300_000);
+  });
+
   it('版本 2（zlib）同样支持', () => {
     expect(decodePackets(outer(2, zlib.deflateSync(inner('{"cmd":"Z"}'))))[0]!.body.toString()).toBe('{"cmd":"Z"}');
   });

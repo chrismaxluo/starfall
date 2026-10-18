@@ -164,7 +164,14 @@ export class LiveClient {
     ws.onmessage = (e) => {
       this.touch();
       const bad = { count: 0 };
-      const packets = decodePackets(Buffer.from(e.data as ArrayBuffer), bad);
+      let packets: ReturnType<typeof decodePackets>;
+      try {
+        packets = decodePackets(Buffer.from(e.data as ArrayBuffer), bad);
+      } catch (err) {
+        // 拆包出错只丢掉这一包，不能让异常一路冒到进程（会直接退出）
+        this.o.onWarn?.(`丢掉一个无法解析的数据包：${(err as Error).message}`);
+        return;
+      }
       if (bad.count) this.o.onWarn?.(`丢掉 ${bad.count} 个无法解析的数据包`);
       for (const p of packets) {
         if (p.op === OP.AUTH_REPLY) this.onAuth(p.body.toString());

@@ -177,6 +177,7 @@ export class Pipeline {
   private unsubscribeOutputs: (() => void) | null = null;
   private seq = 0;
   private recordWarnAt = 0;
+  private readonly faceMemo = new Map<number, { face: string; at: number }>();
   private readonly dayFmt: Intl.DateTimeFormat;
 
   constructor(deps: PipelineDeps) {
@@ -314,13 +315,14 @@ export class Pipeline {
   /** 送礼名单的一条：付费礼物（连击合成后的）、上舰、醒目留言；免费礼物不算 */
   giftListItem(ev: GiftEvent | GuardEvent | ScEvent): GiftListItem | null {
     const v = ev.viewer;
-    const face = v.face || this.d.viewers.cached(v.uid)?.face || '';
+    const face = v.face || this.cachedFace(v.uid);
     const base = { id: ev.id, ts: ev.ts, viewer: { uid: v.uid, name: v.name, ...(face ? { face } : {}), guard: v.guard } };
     if (ev.kind === 'gift') {
       const value = ev.unitPrice * ev.count;
       if (!ev.paid || value <= 0) return null;
-      const g = this.giftOf({ giftId: ev.giftId, ...(ev.icon ? { giftImg: ev.icon } : {}) });
-      return { ...base, kind: 'gift', value, gift: { id: ev.giftId, name: ev.giftName, count: ev.count, ...(g.img ? { img: g.img } : {}) } };
+      // 只要礼物图，不查全屏动画（装一个月的名单时一条条查会很慢，还会去拉动画）
+      const img = this.giftImgOf(ev.giftId, ev.icon);
+      return { ...base, kind: 'gift', value, gift: { id: ev.giftId, name: ev.giftName, count: ev.count, ...(img ? { img } : {}) } };
     }
     if (ev.kind === 'guard') return { ...base, kind: 'guard', value: ev.priceGold ?? 0, guard: { level: ev.level, months: ev.months, op: ev.op } };
     return { ...base, kind: 'sc', value: Math.round(ev.priceYuan * 1000), sc: { text: ev.text, price: ev.priceYuan } };
@@ -544,10 +546,27 @@ export class Pipeline {
   /** 礼物图（设置里选了动图并且有动图时用动图）和 B站全屏动画 */
   private giftOf(vars: Vars): { img?: string; fx?: GiftFxHit } {
     const g = vars.giftId ? this.d.gifts?.find(vars.giftId) : undefined;
-    const anim = this.d.settings.get('giftAnimImg') ? g?.webp || g?.gif : undefined;
-    const img = anim || g?.icon || vars.giftImg;
+    const img = this.giftImgOf(vars.giftId, vars.giftImg);
     const fx = this.d.giftFx?.forGift(g);
     return { ...(img ? { img } : {}), ...(fx ? { fx } : {}) };
+  }
+
+  /** 礼物图：打开了动图礼物图时用动图，没有就用礼物面板的图，再没有用消息里带的 */
+  private giftImgOf(giftId: number | undefined, fallback: string | undefined): string | undefined {
+    const g = giftId ? this.d.gifts?.find(giftId) : undefined;
+    const anim = this.d.settings.get('giftAnimImg') ? g?.webp || g?.gif : undefined;
+    return anim || g?.icon || fallback;
+  }
+
+  /** 消息里没带头像时用记下的（短时间内记住查过的，装名单时同一个人的很多条不用每条都查一次） */
+  private cachedFace(uid: number): string {
+    const now = this.now();
+    const hit = this.faceMemo.get(uid);
+    if (hit && now - hit.at < 60_000) return hit.face;
+    if (this.faceMemo.size > 5000) this.faceMemo.clear();
+    const face = this.d.viewers.cached(uid)?.face ?? '';
+    this.faceMemo.set(uid, { face, at: now });
+    return face;
   }
 
   private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {

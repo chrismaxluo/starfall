@@ -3,7 +3,7 @@ import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { EventKind, PlayStatus, StdEvent } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
-import { events } from '../db/schema.ts';
+import { eventRaw, events } from '../db/schema.ts';
 
 export type EventRow = typeof events.$inferSelect;
 /** 写进事件记录的事件（触发特效的四种 + 醒目留言） */
@@ -101,9 +101,10 @@ export class EventLog {
   record(ev: LoggedEvent, r: { roomId: number | null; sessionId: number | null; rule: string | null; effectId: number | null; status: PlayStatus; raw?: unknown }): EventDto {
     const row = this.db
       .insert(events)
-      .values({ ts: ev.ts, roomId: r.roomId, sessionId: r.sessionId, kind: ev.kind, uid: ev.viewer.uid, uname: ev.viewer.name, viewer: ev.viewer, payload: payloadOf(ev), rule: r.rule, effectId: r.effectId, status: r.status, raw: r.raw ?? null })
+      .values({ ts: ev.ts, roomId: r.roomId, sessionId: r.sessionId, kind: ev.kind, uid: ev.viewer.uid, uname: ev.viewer.name, viewer: ev.viewer, payload: payloadOf(ev), rule: r.rule, effectId: r.effectId, status: r.status })
       .returning()
       .get();
+    if (r.raw != null) this.db.insert(eventRaw).values({ id: row.id, ts: ev.ts, raw: r.raw }).run();
     const d = dto(row);
     for (const fn of this.listeners) fn({ type: 'event', event: d });
     return d;
@@ -360,11 +361,17 @@ export class EventLog {
         deleted += n;
       }
     }
-    // 原始消息：从上次清到的时间往后找，不用每次把 7 天前的记录全看一遍
+    // 原始消息：整行删掉，腾出的空间能再用上
     const cut = now - RAW_KEEP_MS;
+    const delRaw = db.prepare('delete from event_raw where id in (select id from event_raw where ts < ? limit ?)');
+    let rawCleared = 0;
+    for (let n = PRUNE_BATCH; n === PRUNE_BATCH; await yieldLoop()) {
+      n = delRaw.run(cut, PRUNE_BATCH).changes;
+      rawCleared += n;
+    }
+    // 以前存在 events.raw 里的老数据：从上次清到的时间往后找，不用每次把 7 天前的记录全看一遍
     const pick = db.prepare('select id, ts from events where ts >= ? and ts < ? and raw is not null order by ts limit ?');
     const clear = db.prepare('update events set raw = null where id = ?');
-    let rawCleared = 0;
     for (;;) {
       const rows = pick.all(this.rawClearedTo, cut, PRUNE_BATCH) as Array<{ id: number; ts: number }>;
       db.transaction(() => {

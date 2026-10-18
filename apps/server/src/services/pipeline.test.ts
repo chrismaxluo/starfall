@@ -73,7 +73,7 @@ describe('进场 → 播放', () => {
   it('原始消息写进记录；观众昵称写进缓存', async () => {
     const { live, ctx } = await setup();
     live.emit(enter({ guard: 3 }), { cmd: 'INTERACT_WORD_V2', data: { pb: 'xx' } });
-    const row = ctx.db.$client.prepare('select raw from events').get() as { raw: string };
+    const row = ctx.db.$client.prepare('select raw from event_raw where id = (select id from events)').get() as { raw: string };
     expect(JSON.parse(row.raw)).toEqual({ cmd: 'INTERACT_WORD_V2', data: { pb: 'xx' } });
     expect(ctx.viewers.cached(10001)?.name).toBe('小星');
   });

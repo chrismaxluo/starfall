@@ -28,7 +28,7 @@ import { desktop } from './lib/desktop.ts';
 import type { FxHint } from './lib/desktop.ts';
 import { clock as clockText, duration } from './lib/format.ts';
 import { startLive, stopLive } from './lib/live.ts';
-import { go, route } from './lib/route.ts';
+import { confirmLeave, go, route } from './lib/route.ts';
 import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
 import { loadMusic, neteaseIssues } from './lib/music.ts';
@@ -80,6 +80,8 @@ setUnauthorizedHandler(() => {
 });
 
 async function logout(): Promise<void> {
+  // 有没保存的修改：先问一下（退出图标就在主题按钮旁边，容易点错）
+  if (!confirmLeave()) return;
   await attempt(() => post('/api/auth/logout'));
   stopLive();
   state.authed = false;

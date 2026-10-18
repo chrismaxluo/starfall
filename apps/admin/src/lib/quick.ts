@@ -34,7 +34,8 @@ export async function playQuick(b: QuickButton): Promise<void> {
 function busy(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return true;
-  return Boolean(document.querySelector('[aria-modal="true"], .pickpop'));
+  // 所有弹窗（设置专属、扫码、新手引导、导入、素材设置……）都带 role="dialog"
+  return Boolean(document.querySelector('[role="dialog"], [aria-modal="true"], .pickpop'));
 }
 
 /** 在页面里挂上快捷键；active 返回假时（例如正在编辑按钮）不响应 */

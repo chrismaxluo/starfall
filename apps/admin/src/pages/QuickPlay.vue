@@ -8,6 +8,7 @@ import QuickPad from '../components/QuickPad.vue';
 import { put } from '../lib/api.ts';
 import { desktop, reloadHotkeys } from '../lib/desktop.ts';
 import { keyOf, quickName, useQuickHotkeys } from '../lib/quick.ts';
+import { leaveGuards } from '../lib/route.ts';
 import { effectById, loadAll, state } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import { QUICK_GLOBAL_RE } from '@starfall/shared';
@@ -164,8 +165,12 @@ function cancel(): void {
   editing.value = false;
   void reloadHotkeys();
 }
+// 编辑到一半换页面、刷新：先问一下（不然改的按钮、快捷键都丢了）
+const editGuard = () => editing.value && changed.value;
+leaveGuards.add(editGuard);
 // 编辑到一半离开这一页：恢复全局快捷键
 onBeforeUnmount(() => {
+  leaveGuards.delete(editGuard);
   if (editing.value) void reloadHotkeys();
 });
 </script>

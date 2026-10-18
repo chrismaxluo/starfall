@@ -4,7 +4,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { CHAT_WIDTH, chatHeight } from '@starfall/shared/overlay';
 import type { ChatItem, OverlayConfig } from '@starfall/shared/overlay';
-import { onChat } from '../lib/live.ts';
+import { onChat, onResync } from '../lib/live.ts';
 import { state } from '../lib/store.ts';
 
 const props = defineProps<{ config: OverlayConfig; alpha?: boolean }>();
@@ -22,8 +22,11 @@ function onMessage(e: MessageEvent): void {
   if (e.origin !== location.origin || e.source !== frame.value?.contentWindow) return;
   if ((e.data as { type?: string })?.type !== 'starfall-preview-ready') return;
   ready = true;
-  send({ type: 'hello', config: JSON.parse(JSON.stringify(props.config)), preload: [], build: null, chat: JSON.parse(JSON.stringify(state.chat)) });
+  sendHello();
 }
+const sendHello = () => send({ type: 'hello', config: JSON.parse(JSON.stringify(props.config)), preload: [], build: null, chat: JSON.parse(JSON.stringify(state.chat)) });
+// 断线重连后：断开期间的弹幕补上（整份重发）
+const offSync = onResync(sendHello);
 
 watch(() => props.config, (c) => send({ type: 'config', config: JSON.parse(JSON.stringify(c)) }), { deep: true });
 const off = onChat((item) => send(item ? { type: 'chat', item: JSON.parse(JSON.stringify(item)) } : { type: 'chat_clear' }));
@@ -32,6 +35,7 @@ onMounted(() => addEventListener('message', onMessage));
 onBeforeUnmount(() => {
   removeEventListener('message', onMessage);
   off();
+  offSync();
 });
 
 let n = 0;

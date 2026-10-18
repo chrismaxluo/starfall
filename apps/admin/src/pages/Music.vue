@@ -30,6 +30,8 @@ const tab = computed<Tab>(() => (TABS.some((t) => t.key === route.value.sub) ? (
 onMounted(() => void attempt(loadMusic));
 
 const hold = computed(() => music.state?.hold ?? null);
+/** 正在放的歌的封面（标题区域的背景点缀） */
+const cover = computed(() => music.state?.now?.item.song.cover ?? '');
 async function resume(): Promise<void> {
   await attempt(() => post('/api/music/pause', { paused: false }), state.status?.live.live ? '继续放歌' : '没开播也开始放歌（下播前不会再自动暂停）');
 }
@@ -38,7 +40,11 @@ const issues = computed(() => (tab.value === 'play' ? [] : neteaseIssues()));
 </script>
 
 <template>
-  <section class="page">
+  <section class="page mu-page">
+    <!-- 标题区域右上方淡淡透出正在放的歌的封面颜色（和「正在放」卡片呼应） -->
+    <Transition name="mu-glowfade">
+      <div v-if="cover" :key="cover" class="mu-glow" aria-hidden="true"><img :src="cover" alt="" referrerpolicy="no-referrer" /></div>
+    </Transition>
     <div class="page-head">
       <div>
         <h1>弹幕点歌</h1>
@@ -76,6 +82,13 @@ const issues = computed(() => (tab.value === 'play' ? [] : neteaseIssues()));
 </template>
 
 <style scoped>
+.mu-page { position: relative; isolation: isolate; }
+.mu-glow { position: absolute; top: -60px; right: -40px; width: min(720px, 70%); height: 300px; z-index: -1; pointer-events: none; -webkit-mask-image: radial-gradient(closest-side, #000 30%, transparent); mask-image: radial-gradient(closest-side, #000 30%, transparent); }
+.mu-glow img { width: 100%; height: 100%; object-fit: cover; filter: blur(64px) saturate(1.7); opacity: .3; }
+[data-theme="dark"] .mu-glow img { opacity: .42; }
+.mu-glowfade-enter-active, .mu-glowfade-leave-active { transition: opacity 1.2s ease; }
+.mu-glowfade-enter-from, .mu-glowfade-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .mu-glowfade-enter-active, .mu-glowfade-leave-active { transition: none; } }
 .mu-head-r { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
 .mu-sw { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--t2); padding-left: 4px; }
 .mu-alert { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--t1); font-size: 13px; }

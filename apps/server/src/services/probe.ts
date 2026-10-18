@@ -135,6 +135,8 @@ async function probeSvga(file: string): Promise<ProbeResult> {
 async function probeSvga1(file: string): Promise<ProbeResult> {
   const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => yauzl.open(file, { lazyEntries: true }, (e, z) => (e || !z ? reject(e ?? new Error('zip')) : resolve(z))));
   const files = new Map<string, Buffer>();
+  // 不管读完、超限还是出错都关掉 zip（不然文件句柄一直开着，删掉的临时文件占的磁盘要到重启才释放）
+  try {
   await new Promise<void>((resolve, reject) => {
     let total = 0;
     zip.on('entry', (entry: yauzl.Entry) => {
@@ -160,7 +162,9 @@ async function probeSvga1(file: string): Promise<ProbeResult> {
     zip.on('error', reject);
     zip.readEntry();
   });
-  zip.close();
+  } finally {
+    zip.close();
+  }
   const specBuf = files.get('movie.spec');
   if (!specBuf) return { ...EMPTY, hasAlpha: true, slots: [] };
   let spec: { movie?: { viewBox?: { width?: number; height?: number }; fps?: number; frames?: number }; images?: Record<string, string>; sprites?: Array<{ imageKey?: string; matteKey?: string }> };

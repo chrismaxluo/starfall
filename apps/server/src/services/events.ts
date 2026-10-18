@@ -220,7 +220,11 @@ export class EventLog {
   /** 以前记录的上舰没有存价格：从留着的原始消息里补上（原始消息只留 7 天）。返回补了几条 */
   backfillGuardPrices(priceOf: (raw: unknown) => number | undefined): number {
     const rows = this.db.$client
-      .prepare(`select id, payload, raw from events where kind = 'guard' and raw is not null and json_extract(payload, '$.price') is null`)
+      // 原始消息以前存在 events.raw，现在存在 event_raw：两处都看
+      .prepare(
+        `select e.id, e.payload, coalesce(e.raw, r.raw) as raw from events e left join event_raw r on r.id = e.id
+         where e.kind = 'guard' and coalesce(e.raw, r.raw) is not null and json_extract(e.payload, '$.price') is null`,
+      )
       .all() as Array<{ id: number; payload: string; raw: string }>;
     const upd = this.db.$client.prepare(`update events set payload = ? where id = ?`);
     let n = 0;

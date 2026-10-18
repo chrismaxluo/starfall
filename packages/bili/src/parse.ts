@@ -239,9 +239,10 @@ export function parseMessage(raw: Raw, ctx: ParseContext): StdEvent | null {
     }
 
     case 'LIVE':
-      return { kind: 'live', id: ctx.newId(), ts: ctx.now(), live: true };
-    case 'PREPARING':
-      return { kind: 'live', id: ctx.newId(), ts: ctx.now(), live: false };
+    case 'PREPARING': {
+      const room = Number((raw as { roomid?: unknown }).roomid);
+      return { kind: 'live', id: ctx.newId(), ts: ctx.now(), live: raw.cmd === 'LIVE', ...(Number.isInteger(room) && room > 0 ? { roomId: room } : {}) };
+    }
 
     default:
       return null;

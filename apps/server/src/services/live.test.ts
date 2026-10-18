@@ -211,6 +211,39 @@ describe('只在开播时连接（F-BL-10）', () => {
     svc.stop();
   });
 
+  it('别的直播间的下播消息（连麦、PK 时）不理；自己直播间的照常下播', async () => {
+    const { svc, active } = setup({ live: true });
+    await svc.start();
+    const send = active()[0]!.opts.onMessage;
+    send({ cmd: 'PREPARING', roomid: '99999' });
+    expect(svc.status().live).toBe(true);
+    send({ cmd: 'PREPARING', roomid: '30000' });
+    expect(svc.status().live).toBe(false);
+    svc.stop();
+  });
+
+  it('漏了下播消息、又开播了（B 站的开播时间比本场晚很多）：算新的一场，不把上一场的开始时间往后挪', async () => {
+    const { svc, db, state } = setup({ live: true });
+    state.liveSince = 1_000_000;
+    await svc.start();
+    state.liveSince = 1_000_000 + 3 * 3600_000;
+    await svc.poll();
+    svc.stop();
+    expect(db.select().from(liveSessions).all()).toMatchObject([
+      { id: 1, startedAt: 1_000_000, endedAt: 1_000_000 + 3 * 3600_000 },
+      { id: 2, startedAt: 1_000_000 + 3 * 3600_000, endedAt: null },
+    ]);
+  });
+
+  it('下播前就退出了（桌面版合盖、关机）：下次打开时上一场按最后一条事件的时间结束，不按打开的时间', async () => {
+    const { svc, db } = setup({ live: false });
+    db.insert(liveSessions).values({ roomId: 30000, startedAt: 500_000 }).run();
+    db.$client.prepare("insert into events (ts, room_id, session_id, kind, uid, uname, viewer, status) values (900000, 30000, 1, 'enter', 1, 'x', '{}', 'played')").run();
+    await svc.start();
+    svc.stop();
+    expect(db.select().from(liveSessions).all()).toMatchObject([{ id: 1, endedAt: 900_000 }]);
+  });
+
   it('重新扫码换了登录信息：断开，用新的登录信息重连', async () => {
     const { svc, active, acc } = setup({ live: true });
     await svc.start();

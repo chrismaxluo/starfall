@@ -256,15 +256,27 @@ export class LiveService {
       if (open && !sameLive) this.db.update(liveSessions).set({ endedAt: sameRoom ? (liveSince ?? now) : now }).where(isNull(liveSessions.endedAt)).run();
       this.session = open && sameLive ? { id: open.id, roomId: open.roomId ?? roomId, startedAt: open.startedAt } : this.newSession(roomId, liveSince ?? now);
     }
-    // 开播时间以 B 站为准（开播消息里没有开播时间，下一次查询时补上）
-    if (live && this.session && liveSince !== null && liveSince !== this.session.startedAt && Math.abs(liveSince - this.session.startedAt) < SINCE_FIX_MS) {
+    // B 站的开播时间比本场记录的晚很多：中间下播过（下播消息漏了，例如那一刻正在重连），这是新的一场
+    if (live && this.session && liveSince !== null && liveSince > this.session.startedAt + SESSION_SLACK_MS) {
+      this.db.update(liveSessions).set({ endedAt: liveSince }).where(eq(liveSessions.id, this.session.id)).run();
+      this.session = this.newSession(roomId, liveSince);
+      this.emitStatus();
+    }
+    // 开播时间以 B 站为准（开播消息里没有开播时间，下一次查询时补上）：只往前改（我们发现开播总比 B 站记的晚）
+    if (live && this.session && liveSince !== null && liveSince < this.session.startedAt && this.session.startedAt - liveSince < SINCE_FIX_MS) {
       this.session.startedAt = liveSince;
       this.db.update(liveSessions).set({ startedAt: liveSince }).where(eq(liveSessions.id, this.session.id)).run();
       this.emitStatus();
     }
     if (!live) {
       if (this.session) this.db.update(liveSessions).set({ endedAt: now }).where(eq(liveSessions.id, this.session.id)).run();
-      else this.db.update(liveSessions).set({ endedAt: now }).where(isNull(liveSessions.endedAt)).run();
+      else {
+        // 服务启动时发现上一场没结束（下播前就退出了、电脑睡眠了）：结束时间用那一场最后一条事件的时间，不用现在（不然上一场会变成十几个小时）
+        for (const o of this.db.select().from(liveSessions).where(isNull(liveSessions.endedAt)).all()) {
+          const last = this.db.$client.prepare('select max(ts) as ts from events where session_id = ?').get(o.id) as { ts: number | null };
+          this.db.update(liveSessions).set({ endedAt: Math.max(o.startedAt, Math.min(now, last.ts ?? o.startedAt)) }).where(eq(liveSessions.id, o.id)).run();
+        }
+      }
       this.session = null;
     }
     if (live !== this.live) {
@@ -362,6 +374,9 @@ export class LiveService {
     }
     if (!ev) return;
     if (ev.kind === 'live') {
+      // 别的直播间的开播 / 下播（连麦、PK 时可能收到）：不理，不然本场会被结束
+      const room = this.room.get();
+      if (ev.roomId !== undefined && room && ev.roomId !== room.roomId && ev.roomId !== room.shortId) return;
       // 开播 / 下播消息比轮询更及时
       this.setLive(ev.live);
       void this.reconcile();

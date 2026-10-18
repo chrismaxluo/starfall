@@ -292,7 +292,7 @@ export class MusicService {
       now: c ? { item: this.item(c.row), posMs: Math.round(this.pos(c)), paused: c.posAt === null, lyric: c.lyric, load: c.load, ...(player ? { url: c.url } : {}) } : null,
       queue: queued.slice(0, MUSIC_QUEUE_SEND).map((r) => this.item(r)),
       total: queued.length,
-      display: { style: s.style, side: s.side, size: s.size, showQueue: s.showQueue, lyrics: s.lyrics, lyricsLang: s.lyricsLang, lyricsTrans: s.lyricsLang !== 'original' },
+      display: { style: s.style, side: s.side, size: s.size, showQueue: s.showQueue, lyrics: s.lyrics, lyricsLang: s.lyricsLang, lyricsTrans: s.lyricsLang !== 'original', liteMode: s.liteMode },
       cmd: s.cmdRequest,
       volume: s.volume,
       normalize: s.normalize,

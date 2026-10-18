@@ -212,6 +212,17 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
               <span class="hint">有带声音的特效在播时，音乐变小，播完慢慢恢复</span>
             </div></div>
           </div>
+          <div class="srow">
+            <span class="lb">精简模式</span>
+            <div class="ctl"><div class="line">
+              <span class="seg" role="group" aria-label="点歌窗口精简模式">
+                <button :aria-pressed="s.liteMode === 'auto'" @click="set({ liteMode: 'auto' }, '精简模式：直播软件里卡顿时自动打开')">自动</button>
+                <button :aria-pressed="s.liteMode === 'on'" @click="set({ liteMode: 'on' }, '精简模式已打开')">一直开</button>
+                <button :aria-pressed="s.liteMode === 'off'" @click="set({ liteMode: 'off' }, '精简模式已关闭')">关</button>
+              </span>
+              <span class="hint">直播软件里的浏览器忙不过来时，音乐会像慢放、歌词变慢。精简模式去掉模糊和动画，也不做音量均衡，直接原生播放。「自动」发现卡顿就切过去</span>
+            </div></div>
+          </div>
         </div>
       </div>
 

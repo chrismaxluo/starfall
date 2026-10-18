@@ -72,6 +72,8 @@ export const MusicSettingsSchema = z
     lyricsLang: z.enum(MUSIC_LYRICS_LANGS),
     /** 旧版本的「显示歌词翻译」开关：只在旧版本保存的设置、以前导出的配置里出现，读的时候换成 lyricsLang */
     lyricsTrans: z.boolean().optional(),
+    /** 点歌窗口的精简模式：auto 直播软件里卡顿时自动打开、on 一直开、off 不开。精简时不做模糊和复杂动画、不做音量均衡 */
+    liteMode: z.enum(['auto', 'on', 'off']),
     /** 不收的歌：歌名或歌手里有这些字 */
     blockWords: z.array(z.string().trim().min(1).max(30)).max(MUSIC_WORDS_MAX),
     /** 不收的某一首歌（列表、历史里点「这首歌以后不收」）：按这一首本身记，别的版本、名字相近的歌不受影响 */
@@ -115,6 +117,7 @@ export const MUSIC_DEFAULTS: MusicSettings = {
   showQueue: 3,
   lyrics: true,
   lyricsLang: 'both',
+  liteMode: 'auto',
   blockWords: [],
   blockSongs: [],
   bannedUids: [],

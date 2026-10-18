@@ -32,6 +32,9 @@ export const MUSIC_LOAD_TIMEOUT_MS = 20_000;
 /** 过了歌的时长这么久还没报「放完了」，就当放完了（窗口卡住时不一直等） */
 const END_GRACE_MS = 20_000;
 const TICK_MS = 2000;
+/** 网易云连不上时：第一次等 10 秒再试，之后每次翻倍；同一首试这么多次还不行才跳过（共约 2.5 分钟） */
+const NET_RETRY_MS = 10_000;
+const NET_RETRIES = 5;
 
 type Row = typeof musicRequests.$inferSelect;
 export type MusicStatus = Row['status'];
@@ -148,6 +151,8 @@ export class MusicService {
   private seq = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   private gapTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 网易云连不上时，每首已经试了几次 */
+  private readonly netTries = new Map<number, number>();
   private readonly offs: Array<() => void> = [];
   private readonly listeners = new Set<() => void>();
 
@@ -297,7 +302,8 @@ export class MusicService {
         this.cur.started = false;
       }
       this.changed();
-      if (p && this.duckOn) this.d.hub.toMusicPlayer({ type: 'music_duck', on: true, pct: this.cfg().duckPct });
+      // 换了出声的窗口（包括同一个窗口断线重连）：告诉它现在该不该调小，免得断线期间错过「恢复」一直是小音量
+      if (p) this.d.hub.toMusicPlayer({ type: 'music_duck', on: this.duckOn, pct: this.cfg().duckPct });
       this.pump();
     } else this.changed();
   }
@@ -696,6 +702,29 @@ export class MusicService {
     void this.resolve(next)
       .then((r) => {
         const row = this.d.db.select().from(musicRequests).where(eq(musicRequests.id, next.id)).get()!;
+        if (typeof r === 'object' && 'netErr' in r) {
+          // 网易云暂时连不上（断网、网易云出错）：这首放回列表最前面，等一会儿再试；
+          // 不能像「拿不到地址」那样直接跳过，不然列表里网易云的歌会一口气全被跳光
+          const tries = (this.netTries.get(row.id) ?? 0) + 1;
+          if (tries < NET_RETRIES) {
+            this.netTries.set(row.id, tries);
+            this.d.db.update(musicRequests).set({ status: 'queued', startedAt: null }).where(eq(musicRequests.id, row.id)).run();
+            const wait = NET_RETRY_MS * 2 ** (tries - 1);
+            console.warn(`[点歌] 网易云暂时连不上，${Math.round(wait / 1000)} 秒后再试《${row.name}》（第 ${tries} 次）：${r.netErr}`);
+            if (tries === 1) this.notice(false, row.uname, `网易云暂时连不上，《${row.name}》等一会儿再试`, true);
+            if (this.gapTimer) clearTimeout(this.gapTimer);
+            this.gapTimer = setTimeout(() => {
+              this.gapTimer = null;
+              this.pump();
+            }, wait);
+            return;
+          }
+          this.netTries.delete(row.id);
+          this.setStatus(row.id, 'failed', `《${r.name}》获取播放地址失败（网易云一直连不上）`);
+          this.notice(false, row.uname, `《${r.name}》获取播放地址失败（网易云一直连不上），已跳过`);
+          return;
+        }
+        this.netTries.delete(row.id);
         if (typeof r === 'string') {
           this.setStatus(row.id, 'failed', r);
           this.notice(false, row.uname, `${r}，已跳过`);
@@ -713,7 +742,7 @@ export class MusicService {
   }
 
   /** 拿播放地址和歌词；拿不到地址时返回原因 */
-  private async resolve(r: Row): Promise<{ url: string; lyric: LyricLine[] | null } | string> {
+  private async resolve(r: Row): Promise<{ url: string; lyric: LyricLine[] | null } | { netErr: string; name: string } | string> {
     if (r.source === 'local') {
       const row = this.d.library.get(Number(r.songId));
       if (!row) return `《${r.name}》已经从歌库里删掉了`;
@@ -727,9 +756,8 @@ export class MusicService {
     try {
       url = await n.songUrl(id);
     } catch (e) {
-      console.warn('[点歌] 获取网易云播放地址失败：', (e as Error).message);
       this.d.account.urlResult(false, song, '网易云暂时连不上');
-      return `《${r.name}》获取播放地址失败（网易云暂时连不上）`;
+      return { netErr: (e as Error).message, name: r.name };
     }
     // 点得进来的歌按说都能完整放（搜歌时看过），拿不到多半是网易云改了限制或者会员到期了
     this.d.account.urlResult(url !== null, song, url ? '' : '只拿到试听片段，或者没有地址');

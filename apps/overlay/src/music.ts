@@ -489,6 +489,8 @@ let audio = makeAudio(false);
 let loaded: { id: number; load: number } | null = null;
 let seekTo = 0;
 let startedSent = false;
+/** 断线重连后：服务端把这个窗口当作新的出声窗口，等它再报一次「开始了」 */
+let reportAgain = false;
 let lastPosSent = 0;
 let duck = { on: false, pct: 30 };
 let vol = 0;
@@ -636,8 +638,9 @@ function makeAudio(cors: boolean): HTMLAudioElement {
   });
   a.addEventListener('playing', () => {
     if (a !== audio || !loaded) return;
-    if (!startedSent) {
+    if (!startedSent || reportAgain) {
       startedSent = true;
+      reportAgain = false;
       conn?.send({ type: 'music_started', id: loaded.id, load: loaded.load });
     }
     tick();
@@ -721,8 +724,10 @@ if (preview) {
       onMessage,
       onFatal: () => notice('点歌窗口地址已失效', '可能是重置了密钥或删除了这个输出，请在星临管理后台「直播软件输出」重新复制地址'),
       onState: (online) => {
-        // 断开时停下（服务端会把歌停在原处，连回来接着放）
-        if (!online && !audio.paused) audio.pause();
+        // 断开时停下（服务端会把歌停在原处，连回来接着放）；连回来接着放时要再报一次「开始了」，不然 20 秒后会被当成放不了
+        if (online) return;
+        reportAgain = true;
+        if (!audio.paused) audio.pause();
       },
     });
   } else {

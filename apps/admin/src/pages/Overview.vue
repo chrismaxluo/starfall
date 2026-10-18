@@ -41,9 +41,12 @@ const picked = ref<'live' | 'today' | null>(null);
 const noSession = ref(false);
 const scope = computed(() => picked.value ?? (live.value || !noSession.value ? 'live' : 'today'));
 
+// 请求序号：本场 / 今天来回切时，只用最后一次的结果
+let statsSeq = 0;
 async function loadStats(): Promise<void> {
+  const seq = ++statsSeq;
   const r = await get<StatsDto>(`/api/stats?scope=${scope.value}`).catch(() => null);
-  if (!r) return;
+  if (!r || seq !== statsSeq) return;
   stats.value = r;
   // 没开播、也没有上一场：改看今天（会再读一次）
   if (scope.value === 'live' && !r.live && !r.lastSession && !picked.value) noSession.value = true;

@@ -16,12 +16,17 @@ const failed = ref(false);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
 
+// 请求序号：换范围时只用最后一次的结果
+let seq = 0;
 async function load(): Promise<void> {
+  const my = ++seq;
   try {
-    data.value = await get<GiftRankDto>(`/api/stats/gifts?scope=${props.scope}`);
+    const r = await get<GiftRankDto>(`/api/stats/gifts?scope=${props.scope}`);
+    if (my !== seq) return;
+    data.value = r;
     failed.value = false;
   } catch {
-    failed.value = true;
+    if (my === seq) failed.value = true;
   }
 }
 watch(() => [props.scope, state.status?.room?.roomId, state.status?.live.liveSince], () => void load());

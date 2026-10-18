@@ -29,6 +29,28 @@ watch(() => props.kind, () => ((res.value = null), (trace.value = [])));
 
 const paidGifts = computed(() => catalog.value.filter((g) => g.paid));
 
+// 礼物面板上没有的礼物（盲盒里爆出来的权杖这类）：在全站礼物里按名字找，找到的加进下拉框并选上
+const giftQ = ref('');
+const found = ref<GiftConfig[] | null>(null);
+let findTimer: ReturnType<typeof setTimeout> | undefined;
+let findSeq = 0;
+watch(giftQ, (q) => {
+  clearTimeout(findTimer);
+  if (!q.trim()) return void (found.value = null);
+  findTimer = setTimeout(async () => {
+    const seq = ++findSeq;
+    const r = await get<{ gifts: GiftConfig[] }>(`/api/gifts/search?q=${encodeURIComponent(q.trim())}`).catch(() => ({ gifts: [] }));
+    if (seq !== findSeq) return;
+    found.value = r.gifts;
+  }, 300);
+});
+function pickFound(g: GiftConfig): void {
+  if (!catalog.value.some((x) => x.id === g.id)) catalog.value = [...catalog.value, g];
+  giftPick.value = g.id;
+  giftQ.value = '';
+  found.value = null;
+}
+
 async function run(): Promise<void> {
   const w = who.value;
   if (w.identity === 'uid' && !(w.uid && w.uid > 0)) return void (res.value = null, (trace.value = []), (uidMsg.value = '请填观众的 UID'));
@@ -115,6 +137,13 @@ onMounted(async () => {
             <option v-for="g in paidGifts" :key="g.id" :value="g.id">{{ g.name }}（{{ battery(g.price) }} · {{ yuan(g.price) }}）</option>
           </select>
           <div v-if="giftPick === ''" class="suffix"><input v-model.number="customBattery" class="inp num" type="number" min="0" step="1" aria-label="单价（电池）" /><span>电池（{{ yuan(Math.round(Number(customBattery) || 0) * 100) }}）</span></div>
+        </div>
+        <div class="sim-find">
+          <input v-model="giftQ" class="inp" placeholder="找面板上没有的礼物（例如盲盒里爆出的「权杖」）" aria-label="按名字找礼物" maxlength="40" />
+          <div v-if="found" class="sim-found">
+            <button v-for="g in found" :key="g.id" type="button" @click="pickFound(g)">{{ g.name }}<span>{{ battery(g.price) }} · {{ yuan(g.price) }}{{ g.effectId ? ' · 有B站动画' : '' }}</span></button>
+            <span v-if="!found.length" class="none">没有找到</span>
+          </div>
         </div>
         <div class="suffix"><input v-model.number="count" class="inp num" type="number" min="1" aria-label="数量" /><span>个</span></div>
       </template>

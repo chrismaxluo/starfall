@@ -79,6 +79,18 @@ describe('礼物规则接口', () => {
     t.ctx.db.delete(room).run();
     expect((await t.req({ method: 'GET', url: '/api/gifts' })).statusCode).toBe(409);
   });
+
+  it('按名字在全站礼物里找（模拟送礼时找面板上没有的，例如盲盒里爆出的权杖）', async () => {
+    const t = await setup();
+    vi.stubGlobal('fetch', async (url: string) =>
+      new Response(JSON.stringify(String(url).includes('giftConfig')
+        ? { code: 0, data: { list: [{ id: 32281, name: '绮彩权杖', price: 40000, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/q.png', effect_id: 99 }, { id: 1, name: '辣条', price: 100, coin_type: 'silver', img_basic: 'https://i0.hdslb.com/l.png' }] } }
+        : { code: 0, data: { gift_config: { base_config: { list: [{ id: 31036, name: '小花花', price: 100, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/g.png' }] } } } })));
+    await t.req({ method: 'GET', url: '/api/gifts' });
+    const r = (await t.req({ method: 'GET', url: `/api/gifts/search?q=${encodeURIComponent('权杖')}` })).json();
+    expect(r.gifts).toMatchObject([{ id: 32281, name: '绮彩权杖', price: 40000, effectId: 99 }]);
+    expect((await t.req({ method: 'GET', url: `/api/gifts/search?q=${encodeURIComponent('辣条')}` })).json().gifts).toEqual([]);
+  });
 });
 
 describe('上舰规则接口', () => {

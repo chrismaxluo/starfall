@@ -182,6 +182,8 @@ export interface GiftConfig {
   tab?: string;
   /** 在这一页里的位置 */
   panel?: number;
+  /** B站全屏动画的编号（有动画的大礼物才有） */
+  effectId?: number;
 }
 
 export interface EventDto {

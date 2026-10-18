@@ -8,7 +8,7 @@ import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } fr
 import { whoOk } from '@starfall/core/danmu';
 import { NeteaseError, pick, rank, splitNth } from '@starfall/music';
 import type { NeteaseSong, PickResult } from '@starfall/music';
-import { MUSIC_DEFAULTS, MUSIC_QUEUE_SEND, MUSIC_STYLES, MusicSettingsSchema, parseLrc } from '@starfall/shared';
+import { MUSIC_DEFAULTS, MUSIC_QUEUE_SEND, MUSIC_STYLES, MusicSettingsSchema, lyricsLangOf, parseLrc } from '@starfall/shared';
 import type { DanmuEvent, GuardLevel, LyricLine, MusicHold, MusicItem, MusicNotice, MusicRequester, MusicSettings, MusicSong, MusicState, PlayItem, StdEvent, Viewer } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
 import { musicRequests } from '../db/schema.ts';
@@ -187,13 +187,19 @@ export class MusicService {
   cfg(): MusicSettings {
     const raw = this.d.settings.getRaw<Partial<MusicSettings>>(KEY) ?? {};
     const s = { ...MUSIC_DEFAULTS, ...raw };
+    // 旧版本的「显示歌词翻译」开关：关着的换成「只显示原文」
+    s.lyricsLang = lyricsLangOf(raw) ?? MUSIC_DEFAULTS.lyricsLang;
+    delete s.lyricsTrans;
     // 以前有、后来去掉的样子（黑胶、细长胶囊等）：换成流光
     if (!(MUSIC_STYLES as readonly string[]).includes(s.style)) s.style = 'glass';
     return s;
   }
 
   updateSettings(patch: Partial<MusicSettings>): MusicSettings {
-    const next = MusicSettingsSchema.parse({ ...this.cfg(), ...patch });
+    // 以前导出的配置里是「显示歌词翻译」开关：换成歌词语言
+    const { lyricsTrans: _old, ...rest } = patch;
+    const lang = lyricsLangOf(patch);
+    const next = MusicSettingsSchema.parse({ ...this.cfg(), ...rest, ...(lang ? { lyricsLang: lang } : {}) });
     this.d.settings.setRaw(KEY, next);
     // 关掉点歌：正在等的点歌不要了（列表保留，打开后接着放）
     this.changed();
@@ -286,7 +292,7 @@ export class MusicService {
       now: c ? { item: this.item(c.row), posMs: Math.round(this.pos(c)), paused: c.posAt === null, lyric: c.lyric, load: c.load, ...(player ? { url: c.url } : {}) } : null,
       queue: queued.slice(0, MUSIC_QUEUE_SEND).map((r) => this.item(r)),
       total: queued.length,
-      display: { style: s.style, side: s.side, size: s.size, showQueue: s.showQueue, lyrics: s.lyrics, lyricsTrans: s.lyricsTrans },
+      display: { style: s.style, side: s.side, size: s.size, showQueue: s.showQueue, lyrics: s.lyrics, lyricsLang: s.lyricsLang, lyricsTrans: s.lyricsLang !== 'original' },
       cmd: s.cmdRequest,
       volume: s.volume,
       normalize: s.normalize,

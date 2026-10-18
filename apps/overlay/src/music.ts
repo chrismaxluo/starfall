@@ -318,6 +318,7 @@ function applyTint(t: Tint): void {
 // ---------- 歌词 ----------
 
 let lastLine = -2;
+let lastLang = '';
 let lyCur: HTMLElement | null = null;
 /** 当前这句的文字（染色、滑动都在它身上）；放不下时多出来多少像素 */
 let lyIn: HTMLElement | null = null;
@@ -333,12 +334,16 @@ function renderLyric(s: MusicState, pos: number): void {
     return;
   }
   const i = lyricIndex(lines, pos);
-  if (i !== lastLine) {
+  // 歌词语言：双语（下面一行是翻译）、只显示原文、只显示翻译（没有翻译的句子显示原文）；旧版本只有「显示翻译」开关
+  const lang = s.display.lyricsLang ?? (s.display.lyricsTrans ? 'both' : 'original');
+  if (i !== lastLine || lang !== lastLang) {
     lastLine = i;
+    lastLang = lang;
     // 还没唱到第一句（前奏）：先把第一句摆出来，不填色
     const cur = lines[Math.max(0, i)] ?? null;
     const next = lines[Math.max(0, i) + 1] ?? null;
-    const inner = h('span', { class: 'ly-in' }, cur?.text ?? '');
+    const say = (l: LyricLine | null) => (l ? (lang === 'translation' && l.tr ? l.tr : l.text) : '');
+    const inner = h('span', { class: 'ly-in' }, say(cur));
     const line = h('div', { class: 'ly-cur' }, inner);
     lyIn = inner;
     lyCur = line;
@@ -352,8 +357,9 @@ function renderLyric(s: MusicState, pos: number): void {
     };
     requestAnimationFrame(measure);
     setTimeout(measure, 700);
-    const tr = s.display.lyricsTrans && cur?.tr ? cur.tr : null;
-    const sub = h('div', { class: `ly-sub${tr ? ' tr' : ''}` }, tr ?? next?.text ?? '');
+    // 下面一行：双语时是这一句的翻译（没有翻译时是下一句），单语时是下一句
+    const tr = lang === 'both' && cur?.tr ? cur.tr : null;
+    const sub = h('div', { class: `ly-sub${tr ? ' tr' : ''}` }, tr ?? say(next));
     const box = h('div', { class: 'ly-box' }, lyCur, sub);
     lyric.replaceChildren(box);
     if (!reduced()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 460, easing: 'cubic-bezier(.2,.8,.2,1)' });

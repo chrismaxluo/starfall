@@ -52,6 +52,9 @@ export interface MusicDisplay {
   /** 显示后面几首（0 不显示列表） */
   showQueue: number;
   lyrics: boolean;
+  /** 歌词显示哪种语言：both 双语、original 只显示原文、translation 只显示翻译（没有翻译的歌显示原文） */
+  lyricsLang?: 'both' | 'original' | 'translation';
+  /** 旧版本的点歌窗口用（还没刷新的页面）：显示不显示翻译 */
   lyricsTrans: boolean;
 }
 
@@ -112,16 +115,30 @@ export const MUSIC_HEIGHT = 560;
  * 去掉开头的「作词 : xx」「作曲 : xx」这类说明行和空行；没有时间的行不要
  */
 export function parseLrc(lrc: string, trans?: string): LyricLine[] {
-  const lines = readLrc(lrc).filter((l) => !CREDIT_RE.test(l.text));
+  // 同一个时间写了几行（双语歌词写在一起：原文一行、翻译一行，日文歌还可能夹一行罗马音）：第一行当原文，最后一行当翻译。
+  // 以前当成前后挨着的几句，只显示得出最后一行
+  const lines: LyricLine[] = [];
+  for (const l of readLrc(lrc).filter((x) => !CREDIT_RE.test(x.text))) {
+    const prev = lines[lines.length - 1];
+    if (prev && prev.t === l.t) {
+      if (l.text !== prev.text) prev.tr = l.text;
+    } else lines.push({ t: l.t, text: l.text });
+  }
   if (trans) {
-    const tr = new Map(readLrc(trans).map((l) => [l.t, l.text]));
+    // 翻译按时间配到原文上：差半秒以内都算同一句（网易云的翻译时间偶尔和原文差几毫秒）
+    const tr = readLrc(trans);
+    let j = 0;
     for (const l of lines) {
-      const x = tr.get(l.t);
-      if (x && x !== l.text) l.tr = x;
+      while (j < tr.length && tr[j]!.t < l.t - TRANS_SLACK_MS) j++;
+      let best: LyricLine | null = null;
+      for (let k = j; k < tr.length && tr[k]!.t <= l.t + TRANS_SLACK_MS; k++) if (!best || Math.abs(tr[k]!.t - l.t) < Math.abs(best.t - l.t)) best = tr[k]!;
+      if (best && best.text !== l.text) l.tr = best.text;
     }
   }
   return lines;
 }
+/** 翻译和原文的时间差这么多以内算同一句 */
+const TRANS_SLACK_MS = 500;
 
 const TIME_RE = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
 /** 说明行：作词、作曲、编曲、制作人……（网易云的歌词开头常有） */

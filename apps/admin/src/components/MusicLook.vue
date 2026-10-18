@@ -15,7 +15,7 @@ import { toast } from '../lib/toast.ts';
 const s = computed(() => music.settings!);
 const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patch, msg);
 // 外观先改草稿：预览照着草稿显示，点「保存」才到直播画面
-const look = useDraft(() => music.settings ?? undefined, ['style', 'side', 'size', 'showQueue', 'lyrics', 'lyricsTrans'] as const, (p) => saveMusic(p, '已保存，直播画面已更新'));
+const look = useDraft(() => music.settings ?? undefined, ['style', 'side', 'size', 'showQueue', 'lyrics', 'lyricsLang'] as const, (p) => saveMusic(p, '已保存，直播画面已更新'));
 /** 已保存 + 外观草稿 */
 const v = computed(() => look.view.value!);
 
@@ -48,7 +48,7 @@ const sample = ref(false);
 const pvState = computed((): MusicState | null => {
   const st = music.state;
   if (!st || !music.settings) return null;
-  const display = { style: v.value.style, side: v.value.side, size: v.value.size, showQueue: v.value.showQueue, lyrics: v.value.lyrics, lyricsTrans: v.value.lyricsTrans };
+  const display = { style: v.value.style, side: v.value.side, size: v.value.size, showQueue: v.value.showQueue, lyrics: v.value.lyrics, lyricsLang: v.value.lyricsLang, lyricsTrans: v.value.lyricsLang !== 'original' };
   const base = { enabled: true, cmd: s.value.cmdRequest, volume: s.value.volume, normalize: s.value.normalize, display };
   return sample.value || !st.now ? { ...SAMPLE, ...base } : { ...st, ...base, hold: null };
 });
@@ -170,8 +170,17 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
             <span class="lb">歌词</span>
             <div class="ctl"><div class="line">
               <Switch :model-value="v.lyrics" label="显示歌词" @change="(x) => look.set({ lyrics: x })" /><span>滚动歌词</span>
-              <span class="gap" />
-              <Switch :model-value="v.lyricsTrans" :disabled="!v.lyrics" label="显示翻译" @change="(x) => look.set({ lyricsTrans: x })" /><span>外文歌显示中文翻译</span>
+            </div></div>
+          </div>
+          <div class="srow">
+            <span class="lb">歌词语言</span>
+            <div class="ctl"><div class="line">
+              <span class="seg" role="group" aria-label="歌词语言">
+                <button :aria-pressed="v.lyricsLang === 'both'" :disabled="!v.lyrics" @click="look.set({ lyricsLang: 'both' })">双语</button>
+                <button :aria-pressed="v.lyricsLang === 'original'" :disabled="!v.lyrics" @click="look.set({ lyricsLang: 'original' })">只显示原文</button>
+                <button :aria-pressed="v.lyricsLang === 'translation'" :disabled="!v.lyrics" @click="look.set({ lyricsLang: 'translation' })">只显示中文</button>
+              </span>
+              <span class="hint">{{ v.lyricsLang === 'both' ? '外文歌原文下面一行显示中文翻译' : v.lyricsLang === 'original' ? '外文歌只显示原文' : '外文歌只显示中文翻译；没有翻译的歌照常显示原文' }}</span>
             </div></div>
           </div>
         </div>

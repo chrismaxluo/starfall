@@ -855,6 +855,14 @@ export class MusicService {
     this.changed();
   }
 
+  /** 出声的窗口被浏览器拦住了声音（普通浏览器要先点一下页面）：不算放不了，等人点了再开始 */
+  playerBlocked(client: unknown, id: number, load: number): void {
+    const c = this.mine(client, id, load);
+    if (!c || c.started || c.waitSince === null) return;
+    c.waitSince = null;
+    this.notice(false, '点歌窗口', '浏览器拦住了声音：在打开点歌窗口的浏览器里点一下页面就能开始放（直播软件里不会这样）', true);
+  }
+
   /** 出声的窗口：放到哪了（不广播，下次有变化时一起发） */
   playerPos(client: unknown, id: number, pos: number): void {
     const c = this.mine(client, id);

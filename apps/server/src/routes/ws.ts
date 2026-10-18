@@ -18,6 +18,7 @@ const OverlayMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('alive') }),
   z.object({ type: z.literal('music_started'), id: z.number().int(), load: z.number().int() }),
   z.object({ type: z.literal('music_pos'), id: z.number().int(), pos: z.number().min(0).max(1e8) }),
+  z.object({ type: z.literal('music_blocked'), id: z.number().int(), load: z.number().int() }),
   z.object({ type: z.literal('music_ended'), id: z.number().int() }),
   z.object({ type: z.literal('music_error'), id: z.number().int(), load: z.number().int(), message: z.string().max(500) }),
 ]);
@@ -131,6 +132,7 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
       else if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
       else if (msg.type === 'music_started') ctx.music.playerStarted(client, msg.id, msg.load);
       else if (msg.type === 'music_pos') ctx.music.playerPos(client, msg.id, msg.pos);
+      else if (msg.type === 'music_blocked') ctx.music.playerBlocked(client, msg.id, msg.load);
       else if (msg.type === 'music_ended') ctx.music.playerEnded(client, msg.id);
       else if (msg.type === 'music_error') ctx.music.playerError(client, msg.id, msg.load, msg.message);
       else if (msg.type === 'error') {

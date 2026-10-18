@@ -491,6 +491,15 @@ let seekTo = 0;
 let startedSent = false;
 /** 断线重连后：服务端把这个窗口当作新的出声窗口，等它再报一次「开始了」 */
 let reportAgain = false;
+/** 跨域加载失败、正在用普通播放器重试的音乐服务器 */
+let corsTry: string | null = null;
+/** 卡住多久没进度算出错 */
+const STALL_MS = 12_000;
+let stallTimer: ReturnType<typeof setTimeout> | null = null;
+function clearStall(): void {
+  if (stallTimer) clearTimeout(stallTimer);
+  stallTimer = null;
+}
 let lastPosSent = 0;
 let duck = { on: false, pct: 30 };
 let vol = 0;
@@ -592,13 +601,16 @@ function play(): void {
       if (blocked) {
         blocked = false;
         blockedHint();
+        // 点了一下才开始放：从静音淡入（拦住时淡入已经在暂停状态下走完了，不重新淡入会一直没声音）
+        rampVolume(0.1);
       }
     },
     (e: Error) => {
-      // 浏览器要求先点一下页面才能出声（直播软件里不会这样）：不当作放不了
+      // 浏览器要求先点一下页面才能出声（直播软件里不会这样）：不当作放不了，告诉服务端等人点
       if (e.name === 'NotAllowedError') {
         blocked = true;
         blockedHint();
+        if (loaded) conn?.send({ type: 'music_blocked', id: loaded.id, load: loaded.load });
       }
     },
   );
@@ -638,6 +650,11 @@ function makeAudio(cors: boolean): HTMLAudioElement {
   });
   a.addEventListener('playing', () => {
     if (a !== audio || !loaded) return;
+    clearStall();
+    if (corsTry && !a.crossOrigin) {
+      corsBad.add(corsTry);
+      corsTry = null;
+    }
     if (!startedSent || reportAgain) {
       startedSent = true;
       reportAgain = false;
@@ -645,6 +662,18 @@ function makeAudio(cors: boolean): HTMLAudioElement {
     }
     tick();
   });
+  // 网络卡住（不报错、只是不来数据）：10 多秒没有进度就当作出错，服务端会重新拿地址接着放
+  const stalled = () => {
+    if (a !== audio || !loaded || !startedSent || a.paused || stallTimer) return;
+    const at = a.currentTime;
+    stallTimer = setTimeout(() => {
+      stallTimer = null;
+      if (a !== audio || !loaded || a.paused || a.currentTime > at + 0.5) return;
+      conn?.send({ type: 'music_error', id: loaded.id, load: loaded.load, message: '网络卡住了，十几秒没有数据' });
+    }, STALL_MS);
+  };
+  a.addEventListener('waiting', stalled);
+  a.addEventListener('stalled', stalled);
   a.addEventListener('timeupdate', () => {
     if (a !== audio || !loaded || !startedSent) return;
     const now = performance.now();
@@ -657,10 +686,11 @@ function makeAudio(cors: boolean): HTMLAudioElement {
   });
   a.addEventListener('error', () => {
     if (a !== audio || !loaded || !a.getAttribute('src')) return;
-    // 要跨域读取（音量均衡）却加载失败：多半是这个音乐服务器不允许，换普通播放器再试一次，不算放不了
+    // 要跨域读取（音量均衡）却加载失败：可能是这个音乐服务器不允许，换普通播放器再试一次，不算放不了。
+    // 普通播放器放起来了才记下「这个服务器不能跨域」（地址失效这类错误换了也放不了，不能把整个服务器记成不能均衡）
     if (a.crossOrigin && !startedSent) {
       const url = a.src;
-      corsBad.add(hostOf(url));
+      corsTry = hostOf(url);
       startAudio(url, false);
       if (state?.hold === null) {
         play();

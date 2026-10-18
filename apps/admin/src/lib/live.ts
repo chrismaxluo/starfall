@@ -10,6 +10,8 @@ type Msg =
   | { type: 'hello'; status: StatusSnapshot; queue: QueueSnapshot; overlays: OverlayInfo[]; roomInfo: RoomInfo | null; build?: string | null; chat?: ChatItem[]; gifts?: Record<number, GiftRow[]>; pins?: GiftListItem[] }
   /** 弹幕列表：新的一条、换直播间清空 */
   | { type: 'chat'; item: ChatItem }
+  /** 心跳（只用来确认连接还活着） */
+  | { type: 'ping' }
   | { type: 'chat_clear' }
   /** 送礼名单（按输出）：新的一行或者变了的一行、整份重新发 */
   | { type: 'gift_row'; outputId: number; row: GiftRow }
@@ -73,6 +75,11 @@ let hellos = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let attempt = 0;
 let stopped = true;
+/** 最近一次收到消息的时间（服务端每 15 秒发一次心跳） */
+let lastMsgAt = 0;
+let watchdog: ReturnType<typeof setInterval> | null = null;
+/** 超过这么久没收到任何消息：连接多半已经悄悄断了（代理换线路、网络切换时浏览器收不到关闭事件），主动重连 */
+const DEAD_MS = 45_000;
 
 function handle(m: Msg): void {
   switch (m.type) {
@@ -173,9 +180,11 @@ function open(): void {
   ws = s;
   s.onopen = () => {
     attempt = 0;
+    lastMsgAt = Date.now();
     state.wsOnline = true;
   };
   s.onmessage = (e) => {
+    lastMsgAt = Date.now();
     try {
       handle(JSON.parse(String(e.data)) as Msg);
     } catch (err) {
@@ -203,10 +212,22 @@ export function startLive(): void {
   if (timer) clearTimeout(timer);
   timer = null;
   open();
+  watchdog ??= setInterval(() => {
+    const s = ws;
+    if (stopped || !s || s.readyState !== WebSocket.OPEN || Date.now() - lastMsgAt < DEAD_MS) return;
+    // 假死的连接：不等关闭事件（可能一直等不到），直接换一条新的；重连后会重新拿全部数据
+    ws = null;
+    state.wsOnline = false;
+    s.onclose = null;
+    s.close();
+    open();
+  }, 5000);
 }
 
 export function stopLive(): void {
   stopped = true;
+  if (watchdog) clearInterval(watchdog);
+  watchdog = null;
   if (timer) clearTimeout(timer);
   timer = null;
   const s = ws;

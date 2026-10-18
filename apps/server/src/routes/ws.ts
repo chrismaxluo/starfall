@@ -163,8 +163,11 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
     ctx.hub.addAdmin(socket);
     socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat(), gifts: Object.fromEntries(ctx.outputs.list().map((o) => [o.id, ctx.hub.giftBoard(o.id)])), pins: ctx.hub.pins() }));
     const stop = keepAlive(socket, () => ctx.hub.removeAdmin(socket));
+    // 应用层心跳：后台页面据此发现悄悄断掉的连接（浏览器里看不到协议层的 ping），和特效页一样
+    const ping = setInterval(() => socket.send(JSON.stringify({ type: 'ping' })), OVERLAY_TIMING.pingMs);
     socket.on('close', () => {
       stop();
+      clearInterval(ping);
       ctx.hub.removeAdmin(socket);
     });
   });

@@ -1,6 +1,7 @@
 // 弹幕列表：直播间里所有人的弹幕排成一列，新的从下面进来，旧的往上顶，最多显示设置的条数（放不下时少显示几条）。
 // 地址形如 /overlay/?output=1&key=...&chat=1，在直播软件里单独加一个浏览器源（建议 600×900），拖到画面左边或右边。
-// 可以设成没人发弹幕多少秒后，从最旧的开始一条一条淡出（chatFadeSec，0 为一直显示）。设计见 design/preview/chat-list.html。毛玻璃在带透明度动画的父元素里会失效：透明度只加在气泡、头像本身，外层只做位移
+// 可以设成没人发弹幕多少秒后，从最旧的开始一条一条淡出（chatFadeSec，0 为一直显示）。设计见 design/preview/chat-list.html；
+// 小八主题外观（奶油贴纸、星月夜空、像素小屋）在 chat-theme.ts。毛玻璃在带透明度动画的父元素里会失效：透明度只加在气泡、头像本身，外层只做位移
 import './chat.css';
 import { CHAT_MAX_LIMIT, GUARD_BADGES } from '@starfall/shared/overlay';
 import type { ChatItem, OverlayConfig, ServerToOverlay } from '@starfall/shared/overlay';
@@ -10,6 +11,7 @@ import { segments } from './chat-text.ts';
 import { h } from './dom.ts';
 import { detect } from './env.ts';
 import { avatar, fallbackColors, withGuardFrame } from './parts.ts';
+import { buildThemed, isTheme, mountThemed, themeAlpha, themeClass } from './chat-theme.ts';
 import { DEFAULT_CONFIG } from './stage.ts';
 import { autoUpdate, pageBuild } from './update.ts';
 
@@ -42,6 +44,7 @@ function img(cls: string, src: string, alt = ''): HTMLImageElement {
 // ---------- 一条弹幕 ----------
 
 function build(item: ChatItem): HTMLElement {
+  if (isTheme(config)) return buildThemed(item, config, !!item.viewer.medal && (config.chatMedal === 'all' || item.viewer.medal.own));
   const v = item.viewer;
   const guard = v.guard !== 0;
   const cls = ['msg'];
@@ -77,6 +80,8 @@ const anim = (el: Element, kf: Keyframe[], o: KeyframeAnimationOptions) => el.an
 /** 进场动画：只在开始前（延迟期间）保持起始样子，播完就放开，不然会一直压住「快被顶走的两条变淡」写的透明度 */
 const animIn = (el: Element, kf: Keyframe[], o: KeyframeAnimationOptions) => el.animate(kf, { fill: 'backwards', ...o });
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** 一条里面加透明度的部分：玻璃外观是气泡和头像，主题外观是头像和气泡外层（主题外观没有毛玻璃，加在外层没关系） */
+const PARTS = ':scope > .g, :scope > .avw, :scope > .gw';
 
 /** 列表满了时，最上面两条淡一点（快要离开了）；透明度加在气泡和头像本身 */
 function fadeAged(): void {
@@ -85,13 +90,14 @@ function fadeAged(): void {
   rows.forEach((r, i) => {
     const age = rows.length - 1 - i;
     const o = max < 4 ? '' : age >= max - 1 ? '0.55' : age >= max - 2 ? '0.78' : '';
-    for (const e of r.querySelectorAll<HTMLElement>(':scope > .g, :scope > .avw')) e.style.opacity = o;
+    for (const e of r.querySelectorAll<HTMLElement>(PARTS)) e.style.opacity = o;
   });
 }
 
 function enter(el: HTMLElement, item: ChatItem): void {
   if (reduced()) return;
   const right = config.chatSide === 'right';
+  if (isTheme(config)) return enterThemed(el, right);
   const g = el.querySelector<HTMLElement>(':scope > .g')!;
   const av = el.querySelector<HTMLElement>(':scope > .avw')!;
   // 头像先弹出来，气泡从头像那边展开，身份和内容跟着出现
@@ -111,6 +117,18 @@ function enter(el: HTMLElement, item: ChatItem): void {
   }
 }
 
+/** 主题外观：头像先弹出来，小八晚一点探出头，气泡从头像那边弹开 */
+function enterThemed(el: HTMLElement, right: boolean): void {
+  const flip = right ? 'scaleX(-1) ' : '';
+  const av = el.querySelector<HTMLElement>(':scope > .avw')!;
+  const gw = el.querySelector<HTMLElement>(':scope > .gw')!;
+  animIn(av, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1.1)', offset: 0.6 }, { opacity: 1, transform: 'scale(1)' }], { duration: 380, easing: 'ease-out' });
+  gw.style.transformOrigin = right ? '100% 50%' : '0 50%';
+  animIn(gw, [{ opacity: 0, transform: `translateX(${right ? 18 : -18}px) scale(.7)` }, { opacity: 1, transform: 'translateX(0) scale(1.03)', offset: 0.65 }, { opacity: 1, transform: 'none' }], { duration: 440, delay: 70, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  const cat = el.querySelector<HTMLElement>('.cat');
+  if (cat) animIn(cat, [{ opacity: 0, transform: `${flip}translateY(14px) scale(.6)` }, { opacity: 1, transform: `${flip}translateY(-3px) scale(1.06)`, offset: 0.7 }, { opacity: 1, transform: `${flip}none` }], { duration: 460, delay: 340, easing: 'ease-out' });
+}
+
 // ---------- 自动消失 ----------
 // 没人发弹幕一段时间（chatFadeSec）后，从最上面最旧的那条开始，每隔 FADE_STEP_MS 淡出一条；有新弹幕来就重新计时。
 // 新弹幕照样会把最旧的顶走（满了的时候）
@@ -124,7 +142,7 @@ function expire(el: HTMLElement): void {
   el.dataset.out = '1';
   if (reduced()) return void el.remove();
   // 列表从底部往上排，最上面的最旧：原地淡出、往上飘一点，下面的不会跳
-  const parts = el.querySelectorAll<HTMLElement>(':scope > .g, :scope > .avw');
+  const parts = el.querySelectorAll<HTMLElement>(PARTS);
   let done = 0;
   for (const p of parts) {
     anim(p, [{ opacity: Number(p.style.opacity || 1), transform: 'none' }, { opacity: 0, transform: 'translateY(-14px)' }], { duration: 700, easing: 'cubic-bezier(.4,0,.2,1)' }).finished.then(
@@ -150,10 +168,13 @@ setInterval(() => {
 /** 加一条：旧的往上挪（FLIP：先记下位置，插入后从旧位置滑过去）；超过条数或放不下时，最上面的淡出 */
 function add(item: ChatItem, quiet = false, remember = true): void {
   if (remember) items = [...items, item].slice(-CHAT_MAX_LIMIT);
+  // 设成「黑名单的人不显示」：记下来（改设置时还能显示回来），但不画
+  if (config.chatHideBlocked && item.viewer.blocked) return;
   const before = new Map([...list.children].map((r) => [r, r.getBoundingClientRect().top]));
   const el = build(item);
   if (!quiet) lastArrival = Date.now();
   list.append(el);
+  if (isTheme(config)) mountThemed(el, config);
   const leaving: HTMLElement[] = [];
   const live = [...list.children].filter((r) => !(r as HTMLElement).dataset.out) as HTMLElement[];
   while (live.length > 1 && (live.length > config.chatMax || list.offsetHeight > root.clientHeight)) {
@@ -170,7 +191,7 @@ function add(item: ChatItem, quiet = false, remember = true): void {
   for (const old of leaving) {
     old.style.top = `${(before.get(old) ?? top0) - top0}px`;
     const out = [{ opacity: 1, transform: 'translateY(0) scale(1)' }, { opacity: 0, transform: 'translateY(-40px) scale(.94)' }];
-    const parts = old.querySelectorAll<HTMLElement>(':scope > .g, :scope > .avw');
+    const parts = old.querySelectorAll<HTMLElement>(PARTS);
     let done = 0;
     for (const p of parts) {
       out[0]!.opacity = Number(p.style.opacity || 1);
@@ -193,14 +214,18 @@ function add(item: ChatItem, quiet = false, remember = true): void {
 /** 按现在的设置重新画一遍（不要动画） */
 function redraw(): void {
   list.replaceChildren();
-  for (const it of items.slice(-config.chatMax)) add(it, true, false);
+  const shown = config.chatHideBlocked ? items.filter((it) => !it.viewer.blocked) : items;
+  for (const it of shown.slice(-config.chatMax)) add(it, true, false);
 }
 
 function applyConfig(next: OverlayConfig): void {
-  const redrawNeeded = next.chatMedal !== config.chatMedal || next.chatSize !== config.chatSize || next.chatMax !== config.chatMax || next.chatFadeSec !== config.chatFadeSec;
+  const keys = ['chatMedal', 'chatSize', 'chatMax', 'chatFadeSec', 'chatLook', 'chatGuardFrame', 'chatMascot', 'chatHideBlocked'] as const;
+  // 主题外观的气泡是按左右画的：换边也要重画
+  const redrawNeeded = keys.some((k) => next[k] !== config[k]) || (isTheme(next) && next.chatSide !== config.chatSide);
   config = next;
   const lite = q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
-  root.className = `chat-root side-${config.chatSide}${config.chatSize === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${config.chatEnabled ? '' : ' off'}`;
+  root.className = `chat-root side-${config.chatSide}${config.chatSize === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${config.chatEnabled ? '' : ' off'}${themeClass(config)}`;
+  if (isTheme(config)) root.style.setProperty('--bga', String(themeAlpha(config)));
   if (redrawNeeded) redraw();
 }
 

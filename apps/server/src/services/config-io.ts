@@ -155,6 +155,12 @@ const OutputPart = OutputInputSchema.extend({
   chatMedal: OutputInputSchema.shape.chatMedal.default('own'),
   chatMax: OutputInputSchema.shape.chatMax.default(8),
   chatFadeSec: OutputInputSchema.shape.chatFadeSec.default(0),
+  // 弹幕列表外观是 v1.9 加的
+  chatLook: OutputInputSchema.shape.chatLook.default('glass'),
+  chatGuardFrame: OutputInputSchema.shape.chatGuardFrame.default('theme'),
+  chatMascot: OutputInputSchema.shape.chatMascot.default('big'),
+  chatAlpha: OutputInputSchema.shape.chatAlpha.default(0),
+  chatHideBlocked: OutputInputSchema.shape.chatHideBlocked.default(false),
   // 送礼名单是 v1.5 加的
   giftsEnabled: OutputInputSchema.shape.giftsEnabled.default(true),
   giftsSide: OutputInputSchema.shape.giftsSide.default('right'),
@@ -376,7 +382,7 @@ export class ConfigIO {
         return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
       }),
       ...(this.d.music ? { music: this.d.music.cfg() } : {}),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, chatLook: o.chatLook, chatGuardFrame: o.chatGuardFrame, chatMascot: o.chatMascot, chatAlpha: o.chatAlpha, chatHideBlocked: o.chatHideBlocked, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha })),
     };
   }
 

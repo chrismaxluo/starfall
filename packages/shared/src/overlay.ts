@@ -48,6 +48,16 @@ export interface OverlayConfig {
   chatMax: number;
   /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示（只被新弹幕顶走） */
   chatFadeSec: number;
+  /** 弹幕列表外观：玻璃（原来的样子）或三种小八主题 */
+  chatLook: ChatLook;
+  /** 主题外观里大航海的头像框：主题自己的框（按身份换色）/ B 站的大航海框（这时其他人用简单圆框） */
+  chatGuardFrame: 'theme' | 'bili';
+  /** 主题外观里小八放哪：头像旁边（大）、气泡右端、头像右下角（小）、不放 */
+  chatMascot: ChatMascot;
+  /** 主题外观气泡底色的浓淡（%）；0 为跟随外观 */
+  chatAlpha: number;
+  /** 黑名单里的人不显示在弹幕列表里 */
+  chatHideBlocked: boolean;
   /** 送礼名单：开关、对齐（靠左 / 靠右）、字号、最多显示几条、显示哪些 */
   giftsEnabled: boolean;
   giftsSide: 'left' | 'right';
@@ -74,9 +84,19 @@ export const CHAT_FADE_OPTIONS = [5, 10, 15, 30, 60];
 /** 弹幕列表浏览器源的建议宽度 */
 export const CHAT_WIDTH = 600;
 
-/** 弹幕列表浏览器源的建议高度：普通长度的弹幕每条约 110（字号大时 1.2 倍），上下留边，按 50 取整，至少 300 */
-export function chatHeight(max: number, size: 'normal' | 'large'): number {
-  const row = size === 'large' ? 132 : 110;
+export const CHAT_LOOKS = ['glass', 'cream', 'night', 'pixel'] as const;
+export type ChatLook = (typeof CHAT_LOOKS)[number];
+export const CHAT_MASCOTS = ['big', 'end', 'small', 'off'] as const;
+export type ChatMascot = (typeof CHAT_MASCOTS)[number];
+/** 主题外观气泡底色浓淡：30 – 100%；每种外观的默认值（0 = 跟随外观时用它） */
+export const CHAT_ALPHA_MIN = 30;
+export const CHAT_ALPHA_MAX = 100;
+export const CHAT_LOOK_ALPHA: Record<Exclude<ChatLook, 'glass'>, number> = { cream: 95, night: 60, pixel: 80 };
+
+/** 弹幕列表浏览器源的建议高度：普通长度的弹幕每条约 110（主题外观约 130，字号大时 1.2 倍），上下留边，按 50 取整，至少 300 */
+export function chatHeight(max: number, size: 'normal' | 'large', look: ChatLook = 'glass'): number {
+  const base = look === 'glass' ? 110 : 130;
+  const row = size === 'large' ? base * 1.2 : base;
   return Math.max(300, Math.ceil((32 + max * row - 14) / 50) * 50);
 }
 
@@ -95,6 +115,8 @@ export interface ChatItem {
     /** own：本直播间的粉丝牌（设置成「只显示本直播间的」时只显示这种） */
     medal?: { name: string; level: number; own: boolean; colors?: { bg: string; level: string; border: string; text: string } };
     honor?: { level: number; url?: string };
+    /** 在黑名单里（设置成「黑名单的人不显示」时弹幕列表不显示这条） */
+    blocked?: true;
   };
   text: string;
   /** 文字里的小表情：写法 → 图片地址 */

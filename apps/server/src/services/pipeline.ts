@@ -362,6 +362,7 @@ export class Pipeline {
         anchor: anchorUid > 0 && v.uid === anchorUid,
         ...(v.medal && v.medal.level > 0 ? { medal: { name: v.medal.name, level: v.medal.level, own: isOwnMedal(v, anchorUid), ...(v.medal.colors ? { colors: v.medal.colors } : {}) } } : {}),
         ...(v.honor ? { honor: honorOf(v.honor, this.d.honor?.urlFor(v.honor)) } : {}),
+        ...(this.d.blacklist.reason(v.uid) === 'list' ? { blocked: true as const } : {}),
       },
       text: ev.text,
       ...(ev.emots ? { emots: ev.emots } : {}),

@@ -225,7 +225,13 @@ function applyConfig(next: OverlayConfig): void {
   config = next;
   const lite = q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
   root.className = `chat-root side-${config.chatSide}${config.chatSize === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${config.chatEnabled ? '' : ' off'}${themeClass(config)}`;
-  if (isTheme(config)) root.style.setProperty('--bga', String(themeAlpha(config)));
+  if (isTheme(config)) {
+    // 直播姬的旧内核不一定认 opacity 里的 calc()：几种用到的倍数直接算好
+    const a = themeAlpha(config);
+    root.style.setProperty('--bga', String(a));
+    root.style.setProperty('--bga35', (a * 0.35).toFixed(3));
+    root.style.setProperty('--bga90', (a * 0.9).toFixed(3));
+  }
   if (redrawNeeded) redraw();
 }
 

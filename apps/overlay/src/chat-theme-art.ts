@@ -295,7 +295,7 @@ export function bubbleSvg(look: ThemeLook, tier: Tier, w: number, h: number, k: 
       ${im('tail', w - 26 * k, h - 64 * k, 56 * k)}
       <g filter="url(#${id}s)"><path d="${outer}" fill="none" stroke="#fff" stroke-width="${9 * k}" stroke-linejoin="round"/></g>
       <path d="${outer}" style="fill:#FFFAF0;fill-opacity:var(--bga)"/>
-      <rect x="0" y="${-30 * k}" width="${w}" height="${h + 30 * k}" fill="#fff" filter="url(#${id}p)" clip-path="url(#${id}c)" style="opacity:calc(var(--bga) * .35)"/>
+      <rect x="0" y="${-30 * k}" width="${w}" height="${h + 30 * k}" fill="#fff" filter="url(#${id}p)" clip-path="url(#${id}c)" style="opacity:var(--bga35)"/>
       <path d="${earInner(w, k, Ro)}" fill="url(#${id}g)" stroke="${main}" stroke-width="${1.2 * k}"/>
       <path d="${bubPath(w, h, k, 7 * k, Ro)}" fill="none" stroke="${main}" stroke-width="${2.4 * k}" stroke-dasharray="${8 * k} ${6 * k}" stroke-linecap="round" opacity=".9"/>
       <path d="${outer}" fill="none" stroke="${main}" stroke-opacity=".35" stroke-width="${1.2 * k}" stroke-linejoin="round"/>
@@ -317,7 +317,7 @@ export function bubbleSvg(look: ThemeLook, tier: Tier, w: number, h: number, k: 
       <path d="${tailPath(tx, ty, k)}" fill="url(#${id}t)" stroke="#0B1238" stroke-width="${2.2 * k}" stroke-linejoin="round"/>
       <path d="${outer}" fill="none" stroke="${main}" stroke-width="${6 * k}" filter="url(#${id}b)" opacity=".85"/>
       <path d="${outer}" fill="url(#${id}f)" style="fill-opacity:var(--bga)"/>
-      <g clip-path="url(#${id}k)" style="opacity:calc(var(--bga) * .9)"><g filter="url(#${id}c2)" fill="#4B63C8" opacity=".55"><ellipse cx="${w - Ro * 1.6}" cy="${h + 4 * k}" rx="${70 * k}" ry="${22 * k}"/><ellipse cx="${w - Ro * 3.2}" cy="${h + 8 * k}" rx="${60 * k}" ry="${18 * k}"/><ellipse cx="${w * 0.42}" cy="${h + 10 * k}" rx="${90 * k}" ry="${16 * k}"/></g>${stars}</g>
+      <g clip-path="url(#${id}k)" style="opacity:var(--bga90)"><g filter="url(#${id}c2)" fill="#4B63C8" opacity=".55"><ellipse cx="${w - Ro * 1.6}" cy="${h + 4 * k}" rx="${70 * k}" ry="${22 * k}"/><ellipse cx="${w - Ro * 3.2}" cy="${h + 8 * k}" rx="${60 * k}" ry="${18 * k}"/><ellipse cx="${w * 0.42}" cy="${h + 10 * k}" rx="${90 * k}" ry="${16 * k}"/></g>${stars}</g>
       <path d="${earInner(w, k, Ro)}" fill="${main}" opacity=".55"/>
       <path d="${outer}" fill="none" stroke="${light}" stroke-width="${2 * k}" stroke-linejoin="round"/>
       <path d="${bubPath(w, h, k, 3.5 * k, Ro)}" fill="none" stroke="${main}" stroke-opacity=".45" stroke-width="${1 * k}"/>

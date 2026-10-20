@@ -10,7 +10,7 @@ import { state } from '../lib/store.ts';
 const props = defineProps<{ config: OverlayConfig; alpha?: boolean }>();
 const frame = ref<HTMLIFrameElement | null>(null);
 /** 按建议的浏览器源大小（600 宽，高度随条数、字号变）缩小显示，最高 520 */
-const H = computed(() => chatHeight(props.config.chatMax, props.config.chatSize));
+const H = computed(() => chatHeight(props.config.chatMax, props.config.chatSize, props.config.chatLook));
 const K = computed(() => Math.min(0.5, 520 / H.value));
 let ready = false;
 

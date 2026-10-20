@@ -34,6 +34,16 @@ describe('直播软件输出', () => {
     expect((await req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload: { chatFadeSec: 0 } })).json()).toMatchObject({ chatFadeSec: 0 });
   });
 
+  it('弹幕列表外观：默认玻璃（和以前一样）；主题外观的头像框、小八、浓淡、黑名单开关可以改，取值要合法', async () => {
+    const { req } = await setup();
+    const [o] = (await req({ method: 'GET', url: '/api/outputs' })).json().outputs;
+    expect(o).toMatchObject({ chatLook: 'glass', chatGuardFrame: 'theme', chatMascot: 'big', chatAlpha: 0, chatHideBlocked: false });
+    const put = (payload: object) => req({ method: 'PUT', url: `/api/outputs/${o.id}`, payload });
+    expect((await put({ chatLook: 'pixel', chatGuardFrame: 'bili', chatMascot: 'end', chatAlpha: 70, chatHideBlocked: true })).json()).toMatchObject({ chatLook: 'pixel', chatGuardFrame: 'bili', chatMascot: 'end', chatAlpha: 70, chatHideBlocked: true });
+    for (const p of [{ chatLook: 'cloud' }, { chatGuardFrame: 'none' }, { chatMascot: 'huge' }, { chatAlpha: 20 }, { chatAlpha: 101 }, { chatAlpha: 50.5 }]) expect((await put(p)).statusCode).toBe(400);
+    expect((await put({ chatAlpha: 0 })).json()).toMatchObject({ chatAlpha: 0 });
+  });
+
   it('送礼名单：默认打开、靠右、6 条、所有付费礼物和上舰、醒目留言；可以改成只显示选中的礼物', async () => {
     const { req } = await setup();
     const [o] = (await req({ method: 'GET', url: '/api/outputs' })).json().outputs;

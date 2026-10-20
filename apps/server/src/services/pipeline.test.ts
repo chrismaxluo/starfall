@@ -707,6 +707,8 @@ describe('弹幕列表', () => {
     t.live.emit(dm('晚上好'));
     t.live.emit(dm('欢迎来到直播间', { uid: 10002, name: '机器人' }));
     expect(chats(chat).map((c) => c.text)).toEqual(['晚上好', '欢迎来到直播间']);
+    // 黑名单里的人标上 blocked（设成「黑名单的人不显示」时弹幕列表自己不显示）
+    expect(chats(chat).map((c) => c.viewer.blocked)).toEqual([undefined, true]);
     expect(t.sock.sent.some((m) => m.type === 'chat')).toBe(false);
     expect(chat.sent.some((m) => m.type === 'play')).toBe(false);
   });

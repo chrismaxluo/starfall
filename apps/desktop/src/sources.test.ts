@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { downloadSources, MIRRORS, normalizeMirror, sourceName, SpeedWatch, viaMirror } from './sources.ts';
+import { downloadSources, MIRRORS, normalizeMirror, R2, r2ChannelUrl, sourceName, SpeedWatch, viaMirror } from './sources.ts';
 
 describe('下载来源', () => {
-  it('先直连 GitHub，再试自己填的，最后是内置加速站；重复的去掉', () => {
-    expect(downloadSources()).toEqual([null, ...MIRRORS]);
-    expect(downloadSources('https://my.proxy/')).toEqual([null, 'https://my.proxy/', ...MIRRORS]);
-    expect(downloadSources(MIRRORS[2])).toEqual([null, MIRRORS[2], ...MIRRORS.filter((m) => m !== MIRRORS[2])]);
+  it('先直连 GitHub，再试自己填的、星临的备用下载地址，最后是内置加速站；重复的去掉', () => {
+    expect(downloadSources()).toEqual([null, R2, ...MIRRORS]);
+    expect(downloadSources('https://my.proxy/')).toEqual([null, 'https://my.proxy/', R2, ...MIRRORS]);
+    expect(downloadSources(MIRRORS[2])).toEqual([null, MIRRORS[2], R2, ...MIRRORS.filter((m) => m !== MIRRORS[2])]);
+    expect(downloadSources(R2)).toEqual([null, R2, ...MIRRORS]);
+  });
+
+  it('查新版本时 GitHub 就连不上：不再试直连', () => {
+    expect(downloadSources(null, true)).toEqual([R2, ...MIRRORS]);
+    expect(downloadSources('https://my.proxy/', true)).toEqual(['https://my.proxy/', R2, ...MIRRORS]);
   });
 
   it('自己填的地址：空的为不用，补上末尾的 /，不是网址的不收', () => {
@@ -24,6 +30,15 @@ describe('下载来源', () => {
     expect(new URL(viaMirror(u, 'https://gh-proxy.com/')).pathname).toBe(`/${u}`);
     expect(sourceName(null)).toBe('GitHub 直连');
     expect(sourceName('https://gh-proxy.com/')).toBe('备用地址 gh-proxy.com');
+  });
+
+  it('星临的备用下载地址：按文件名找，旧版本的 blockmap 也一样；查新版本按测试版、正式版分开', () => {
+    const u = 'https://github.com/o/r/releases/download/v1.9.0/Starfall-1.9.0-win-x64-setup.exe';
+    expect(viaMirror(u, R2)).toBe(`${R2}Starfall-1.9.0-win-x64-setup.exe`);
+    expect(viaMirror(`${u}.blockmap`, R2)).toBe(`${R2}Starfall-1.9.0-win-x64-setup.exe.blockmap`);
+    expect(sourceName(R2)).toBe('星临备用下载地址');
+    expect(r2ChannelUrl(false)).toBe(`${R2}latest.yml`);
+    expect(r2ChannelUrl(true)).toBe(`${R2}beta.yml`);
   });
 });
 

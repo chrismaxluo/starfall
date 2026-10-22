@@ -8,7 +8,7 @@
 
 识别每一位进场的观众，在弹幕、礼物、上舰的时刻，于直播画面上播放专属的动画、欢迎语与音效。
 
-[![Version](https://img.shields.io/badge/version-1.8.0-5451D6?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.9.0-5451D6?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-2F6FEB?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24-3C873A?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -37,7 +37,7 @@
   </tr>
   <tr>
     <td width="33%" valign="top"><b>特效素材</b><br><sub>内置大航海东方宫廷特效和玻璃质感特效，支持上传透明 WebM、MP4、图片、SVGA、Lottie，可搭配音效；SVGA 里的头像、昵称、头像框等图层自动换成进场的观众；位置、大小、边缘羽化随意调</sub></td>
-    <td width="33%" valign="top"><b>直播软件</b><br><sub>兼容 B 站直播姬与 OBS，竖屏优先并自动避开安全区，支持多路输出；另有弹幕列表和送礼名单，把弹幕、收到的礼物（本场、本周、本月或感谢榜）排成一列显示在画面边上；弹幕点歌（网易云 + 本地歌库，点歌窗口带滚动歌词）；升级后自动更新</sub></td>
+    <td width="33%" valign="top"><b>直播软件</b><br><sub>兼容 B 站直播姬与 OBS，竖屏优先并自动避开安全区，支持多路输出；另有弹幕列表（含五种小八主题外观）和送礼名单，把弹幕、收到的礼物（本场、本周、本月或感谢榜）排成一列显示在画面边上；弹幕点歌（网易云 + 本地歌库，点歌窗口带滚动歌词）；升级后自动更新</sub></td>
     <td width="33%" valign="top"><b>管理后台</b><br><sub>实时动态、播放队列、在线观众、礼物榜（含上舰与醒目留言）、大航海到场、事件记录、模拟验证、备份与导入导出</sub></td>
   </tr>
 </table>
@@ -251,6 +251,7 @@ pnpm build        # 构建管理后台与特效页
 - [x] **v1.6.0**：国内下载更新更容易（GitHub 连不上或太慢时自动换加速站）；送礼名单最低金额；内置素材统一命名；新安装的默认设置调整；桌面版卸载时可以选择是否删除数据
 - [x] **v1.7.0**：弹幕点歌（网易云 + 本地歌库，点歌窗口带滚动歌词，六种样子，音量均衡）；外观设置点「保存」才更新到直播画面；修复旧内核直播软件里彩色底条不显示
 - [x] **v1.8.0**：送礼名单可选时间范围（本场、今天、本周、本月、从某时起）、感谢榜、置顶和标题、七种样式和三种滚法；点歌主页（网易云会员到期提醒、本场点歌数据、歌词）；桌面版直播软件先打开时特效页自动连上
+- [x] **v1.9.0**：弹幕列表五种小八主题外观（果冻玻璃、青花瓷、奶油贴纸、星月夜空、像素小屋），昵称和弹幕完整显示；点歌精简模式、双语歌词；全站礼物搜索；星临自己的备用下载地址
 - [ ] 第二期：醒目留言、关注、点赞触发；直播数据统计；观众档案
 
 ## 声明

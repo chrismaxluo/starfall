@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_ALPHA_DEFAULT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, lyricsLangOf, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { CHAT_MASCOT_OLD, DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_ALPHA_DEFAULT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, lyricsLangOf, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -158,7 +158,9 @@ const OutputPart = OutputInputSchema.extend({
   // 弹幕列表外观是 v1.9 加的
   chatLook: OutputInputSchema.shape.chatLook.default('glass'),
   chatGuardFrame: OutputInputSchema.shape.chatGuardFrame.default('theme'),
-  chatMascot: OutputInputSchema.shape.chatMascot.default('big'),
+  // 小八的设置在 1.9 开发期间换过一次：以前的「头像旁边、气泡右端、头像右下角」换成现在的出场方式
+  chatMascot: z.preprocess((v) => (typeof v === 'string' ? (CHAT_MASCOT_OLD[v] ?? v) : v), OutputInputSchema.shape.chatMascot).default('hop'),
+  chatCreamFrame: OutputInputSchema.shape.chatCreamFrame.default('hachi'),
   chatAlpha: OutputInputSchema.shape.chatAlpha.default(0),
   chatHideBlocked: OutputInputSchema.shape.chatHideBlocked.default(false),
   // 送礼名单是 v1.5 加的
@@ -382,7 +384,7 @@ export class ConfigIO {
         return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
       }),
       ...(this.d.music ? { music: this.d.music.cfg() } : {}),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, chatLook: o.chatLook, chatGuardFrame: o.chatGuardFrame, chatMascot: o.chatMascot, chatAlpha: o.chatAlpha, chatHideBlocked: o.chatHideBlocked, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, chatLook: o.chatLook, chatGuardFrame: o.chatGuardFrame, chatMascot: o.chatMascot, chatCreamFrame: o.chatCreamFrame, chatAlpha: o.chatAlpha, chatHideBlocked: o.chatHideBlocked, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha })),
     };
   }
 

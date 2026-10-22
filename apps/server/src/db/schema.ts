@@ -2,7 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { CHAT_LOOKS, CHAT_MASCOTS, GIFTS_ALPHA_DEFAULT, GIFTS_LOOKS, GIFTS_MOTIONS } from '@starfall/shared';
+import { CHAT_CREAM_FRAMES, CHAT_LOOKS, CHAT_MASCOTS, GIFTS_ALPHA_DEFAULT, GIFTS_LOOKS, GIFTS_MOTIONS } from '@starfall/shared';
 import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, MusicSource, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
 
@@ -193,10 +193,11 @@ export const outputs = sqliteTable('outputs', {
   chatMedal: text('chat_medal', { enum: ['own', 'all'] }).notNull().default('own'),
   chatMax: integer('chat_max').notNull().default(8),
   chatFadeSec: integer('chat_fade_sec').notNull().default(0),
-  // 外观（默认玻璃，和以前一样）、主题外观的大航海头像框、小八放哪、气泡浓淡（0 = 跟随外观）、黑名单的人不显示
+  // 外观（默认玻璃，和以前一样）、主题外观的大航海头像框、小八怎么出场、奶油贴纸的头像框、气泡浓淡（0 = 跟随外观）、黑名单的人不显示
   chatLook: text('chat_look', { enum: CHAT_LOOKS }).notNull().default('glass'),
   chatGuardFrame: text('chat_guard_frame', { enum: ['theme', 'bili'] }).notNull().default('theme'),
-  chatMascot: text('chat_mascot', { enum: CHAT_MASCOTS }).notNull().default('big'),
+  chatMascot: text('chat_mascot', { enum: CHAT_MASCOTS }).notNull().default('hop'),
+  chatCreamFrame: text('chat_cream_frame', { enum: CHAT_CREAM_FRAMES }).notNull().default('hachi'),
   chatAlpha: integer('chat_alpha').notNull().default(0),
   chatHideBlocked: integer('chat_hide_blocked', { mode: 'boolean' }).notNull().default(false),
   // 送礼名单（同一个输出的又一个浏览器源）；默认靠右，和靠左的弹幕列表错开

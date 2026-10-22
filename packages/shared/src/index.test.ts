@@ -17,7 +17,8 @@ describe('弹幕列表建议高度', () => {
     expect(chatHeight(20, 'normal')).toBe(2250);
     expect(chatHeight(1, 'normal')).toBe(300);
     // 小八主题外观一条高一些
-    expect(chatHeight(8, 'normal', 'cream')).toBe(1100);
+    expect(chatHeight(8, 'normal', 'cream')).toBe(1300);
+    expect(chatHeight(8, 'large', 'jelly')).toBe(1550);
     expect(chatHeight(8, 'normal', 'glass')).toBe(900);
     for (let n = 1; n < 20; n++) expect(chatHeight(n + 1, 'normal')).toBeGreaterThan(chatHeight(n, 'normal') - 1);
   });

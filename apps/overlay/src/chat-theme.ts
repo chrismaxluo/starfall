@@ -5,7 +5,7 @@ import { CHAT_LOOK_ALPHA, GUARD_BADGES, GUARD_FRAMES } from '@starfall/shared/ov
 import type { ChatItem, OverlayConfig } from '@starfall/shared/overlay';
 import { segments } from './chat-text.ts';
 import { h } from './dom.ts';
-import { avatar, fallbackColors } from './parts.ts';
+import { avatar, fallbackColors, img } from './parts.ts';
 import { CREAM_CHARMS, CREAM_GEO, DRAWN_GEO, bubbleSvg, nameIcon, ornaments, pickCat, pixelize, simpleFrame, sparkSvg, svgUrl, themeFrame, tint } from './chat-theme-art.ts';
 import type { CreamCharm, ThemeLook, Tier } from './chat-theme-art.ts';
 
@@ -25,14 +25,6 @@ let idle = 0;
 let lastCharm: CreamCharm | '' = '';
 let seq = 0;
 
-function img(cls: string, src: string, alt = ''): HTMLImageElement {
-  const el = h('img', { class: cls });
-  el.alt = alt;
-  el.referrerPolicy = 'no-referrer';
-  el.onerror = () => el.remove();
-  el.src = src;
-  return el;
-}
 /** 本地的图（装饰、小八）：不用 no-referrer，加载失败就不显示 */
 function pic(cls: string, src: string): HTMLImageElement {
   const el = h('img', { class: cls });

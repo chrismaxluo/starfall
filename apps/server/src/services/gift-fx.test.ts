@@ -46,4 +46,18 @@ describe('B站礼物全屏动画', () => {
     await fx.ready(car);
     expect(fx.forGift(car)?.durationMs).toBe(5700);
   });
+  it('收到礼物时：正在读才等；读失败后 10 分钟内每个礼物都不再去读、不用等', async () => {
+    let fail = true;
+    const { fx, fetchLayout } = make({ layout: async () => { if (fail) throw new Error('x'); return LAYOUT; } });
+    fx.start(async () => []);
+    await flush();
+    const w = fx.waitFor(car, 2000);
+    expect(w).not.toBeNull();
+    await w;
+    expect(fetchLayout).toHaveBeenCalledTimes(1);
+    fail = false;
+    for (let i = 0; i < 5; i++) expect(fx.waitFor(car, 2000)).toBeNull();
+    expect(fetchLayout).toHaveBeenCalledTimes(1);
+    expect(fx.waitFor(flower, 2000)).toBeNull();
+  });
 });

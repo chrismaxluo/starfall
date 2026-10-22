@@ -67,6 +67,22 @@ export class GiftEffects {
     await Promise.race([work.catch(() => undefined), new Promise((r) => setTimeout(r, ms))]);
   }
 
+  /**
+   * 收到礼物时调用：动画还没读到就在后台读（读失败后同样 10 分钟内不再重试，B 站接口出问题时不会每个礼物都去读一次），
+   * 正在读时返回最多等 ms 毫秒的 Promise；已经有了、没有动画、这次不读时返回 null（不用等）
+   */
+  waitFor(g: GiftConfig | undefined, ms: number): Promise<void> | null {
+    if (!this.started || !g?.effectId || this.forGift(g)) return null;
+    const id = g.effectId;
+    const list = this.loadingList;
+    if (!list && !this.loading.has(id)) return null;
+    const work = (async () => {
+      await list;
+      await this.loadLayout(id);
+    })();
+    return Promise.race([work.catch(() => undefined), new Promise<void>((r) => setTimeout(r, ms))]);
+  }
+
   private loadList(force = false): Promise<void> {
     const now = Date.now();
     if (this.loadingList) return this.loadingList;

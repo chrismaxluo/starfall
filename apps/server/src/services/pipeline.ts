@@ -135,7 +135,7 @@ export interface PipelineDeps {
   /** 查礼物图；测试里可以不传 */
   gifts?: Pick<GiftCatalog, 'find'>;
   /** 查 B站礼物全屏动画；测试里可以不传 */
-  giftFx?: Pick<GiftEffects, 'forGift'> & Partial<Pick<GiftEffects, 'ready'>>;
+  giftFx?: Pick<GiftEffects, 'forGift'> & Partial<Pick<GiftEffects, 'waitFor'>>;
   /** 查荣耀等级勋章图；测试里可以不传 */
   honor?: Pick<HonorMedals, 'urlFor'>;
   room: RoomStore;
@@ -164,6 +164,11 @@ export class Pipeline {
   private combo = new GiftComboMerger();
   private guards = new GuardDeduper();
   private unsubscribeRoom: (() => void) | null = null;
+  /** 在等官方动画读好的礼物（按收到的顺序）；后到的礼物排在它们后面，不会抢先播、先记 */
+  private held: TriggerEvent[] = [];
+  private heldChain: Promise<void> = Promise.resolve();
+  /** 停止、换直播间时加一：之前在等的礼物读好后不再处理 */
+  private heldGen = 0;
   private readonly cooldowns = new Cooldowns();
   private readonly once = new OncePerLive();
   private readonly queue = new PlayQueue<Queued>();
@@ -209,8 +214,9 @@ export class Pipeline {
     this.guard('恢复送礼名单', () => this.giftBoards.restore());
     this.unsubscribeOutputs = this.d.outputs.onChange((o, change) => this.guard('更新送礼名单', () => this.giftBoards.outputChanged(o, change)));
     this.unsubscribe = this.d.live.onEvent((ev, raw) => this.handle(ev, raw));
-    // 换了直播间：还在合并中（等待中的进场、连击中的礼物、等待确认的上舰）属于上一个直播间，丢掉，不要记到新直播间名下
+    // 换了直播间：还在合并中（等待中的进场、连击中的礼物、在等官方动画的礼物、等待确认的上舰）属于上一个直播间，丢掉，不要记到新直播间名下
     this.unsubscribeRoom = this.d.room.onChange(() => {
+      this.dropHeld();
       this.merger = new EnterMerger();
       this.combo = new GiftComboMerger();
       this.guards = new GuardDeduper();
@@ -240,7 +246,7 @@ export class Pipeline {
     if (this.current) clearTimeout(this.current.timer);
     this.current = null;
     // 还在合并中的礼物连击、上舰、进场：记下来（不播），不然这份礼物不进事件记录和送礼名单
-    for (const e of [...this.combo.flush(Infinity), ...this.guards.flush(Infinity), ...this.merger.flush(Infinity)]) {
+    for (const e of [...this.dropHeld(), ...this.combo.flush(Infinity), ...this.guards.flush(Infinity), ...this.merger.flush(Infinity)]) {
       this.guard('记下合并中的事件', () => {
         const j = this.judge(e);
         this.record(e, j.hit, j.status === 'queued' ? 'cleared' : j.status);
@@ -277,13 +283,8 @@ export class Pipeline {
         this.combo.enabled = g.comboEnabled;
         // 有 B 站全屏动画、还没读到的礼物（盲盒里爆出的权杖这类不在礼物面板上，启动时不会提前读）：一收到就开始读，
         // 连击合并要等几秒，一般来得及；马上就要播的最多等 2 秒，第一次也能用上官方动画
-        const cfg = this.d.gifts?.find(ev.giftId);
-        const fx = this.d.giftFx;
-        const loading = cfg?.effectId && fx?.ready && !fx.forGift(cfg) ? fx.ready(cfg, FX_WAIT_MS) : null;
-        for (const e of this.combo.push(ev, now)) {
-          if (loading) void loading.then(() => this.guard('处理礼物', () => this.process(e)));
-          else this.process(e);
-        }
+        const loading = this.d.giftFx?.waitFor?.(this.d.gifts?.find(ev.giftId), FX_WAIT_MS) ?? null;
+        this.gifts(this.combo.push(ev, now), loading);
         break;
       }
       case 'guard':
@@ -309,11 +310,39 @@ export class Pipeline {
   }
   private readonly scSeen = new Map<string, number>();
 
+  /** 处理礼物：loading 不为空（官方动画还在读）或前面还有在等的礼物时，排在后面等它们处理完 */
+  private gifts(evs: TriggerEvent[], loading: Promise<void> | null): void {
+    if (!loading && !this.held.length) {
+      for (const e of evs) this.process(e);
+      return;
+    }
+    if (!evs.length) return;
+    const gen = this.heldGen;
+    this.held.push(...evs);
+    this.heldChain = this.heldChain
+      .then(() => loading ?? undefined)
+      .then(() => {
+        if (gen !== this.heldGen) return;
+        for (const e of evs) {
+          this.held.splice(this.held.indexOf(e), 1);
+          this.guard('处理礼物', () => this.process(e));
+        }
+      });
+  }
+
+  /** 取出还在等的礼物，之后读好了也不再处理 */
+  private dropHeld(): TriggerEvent[] {
+    this.heldGen++;
+    const evs = this.held;
+    this.held = [];
+    return evs;
+  }
+
   /** 取出等待超时的进场、连击结束的礼物、单独到达的 GUARD_BUY（定时调用） */
   flush(): void {
     const now = this.now();
     for (const e of this.merger.flush(now)) this.process(e);
-    for (const e of this.combo.flush(now)) this.process(e);
+    this.gifts(this.combo.flush(now), null);
     for (const e of this.guards.flush(now)) this.process(e);
     this.giftBoards.sync();
     for (const [id, r] of this.raws) if (now - r.at > RAW_TTL_MS) this.raws.delete(id);

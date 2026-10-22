@@ -219,11 +219,24 @@ describe('导入配置', () => {
     const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
     expect(f.outputs[1]).toMatchObject({ chatEnabled: true, chatSide: 'right', chatSize: 'normal', chatMedal: 'all', chatMax: 12 });
     const old = structuredClone(f);
-    for (const o of old.outputs) for (const k of ['chatEnabled', 'chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec', 'chatLook', 'chatGuardFrame', 'chatMascot', 'chatAlpha', 'chatHideBlocked']) delete o[k];
+    for (const o of old.outputs) for (const k of ['chatEnabled', 'chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec', 'chatLook', 'chatGuardFrame', 'chatMascot', 'chatCreamFrame', 'chatAlpha', 'chatHideBlocked']) delete o[k];
     const dst = await setup();
     const { token } = (await importFile(dst, 'old.json', JSON.stringify(old))).json();
     expect((await dst.req({ method: 'POST', url: `/api/backup/import/${token}` })).statusCode).toBe(200);
-    expect(dst.ctx.outputs.list()[1]).toMatchObject({ name: '横屏录播', chatEnabled: true, chatSide: 'left', chatMedal: 'own', chatMax: 8, chatFadeSec: 0, chatLook: 'glass', chatGuardFrame: 'theme', chatMascot: 'big', chatAlpha: 0, chatHideBlocked: false });
+    expect(dst.ctx.outputs.list()[1]).toMatchObject({ name: '横屏录播', chatEnabled: true, chatSide: 'left', chatMedal: 'own', chatMax: 8, chatFadeSec: 0, chatLook: 'glass', chatGuardFrame: 'theme', chatMascot: 'hop', chatCreamFrame: 'hachi', chatAlpha: 0, chatHideBlocked: false });
+  });
+
+  it('1.9 开发期间导出的文件里小八还是「放哪」的旧设置：换成对应的出场方式', async () => {
+    const src = await setup();
+    await populate(src);
+    const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
+    f.outputs[0].chatMascot = 'big';
+    f.outputs[1].chatMascot = 'end';
+    delete f.outputs[1].chatCreamFrame;
+    const dst = await setup();
+    const { token } = (await importFile(dst, 'dev.json', JSON.stringify(f))).json();
+    expect((await dst.req({ method: 'POST', url: `/api/backup/import/${token}` })).statusCode).toBe(200);
+    expect(dst.ctx.outputs.list().map((o) => [o.chatMascot, o.chatCreamFrame])).toEqual([['hop', 'hachi'], ['corner', 'hachi']]);
   });
 
   it('取消导入；无效的文件给出能看懂的错误', async () => {

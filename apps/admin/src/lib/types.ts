@@ -1,5 +1,5 @@
 // 接口返回的数据格式（与服务端 apps/server 的返回值一致）
-import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, ChatLook, ChatMascot, GiftsFilter, GiftsLook, GiftsMotion, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, ChatCreamFrame, ChatLook, ChatMascot, GiftsFilter, GiftsLook, GiftsMotion, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
 
 export type { Tier, TierRule, HonorBand, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules, QuickButton };
 
@@ -68,10 +68,11 @@ export interface OutputDto {
   chatMax: number;
   /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示 */
   chatFadeSec: number;
-  /** 外观；主题外观的大航海头像框、小八放哪、气泡浓淡（0 = 跟随外观）；黑名单的人不显示 */
+  /** 外观；主题外观的大航海头像框、小八怎么出场、奶油贴纸的头像框、气泡浓淡（0 = 跟随外观）；黑名单的人不显示 */
   chatLook: ChatLook;
   chatGuardFrame: 'theme' | 'bili';
   chatMascot: ChatMascot;
+  chatCreamFrame: ChatCreamFrame;
   chatAlpha: number;
   chatHideBlocked: boolean;
   giftsEnabled: boolean;

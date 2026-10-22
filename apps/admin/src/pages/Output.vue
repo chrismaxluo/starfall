@@ -45,7 +45,7 @@ const online = (id: number) => state.overlays.some((x) => x.outputId === id && i
 const fx = useDraft(() => o.value, ['orient', 'width', 'height', 'safeTop', 'safeBottom', 'marginX', 'scale', 'liteMode'] as const, (p): Promise<boolean> =>
   save(p, 'width' in p || 'height' in p ? '已保存：分辨率改了，直播软件里的浏览器源宽高也要一起改' : '已保存，直播画面已更新'),
 );
-const chat = useDraft(() => o.value, ['chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec', 'chatLook', 'chatGuardFrame', 'chatMascot', 'chatAlpha', 'chatHideBlocked'] as const, (p): Promise<boolean> => {
+const chat = useDraft(() => o.value, ['chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec', 'chatLook', 'chatGuardFrame', 'chatMascot', 'chatCreamFrame', 'chatAlpha', 'chatHideBlocked'] as const, (p): Promise<boolean> => {
   const x = { ...o.value!, ...p };
   const tall = chatHeight(x.chatMax, x.chatSize, x.chatLook) !== chatHeight(o.value!.chatMax, o.value!.chatSize, o.value!.chatLook);
   return save(p, tall ? `已保存：浏览器源的高度建议改成 ${chatHeight(x.chatMax, x.chatSize, x.chatLook)}` : '已保存，直播画面已更新');
@@ -173,18 +173,19 @@ const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 const giftsWh = computed(() => (o.value ? giftsSourceSize(o.value) : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize, o.value.chatLook) } : { w: CHAT_WIDTH, h: 900 }));
-/** 弹幕列表外观：玻璃是原来的样子，另外三种是小八主题 */
+/** 弹幕列表外观：玻璃是原来的样子，另外五种是小八主题（头像框是小八的脑袋，气泡右上角是小八的头顶） */
 const CHAT_LOOK_OPTS: Array<{ value: OutputDto['chatLook']; label: string; hint: string }> = [
   { value: 'glass', label: '玻璃', hint: '毛玻璃气泡，大航海观众使用 B站头像框（默认外观）' },
-  { value: 'cream', label: '奶油贴纸', hint: '奶油色贴纸气泡，带蓝色缝线和格纹猫耳；小八的表情随弹幕内容变化' },
-  { value: 'night', label: '星月夜空', hint: '深蓝色半透明夜空气泡，带发光描边、月亮和星星' },
-  { value: 'pixel', label: '像素小屋', hint: '像素风格气泡，小八同样显示为像素画' },
+  { value: 'jelly', label: '果冻玻璃', hint: '有厚度的透明玻璃气泡，小八头顶是蓝色果冻；大航海以边缘光的颜色区分' },
+  { value: 'porcelain', label: '青花瓷', hint: '白釉气泡，钴蓝弦纹和青海波浪纹，朱红印章；提督、总督为描金' },
+  { value: 'cream', label: '奶油贴纸', hint: '奶油色贴纸气泡，带蓝色缝线和粉色格子胶带' },
+  { value: 'night', label: '星月夜空', hint: '深蓝色夜空气泡，带发光描边、月亮和星星' },
+  { value: 'pixel', label: '像素小屋', hint: '像素风格气泡，小八同样显示为像素画，动作按像素游戏的节奏播放' },
 ];
-const MASCOT_OPTS: Array<{ value: OutputDto['chatMascot']; label: string }> = [
-  { value: 'big', label: '头像旁边' },
-  { value: 'end', label: '气泡右端' },
-  { value: 'small', label: '小贴纸' },
-  { value: 'off', label: '不放' },
+const MASCOT_OPTS: Array<{ value: OutputDto['chatMascot']; label: string; hint: string }> = [
+  { value: 'hop', label: '先在框中间露脸', hint: '每条弹幕进来时，小八先在头像框中间出现约 1 秒，再移到头像右下角，头像随后显示' },
+  { value: 'corner', label: '一直在右下角', hint: '头像一开始就显示，小八从头像后面探出，停在头像右下角' },
+  { value: 'off', label: '不显示', hint: '不显示小八' },
 ];
 const themed = computed(() => o.value && v.value.chatLook !== 'glass');
 /** 气泡浓淡：0 为跟随外观，滑块显示外观的默认值 */
@@ -503,12 +504,22 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             </div>
             <template v-if="themed">
               <div class="srow">
-                <span class="lb">小八</span>
+                <span class="lb">小八出场</span>
                 <div class="ctl">
-                  <span class="seg wrap" role="group" aria-label="小八放哪">
+                  <span class="seg wrap" role="group" aria-label="小八出场">
                     <button v-for="x in MASCOT_OPTS" :key="x.value" :aria-pressed="v.chatMascot === x.value" @click="chat.set({ chatMascot: x.value })">{{ x.label }}</button>
                   </span>
-                  <span class="hint">{{ v.chatMascot === 'big' ? '与头像大小相近，显示在头像框右下方' : v.chatMascot === 'end' ? '显示在气泡最右端；文字区域较窄，较长的昵称更容易被省略' : v.chatMascot === 'small' ? '以小贴纸显示在头像右下角' : '不显示小八' }}</span>
+                  <span class="hint">{{ MASCOT_OPTS.find((x) => x.value === v.chatMascot)?.hint }}。小八的表情和动作随弹幕内容变化</span>
+                </div>
+              </div>
+              <div v-if="v.chatLook === 'cream'" class="srow">
+                <span class="lb">头像框</span>
+                <div class="ctl">
+                  <span class="seg" role="group" aria-label="奶油贴纸的头像框">
+                    <button :aria-pressed="v.chatCreamFrame === 'hachi'" @click="chat.set({ chatCreamFrame: 'hachi' })">小八风</button>
+                    <button :aria-pressed="v.chatCreamFrame === 'lace'" @click="chat.set({ chatCreamFrame: 'lace' })">格子花边</button>
+                  </span>
+                  <span class="hint">{{ v.chatCreamFrame === 'hachi' ? '头像框和气泡右上角都画成小八的脑袋' : '蓝白格子花边头像框，气泡右上角为格子猫耳' }}</span>
                 </div>
               </div>
               <div class="srow">
@@ -518,14 +529,14 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                     <button :aria-pressed="v.chatGuardFrame === 'theme'" @click="chat.set({ chatGuardFrame: 'theme' })">主题头像框</button>
                     <button :aria-pressed="v.chatGuardFrame === 'bili'" @click="chat.set({ chatGuardFrame: 'bili' })">B站头像框</button>
                   </span>
-                  <span class="hint">{{ v.chatGuardFrame === 'theme' ? '舰长、提督、总督使用当前外观的头像框，按身份区分颜色，并分别加上星星或皇冠' : '舰长、提督、总督使用 B站头像框（无法加载时改用简单圆框）；其他观众和主播使用简单圆框' }}</span>
+                  <span class="hint">{{ v.chatGuardFrame === 'theme' ? '舰长、提督、总督使用当前外观的头像框，按身份区分颜色，并分别加上星星或皇冠' : '舰长、提督、总督使用 B站头像框（无法加载时改用当前外观的头像框）；其他观众和主播使用当前外观的头像框' }}</span>
                 </div>
               </div>
               <div class="srow">
                 <span class="lb">气泡浓淡</span>
                 <div class="ctl">
                   <div class="slider-row"><label for="cAlpha">底色</label><input id="cAlpha" :value="alphaShown" type="range" :min="CHAT_ALPHA_MIN" :max="CHAT_ALPHA_MAX" step="5" @input="chat.set({ chatAlpha: num($event) })" /><output>{{ alphaShown }}%</output></div>
-                  <div class="line"><button class="btn sm" type="button" :disabled="v.chatAlpha === 0" @click="chat.set({ chatAlpha: 0 })">跟随外观</button><span class="hint">{{ v.chatAlpha === 0 ? `当前跟随外观（${alphaShown}%）` : '已自定义' }}。只有气泡底色为半透明，文字、头像框和小八不透明；直播画面较亮或较复杂时建议调高</span></div>
+                  <div class="line"><button class="btn sm" type="button" :disabled="v.chatAlpha === 0" @click="chat.set({ chatAlpha: 0 })">跟随外观</button><span class="hint">{{ v.chatAlpha === 0 ? `当前跟随外观（${alphaShown}%）` : '已自定义' }}。只有气泡底色为半透明，文字、头像框和小八不透明。各外观的默认值在亮、暗和花哨的直播画面上都能看清文字；调得比默认值更低时，较亮的画面上文字可能不够清楚</span></div>
                 </div>
               </div>
             </template>

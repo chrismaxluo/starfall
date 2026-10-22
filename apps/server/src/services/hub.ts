@@ -58,6 +58,7 @@ export const overlayConfig = (o: OutputRow): OverlayConfig => ({
   chatLook: o.chatLook,
   chatGuardFrame: o.chatGuardFrame,
   chatMascot: o.chatMascot,
+  chatCreamFrame: o.chatCreamFrame,
   chatAlpha: o.chatAlpha,
   chatHideBlocked: o.chatHideBlocked,
   giftsEnabled: o.giftsEnabled,

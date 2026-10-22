@@ -82,7 +82,7 @@ const issues = computed(() => (tab.value === 'play' ? [] : neteaseIssues()));
 </template>
 
 <style scoped>
-.mu-page { position: relative; isolation: isolate; }
+.mu-page { position: relative; isolation: isolate; overflow-x: hidden; }
 .mu-glow { position: absolute; top: -60px; right: -40px; width: min(720px, 70%); height: 300px; z-index: -1; pointer-events: none; -webkit-mask-image: radial-gradient(closest-side, #000 30%, transparent); mask-image: radial-gradient(closest-side, #000 30%, transparent); }
 .mu-glow img { width: 100%; height: 100%; object-fit: cover; filter: blur(64px) saturate(1.7); opacity: .3; }
 [data-theme="dark"] .mu-glow img { opacity: .42; }

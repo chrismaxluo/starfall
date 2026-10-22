@@ -37,7 +37,9 @@ const { extra: found, searching } = useGiftSearch(giftQ, () => catalog.value);
 const giftShown = computed(() => {
   const k = giftQ.value.trim();
   const panel = paidGifts.value.filter((g) => !k || g.name.includes(k));
-  return [...panel, ...found.value.filter((g) => !panel.some((x) => x.id === g.id))].slice(0, 60);
+  // 没打字时列出礼物面板上全部付费礼物；搜索结果最多列 60 个
+  const all = [...panel, ...found.value.filter((g) => !panel.some((x) => x.id === g.id))];
+  return k ? all.slice(0, 60) : all;
 });
 const picked = computed(() => catalog.value.find((x) => x.id === Number(giftPick.value)) ?? null);
 function pickGift(g: GiftConfig | null): void {
@@ -142,7 +144,8 @@ onMounted(async () => {
               @focus="giftOpen = true"
               @keydown.esc="giftOpen = false"
             />
-            <div v-if="giftOpen" class="sim-found">
+            <!-- 按下时不让输入框失去焦点：有的浏览器（Mac 上的 Safari）点按钮不给按钮焦点，列表会在点中之前收起 -->
+            <div v-if="giftOpen" class="sim-found" @mousedown.prevent>
               <button type="button" @click="pickGift(null)">自定义单价<span>自己填一个价钱</span></button>
               <button v-for="g in giftShown" :key="g.id" type="button" :class="{ on: g.id === giftPick }" @click="pickGift(g)">{{ g.name }}<span>{{ battery(g.price) }} · {{ yuan(g.price) }}{{ g.tab ? '' : ' · 面板上没有' }}{{ g.effectId ? ' · 有B站动画' : '' }}</span></button>
               <span v-if="searching" class="none">正在全站礼物里找…</span>

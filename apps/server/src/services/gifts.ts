@@ -69,9 +69,11 @@ export class GiftCatalog {
     const key = q.trim();
     const panel = this.cached();
     const out = new Map<number, GiftConfig>();
-    for (const g of [...panel, ...(this.all?.gifts.values() ?? [])]) {
-      if (out.size >= limit) break;
-      if (g.paid && g.price > 0 && (!key || g.name.includes(key)) && !out.has(g.id)) out.set(g.id, g);
+    for (const list of [panel, this.all?.gifts.values() ?? []]) {
+      for (const g of list) {
+        if (out.size >= limit) break;
+        if (g.paid && g.price > 0 && (!key || g.name.includes(key)) && !out.has(g.id)) out.set(g.id, g);
+      }
     }
     return [...out.values()];
   }

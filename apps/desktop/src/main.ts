@@ -6,13 +6,14 @@ import type { MenuItemConstructorOptions, UtilityProcess } from 'electron';
 import { autoUpdater, CancellationToken } from 'electron-updater';
 import type { ProgressInfo } from 'electron-updater';
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider.js';
+import { parseUpdateInfo } from 'electron-updater/out/providers/Provider.js';
 import type { ResolvedUpdateFileInfo } from 'electron-updater/out/types.js';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fixText, HOME_PORT, planPorts } from './ports.ts';
-import { downloadSources, normalizeMirror, sourceName, SpeedWatch, viaMirror } from './sources.ts';
+import { downloadSources, normalizeMirror, r2ChannelUrl, sourceName, SpeedWatch, viaMirror } from './sources.ts';
 import { findStreamApp } from './stream-apps.ts';
 
 const NAME = '星临';
@@ -577,19 +578,43 @@ function setAutoStart(on: boolean): void {
   log(`开机自动启动：${on ? '开' : '关'}`);
 }
 
-// ---------- 检查更新（GitHub 发布页） ----------
+// ---------- 检查更新（GitHub 发布页，连不上时用星临的备用下载地址） ----------
 
 /** 这次下载用的加速站（null 为 GitHub 直连） */
 let mirror: string | null = null;
+/** 上次查新版本时 GitHub 连不上、改从星临的备用下载地址查的：下载时不再试 GitHub 直连 */
+let githubDown = false;
 /**
  * 和自带的 GitHub 来源一样（有没有新版本、latest.yml 里的校验值都直接问 GitHub），
- * 只是下载安装包和 blockmap 时可以在地址前面加上加速站。electron-updater 版本是锁定的（package.json），升级时确认 resolveFiles 还是这样用
+ * 只是下载安装包和 blockmap 时可以换成加速站。GitHub 连不上时，改从星临的备用下载地址读 latest.yml（自己上传的，同样可信）。
+ * electron-updater 版本是锁定的（package.json），升级时确认 getLatestVersion、resolveFiles 还是这样用
  */
 type GitHubArgs = ConstructorParameters<typeof GitHubProvider>;
 class MirrorProvider extends GitHubProvider {
   // setFeedURL 的设置原样传进来（provider 是 custom），按 GitHub 来源处理
   constructor(options: Record<string, unknown>, updater: GitHubArgs[1], runtime: GitHubArgs[2]) {
     super({ ...options, provider: 'github' } as GitHubArgs[0], updater, runtime);
+  }
+  override async getLatestVersion(): ReturnType<GitHubProvider['getLatestVersion']> {
+    try {
+      const info = await super.getLatestVersion();
+      githubDown = false;
+      return info;
+    } catch (e) {
+      const url = new URL(r2ChannelUrl(autoUpdater.allowPrerelease));
+      log('[更新]', `GitHub 查不到新版本，改问星临的备用下载地址 ${url.href}`, e);
+      let raw: string | null;
+      try {
+        raw = await this.httpRequest(url, { accept: '*/*', 'cache-control': 'no-cache' });
+      } catch (e2) {
+        log('[更新]', '星临的备用下载地址也查不到', e2);
+        throw e;
+      }
+      const info = parseUpdateInfo(raw, path.basename(url.pathname), url);
+      githubDown = true;
+      // 标签和 GitHub 上的一样，下载地址照常按 GitHub 的算，再换成备用地址（resolveFiles）
+      return { ...info, tag: `v${info.version}` };
+    }
   }
   override resolveFiles(info: Parameters<GitHubProvider['resolveFiles']>[0]): ResolvedUpdateFileInfo[] {
     return super.resolveFiles(info).map((f) => ({ ...f, url: new URL(viaMirror(f.url.href, mirror)) }));
@@ -701,11 +726,11 @@ async function checkUpdate(manual: boolean): Promise<void> {
 }
 
 /**
- * 下载新版本：先直连 GitHub；连不上、断了、或者太慢（sources.ts）就换下一个加速站。
+ * 下载新版本：先直连 GitHub；连不上、断了、或者太慢（sources.ts）就换下一个地址。
  * 最后一个地址不再因为慢而换掉，慢也下完；全都失败时报最后一个错误
  */
 async function downloadWithFallback(): Promise<void> {
-  const sources = downloadSources(readState().updateMirror);
+  const sources = downloadSources(readState().updateMirror, githubDown);
   let note: string | null = null;
   let lastError: unknown = null;
   for (const [i, src] of sources.entries()) {

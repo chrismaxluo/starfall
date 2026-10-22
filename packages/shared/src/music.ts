@@ -52,7 +52,12 @@ export interface MusicDisplay {
   /** 显示后面几首（0 不显示列表） */
   showQueue: number;
   lyrics: boolean;
+  /** 歌词显示哪种语言：both 双语、original 只显示原文、translation 只显示翻译（没有翻译的歌显示原文） */
+  lyricsLang?: 'both' | 'original' | 'translation';
+  /** 旧版本的点歌窗口用（还没刷新的页面）：显示不显示翻译 */
   lyricsTrans: boolean;
+  /** 精简模式：auto 卡顿时自动打开、on 一直开、off 不开 */
+  liteMode?: 'auto' | 'on' | 'off';
 }
 
 /** 为什么没在放：manual 后台暂停、offline 没开播（下播自动暂停）、no_player 没有加点歌窗口、disabled 点歌关着 */
@@ -112,16 +117,52 @@ export const MUSIC_HEIGHT = 560;
  * 去掉开头的「作词 : xx」「作曲 : xx」这类说明行和空行；没有时间的行不要
  */
 export function parseLrc(lrc: string, trans?: string): LyricLine[] {
-  const lines = readLrc(lrc).filter((l) => !CREDIT_RE.test(l.text));
+  // 同一个时间写了几行：双语歌词写在一起（外文原文一行、中文翻译一行，日文歌还可能夹一行罗马音）时，第一行当原文，中文那行当翻译；
+  // 对唱这类同一时间的几句（都是同一种文字）连成一句显示，不当成翻译（只显示原文时也看得到）
+  const lines: LyricLine[] = [];
+  /** 这个时间的第一行 */
+  let first = '';
+  for (const l of readLrc(lrc).filter((x) => !CREDIT_RE.test(x.text))) {
+    const prev = lines[lines.length - 1];
+    if (!prev || prev.t !== l.t) {
+      lines.push({ t: l.t, text: l.text });
+      first = l.text;
+    } else if (l.text === first) continue;
+    else if (isTranslation(first, l.text)) prev.tr = l.text;
+    // 日文、韩文歌夹着的罗马音不要
+    else if (!(KANA_HANGUL_RE.test(first) && !HAN_RE.test(l.text) && !KANA_HANGUL_RE.test(l.text))) prev.text = `${prev.text} ${l.text}`;
+  }
   if (trans) {
-    const tr = new Map(readLrc(trans).map((l) => [l.t, l.text]));
-    for (const l of lines) {
-      const x = tr.get(l.t);
-      if (x && x !== l.text) l.tr = x;
+    // 翻译按时间配到原文上：差半秒以内都算同一句（网易云的翻译时间偶尔和原文差几毫秒）。
+    // 每句翻译只配给离它最近的一句原文（快歌里两句原文挨得很近时，不会两句都显示同一句翻译）
+    const tr = readLrc(trans);
+    const pick = new Map<number, { text: string; d: number }>();
+    let i = 0;
+    for (const x of tr) {
+      while (i + 1 < lines.length && lines[i + 1]!.t <= x.t) i++;
+      let best = -1;
+      for (const k of [i, i + 1]) {
+        const l = lines[k];
+        if (l && Math.abs(l.t - x.t) <= TRANS_SLACK_MS && (best < 0 || Math.abs(l.t - x.t) < Math.abs(lines[best]!.t - x.t))) best = k;
+      }
+      if (best < 0) continue;
+      const d = Math.abs(lines[best]!.t - x.t);
+      const had = pick.get(best);
+      if (!had || d < had.d) pick.set(best, { text: x.text, d });
     }
+    for (const [k, x] of pick) if (x.text !== lines[k]!.text) lines[k]!.tr = x.text;
   }
   return lines;
 }
+
+const HAN_RE = /[\u4e00-\u9fff]/;
+const KANA_HANGUL_RE = /[\u3040-\u30ff\uac00-\ud7af]/;
+/** 同一时间的另一行像不像翻译：这一行是中文，原文是外文（日文假名、韩文，或者没有汉字的拉丁字母等） */
+function isTranslation(orig: string, line: string): boolean {
+  return HAN_RE.test(line) && !KANA_HANGUL_RE.test(line) && (KANA_HANGUL_RE.test(orig) || !HAN_RE.test(orig));
+}
+/** 翻译和原文的时间差这么多以内算同一句 */
+const TRANS_SLACK_MS = 500;
 
 const TIME_RE = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
 /** 说明行：作词、作曲、编曲、制作人……（网易云的歌词开头常有） */

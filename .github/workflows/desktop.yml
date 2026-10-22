@@ -1,6 +1,7 @@
 # 打包桌面版：在 GitHub 的 Windows 电脑上打出安装包，不占服务器。
 #   推送 v 开头的版本标签（例如 v1.4.0-beta.1）→ 打包并上传到 GitHub 发布页（带 - 的是测试版，标成「预发布」）
 #   在 Actions 页面手动运行 → 只打包，安装包在这次运行的页面下载（试打包用）
+#   两种都会再连一下星临自己的备用下载地址（Cloudflare R2）：推送标签时上传安装包和服务器版代码包，手动运行时只试能不能上传
 # 命名规则见 docs/desktop.md
 name: 打包桌面版
 
@@ -25,6 +26,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 不把有写权限的令牌留在 .git 里（安装依赖时运行的脚本读不到；上传发布时单独传进去）
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -58,7 +62,8 @@ jobs:
 
       - name: 安装运行时依赖
         working-directory: apps/desktop/stage
-        run: npm install --omit=dev --no-package-lock --no-audit --no-fund
+        # 按 apps/desktop/package-lock.json 锁定的版本装（准备打包文件时复制过来了）
+        run: npm install --omit=dev --no-audit --no-fund
 
       - name: 打包
         working-directory: apps/desktop
@@ -94,3 +99,51 @@ jobs:
             [[ "$tag" == *-* ]] && pre=(--prerelease)
             gh release create "$tag" "${files[@]}" --verify-tag --title "$tag" --notes "星临 $tag。下载 Starfall-…-setup.exe 安装（Windows 10 / 11，64 位）。" "${pre[@]}"
           fi
+
+  # 星临自己的备用下载地址（Cloudflare R2）：GitHub 连不上时，桌面版和服务器版从这里下载。
+  # 推送版本标签时上传安装包和服务器版代码包；手动运行时只试一下能不能上传（不传安装包）
+  r2:
+    name: 上传到备用下载地址
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 服务器版代码包要完整的历史和全部版本标签
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: 试一下能不能上传
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: node apps/desktop/scripts/release-r2.mjs check
+
+      - uses: actions/download-artifact@v8
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: Starfall-win-x64-${{ github.run_number }}
+          path: release
+
+      - name: 打包服务器版代码（main 和全部版本标签）
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          git branch -f main origin/main
+          git bundle create "$RUNNER_TEMP/starfall.bundle" main --tags
+          git bundle verify -q "$RUNNER_TEMP/starfall.bundle"
+
+      - name: 上传
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: node apps/desktop/scripts/release-r2.mjs publish "$GITHUB_REF_NAME" release "$RUNNER_TEMP/starfall.bundle"

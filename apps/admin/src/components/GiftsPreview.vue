@@ -4,7 +4,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { giftsSourceSize, giftsView } from '@starfall/shared/overlay';
 import type { GiftListItem, GiftRankRow, OverlayConfig } from '@starfall/shared/overlay';
-import { onGiftRow } from '../lib/live.ts';
+import { onGiftRow, onResync } from '../lib/live.ts';
 import { state } from '../lib/store.ts';
 
 const props = defineProps<{ config: OverlayConfig; alpha?: boolean }>();
@@ -27,8 +27,11 @@ function onMessage(e: MessageEvent): void {
   if (e.origin !== location.origin || e.source !== frame.value?.contentWindow) return;
   if ((e.data as { type?: string })?.type !== 'starfall-preview-ready') return;
   ready = true;
-  send({ type: 'hello', config: clone(props.config), preload: [], build: null, gifts: clone(board.value), pins: clone(state.giftPins) });
+  sendHello();
 }
+const sendHello = () => send({ type: 'hello', config: clone(props.config), preload: [], build: null, gifts: clone(board.value), pins: clone(state.giftPins) });
+// 断线重连后：断开期间的礼物补上、顺序重排（整份重发）
+const offSync = onResync(sendHello);
 
 watch(() => props.config, (c) => send({ type: 'config', config: clone(c) }), { deep: true });
 const off = onGiftRow((id, row) => {
@@ -48,6 +51,7 @@ watch(() => props.config.giftsFilter.mode === 'pinned', () => {
 
 onMounted(() => addEventListener('message', onMessage));
 onBeforeUnmount(() => {
+  offSync();
   removeEventListener('message', onMessage);
   off();
 });

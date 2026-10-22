@@ -59,6 +59,25 @@ export class GiftCatalog {
     return this.cached().find((g) => g.name === name && g.icon);
   }
 
+  /**
+   * 按名字在全站礼物里找付费礼物（模拟送礼用：盲盒里爆出来的权杖这类礼物不在礼物面板上）。
+   * 面板上的排前面；全站列表还没读到时等它读完
+   */
+  async search(q: string, limit = 30): Promise<GiftConfig[]> {
+    this.loadAll();
+    await this.loadingAll;
+    const key = q.trim();
+    const panel = this.cached();
+    const out = new Map<number, GiftConfig>();
+    for (const list of [panel, this.all?.gifts.values() ?? []]) {
+      for (const g of list) {
+        if (out.size >= limit) break;
+        if (g.paid && g.price > 0 && (!key || g.name.includes(key)) && !out.has(g.id)) out.set(g.id, g);
+      }
+    }
+    return [...out.values()];
+  }
+
   /** 读全站礼物列表（只留图）；失败时最多 10 分钟再试一次 */
   private loadAll(): void {
     const now = Date.now();

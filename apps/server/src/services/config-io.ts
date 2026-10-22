@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_ALPHA_DEFAULT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { CHAT_MASCOT_OLD, DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_ALPHA_DEFAULT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, lyricsLangOf, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -155,6 +155,14 @@ const OutputPart = OutputInputSchema.extend({
   chatMedal: OutputInputSchema.shape.chatMedal.default('own'),
   chatMax: OutputInputSchema.shape.chatMax.default(8),
   chatFadeSec: OutputInputSchema.shape.chatFadeSec.default(0),
+  // 弹幕列表外观是 v1.9 加的
+  chatLook: OutputInputSchema.shape.chatLook.default('glass'),
+  chatGuardFrame: OutputInputSchema.shape.chatGuardFrame.default('theme'),
+  // 小八的设置在 1.9 开发期间换过一次：以前的「头像旁边、气泡右端、头像右下角」换成现在的出场方式
+  chatMascot: z.preprocess((v) => (typeof v === 'string' ? (CHAT_MASCOT_OLD[v] ?? v) : v), OutputInputSchema.shape.chatMascot).default('hop'),
+  chatCreamFrame: OutputInputSchema.shape.chatCreamFrame.default('hachi'),
+  chatAlpha: OutputInputSchema.shape.chatAlpha.default(0),
+  chatHideBlocked: OutputInputSchema.shape.chatHideBlocked.default(false),
   // 送礼名单是 v1.5 加的
   giftsEnabled: OutputInputSchema.shape.giftsEnabled.default(true),
   giftsSide: OutputInputSchema.shape.giftsSide.default('right'),
@@ -284,8 +292,11 @@ const MUSIC_NAMES: Record<string, string> = {
   size: '点歌窗口字号',
   showQueue: '显示后面几首',
   lyrics: '显示歌词',
-  lyricsTrans: '显示歌词翻译',
-  blockWords: '不收的歌',
+  lyricsLang: '歌词语言',
+  liteMode: '点歌窗口精简模式',
+  lyricsTrans: '歌词语言',
+  blockWords: '不收的字',
+  blockSongs: '不收的歌',
   bannedUids: '不让点歌的观众',
 };
 const clip = (xs: string[]) => (xs.length > 20 ? [...xs.slice(0, 20), `…… 还有 ${xs.length - 20} 条`] : xs);
@@ -373,7 +384,7 @@ export class ConfigIO {
         return effect === null ? [] : [{ effect, label: b.label, hotkey: b.hotkey, globalHotkey: b.globalHotkey }];
       }),
       ...(this.d.music ? { music: this.d.music.cfg() } : {}),
-      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha })),
+      outputs: this.d.outputs.list().map((o) => ({ name: o.name, app: o.app, orient: o.orient, width: o.width, height: o.height, safeTop: o.safeTop, safeBottom: o.safeBottom, marginX: o.marginX, scale: o.scale, liteMode: o.liteMode, chatEnabled: o.chatEnabled, chatSide: o.chatSide, chatSize: o.chatSize, chatMedal: o.chatMedal, chatMax: o.chatMax, chatFadeSec: o.chatFadeSec, chatLook: o.chatLook, chatGuardFrame: o.chatGuardFrame, chatMascot: o.chatMascot, chatCreamFrame: o.chatCreamFrame, chatAlpha: o.chatAlpha, chatHideBlocked: o.chatHideBlocked, giftsEnabled: o.giftsEnabled, giftsSide: o.giftsSide, giftsSize: o.giftsSize, giftsMax: o.giftsMax, giftsSpeed: o.giftsSpeed, giftsFilter: o.giftsFilter, giftsTitle: o.giftsTitle, giftsLook: o.giftsLook, giftsMotion: o.giftsMotion, giftsAlpha: o.giftsAlpha })),
     };
   }
 
@@ -549,7 +560,11 @@ export class ConfigIO {
     // 点歌设置（整体替换；旧版本导出的文件里没有，不动）
     if (file.music && this.d.music) {
       const curMusic = this.d.music.cfg() as Record<string, unknown>;
-      const keys = Object.entries(file.music).filter(([k, v]) => !same(curMusic[k], v)).map(([k]) => MUSIC_NAMES[k] ?? k);
+      // 旧版本导出的文件里是「显示翻译」开关：换成现在的歌词语言再比较，没变就不报修改
+      const { lyricsTrans: _old, ...fileMusic } = file.music as Record<string, unknown> & { lyricsTrans?: boolean };
+      const lang = lyricsLangOf(file.music);
+      if (lang) fileMusic.lyricsLang = lang;
+      const keys = Object.entries(fileMusic).filter(([k, v]) => !same(curMusic[k], v)).map(([k]) => MUSIC_NAMES[k] ?? k);
       sections.push({ key: 'music', label: '点歌设置', summary: keys.length ? `修改 ${keys.length} 项` : '没有变化', changed: keys.length > 0, details: clip(keys) });
     }
 

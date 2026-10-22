@@ -6,9 +6,7 @@ import PanelFleet from './PanelFleet.vue';
 import PanelGifts from './PanelGifts.vue';
 import PanelOnline from './PanelOnline.vue';
 import PanelQueue from './PanelQueue.vue';
-import { post } from '../lib/api.ts';
-import { state } from '../lib/store.ts';
-import { attempt } from '../lib/toast.ts';
+import { skipPlaying, state } from '../lib/store.ts';
 import type { Viewer } from '../lib/types.ts';
 
 type Tab = 'queue' | 'online' | 'gift' | 'fleet';
@@ -50,9 +48,7 @@ const TABS: Array<{ k: Tab; icon: string; name: string }> = [
 const pick = (v: Viewer, x: number, y: number) => emit('pick', v, x, y);
 // 看别的标签时，正在播放的特效用一条细条显示在最上面（不用切回「播放队列」）
 const playing = computed(() => state.queue.playing);
-async function skip(): Promise<void> {
-  await attempt(() => post('/api/playback/skip'), '已跳过，开始播下一个');
-}
+const skip = skipPlaying;
 </script>
 
 <template>

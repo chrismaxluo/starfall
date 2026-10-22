@@ -1,0 +1,157 @@
+/* 弹幕列表的小八主题外观（果冻玻璃、青花瓷、奶油贴纸、星月夜空、像素小屋），设计见 design/preview/chat-looks-v2.html。
+   一条（.tm）= 头像框（.fw）+ 气泡（.bw）。头像框、气泡里的零件位置由 chat-theme.ts 按大小算好（left/top/width/height），这里只管层次和外观。
+   玻璃外观的样式都写在 .msg 下面，这里一律写在 .tm 下面，两边互不影响。
+   直播姬是旧内核（Chrome 95）：不用 color-mix、单独的 rotate / scale 属性；动画只改位移、缩放、旋转、透明度 */
+@font-face { font-family: "SF Round"; font-weight: 700; font-display: swap; src: url(./chat-looks/fonts/rhr-Bold.woff2) format("woff2"); }
+@font-face { font-family: "SF Round"; font-weight: 900; font-display: swap; src: url(./chat-looks/fonts/rhr-Heavy.woff2) format("woff2"); }
+
+.chat-root.theme { --round: "SF Round", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+.theme .chat { padding: 40px 36px 26px 6px; gap: calc(14px * var(--k)); align-items: flex-start; font-family: var(--round); }
+.theme.side-right .chat { padding: 40px 6px 26px 36px; align-items: flex-end; }
+.tm { position: relative; display: flex; align-items: center; max-width: 100%; }
+.side-right .tm { flex-direction: row-reverse; }
+.tm .fx, .tm .sheen { position: absolute; pointer-events: none; }
+.tm .fx { z-index: 6; }
+.tm .px, .tm .px img { image-rendering: pixelated; }
+
+/* 头像框：窗口（圆形，里面是自己的头像）→ 框 → 身份装饰 → 坐在右下角的小八 */
+.tm .fw { position: relative; flex: none; z-index: 3; }
+.tm .fw > * { position: absolute; }
+.tm .win { border-radius: 50%; overflow: hidden; background: #fff; }
+.tm .win .av { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: calc(36px * var(--k)); }
+.tm .win .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tm .frm { pointer-events: none; filter: drop-shadow(0 calc(3px * var(--k)) calc(3px * var(--k)) rgba(28,37,80,.32)); }
+.tm .frm.bili { filter: none; }
+.tm .orn, .tm .twk { z-index: 4; pointer-events: none; }
+.tm .catw { z-index: 5; transform-origin: 50% 50%; }
+.tm .catw .br { width: 100%; height: 100%; transform-origin: 50% 100%; }
+.tm .catw img { display: block; width: 100%; height: 100%; filter: drop-shadow(0 calc(2px * var(--k)) calc(3px * var(--k)) rgba(0,0,0,.25)); }
+.side-right .tm .catw img { transform: scaleX(-1); }
+
+/* 气泡：按内容伸缩（最长到浏览器源的宽度，再长就换行），左端塞在头像框下面 */
+.tm .bw { position: relative; flex: 0 1 auto; min-width: 0; z-index: 1; }
+.tm .bx { position: relative; display: flex; flex-direction: column; justify-content: center; }
+.tm .bx > .bub, .tm .bx > .frost, .tm .bx > .waves, .tm .bx > .jcap { position: absolute; pointer-events: none; max-width: none; }
+.tm .bx > .bub, .tm .bx > .frost { z-index: 0; }
+.tm .bx > .waves, .tm .bx > .jcap, .tm .bx > .jglint { z-index: 1; }
+.tm .bx > .who, .tm .bx > .tx, .tm .bx > .sticker { position: relative; z-index: 2; }
+.side-right .tm .bx > .bub, .side-right .tm .bx > .frost, .side-right .tm .bx > .waves { transform: scaleX(-1); }
+/* 气泡后面的背景模糊（形状和气泡一样）；精简模式、不支持模糊的直播姬不显示，实测字的对比度照样够 */
+.tm .bx > .frost { -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+.lk-cream .tm .bx > .frost, .lk-porcelain .tm .bx > .frost { -webkit-backdrop-filter: blur(10px) saturate(125%) brightness(1.35); backdrop-filter: blur(10px) saturate(125%) brightness(1.35); }
+.lk-jelly .tm .bx > .frost { -webkit-backdrop-filter: blur(16px) saturate(175%); backdrop-filter: blur(16px) saturate(175%); }
+.lite .tm .bx > .frost { display: none; }
+.tm .bw > .tail, .tm .bw > .paw, .tm .bw > .tape, .tm .bw > .charm { position: absolute; pointer-events: none; }
+.tm .bw > .tail { z-index: 0; }
+.tm .bw > .paw, .tm .bw > .tape, .tm .bw > .charm { z-index: 3; }
+.tm .tail .sw, .tm .tail img, .tm .paw img, .tm .tape img, .tm .charm .sw, .tm .charm img { display: block; width: 100%; height: 100%; }
+.tm .charm { transform-origin: 50% 0; }
+.tm .charm .sw { transform-origin: 50% 0; }
+.side-right .tm .tail img { transform: scaleX(-1); }
+.side-right .tm .bw > .paw { transform: scaleX(-1); }
+
+/* 只有最新一条会轻轻动（尾巴摇、小八呼吸、吊坠晃、星星闪），旧的都停住，不抢眼也省直播姬的资源；精简模式全停 */
+.tm.live .tail .sw { animation: sf-sway 2.6s ease-in-out infinite; }
+.tm.live .catw .br { animation: sf-breathe 3.2s ease-in-out infinite; }
+.tm.live .charm .sw { animation: sf-swing 3s ease-in-out infinite; }
+@keyframes sf-sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(7deg); } }
+@keyframes sf-breathe { 0%, 100% { transform: none; } 50% { transform: scale(1.02, 1.035); } }
+@keyframes sf-swing { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+.lite .tm .tail .sw, .lite .tm .catw .br, .lite .tm .charm .sw, .lite .tm .twk, .lite .tm .jglint i { animation: none !important; }
+
+/* 一次性的效果层：扫光 */
+.tm .sheen { z-index: 2; overflow: hidden; border-radius: calc(26px * var(--k)); }
+.tm .sheen i { position: absolute; top: -20%; bottom: -20%; width: 34%; left: 0; transform: translateX(-140%) skewX(-18deg); background: linear-gradient(90deg, transparent, var(--sh, rgba(255,255,255,.85)) 50%, transparent); }
+.tm .ring { border-radius: 50%; z-index: 2; }
+
+/* 第一行：身份 + 昵称；昵称和弹幕一律完整显示，放不下就换行，不截断、不加省略号 */
+.tm .who { display: flex; flex-wrap: wrap; align-items: center; gap: calc(4px * var(--k)) calc(7px * var(--k)); min-width: 0; min-height: calc(32px * var(--k)); }
+.side-right .tm .who { flex-direction: row-reverse; }
+.tm .ic { flex: none; width: calc(25px * var(--k)); height: calc(25px * var(--k)); margin-right: calc(-1px * var(--k)); }
+.tm .badge { flex: none; width: calc(30px * var(--k)); height: calc(30px * var(--k)); object-fit: contain; filter: drop-shadow(0 1px 1px rgba(28,37,80,.25)); }
+.tm .honor { flex: none; height: calc(21px * var(--k)); width: auto; }
+.tm .fang { flex: none; display: inline-grid; place-items: center; width: calc(25px * var(--k)); height: calc(25px * var(--k)); border-radius: 50%; font-size: calc(14px * var(--k)); font-weight: 900; font-style: normal; line-height: 1; background: #FFF1DE; color: #E07B1F; box-shadow: inset 0 0 0 calc(2px * var(--k)) #F3A04D, 0 0 0 calc(2px * var(--k)) #fff; }
+.tm .zb { flex: none; height: calc(26px * var(--k)); padding: 0 calc(11px * var(--k)); display: inline-flex; align-items: center; font-size: calc(15px * var(--k)); font-weight: 900; letter-spacing: .08em; border-radius: 999px; background: linear-gradient(180deg, #FF9CC0, #FF6F9E); color: #fff; box-shadow: 0 0 0 calc(2px * var(--k)) #fff; }
+/* 粉丝牌：B 站按等级的颜色，形状换成贴纸小胶囊；放不下时只留等级 */
+.tm .medal { flex: 0 1 auto; min-width: calc(30px * var(--k)); display: inline-flex; align-items: stretch; height: calc(26px * var(--k)); font-size: calc(15px * var(--k)); font-weight: 900; line-height: 1; overflow: hidden; border-radius: 999px; box-shadow: 0 0 0 calc(2px * var(--k)) #fff; }
+.tm .medal .mn { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; display: inline-flex; align-items: center; padding: 0 calc(7px * var(--k)) 0 calc(10px * var(--k)); background: var(--mc); color: var(--mt, #fff); }
+.tm .medal .ml { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: calc(26px * var(--k)); padding: 0 calc(8px * var(--k)) 0 calc(6px * var(--k)); background: #fff; color: var(--ml); font-family: "Geist Sans", var(--round); font-weight: 700; }
+.tm .medal.lv-only .ml { background: var(--mc); color: var(--mt, #fff); padding: 0 calc(9px * var(--k)); }
+.tm .nm { flex: 0 0 auto; max-width: 100%; display: inline-flex; align-items: center; min-height: calc(28px * var(--k)); padding: 0 calc(13px * var(--k)); border-radius: 999px; background: var(--pale); color: var(--deep); font-size: calc(19px * var(--k)); font-weight: 900; }
+.tm .nm .t { min-width: 0; white-space: normal; word-break: break-all; line-height: 1.25; }
+/* 第二行：弹幕内容，完整显示；表情包单独一张图 */
+.tm .tx { margin-top: calc(4px * var(--k)); font-size: calc(28px * var(--k)); line-height: 1.3; font-weight: 900; letter-spacing: .02em; color: #1F2B5B; word-break: break-word; }
+.tm .tx .em { height: 1.25em; width: auto; vertical-align: -0.28em; margin: 0 .04em; }
+.side-right .tm .tx { text-align: right; }
+.tm .sticker { display: block; margin-top: calc(6px * var(--k)); height: calc(100px * var(--k)); width: auto; max-width: 100%; object-fit: contain; align-self: flex-start; }
+.side-right .tm .sticker { align-self: flex-end; }
+.tm { --deep: #2B4C8C; --pale: #DCE8FB; }
+.tm.lv-3 { --deep: #1D4A9E; --pale: #CFE2FF; }
+.tm.lv-2 { --deep: #5530A6; --pale: #E6DAFF; }
+.tm.lv-1 { --deep: #865406; --pale: #FFE9B0; }
+.tm.anchor { --deep: #A12E5C; --pale: #FFDCE9; }
+
+/* ================= 奶油贴纸 ================= */
+.lk-cream .tm .tape { transform-origin: 50% 50%; }
+
+/* ================= 星月夜空：白字、金色昵称，字带一点光；框旁的星星一闪一闪 ================= */
+.lk-night .tm .win { background: #1A2468; }
+.lk-night .tm .frm { filter: none; }
+.lk-night .tm .tx { color: #fff; text-shadow: 0 1px 6px rgba(4,8,40,.7), 0 0 16px rgba(130,160,255,.28); }
+.lk-night .tm .nm { background: none; padding: 0 calc(2px * var(--k)); color: var(--nmc); text-shadow: 0 0 10px var(--nmg), 0 1px 2px rgba(4,8,40,.8); }
+.lk-night .tm { --nmc: #FFE7B0; --nmg: rgba(255,214,120,.38); }
+.lk-night .tm.lv-3 { --nmc: #B2DCFF; --nmg: rgba(120,190,255,.45); }
+.lk-night .tm.lv-2 { --nmc: #E4D0FF; --nmg: rgba(190,150,255,.5); }
+.lk-night .tm.lv-1 { --nmc: #FFE29A; --nmg: rgba(255,200,90,.55); }
+.lk-night .tm.anchor { --nmc: #FFC9DE; --nmg: rgba(255,140,190,.5); }
+.lk-night .tm .medal { box-shadow: 0 0 0 calc(1.5px * var(--k)) rgba(255,255,255,.6), 0 0 10px rgba(160,140,255,.45); }
+.lk-night .tm .medal .ml { background: rgba(255,255,255,.92); }
+.lk-night .tm .zb { background: linear-gradient(180deg, #FF8DBA, #F0588F); box-shadow: 0 0 0 calc(1.5px * var(--k)) rgba(255,255,255,.7), 0 0 10px rgba(255,110,170,.6); }
+.lk-night .tm .fang { background: rgba(20,24,60,.6); color: #FFC07A; box-shadow: inset 0 0 0 calc(1.5px * var(--k)) #FFB061, 0 0 8px rgba(255,170,90,.45); }
+.lk-night .tm .badge { filter: drop-shadow(0 0 4px rgba(150,180,255,.55)); }
+.lk-night .tm.live .twk { animation: sf-twinkle 2.6s ease-in-out infinite; }
+.lk-night .tm.live .twk.t2 { animation-delay: -1.3s; }
+@keyframes sf-twinkle { 0%, 100% { transform: scale(.55) rotate(0deg); opacity: .35; } 50% { transform: scale(1.1) rotate(45deg); opacity: 1; } }
+
+/* ================= 像素小屋：字带硬阴影，胶囊换成切角方块；动起来一跳一跳 ================= */
+.lk-pixel .tm .win { background: #18256A; }
+.lk-pixel .tm .frm { filter: none; }
+.lk-pixel .tm .tx { color: #fff; text-shadow: calc(2px * var(--k)) calc(2px * var(--k)) 0 #0A1230; }
+.lk-pixel .tm .nm { background: none; padding: 0 calc(2px * var(--k)); color: var(--nmc); text-shadow: calc(2px * var(--k)) calc(2px * var(--k)) 0 #0A1230; }
+.lk-pixel .tm { --nmc: #FFE7A8; }
+.lk-pixel .tm.lv-3 { --nmc: #A6D4FF; }
+.lk-pixel .tm.lv-2 { --nmc: #DCC6FF; }
+.lk-pixel .tm.lv-1 { --nmc: #FFD66B; }
+.lk-pixel .tm.anchor { --nmc: #FFB8D2; }
+.lk-pixel .tm .medal, .lk-pixel .tm .zb, .lk-pixel .tm .fang { --c: calc(3px * var(--k)); border-radius: 0; box-shadow: none; -webkit-clip-path: polygon(var(--c) 0, calc(100% - var(--c)) 0, 100% var(--c), 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, var(--c) 100%, 0 calc(100% - var(--c)), 0 var(--c)); clip-path: polygon(var(--c) 0, calc(100% - var(--c)) 0, 100% var(--c), 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, var(--c) 100%, 0 calc(100% - var(--c)), 0 var(--c)); }
+.lk-pixel .tm .medal .ml { font-family: var(--round); font-weight: 900; }
+.lk-pixel .tm .zb { background: #FF6F9E; }
+.lk-pixel .tm .fang { background: #F39A3D; color: #2A1606; }
+.lk-pixel .tm.live .tail .sw, .lk-pixel .tm.live .charm .sw { animation-timing-function: steps(3, end); }
+.lk-pixel .tm.live .catw .br { animation-timing-function: steps(2, end); }
+.lk-pixel .tm.live .twk { animation: sf-blink 2.4s steps(1, end) infinite; }
+.lk-pixel .tm.live .twk.t2 { animation-delay: -1.2s; }
+@keyframes sf-blink { 0%, 100% { opacity: 1; transform: none; } 40% { opacity: 1; transform: scale(.6); } 60% { opacity: .25; transform: scale(.6); } 80% { opacity: 1; transform: none; } }
+
+/* ================= 青花瓷：钴蓝字、描线胶囊，素净 ================= */
+.lk-porcelain .tm .tx { color: #142F66; }
+.lk-porcelain .tm .nm { background: rgba(255,255,255,.55); color: var(--pdeep, #1B3F8F); box-shadow: inset 0 0 0 calc(1.4px * var(--k)) var(--pline, rgba(45,93,181,.55)); }
+.lk-porcelain .tm.lv-2 { --pdeep: #2F2C86; --pline: #C9A24A; }
+.lk-porcelain .tm.lv-1 { --pdeep: #132E6E; --pline: #D4AF55; }
+.lk-porcelain .tm.anchor { --pdeep: #8A2C4C; --pline: rgba(184,69,106,.6); }
+.lk-porcelain .tm .frm { filter: none; }
+
+/* ================= 果冻玻璃：白字、名字带一点身份色；最新一条上沿有一点光慢慢流过 ================= */
+.lk-jelly .tm .win { background: #1B2348; }
+.lk-jelly .tm .frm { filter: none; }
+.lk-jelly .tm .tx { color: #fff; text-shadow: 0 1px 3px rgba(6,10,30,.55); }
+.lk-jelly .tm .nm { background: none; padding: 0 calc(2px * var(--k)); color: var(--jn, #F2F6FF); text-shadow: 0 1px 3px rgba(6,10,30,.55); }
+.lk-jelly .tm.lv-3 { --jn: #BFE0FF; }
+.lk-jelly .tm.lv-2 { --jn: #E2D4FF; }
+.lk-jelly .tm.lv-1 { --jn: #FFE7A6; }
+.lk-jelly .tm.anchor { --jn: #FFD3E5; }
+.lk-jelly .tm .medal { box-shadow: 0 0 0 calc(1.2px * var(--k)) rgba(255,255,255,.7); }
+.tm .bx > .jglint { position: absolute; pointer-events: none; overflow: hidden; border-radius: 99px; }
+.tm .jglint i { position: absolute; top: 0; bottom: 0; width: 22%; left: 0; transform: translateX(-120%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); opacity: 0; }
+.tm.live .jglint i { animation: sf-glint 5.5s ease-in-out 1.6s infinite; }
+@keyframes sf-glint { 0% { transform: translateX(-120%); opacity: 0; } 8% { opacity: 1; } 40% { transform: translateX(480%); opacity: 1; } 46%, 100% { transform: translateX(480%); opacity: 0; } }

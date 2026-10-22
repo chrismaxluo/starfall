@@ -24,6 +24,15 @@ const q = new URLSearchParams(location.search);
 const preview = q.get('preview') === '1';
 const browse = q.get('view') === '1' && !preview;
 const env = detect();
+/** 发现直播软件里的浏览器忙不过来了（音乐像慢放、页面变卡）：之后都用精简模式，直到页面刷新 */
+let lagging = false;
+/** 最近一次网络缓冲（歌停下来等数据）的时间：缓冲不算卡顿 */
+let waitedAt = -Infinity;
+/** 精简模式：不做模糊和复杂动画、刷新慢一点、不做音量均衡（直接原生播放）；设成「关」时一律不用 */
+function liteActive(): boolean {
+  const mode = state?.display.liteMode ?? 'auto';
+  return q.get('lite') === '1' || mode === 'on' || (mode === 'auto' && (lagging || !env.blur));
+}
 
 document.getElementById('stage')?.remove();
 document.documentElement.classList.add('mu-page');
@@ -318,6 +327,9 @@ function applyTint(t: Tint): void {
 // ---------- 歌词 ----------
 
 let lastLine = -2;
+let lastLang = '';
+/** 有没有汉字 */
+const HAN = /\p{Script=Han}/u;
 let lyCur: HTMLElement | null = null;
 /** 当前这句的文字（染色、滑动都在它身上）；放不下时多出来多少像素 */
 let lyIn: HTMLElement | null = null;
@@ -333,12 +345,17 @@ function renderLyric(s: MusicState, pos: number): void {
     return;
   }
   const i = lyricIndex(lines, pos);
-  if (i !== lastLine) {
+  // 歌词语言：双语（下面一行是翻译）、只显示原文、只显示翻译（没有翻译的句子显示原文）；旧版本只有「显示翻译」开关
+  const lang = s.display.lyricsLang ?? (s.display.lyricsTrans ? 'both' : 'original');
+  if (i !== lastLine || lang !== lastLang) {
     lastLine = i;
+    lastLang = lang;
     // 还没唱到第一句（前奏）：先把第一句摆出来，不填色
     const cur = lines[Math.max(0, i)] ?? null;
     const next = lines[Math.max(0, i) + 1] ?? null;
-    const inner = h('span', { class: 'ly-in' }, cur?.text ?? '');
+    // 只显示中文：这一句的原文和翻译里挑带中文的那一行（外文歌显示翻译，中文歌配了英文翻译的照样显示中文原文）
+    const say = (l: LyricLine | null) => (l ? (lang === 'translation' && l.tr && (HAN.test(l.tr) || !HAN.test(l.text)) ? l.tr : l.text) : '');
+    const inner = h('span', { class: 'ly-in' }, say(cur));
     const line = h('div', { class: 'ly-cur' }, inner);
     lyIn = inner;
     lyCur = line;
@@ -352,11 +369,12 @@ function renderLyric(s: MusicState, pos: number): void {
     };
     requestAnimationFrame(measure);
     setTimeout(measure, 700);
-    const tr = s.display.lyricsTrans && cur?.tr ? cur.tr : null;
-    const sub = h('div', { class: `ly-sub${tr ? ' tr' : ''}` }, tr ?? next?.text ?? '');
+    // 下面一行：双语时是这一句的翻译（没有翻译时是下一句），单语时是下一句
+    const tr = lang === 'both' && cur?.tr ? cur.tr : null;
+    const sub = h('div', { class: `ly-sub${tr ? ' tr' : ''}` }, tr ?? say(next));
     const box = h('div', { class: 'ly-box' }, lyCur, sub);
     lyric.replaceChildren(box);
-    if (!reduced()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 460, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    if (!reduced() && !liteActive()) box.animate([{ opacity: 0, transform: 'translateY(16px)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 460, easing: 'cubic-bezier(.2,.8,.2,1)' });
   }
   // 这一句唱到哪：从这一句开始到下一句开始，颜色从左往右填过去
   if (lyCur && i < 0) lyCur.style.setProperty('--p', '0%');
@@ -425,7 +443,8 @@ function render(): void {
   const s = state;
   if (!s) return;
   const d = s.display;
-  const lite = q.get('lite') === '1' || !env.blur;
+  // 不支持模糊的浏览器：样式总是用实色底（不然半透明的底看不清字）
+  const lite = liteActive() || !env.blur;
   root.className = `mu-root st-${d.style} side-${d.side}${d.size === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${s.enabled ? '' : ' off'}`;
   renderCard(s);
   renderQueue(s);
@@ -458,7 +477,8 @@ function tick(): void {
   const s = state;
   if (!s?.now) return;
   const now = performance.now();
-  if (now - lastPaint > 45) {
+  // 精简模式下进度条、歌词一秒刷新 4 次就够了（省下来给声音）
+  if (now - lastPaint > (liteActive() ? 250 : 45)) {
     lastPaint = now;
     const pos = position();
     const dur = s.now.item.song.durationMs || (player ? audio.duration * 1000 : 0) || 1;
@@ -489,6 +509,17 @@ let audio = makeAudio(false);
 let loaded: { id: number; load: number } | null = null;
 let seekTo = 0;
 let startedSent = false;
+/** 断线重连后：服务端把这个窗口当作新的出声窗口，等它再报一次「开始了」 */
+let reportAgain = false;
+/** 跨域加载失败、正在用普通播放器重试的音乐服务器 */
+let corsTry: string | null = null;
+/** 卡住多久没进度算出错 */
+const STALL_MS = 12_000;
+let stallTimer: ReturnType<typeof setTimeout> | null = null;
+function clearStall(): void {
+  if (stallTimer) clearTimeout(stallTimer);
+  stallTimer = null;
+}
 let lastPosSent = 0;
 let duck = { on: false, pct: 30 };
 let vol = 0;
@@ -567,7 +598,7 @@ function syncAudio(): void {
       startedSent = false;
       seekTo = next.posMs / 1000;
       vol = 0;
-      startAudio(url, Boolean(state?.normalize) && !corsBad.has(hostOf(url)));
+      startAudio(url, Boolean(state?.normalize) && !liteActive() && !corsBad.has(hostOf(url)));
       go();
     });
     return;
@@ -590,13 +621,16 @@ function play(): void {
       if (blocked) {
         blocked = false;
         blockedHint();
+        // 点了一下才开始放：从静音淡入（拦住时淡入已经在暂停状态下走完了，不重新淡入会一直没声音）
+        rampVolume(0.1);
       }
     },
     (e: Error) => {
-      // 浏览器要求先点一下页面才能出声（直播软件里不会这样）：不当作放不了
+      // 浏览器要求先点一下页面才能出声（直播软件里不会这样）：不当作放不了，告诉服务端等人点
       if (e.name === 'NotAllowedError') {
         blocked = true;
         blockedHint();
+        if (loaded) conn?.send({ type: 'music_blocked', id: loaded.id, load: loaded.load });
       }
     },
   );
@@ -636,12 +670,33 @@ function makeAudio(cors: boolean): HTMLAudioElement {
   });
   a.addEventListener('playing', () => {
     if (a !== audio || !loaded) return;
-    if (!startedSent) {
+    clearStall();
+    if (corsTry && !a.crossOrigin) {
+      corsBad.add(corsTry);
+      corsTry = null;
+    }
+    if (!startedSent || reportAgain) {
       startedSent = true;
+      reportAgain = false;
       conn?.send({ type: 'music_started', id: loaded.id, load: loaded.load });
     }
     tick();
   });
+  // 网络卡住（不报错、只是不来数据）：10 多秒没有进度就当作出错，服务端会重新拿地址接着放
+  const stalled = () => {
+    if (a !== audio || !loaded || !startedSent || a.paused || stallTimer) return;
+    const at = a.currentTime;
+    stallTimer = setTimeout(() => {
+      stallTimer = null;
+      if (a !== audio || !loaded || a.paused || a.currentTime > at + 0.5) return;
+      conn?.send({ type: 'music_error', id: loaded.id, load: loaded.load, message: '网络卡住了，十几秒没有数据' });
+    }, STALL_MS);
+  };
+  a.addEventListener('waiting', () => {
+    if (a === audio) waitedAt = performance.now();
+    stalled();
+  });
+  a.addEventListener('stalled', stalled);
   a.addEventListener('timeupdate', () => {
     if (a !== audio || !loaded || !startedSent) return;
     const now = performance.now();
@@ -654,10 +709,11 @@ function makeAudio(cors: boolean): HTMLAudioElement {
   });
   a.addEventListener('error', () => {
     if (a !== audio || !loaded || !a.getAttribute('src')) return;
-    // 要跨域读取（音量均衡）却加载失败：多半是这个音乐服务器不允许，换普通播放器再试一次，不算放不了
+    // 要跨域读取（音量均衡）却加载失败：可能是这个音乐服务器不允许，换普通播放器再试一次，不算放不了。
+    // 普通播放器放起来了才记下「这个服务器不能跨域」（地址失效这类错误换了也放不了，不能把整个服务器记成不能均衡）
     if (a.crossOrigin && !startedSent) {
       const url = a.src;
-      corsBad.add(hostOf(url));
+      corsTry = hostOf(url);
       startAudio(url, false);
       if (state?.hold === null) {
         play();
@@ -673,6 +729,47 @@ function makeAudio(cors: boolean): HTMLAudioElement {
 }
 
 // ---------- 连接 ----------
+
+// ---------- 卡顿检测 ----------
+// 直播软件里的浏览器忙不过来时，音乐像慢放、歌词变慢，播放器自己不会报错。每秒看一次：
+// 定时器晚了很多（页面被拖慢），或者正在出声的歌走得比真实时间慢很多（像慢放），10 秒里有 3 次就算卡顿
+const lagMarks: boolean[] = [];
+let lagAt = performance.now();
+let lagMedia = -1;
+setInterval(() => {
+  const wall = performance.now();
+  const dt = wall - lagAt;
+  const playing = player && !audio.paused && !audio.seeking && audio.readyState >= 3;
+  const media = playing ? audio.currentTime * 1000 : -1;
+  let why = '';
+  // 直播软件把看不见的源暂停时也会晚：那时不算
+  if (!document.hidden && dt > 1800) why = `页面被拖慢（本该 1 秒一次，隔了 ${(dt / 1000).toFixed(1)} 秒）`;
+  // 这一秒里缓冲过（网络慢，歌停下来等数据）时歌也走得慢：那不是页面卡，不算
+  else if (playing && lagMedia >= 0 && wall - waitedAt > dt && media > lagMedia && media - lagMedia < dt * 0.8) why = `音乐像慢放（1 秒只放了 ${((media - lagMedia) / dt).toFixed(2)} 秒）`;
+  lagAt = wall;
+  lagMedia = media;
+  lagMarks.push(Boolean(why));
+  if (lagMarks.length > 10) lagMarks.shift();
+  if (lagging || lagMarks.filter(Boolean).length < 3) return;
+  lagging = true;
+  conn?.send({ type: 'report', env: { ...detect(), music: true, build: build0, lag: true, lagWhy: why || '页面被拖慢', lite: liteActive(), ...(browse ? { view: true } : {}) } });
+  if (state?.display.liteMode === 'off') return;
+  render();
+  goNative();
+}, 1000);
+
+/** 正在出声、接着音量均衡的歌：在当前位置换成原生播放（声音不再经过浏览器的音频处理） */
+function goNative(): void {
+  if (!player || !loaded || !leveler.active() || !audio.src) return;
+  const at = audio.currentTime;
+  const playing = !audio.paused;
+  startAudio(audio.src, false);
+  seekTo = at;
+  if (playing) {
+    play();
+    rampVolume(0.25);
+  }
+}
 
 let conn: Conn | null = null;
 const build0 = pageBuild();
@@ -721,8 +818,10 @@ if (preview) {
       onMessage,
       onFatal: () => notice('点歌窗口地址已失效', '可能是重置了密钥或删除了这个输出，请在星临管理后台「直播软件输出」重新复制地址'),
       onState: (online) => {
-        // 断开时停下（服务端会把歌停在原处，连回来接着放）
-        if (!online && !audio.paused) audio.pause();
+        // 断开时停下（服务端会把歌停在原处，连回来接着放）；连回来接着放时要再报一次「开始了」，不然 20 秒后会被当成放不了
+        if (online) return;
+        reportAgain = true;
+        if (!audio.paused) audio.pause();
       },
     });
   } else {

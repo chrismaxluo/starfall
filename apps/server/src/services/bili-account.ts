@@ -17,6 +17,8 @@ export interface AccountStatus {
 }
 
 export class BiliAccount {
+  /** 发出去、还没用掉的登录二维码 */
+  private readonly qrKeys = new Set<string>();
   private readonly db: Db;
   private readonly secret: Secret;
   private readonly listeners = new Set<() => void>();
@@ -70,13 +72,20 @@ export class BiliAccount {
   async startQrLogin(): Promise<{ key: string; image: string }> {
     const qr = await createLoginQrCode(this.anon);
     const image = await QRCode.toDataURL(qr.url, { width: 360, margin: 1 });
+    this.qrKeys.add(qr.key);
+    if (this.qrKeys.size > 20) this.qrKeys.delete(this.qrKeys.values().next().value!);
     return { key: qr.key, image };
   }
 
   /** 查询扫码状态；成功时保存登录信息 */
   async pollQrLogin(key: string): Promise<QrState['state']> {
+    // 只认这里发出去的二维码：不能拿别人的二维码 key 来把这里换绑成别人的 B 站账号
+    if (!this.qrKeys.has(key)) return 'expired';
     const r = await pollLoginQrCode(this.anon, key);
-    if (r.state === 'success') await this.save(r.cookies, r.refreshToken, r.expiresAt);
+    if (r.state === 'success') {
+      this.qrKeys.delete(key);
+      await this.save(r.cookies, r.refreshToken, r.expiresAt);
+    }
     return r.state;
   }
 

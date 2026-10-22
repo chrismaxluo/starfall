@@ -52,6 +52,13 @@ describe('点歌接口', () => {
     expect((await t.req({ method: 'PUT', url: '/api/music/settings', payload: { nope: 1 } })).statusCode).toBe(400);
     // 导出的配置里带上点歌设置
     expect(t.ctx.io.export().music).toMatchObject({ enabled: true, cmdRequest: '来一首' });
+    // 旧版本导出的文件里是「显示翻译」开关：和现在的歌词语言一样时不报修改
+    const file = t.ctx.io.export();
+    const { lyricsLang: _lang, ...old } = file.music!;
+    const lang = t.ctx.music.cfg().lyricsLang;
+    const music = (trans: boolean) => t.ctx.io.plan({ ...file, music: { ...old, lyricsTrans: trans } as typeof file.music }).sections.find((x) => x.key === 'music');
+    expect(music(lang !== 'original')).toMatchObject({ changed: false });
+    expect(music(lang === 'original')).toMatchObject({ changed: true, details: ['歌词语言'] });
   });
 
   it('网易云扫码登录：登录信息加密保存，会员看得出来；退出后删掉', async () => {

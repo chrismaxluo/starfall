@@ -9,6 +9,7 @@ import { effectById, state } from '../lib/store.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { battery, yuan } from '../lib/preview.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
+import { useGiftSearch } from '../lib/gift-search.ts';
 import { attempt } from '../lib/toast.ts';
 import type { GiftConfig, SimulateResult, TriggerKind } from '../lib/types.ts';
 
@@ -28,6 +29,29 @@ const res = ref<SimulateResult | null>(null);
 watch(() => props.kind, () => ((res.value = null), (trace.value = [])));
 
 const paidGifts = computed(() => catalog.value.filter((g) => g.paid));
+
+// 选礼物：打字就搜（礼物面板上的，加上全站礼物里找到的，例如盲盒里爆出的权杖）；不选礼物就是自定义单价
+const giftQ = ref('');
+const giftOpen = ref(false);
+const { extra: found, searching } = useGiftSearch(giftQ, () => catalog.value);
+const giftShown = computed(() => {
+  const k = giftQ.value.trim();
+  const panel = paidGifts.value.filter((g) => !k || g.name.includes(k));
+  // 没打字时列出礼物面板上全部付费礼物；搜索结果最多列 60 个
+  const all = [...panel, ...found.value.filter((g) => !panel.some((x) => x.id === g.id))];
+  return k ? all.slice(0, 60) : all;
+});
+const picked = computed(() => catalog.value.find((x) => x.id === Number(giftPick.value)) ?? null);
+function pickGift(g: GiftConfig | null): void {
+  if (g && !catalog.value.some((x) => x.id === g.id)) catalog.value = [...catalog.value, g];
+  giftPick.value = g ? g.id : '';
+  giftQ.value = '';
+  giftOpen.value = false;
+}
+// 点别处收起
+function onGiftBlur(e: FocusEvent): void {
+  if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) giftOpen.value = false;
+}
 
 async function run(): Promise<void> {
   const w = who.value;
@@ -109,11 +133,25 @@ onMounted(async () => {
         <input v-model="text" class="inp" placeholder="弹幕内容" aria-label="弹幕内容" maxlength="100" />
       </template>
       <template v-if="kind === 'gift'">
-        <div class="row">
-          <select v-model="giftPick" class="sel" aria-label="礼物">
-            <option value="">自定义单价</option>
-            <option v-for="g in paidGifts" :key="g.id" :value="g.id">{{ g.name }}（{{ battery(g.price) }} · {{ yuan(g.price) }}）</option>
-          </select>
+        <div class="row sim-giftrow">
+          <div class="sim-gift" @focusout="onGiftBlur">
+            <input
+              v-model="giftQ"
+              class="inp"
+              :placeholder="picked ? `${picked.name}（${battery(picked.price)} · ${yuan(picked.price)}）` : '自定义单价 · 打字搜礼物（例如「权杖」）'"
+              aria-label="选礼物，打字搜索"
+              maxlength="40"
+              @focus="giftOpen = true"
+              @keydown.esc="giftOpen = false"
+            />
+            <!-- 按下时不让输入框失去焦点：有的浏览器（Mac 上的 Safari）点按钮不给按钮焦点，列表会在点中之前收起 -->
+            <div v-if="giftOpen" class="sim-found" @mousedown.prevent>
+              <button type="button" @click="pickGift(null)">自定义单价<span>自己填一个价钱</span></button>
+              <button v-for="g in giftShown" :key="g.id" type="button" :class="{ on: g.id === giftPick }" @click="pickGift(g)">{{ g.name }}<span>{{ battery(g.price) }} · {{ yuan(g.price) }}{{ g.tab ? '' : ' · 面板上没有' }}{{ g.effectId ? ' · 有B站动画' : '' }}</span></button>
+              <span v-if="searching" class="none">正在全站礼物里找…</span>
+              <span v-else-if="giftQ.trim() && !giftShown.length" class="none">没有找到这个礼物</span>
+            </div>
+          </div>
           <div v-if="giftPick === ''" class="suffix"><input v-model.number="customBattery" class="inp num" type="number" min="0" step="1" aria-label="单价（电池）" /><span>电池（{{ yuan(Math.round(Number(customBattery) || 0) * 100) }}）</span></div>
         </div>
         <div class="suffix"><input v-model.number="count" class="inp num" type="number" min="1" aria-label="数量" /><span>个</span></div>

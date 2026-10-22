@@ -2,7 +2,7 @@
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { GIFTS_ALPHA_DEFAULT, GIFTS_LOOKS, GIFTS_MOTIONS } from '@starfall/shared';
+import { CHAT_CREAM_FRAMES, CHAT_LOOKS, CHAT_MASCOTS, GIFTS_ALPHA_DEFAULT, GIFTS_LOOKS, GIFTS_MOTIONS } from '@starfall/shared';
 import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, MusicSource, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
 
@@ -193,6 +193,13 @@ export const outputs = sqliteTable('outputs', {
   chatMedal: text('chat_medal', { enum: ['own', 'all'] }).notNull().default('own'),
   chatMax: integer('chat_max').notNull().default(8),
   chatFadeSec: integer('chat_fade_sec').notNull().default(0),
+  // 外观（默认玻璃，和以前一样）、主题外观的大航海头像框、小八怎么出场、奶油贴纸的头像框、气泡浓淡（0 = 跟随外观）、黑名单的人不显示
+  chatLook: text('chat_look', { enum: CHAT_LOOKS }).notNull().default('glass'),
+  chatGuardFrame: text('chat_guard_frame', { enum: ['theme', 'bili'] }).notNull().default('theme'),
+  chatMascot: text('chat_mascot', { enum: CHAT_MASCOTS }).notNull().default('hop'),
+  chatCreamFrame: text('chat_cream_frame', { enum: CHAT_CREAM_FRAMES }).notNull().default('hachi'),
+  chatAlpha: integer('chat_alpha').notNull().default(0),
+  chatHideBlocked: integer('chat_hide_blocked', { mode: 'boolean' }).notNull().default(false),
   // 送礼名单（同一个输出的又一个浏览器源）；默认靠右，和靠左的弹幕列表错开
   giftsEnabled: integer('gifts_enabled', { mode: 'boolean' }).notNull().default(true),
   giftsSide: text('gifts_side', { enum: ['left', 'right'] }).notNull().default('right'),
@@ -246,8 +253,14 @@ export const events = sqliteTable(
     status: text('status').notNull(),
     raw: text('raw', { mode: 'json' }),
   },
-  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id)],
+  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id), index('events_room_status_id').on(t.roomId, t.status, t.id), index('events_session_kind').on(t.sessionId, t.kind), index('events_room_id_uname').on(t.roomId, t.id, t.uname)],
 );
+
+/**
+ * 事件的原始消息（排查问题用，只留 7 天）。单独一张表、过期整行删掉，腾出的空间能再用上；
+ * 以前存在 events.raw 里，清空后留下的空洞用不上，数据库会比实际需要大好几倍（那一列只剩老数据）
+ */
+export const eventRaw = sqliteTable('event_raw', { id: integer('id').primaryKey(), ts: integer('ts').notNull(), raw: text('raw', { mode: 'json' }).notNull() }, (t) => [index('event_raw_ts').on(t.ts)]);
 
 /** 素材快捷播放的按钮（按 sort 排列）。素材删除时按钮一起删掉 */
 export const quickPlay = sqliteTable('quick_play', {

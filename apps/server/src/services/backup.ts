@@ -14,6 +14,19 @@ const BACKUP_HOUR = 4;
 const CHECK_MS = 3600_000;
 /** 自动备份 starfall-20260926-0400.db；手动备份 starfall-20260926-153012-m.db（精确到秒，同一分钟多次不会覆盖） */
 const NAME = /^starfall-(\d{8}-\d{4}(?:\d{2}-m)?)\.(db|json)$/;
+/** 备份后至少还要剩这么多空间给数据库继续写 */
+const RESERVE_BYTES = 100 * 1024 * 1024;
+const mb = (n: number) => `${Math.round(n / 1024 / 1024)}MB`;
+
+/** 目录所在磁盘剩多少空间；查不到时返回 null（不拦着备份） */
+export function freeBytes(dir: string): number | null {
+  try {
+    const st = fs.statfsSync(dir);
+    return st.bavail * st.bsize;
+  } catch {
+    return null;
+  }
+}
 
 export interface BackupItem {
   /** 备份时间标记，例如 20260926-0400 */
@@ -94,12 +107,35 @@ export class BackupService {
     const stamp = manual ? `${t.stamp}${t.seconds}-m` : t.stamp;
     const dbFile = path.join(this.dir, `starfall-${stamp}.db`);
     const tmp = `${dbFile}.part`;
-    await this.db.$client.backup(tmp);
-    fs.chmodSync(tmp, 0o600);
-    fs.renameSync(tmp, dbFile);
+    // 剩下的空间不够放一份数据库就不备份：不然写到磁盘满才失败，数据库也写不进了
+    const need = this.dbSize() + RESERVE_BYTES;
+    const free = freeBytes(this.dir);
+    if (free !== null && free < need) throw new Error(`磁盘剩余空间不够（剩 ${mb(free)}，备份需要约 ${mb(need)}），跳过这次备份`);
+    try {
+      await this.db.$client.backup(tmp);
+      fs.chmodSync(tmp, 0o600);
+      fs.renameSync(tmp, dbFile);
+    } catch (e) {
+      fs.rmSync(tmp, { force: true });
+      throw e;
+    }
     fs.writeFileSync(path.join(this.dir, `starfall-${stamp}.json`), JSON.stringify(this.io.export(), null, 2), { mode: 0o600 });
     this.prune();
     return this.list().find((b) => b.stamp === stamp)!;
+  }
+
+  /** 数据库现在多大（连同还没合并进去的 -wal） */
+  private dbSize(): number {
+    const file = this.db.$client.name;
+    let n = 0;
+    for (const f of [file, `${file}-wal`]) {
+      try {
+        n += fs.statSync(f).size;
+      } catch {
+        /* 内存数据库、没有 -wal */
+      }
+    }
+    return n;
   }
 
   /** 自动备份保留最近 KEEP_BACKUPS 份，手动备份保留最近 KEEP_MANUAL 份 */

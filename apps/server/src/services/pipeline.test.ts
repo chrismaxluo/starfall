@@ -16,7 +16,7 @@ function fakeLive() {
   return {
     state,
     onEvent: (fn: (ev: StdEvent, raw: unknown) => void) => (listeners.add(fn), () => listeners.delete(fn)),
-    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, loginInvalid: false, adminCount: 0 }),
+    status: () => ({ ...state, liveSince: 0, connection: 'connected' as const, connectionDetail: null, reason: 'ok' as const, loginInvalid: false, checkError: null, adminCount: 0 }),
     emit: (ev: StdEvent, raw?: unknown) => { for (const fn of listeners) fn(ev, raw); },
   };
 }
@@ -73,7 +73,7 @@ describe('进场 → 播放', () => {
   it('原始消息写进记录；观众昵称写进缓存', async () => {
     const { live, ctx } = await setup();
     live.emit(enter({ guard: 3 }), { cmd: 'INTERACT_WORD_V2', data: { pb: 'xx' } });
-    const row = ctx.db.$client.prepare('select raw from events').get() as { raw: string };
+    const row = ctx.db.$client.prepare('select raw from event_raw where id = (select id from events)').get() as { raw: string };
     expect(JSON.parse(row.raw)).toEqual({ cmd: 'INTERACT_WORD_V2', data: { pb: 'xx' } });
     expect(ctx.viewers.cached(10001)?.name).toBe('小星');
   });
@@ -377,7 +377,10 @@ describe('播放队列', () => {
     expect(t.events().find((e) => e.uid === 2)?.status).toBe('cleared');
     // 跳过正在播的：马上播下一个
     const before = t.plays().length;
-    expect(t.p.skip()).toBe(true);
+    const playingId = t.p.snapshot().playing!.id;
+    expect(t.p.skip(playingId)).toBe(true);
+    // 双击「跳过」的第二下还带着刚才那一个：不会把刚开始播的下一个也跳掉
+    expect(t.p.skip(playingId)).toBe(false);
     expect(t.sock.sent.at(-2)).toMatchObject({ type: 'stop' });
     expect(t.plays()).toHaveLength(before + 1);
     expect(t.p.snapshot()).toMatchObject({ playing: { detail: '小花花 ×2' }, items: [] });
@@ -424,11 +427,19 @@ describe('其他', () => {
     expect(t.ctx.log.query({ status: ['no_rule'] }).events).toHaveLength(3);
     expect(t.ctx.log.query({ q: '3' }).events.map((e) => e.kind)).toEqual(['danmu', 'enter']);
     expect(t.ctx.log.query({ q: '%' }).events).toHaveLength(0);
+    // 名字里的 _ % 按原样找（以前搜不到）；数字同时按 UID 和名字找，还能和其他条件、分页一起用
+    t.live.emit(enter({ uid: 30, name: 'abc_d3', guard: 3 }));
+    expect(t.ctx.log.query({ q: 'c_d' }).events.map((e) => e.uid)).toEqual([30]);
+    expect(t.ctx.log.query({ q: 'cxd' }).events).toHaveLength(0);
+    expect(t.ctx.log.query({ q: '3' }).events.map((e) => e.uid)).toEqual([30, 3, 3]);
+    expect(t.ctx.log.query({ q: '3', kind: 'enter' }).events.map((e) => e.uid)).toEqual([30, 3]);
+    const q1 = t.ctx.log.query({ q: '3', limit: 2 });
+    expect(q1.events.map((e) => e.uid)).toEqual([30, 3]);
+    expect(t.ctx.log.query({ q: '3', limit: 2, cursor: q1.nextCursor! }).events.map((e) => e.kind)).toEqual(['enter']);
     const p1 = t.ctx.log.query({ limit: 4 });
     expect(p1.events).toHaveLength(4);
     const p2 = t.ctx.log.query({ limit: 4, cursor: p1.nextCursor! });
-    expect(p2).toMatchObject({ nextCursor: null });
-    expect(p2.events).toHaveLength(2);
+    expect(p2.events).toHaveLength(3);
   });
 
   it('清理：超过保留期的事件删除，7 天前的原始消息清空', async () => {
@@ -436,9 +447,24 @@ describe('其他', () => {
     t.live.emit(enter({ uid: 1, guard: 3 }), { cmd: 'X' });
     vi.advanceTimersByTime(8 * 24 * 3600_000);
     t.live.emit(enter({ uid: 2, guard: 3 }), { cmd: 'Y' });
-    expect(t.ctx.log.prune(Date.now(), 90)).toEqual({ deleted: 0, rawCleared: 1 });
-    expect(t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 0)).toEqual({ deleted: 0, rawCleared: 1 });
-    expect(t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 90)).toEqual({ deleted: 2, rawCleared: 0 });
+    expect(await t.ctx.log.prune(Date.now(), 90)).toEqual({ deleted: 0, rawCleared: 1 });
+    expect(await t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 0)).toEqual({ deleted: 0, rawCleared: 1 });
+    expect(await t.ctx.log.prune(Date.now() + 100 * 24 * 3600_000, 90)).toEqual({ deleted: 2, rawCleared: 0 });
+  });
+
+  it('清理分批做：一次要删很多条时全部删完', async () => {
+    const t = await setup();
+    const db = t.ctx.db.$client;
+    const ins = db.prepare("insert into events (ts, room_id, kind, uid, uname, viewer, status, raw) values (?, 30000, 'enter', 1, 'x', '{}', 'no_rule', '{}')");
+    db.transaction(() => {
+      for (let i = 0; i < 4500; i++) ins.run(Date.now() - (i < 4200 ? 40 : 3) * 24 * 3600_000);
+    })();
+    expect(await t.ctx.log.prune(Date.now(), 30)).toEqual({ deleted: 4200, rawCleared: 0 });
+    expect(await t.ctx.log.prune(Date.now() + 5 * 24 * 3600_000, 30)).toEqual({ deleted: 0, rawCleared: 300 });
+    // 直播中不删过期的记录
+    db.prepare("update events set ts = ? where id = (select max(id) from events)").run(Date.now() - 40 * 24 * 3600_000);
+    expect(await t.ctx.log.prune(Date.now(), 30, { live: true })).toEqual({ deleted: 0, rawCleared: 0 });
+    expect(await t.ctx.log.prune(Date.now(), 30)).toMatchObject({ deleted: 1 });
   });
 });
 
@@ -559,6 +585,73 @@ describe('礼物', () => {
     expect(t.plays().at(-1)!.gift?.img).toBe('https://i0.hdslb.com/gift/flower.png');
   });
 
+  it('面板上没有、动画还没读到的大礼物（盲盒里爆出的权杖）：一收到就去读，读好了再播，第一次也用官方动画', async () => {
+    const t = await setup();
+    const bili = t.ctx.effects.list().find((e) => e.name === 'B站·礼物动画')!.id;
+    const g = t.ctx.giftRules.get();
+    t.ctx.giftRules.set({ ...g, comboEnabled: false, bands: g.bands.map((b) => ({ ...b, effectId: bili, enabled: true })) });
+    let loaded = false;
+    const hub2 = new Hub();
+    const sock2 = fakeSock();
+    hub2.addOverlay(sock2, t.ctx.outputs.list()[0]!, []);
+    const p2 = new Pipeline({
+      ...t.ctx,
+      live: t.live,
+      hub: hub2,
+      gifts: { find: (id: number) => GIFTS[id] },
+      giftFx: { forGift: (x) => (loaded && x?.effectId === 699 ? { fx: CAR_FX, durationMs: 5700 } : undefined), waitFor: () => (loaded ? null : Promise.resolve().then(() => void (loaded = true))) },
+      timeZone: 'Asia/Shanghai',
+      rng: () => 0,
+    });
+    t.p.stop();
+    p2.start();
+    cleanup.push(() => p2.stop());
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
+    await vi.advanceTimersByTimeAsync(0);
+    const play = sock2.sent.filter((m) => m.type === 'play').at(-1) as Extract<ServerToOverlay, { type: 'play' }> | undefined;
+    expect(play?.item).toMatchObject({ effect: { visual: { style: 'bili-gift' } }, gift: { name: '极速超跑', fx: CAR_FX } });
+  });
+
+  it('等官方动画的大礼物后面来的礼物排在它后面（顺序不乱）；等的时候停止服务，这份礼物照样记下来、读好后不再播', async () => {
+    const t = await setup();
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    let done = (): void => undefined;
+    const wait = new Promise<void>((r) => (done = r));
+    const p2 = new Pipeline({
+      ...t.ctx,
+      live: t.live,
+      hub: t.hub,
+      gifts: { find: (id: number) => GIFTS[id] },
+      giftFx: { forGift: () => undefined, waitFor: (x) => (x?.effectId === 699 ? wait : null) },
+      timeZone: 'Asia/Shanghai',
+      rng: () => 0,
+    });
+    t.p.stop();
+    p2.start();
+    cleanup.push(() => p2.stop());
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
+    t.live.emit(gf({ unitPrice: 20_000 }, { uid: 2 }));
+    vi.advanceTimersByTime(500);
+    expect(t.events().map((e) => e.uid)).toEqual([]);
+    done();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(t.events().map((e) => e.uid)).toEqual([1, 2]);
+
+    let done2 = (): void => undefined;
+    const wait2 = new Promise<void>((r) => (done2 = r));
+    const p3 = new Pipeline({ ...t.ctx, live: t.live, hub: t.hub, gifts: { find: (id: number) => GIFTS[id] }, giftFx: { forGift: () => undefined, waitFor: () => wait2 }, timeZone: 'Asia/Shanghai', rng: () => 0 });
+    p2.stop();
+    p3.start();
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 3 }));
+    p3.stop();
+    expect(t.events().at(-1)).toMatchObject({ uid: 3 });
+    const n = t.plays().length;
+    done2();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(t.events().filter((e) => e.uid === 3)).toHaveLength(1);
+    expect(t.plays()).toHaveLength(n);
+  });
+
   it('「B站·礼物动画」：有官方全屏动画的礼物按动画长度播；没有动画时 100 元以上显示晶·大礼物、以下显示晶·礼物', async () => {
     const t = await setup();
     const bili = t.ctx.effects.list().find((e) => e.name === 'B站·礼物动画')!.id;
@@ -653,6 +746,8 @@ describe('弹幕列表', () => {
     t.live.emit(dm('晚上好'));
     t.live.emit(dm('欢迎来到直播间', { uid: 10002, name: '机器人' }));
     expect(chats(chat).map((c) => c.text)).toEqual(['晚上好', '欢迎来到直播间']);
+    // 黑名单里的人标上 blocked（设成「黑名单的人不显示」时弹幕列表自己不显示）
+    expect(chats(chat).map((c) => c.viewer.blocked)).toEqual([undefined, true]);
     expect(t.sock.sent.some((m) => m.type === 'chat')).toBe(false);
     expect(chat.sent.some((m) => m.type === 'play')).toBe(false);
   });
@@ -722,6 +817,25 @@ describe('送礼名单', () => {
     for (const r of giftRows(gifts)) expect(ids).toContain(r.id);
     expect(t.sock.sent.some((m) => m.type === 'gift_row')).toBe(false);
     expect(t.hub.giftBoard(oid(t))).toHaveLength(3);
+  });
+
+  it('服务停止时还在合并中的连击、上舰记进事件记录（不播），重启后送礼名单里有', async () => {
+    const t = await setup();
+    t.live.emit(gf({ unitPrice: 10_000, count: 2 }));
+    t.live.emit(gd({ source: 'guard_buy', dedupeKey: undefined, priceGold: 138_000 }));
+    expect(t.events()).toHaveLength(0);
+    t.p.stop();
+    expect(t.events().map((e) => [e.kind, e.status])).toEqual([
+      ['gift', 'cleared'],
+      ['guard', 'cleared'],
+    ]);
+    expect(t.plays()).toHaveLength(0);
+    const hub2 = new Hub();
+    const p2 = new Pipeline({ ...t.ctx, live: t.live, hub: hub2, gifts: { find: (id: number) => GIFTS[id] }, timeZone: 'Asia/Shanghai' });
+    p2.start();
+    cleanup.push(() => p2.stop());
+    vi.advanceTimersByTime(500);
+    expect(hub2.giftBoard(oid(t)).map((r) => r.kind).sort()).toEqual(['gift', 'guard']);
   });
 
   it('直播中重启服务：启动时还不知道场次，接上本场后把本场的送礼名单装回来（不会清空）', async () => {

@@ -1,7 +1,7 @@
 // 直播连接（需求 F-BL-04 ~ 07、F-BL-10）。
 // 默认"只在开播时连接"：未开播时只用公开接口每分钟查一次状态，账号不在线；开播后才用账号连接直播间。
 import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
-import { BiliApiError, LiveClient, WbiSigner, getDanmuInfo, getRoomAdmins, getRoomInit, parseMessage, parseRoomStats } from '@starfall/bili';
+import { BiliApiError, LiveClient, WbiSigner, checkLogin, getDanmuInfo, getRoomAdmins, getRoomInit, parseMessage, parseRoomStats } from '@starfall/bili';
 import type { BiliHttp, ClientState, LiveClientOptions, RoomStatsPatch } from '@starfall/bili';
 import type { StdEvent } from '@starfall/shared';
 import type { Db } from '../db/index.ts';
@@ -14,6 +14,7 @@ export interface LiveDeps {
   getRoomInit: typeof getRoomInit;
   getRoomAdmins: typeof getRoomAdmins;
   getDanmuInfo: typeof getDanmuInfo;
+  checkLogin: typeof checkLogin;
   createClient: (o: LiveClientOptions) => Pick<LiveClient, 'start' | 'stop' | 'state'>;
   now: () => number;
 }
@@ -22,6 +23,7 @@ export const defaultLiveDeps: LiveDeps = {
   getRoomInit,
   getRoomAdmins,
   getDanmuInfo,
+  checkLogin,
   createClient: (o) => new LiveClient(o),
   now: Date.now,
 };
@@ -37,8 +39,10 @@ export interface LiveStatus {
   connectionDetail: string | null;
   /** 为什么没有连接 */
   reason: LiveReason;
-  /** B 站说登录已失效（在别处退出或过期）：要重新扫码，不然收不到直播间消息 */
+  /** B 站说登录已失效（在别处退出或过期）：要重新扫码，不然收不到直播间消息。没开播时也会定时确认，换了账号才清掉 */
   loginInvalid: boolean;
+  /** 查开播状态一直失败（被 B 站风控、网络不通）：从什么时候开始、最近一次的原因；查到了就清掉 */
+  checkError: { since: number; text: string } | null;
   adminCount: number;
 }
 
@@ -48,6 +52,10 @@ const SESSION_SLACK_MS = 60_000;
 /** 本场记录的开始时间和 B 站的开播时间差得不多时，改成 B 站的时间（旧版本记录的是发现开播的时间） */
 const SINCE_FIX_MS = 12 * 3600_000;
 const ADMIN_REFRESH_MS = 30 * 60_000;
+/** 没开播（没连接）时多久确认一次 B 站登录还有效 */
+const LOGIN_CHECK_MS = 3600_000;
+/** 查开播状态一直失败时，多久写一次日志 */
+const CHECK_ERROR_LOG_MS = 30 * 60_000;
 
 export class LiveService {
   private readonly db: Db;
@@ -73,6 +81,10 @@ export class LiveService {
   private connection: ClientState = 'idle';
   private connectionDetail: string | null = null;
   private loginInvalid = false;
+  private loginCheckedAt = -Infinity;
+  private accountGen = 0;
+  private checkError: { since: number; text: string } | null = null;
+  private checkErrorLoggedAt = 0;
   private reason: LiveReason = 'no_room';
   /** 解析失败的消息数（协议可能变了） */
   parseErrors = 0;
@@ -114,6 +126,7 @@ export class LiveService {
       connectionDetail: this.connectionDetail,
       reason: this.reason,
       loginInvalid: this.loginInvalid,
+      checkError: this.checkError,
       adminCount: this.admins.size,
     };
   }
@@ -126,6 +139,9 @@ export class LiveService {
     // 换了账号（重新扫码、退出）：断开，用新的登录信息重新连接
     this.account.onChange(() => {
       this.disconnect();
+      this.loginInvalid = false;
+      this.loginCheckedAt = -Infinity;
+      this.accountGen++;
       void this.reconcile();
     });
     this.room.onChange(() => {
@@ -134,10 +150,9 @@ export class LiveService {
       this.setLive(false);
       void this.poll();
     });
-    await this.poll();
-    // 第一次查询期间服务已经在退出
-    if (this.stopped) return;
+    // 先建定时器：第一次查询出错也不会让之后再也不查
     this.pollTimer = setInterval(() => void this.poll(), POLL_MS);
+    await this.poll();
   }
 
   stop(): void {
@@ -182,11 +197,50 @@ export class LiveService {
       const init = await this.deps.getRoomInit(this.account.anon, room.roomId);
       // 查询期间换了直播间：这是旧直播间的结果，丢掉
       if (this.room.get()?.roomId !== room.roomId) return;
+      this.setCheckError(null);
       this.setLive(init.liveStatus === 1, init.liveSince ?? null);
-    } catch {
-      /* 查询失败时保持原状态，下次再查 */
+    } catch (e) {
+      // 查询失败时保持原状态，下次再查；一直失败时后台要能看到原因
+      this.setCheckError(e instanceof BiliApiError ? `B 站返回 ${e.code}：${e.message}` : (e as Error).message);
     }
     await this.reconcile();
+    await this.checkLoginIdle();
+  }
+
+  private setCheckError(text: string | null): void {
+    const now = this.deps.now();
+    if (text === null) {
+      if (!this.checkError) return;
+      console.log('[直播] 又能查到开播状态了');
+      this.checkError = null;
+    } else {
+      const first = !this.checkError;
+      this.checkError = { since: this.checkError?.since ?? now, text };
+      if (first || now - this.checkErrorLoggedAt >= CHECK_ERROR_LOG_MS) {
+        this.checkErrorLoggedAt = now;
+        console.warn(`[直播] 查开播状态失败${first ? '' : `（已经连着失败 ${Math.round((now - this.checkError.since) / 60_000)} 分钟）`}：${text}`);
+      }
+    }
+    this.emitStatus();
+  }
+
+  /** 没连接时（没开播）每小时确认一次 B 站登录还有效：两场直播之间登录失效了，开播前就能提醒 */
+  private async checkLoginIdle(): Promise<void> {
+    const http = this.account.http();
+    const now = this.deps.now();
+    if (!http || this.client || now - this.loginCheckedAt < LOGIN_CHECK_MS) return;
+    this.loginCheckedAt = now;
+    const gen = this.accountGen;
+    try {
+      // 确认期间换了账号：结果作废
+      const ok = await this.deps.checkLogin(http);
+      if (gen !== this.accountGen || ok === !this.loginInvalid) return;
+      this.loginInvalid = !ok;
+      if (!ok) console.warn('[直播] B 站登录已失效，需要重新扫码');
+      this.emitStatus();
+    } catch {
+      /* 查不到时不算失效，下次再查 */
+    }
   }
 
   /** liveSince：B 站给的这一场开播时间（毫秒），用来判断没关闭的记录是不是同一场，也作为本场的开始时间 */
@@ -202,15 +256,27 @@ export class LiveService {
       if (open && !sameLive) this.db.update(liveSessions).set({ endedAt: sameRoom ? (liveSince ?? now) : now }).where(isNull(liveSessions.endedAt)).run();
       this.session = open && sameLive ? { id: open.id, roomId: open.roomId ?? roomId, startedAt: open.startedAt } : this.newSession(roomId, liveSince ?? now);
     }
-    // 开播时间以 B 站为准（开播消息里没有开播时间，下一次查询时补上）
-    if (live && this.session && liveSince !== null && liveSince !== this.session.startedAt && Math.abs(liveSince - this.session.startedAt) < SINCE_FIX_MS) {
+    // B 站的开播时间比本场记录的晚很多：中间下播过（下播消息漏了，例如那一刻正在重连），这是新的一场
+    if (live && this.session && liveSince !== null && liveSince > this.session.startedAt + SESSION_SLACK_MS) {
+      this.db.update(liveSessions).set({ endedAt: liveSince }).where(eq(liveSessions.id, this.session.id)).run();
+      this.session = this.newSession(roomId, liveSince);
+      this.emitStatus();
+    }
+    // 开播时间以 B 站为准（开播消息里没有开播时间，下一次查询时补上）：只往前改（我们发现开播总比 B 站记的晚）
+    if (live && this.session && liveSince !== null && liveSince < this.session.startedAt && this.session.startedAt - liveSince < SINCE_FIX_MS) {
       this.session.startedAt = liveSince;
       this.db.update(liveSessions).set({ startedAt: liveSince }).where(eq(liveSessions.id, this.session.id)).run();
       this.emitStatus();
     }
     if (!live) {
       if (this.session) this.db.update(liveSessions).set({ endedAt: now }).where(eq(liveSessions.id, this.session.id)).run();
-      else this.db.update(liveSessions).set({ endedAt: now }).where(isNull(liveSessions.endedAt)).run();
+      else {
+        // 服务启动时发现上一场没结束（下播前就退出了、电脑睡眠了）：结束时间用那一场最后一条事件的时间，不用现在（不然上一场会变成十几个小时）
+        for (const o of this.db.select().from(liveSessions).where(isNull(liveSessions.endedAt)).all()) {
+          const last = this.db.$client.prepare('select max(ts) as ts from events where session_id = ?').get(o.id) as { ts: number | null };
+          this.db.update(liveSessions).set({ endedAt: Math.max(o.startedAt, Math.min(now, last.ts ?? o.startedAt)) }).where(eq(liveSessions.id, o.id)).run();
+        }
+      }
       this.session = null;
     }
     if (live !== this.live) {
@@ -244,7 +310,6 @@ export class LiveService {
     if (gen !== this.gen || this.stopped) return;
     const wbi = new WbiSigner(http);
     this.connectedRoom = roomId;
-    this.loginInvalid = false;
     this.client = this.deps.createClient({
       roomId,
       uid: http.uid,
@@ -261,8 +326,8 @@ export class LiveService {
           }
           throw e;
         }),
+      // 连上了也不清掉「登录失效」：登录失效时 B 站可能按游客身份照样让连上（收到的消息里都没有观众信息）
       onState: (s, detail) => {
-        if (s === 'connected') this.loginInvalid = false;
         this.connection = s;
         this.connectionDetail = detail ?? null;
         this.emitStatus();
@@ -283,7 +348,6 @@ export class LiveService {
     this.connectedRoom = null;
     this.connection = 'idle';
     this.connectionDetail = null;
-    this.loginInvalid = false;
   }
 
   private async refreshAdmins(roomId: number): Promise<void> {
@@ -310,6 +374,9 @@ export class LiveService {
     }
     if (!ev) return;
     if (ev.kind === 'live') {
+      // 别的直播间的开播 / 下播（连麦、PK 时可能收到）：不理，不然本场会被结束
+      const room = this.room.get();
+      if (ev.roomId !== undefined && room && ev.roomId !== room.roomId && ev.roomId !== room.shortId) return;
       // 开播 / 下播消息比轮询更及时
       this.setLive(ev.live);
       void this.reconcile();

@@ -1,0 +1,1665 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星临 · 弹幕外观新设计</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<style>
+/* 圆体（Resource Han Rounded，SIL OFL 1.1）：只留了 GB2312 里的字，生僻字回落到思源黑体 */
+@font-face { font-family: "SF Round"; font-weight: 700; font-display: swap; src: url(assets/chat-looks/fonts/rhr-Bold.woff2) format("woff2"); }
+@font-face { font-family: "SF Round"; font-weight: 900; font-display: swap; src: url(assets/chat-looks/fonts/rhr-Heavy.woff2) format("woff2"); }
+:root { --font-sans: "Geist", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; --round: "SF Round", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --bg: #0B0B10; --panel: #121218; --line: rgba(255,255,255,.08); --text: #EDEDF1; --mute: #A6A8B4; --dim: #80838F; --acc: #8D8BFF; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.app { height: 100%; display: grid; grid-template-columns: 340px 1fr; }
+.embed .app { grid-template-columns: 1fr; }
+.embed .side { display: none; }
+.side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 22px 18px 40px; }
+.side h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.side h1 img { width: 22px; height: 22px; }
+.side .sub { color: var(--dim); font-size: 12.5px; line-height: 1.6; }
+.side .sub a { color: var(--acc); }
+.grp { margin-top: 16px; }
+.grp > b { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5px; letter-spacing: .12em; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+.grp > b em { font-style: normal; letter-spacing: 0; color: var(--mute); }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: #0D0D12; padding: 3px; border-radius: 9px; border: 1px solid var(--line); }
+.seg button { flex: 1 1 22%; border: 0; background: transparent; padding: 7px 8px; border-radius: 7px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.seg button.on { background: #26262F; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.seg button:disabled { opacity: .35; cursor: default; }
+.row2 { display: flex; gap: 8px; margin-top: 8px; }
+.btn { flex: 1; height: 34px; border-radius: 9px; border: 0; background: #22222B; color: var(--text); font-size: 12.5px; white-space: nowrap; padding: 0 8px; }
+.btn.pri { background: var(--acc); color: #0B0B12; font-weight: 600; }
+.btn.on { background: rgba(61,214,140,.16); color: #3DD68C; }
+.say-in { flex: 1; min-width: 0; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: #0D0D12; padding: 0 10px; font-size: 13px; outline: none; }
+.say-in:focus { border-color: var(--acc); }
+.rng { display: flex; align-items: center; gap: 10px; }
+.rng input { flex: 1; accent-color: var(--acc); }
+.rng .btn { flex: none; width: 76px; }
+.note { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: #0D0D12; border: 1px solid var(--line); font-size: 12.5px; line-height: 1.75; color: var(--mute); }
+.note b { color: var(--text); font-weight: 600; }
+.cats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 8px; }
+.cats button { border: 0; background: #0D0D12; border-radius: 8px; padding: 4px 2px 3px; display: grid; justify-items: center; gap: 1px; font-size: 10.5px; color: var(--dim); box-shadow: inset 0 0 0 1px var(--line); }
+.cats button img { width: 40px; height: 40px; }
+.cats button:hover { color: var(--text); box-shadow: inset 0 0 0 1px rgba(141,139,255,.5); }
+.view { position: relative; overflow: hidden; display: grid; place-items: center; }
+.frame { position: relative; flex: none; }
+.frame > .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+@media (max-width: 820px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100%; } .side { border-right: 0; border-bottom: 1px solid var(--line); padding: 16px; } .view { height: 86vh; } }
+
+/* ================= 画布（1080×1920 竖屏）：背景只是模拟直播画面，实际页面是透明的 ================= */
+.stage { width: 1080px; height: 1920px; overflow: hidden; --st: 10%; --sb: 36%; box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+.stage.sc-clear { background-color: #15151C; background-image: linear-gradient(45deg, #1F1F29 25%, transparent 25%, transparent 75%, #1F1F29 75%), linear-gradient(45deg, #1F1F29 25%, transparent 25%, transparent 75%, #1F1F29 75%); background-size: 64px 64px; background-position: 0 0, 32px 32px; }
+.stage.sc-room { background: radial-gradient(260px 260px at 18% 62%, rgba(255,170,90,.85), transparent 70%), radial-gradient(340px 300px at 86% 70%, rgba(90,160,255,.75), transparent 70%), radial-gradient(500px 420px at 60% 18%, rgba(210,120,255,.45), transparent 70%), linear-gradient(175deg, #2A2436, #151823 60%, #0E1017); }
+.stage.sc-light { background: radial-gradient(700px 600px at 30% 20%, #FFE9D6, transparent 70%), radial-gradient(700px 600px at 80% 70%, #D9ECFF, transparent 70%), linear-gradient(170deg, #F6F1EA, #E6EEF6); }
+.stage.sc-busy { background:
+  repeating-linear-gradient(115deg, rgba(255,255,255,.16) 0 18px, transparent 18px 70px),
+  radial-gradient(240px 240px at 14% 30%, #FF3D7F, transparent 70%), radial-gradient(300px 260px at 30% 58%, #FFE14D, transparent 70%),
+  radial-gradient(320px 320px at 78% 40%, #2DE2E6, transparent 70%), radial-gradient(380px 300px at 18% 80%, #7C3DFF, transparent 70%),
+  radial-gradient(420px 360px at 84% 86%, #FF7A1A, transparent 70%),
+  conic-gradient(from 30deg at 50% 50%, #241446, #0E3A4A, #3A1030, #241446); }
+.person { position: absolute; left: 62%; top: 520px; width: 0; height: 0; }
+.stage.sc-clear .person { display: none; }
+.person::before { content: ""; position: absolute; left: -165px; top: 0; width: 330px; height: 380px; border-radius: 50% 50% 46% 46%; background: #6E5A50; }
+.person::after { content: ""; position: absolute; left: -380px; top: 420px; width: 760px; height: 900px; border-radius: 380px 380px 0 0; background: linear-gradient(90deg, #3A4A78, #7A4A8A); }
+.stage.sc-light .person::before { background: #C9A690; }
+.stage.sc-light .person::after { background: #4A5670; }
+.stage.sc-busy .person::after { background: linear-gradient(90deg, #1B1B1B, #4A2A6A); }
+.src { position: absolute; top: calc(var(--st) + 20px); bottom: calc(var(--sb) + 20px); width: 600px; z-index: 10; }
+.src.at-l { left: 28px; }
+.src.at-r { right: 28px; }
+.stage.show-src .src { outline: 3px dashed rgba(141,139,255,.7); outline-offset: 6px; }
+
+/* ================= 弹幕列表 =================
+   一条 = 头像框（普通观众框里是小八，大航海和主播是自己的头像）+ 气泡。
+   气泡是按这一条的实际大小现画的一张图（猫耳和描边连在一起，底色半透明）；尾巴、猫爪、胶带是单独的图，进场时各自动。
+   动画只改位置、缩放、旋转、透明度，不碰模糊和滤镜，老内核也跑得动 */
+.chat { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 36px 26px 6px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: calc(14px * var(--k)); --k: 1; font-family: var(--round); }
+.at-r .chat { align-items: flex-end; padding: 40px 6px 26px 36px; }
+.chat.big { --k: 1.2; }
+.chat.uni .row { align-self: stretch; }
+.chat.uni .bw { flex: 1 1 auto; }
+.row { position: relative; display: flex; align-items: center; max-width: 100%; }
+.at-r .row { flex-direction: row-reverse; }
+
+/* 头像框：窗口（圆形，里面是小八或头像）→ 框 → 趴在框沿上的小八爪子 → 身份装饰 */
+.fw { position: relative; flex: none; z-index: 3; }
+.fw > * { position: absolute; }
+.fw .win { border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 36%, #FFFFFF 0%, #FFF9EE 52%, #E6EFFC 100%); }
+.fw .win .av { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.fw .win .ini { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: grid; place-items: center; color: #fff; font-weight: 900; }
+.fw .frm { left: 0; top: 0; width: 100%; height: 100%; filter: drop-shadow(0 calc(3px * var(--k)) calc(3px * var(--k)) rgba(28,37,80,.32)); }
+/* 小八：平时坐在头像右下角；进场时先在框里露脸，再跳到角上 */
+.fw .catw { z-index: 4; transform-origin: 50% 50%; }
+.fw .catw .br { width: 100%; height: 100%; transform-origin: 50% 100%; }
+.at-r .fw .catw img { transform: scaleX(-1); }
+.fw .catw img { display: block; width: 100%; height: 100%; }
+/* 压在框沿上的那份只露出「下半截、圆窗外面」的部分：窗里只画一份，半透明的边不会叠出一道线。遮罩放在不动的外层，小八动的时候遮罩不跟着走 */
+.fw .orn { z-index: 4; pointer-events: none; }
+.row.live .fw .catw .br { animation: breathe 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes breathe { 0%, 100% { transform: none; } 50% { transform: scale(1.02, 1.035); } }
+
+/* 气泡 */
+.bw { position: relative; flex: 0 1 auto; min-width: 0; z-index: 1; }
+.bx { position: relative; display: flex; flex-direction: column; justify-content: center; }
+.bx > .bub { position: absolute; z-index: 0; pointer-events: none; max-width: none; }
+/* 气泡后面那一块直播画面模糊一下（形状和气泡一样），底色半透明也不会发灰、字照样清楚 */
+.bx > .frost { position: absolute; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(var(--fb, 10px)) saturate(140%); backdrop-filter: blur(var(--fb, 10px)) saturate(140%); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+.at-r .bx > .frost { transform: scaleX(-1); }
+/* 奶油：模糊的同时提亮一点，像磨砂纸，不会透成灰色 */
+.lk-cream .bx > .frost, .lk-porcelain .bx > .frost { -webkit-backdrop-filter: blur(10px) saturate(125%) brightness(1.35); backdrop-filter: blur(10px) saturate(125%) brightness(1.35); }
+.nofrost .bx > .frost { display: none; }
+.bx > .who, .bx > .tx, .bx > .sticker { position: relative; z-index: 2; }
+.at-r .bx > .bub { transform: scaleX(-1); }
+.bw > .tail, .bw > .paw, .bw > .tape { position: absolute; pointer-events: none; }
+.bw > .tail { z-index: 0; }
+.bw > .paw, .bw > .tape { z-index: 3; }
+.row.live .bw > .tail .sw { animation: sway 2.6s ease-in-out infinite; }
+.row:not(.live) .bw > .tail .sw, .row:not(.live) .fw .catw .br { animation-play-state: paused; }
+.tail .sw, .tail img, .paw img, .tape img { display: block; width: 100%; height: 100%; }
+@keyframes sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(7deg); } }
+.at-r .bw > .paw, .at-r .bw > .tape { transform: scaleX(-1); }
+.at-r .tail img { transform: scaleX(-1); }
+
+/* 昵称和弹幕一律完整显示：放不下就换行，不截断、不加省略号 */
+.who { display: flex; flex-wrap: wrap; align-items: center; gap: calc(4px * var(--k)) calc(7px * var(--k)); min-width: 0; min-height: calc(32px * var(--k)); }
+.at-r .who { flex-direction: row-reverse; }
+.who .ic { flex: none; width: calc(25px * var(--k)); height: calc(25px * var(--k)); margin-right: calc(-1px * var(--k)); }
+.badge { flex: none; width: calc(30px * var(--k)); height: calc(30px * var(--k)); object-fit: contain; filter: drop-shadow(0 1px 1px rgba(28,37,80,.25)); }
+.honor { flex: none; height: calc(21px * var(--k)); width: auto; }
+.fang { flex: none; display: inline-grid; place-items: center; width: calc(25px * var(--k)); height: calc(25px * var(--k)); border-radius: 50%; font-size: calc(14px * var(--k)); font-weight: 900; font-style: normal; line-height: 1; background: #FFF1DE; color: #E07B1F; box-shadow: inset 0 0 0 calc(2px * var(--k)) #F3A04D, 0 0 0 calc(2px * var(--k)) #fff; }
+.zb { flex: none; height: calc(26px * var(--k)); padding: 0 calc(11px * var(--k)); display: inline-flex; align-items: center; font-size: calc(15px * var(--k)); font-weight: 900; letter-spacing: .08em; border-radius: 999px; background: linear-gradient(180deg, #FF9CC0, #FF6F9E); color: #fff; box-shadow: 0 0 0 calc(2px * var(--k)) #fff; }
+/* 粉丝牌：B 站按等级的颜色，形状换成贴纸小胶囊 */
+.medal { flex: 0 1 auto; min-width: calc(30px * var(--k)); display: inline-flex; align-items: stretch; height: calc(26px * var(--k)); font-size: calc(15px * var(--k)); font-weight: 900; line-height: 1; overflow: hidden; border-radius: 999px; box-shadow: 0 0 0 calc(2px * var(--k)) #fff; }
+.medal .mn { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; display: inline-flex; align-items: center; padding: 0 calc(7px * var(--k)) 0 calc(10px * var(--k)); background: var(--mbg); color: #fff; }
+.medal.lv-only .ml { background: var(--mbg); color: #fff; padding: 0 calc(9px * var(--k)); }
+.medal .ml { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: calc(26px * var(--k)); padding: 0 calc(8px * var(--k)) 0 calc(6px * var(--k)); background: #fff; color: var(--mlv); font-family: "Geist", var(--round); font-weight: 700; }
+/* 昵称：浅色胶囊；普通观众的小头像放在胶囊开头 */
+.nm { flex: 0 0 auto; max-width: 100%; display: inline-flex; align-items: center; gap: calc(6px * var(--k)); min-height: calc(28px * var(--k)); padding: 0 calc(13px * var(--k)); border-radius: 999px; background: var(--pale); color: var(--deep); font-size: calc(19px * var(--k)); font-weight: 900; }
+.nm.has-mini { padding-left: calc(3px * var(--k)); }
+.nm .mini { flex: none; width: calc(24px * var(--k)); height: calc(24px * var(--k)); border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 calc(1.5px * var(--k)) #fff; background: #fff; }
+.nm .t { min-width: 0; white-space: normal; word-break: break-all; line-height: 1.25; }
+.at-r .nm { flex-direction: row-reverse; }
+.at-r .nm.has-mini { padding-left: calc(13px * var(--k)); padding-right: calc(3px * var(--k)); }
+.tx { margin-top: calc(4px * var(--k)); font-size: calc(28px * var(--k)); line-height: 1.3; font-weight: 900; letter-spacing: .02em; color: #1F2B5B; word-break: break-word; }
+.tx .em { height: 1.25em; width: auto; vertical-align: -0.28em; margin: 0 .04em; }
+.at-r .tx { text-align: right; }
+.sticker { display: block; margin-top: calc(6px * var(--k)); height: calc(100px * var(--k)); width: auto; max-width: 100%; object-fit: contain; align-self: flex-start; }
+.at-r .sticker { align-self: flex-end; }
+.row { --deep: #2B4C8C; --pale: #DCE8FB; }
+.row.lv-3 { --deep: #1D4A9E; --pale: #CFE2FF; }
+.row.lv-2 { --deep: #5530A6; --pale: #E6DAFF; }
+.row.lv-1 { --deep: #865406; --pale: #FFE9B0; }
+.row.anchor { --deep: #A12E5C; --pale: #FFDCE9; }
+
+/* ---------- 星月夜空：深蓝半透明气泡 + 发光描边；白字、金色昵称，字带一点光 ---------- */
+.lk-night .fw .win { background: radial-gradient(circle at 50% 34%, #3E54B8 0%, #222E7C 52%, #111850 100%); }
+.lk-night .fw .frm { filter: none; }
+.lk-night .tx { color: #fff; text-shadow: 0 1px 6px rgba(4,8,40,.7), 0 0 16px rgba(130,160,255,.28); }
+.lk-night .nm { background: none; padding: 0 calc(2px * var(--k)); color: var(--nmc); text-shadow: 0 0 10px var(--nmg), 0 1px 2px rgba(4,8,40,.8); }
+.lk-night .nm.has-mini { padding-left: 0; }
+.lk-night .nm .mini { box-shadow: 0 0 0 calc(1.5px * var(--k)) #C9D6FF, 0 0 8px rgba(150,180,255,.7); }
+.lk-night .row { --nmc: #FFE7B0; --nmg: rgba(255,214,120,.38); }
+.lk-night .row.lv-3 { --nmc: #B2DCFF; --nmg: rgba(120,190,255,.45); }
+.lk-night .row.lv-2 { --nmc: #E4D0FF; --nmg: rgba(190,150,255,.5); }
+.lk-night .row.lv-1 { --nmc: #FFE29A; --nmg: rgba(255,200,90,.55); }
+.lk-night .row.anchor { --nmc: #FFC9DE; --nmg: rgba(255,140,190,.5); }
+.lk-night .medal { box-shadow: 0 0 0 calc(1.5px * var(--k)) rgba(255,255,255,.6), 0 0 10px rgba(160,140,255,.45); }
+.lk-night .medal .ml { background: rgba(255,255,255,.92); }
+.lk-night .zb { background: linear-gradient(180deg, #FF8DBA, #F0588F); box-shadow: 0 0 0 calc(1.5px * var(--k)) rgba(255,255,255,.7), 0 0 10px rgba(255,110,170,.6); }
+.lk-night .fang { background: rgba(20,24,60,.6); color: #FFC07A; box-shadow: inset 0 0 0 calc(1.5px * var(--k)) #FFB061, 0 0 8px rgba(255,170,90,.45); }
+.lk-night .badge { filter: drop-shadow(0 0 4px rgba(150,180,255,.55)); }
+.lk-night .fw .twk { z-index: 4; pointer-events: none; opacity: .9; }
+.lk-night .row.live .fw .twk { animation: twinkle 2.6s ease-in-out infinite; }
+.lk-night .row.live .fw .twk.t2 { animation-delay: -1.3s; }
+.lk-night .row:not(.live) .fw .twk { animation-play-state: paused; }
+@keyframes twinkle { 0%, 100% { transform: scale(.55) rotate(0deg); opacity: .35; } 50% { transform: scale(1.1) rotate(45deg); opacity: 1; } }
+/* 吊坠：挂在气泡右上，最新一条轻轻晃 */
+.bw > .charm { position: absolute; pointer-events: none; z-index: 3; transform-origin: 50% 0; }
+.bw > .charm img { display: block; width: 100%; height: 100%; }
+.row.live .bw > .charm .sw { animation: swing 3s ease-in-out infinite; transform-origin: 50% 0; }
+.row:not(.live) .bw > .charm .sw { animation-play-state: paused; }
+.bw > .charm .sw { width: 100%; height: 100%; }
+@keyframes swing { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+
+/* ---------- 像素小屋：一格一格的深蓝方框；字带硬阴影，胶囊换成切角方块；动起来也是一跳一跳的 ---------- */
+.lk-pixel img.px, .lk-pixel .px img { image-rendering: pixelated; image-rendering: crisp-edges; }
+.lk-pixel .fw .win { background: #2A3C8E; }
+.lk-pixel .fw .frm { filter: none; image-rendering: pixelated; }
+.lk-pixel .tx { color: #fff; text-shadow: calc(2px * var(--k)) calc(2px * var(--k)) 0 #0A1230; }
+.lk-pixel .nm { background: none; padding: 0 calc(2px * var(--k)); color: var(--nmc); text-shadow: calc(2px * var(--k)) calc(2px * var(--k)) 0 #0A1230; }
+.lk-pixel .nm.has-mini { padding-left: 0; }
+.lk-pixel .row { --nmc: #FFE7A8; }
+.lk-pixel .row.lv-3 { --nmc: #A6D4FF; }
+.lk-pixel .row.lv-2 { --nmc: #DCC6FF; }
+.lk-pixel .row.lv-1 { --nmc: #FFD66B; }
+.lk-pixel .row.anchor { --nmc: #FFB8D2; }
+.lk-pixel .medal, .lk-pixel .zb, .lk-pixel .fang, .lk-pixel .nm .mini { --c: calc(3px * var(--k)); border-radius: 0; box-shadow: none; clip-path: polygon(var(--c) 0, calc(100% - var(--c)) 0, 100% var(--c), 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, var(--c) 100%, 0 calc(100% - var(--c)), 0 var(--c)); }
+.lk-pixel .medal .ml { font-family: var(--round); font-weight: 900; }
+.lk-pixel .zb { background: #FF6F9E; }
+.lk-pixel .fang { background: #F39A3D; color: #2A1606; }
+.lk-pixel .row.live .bw > .tail .sw { animation-timing-function: steps(3, end); }
+.lk-pixel .row.live .bw > .charm .sw { animation-timing-function: steps(3, end); }
+.lk-pixel .row.live .fw .catw .br { animation-timing-function: steps(2, end); }
+.lk-pixel .fw .twk { z-index: 4; pointer-events: none; image-rendering: pixelated; }
+.lk-pixel .row.live .fw .twk { animation: blink 2.4s steps(1, end) infinite; }
+.lk-pixel .row.live .fw .twk.t2 { animation-delay: -1.2s; }
+.lk-pixel .row:not(.live) .fw .twk { animation-play-state: paused; }
+@keyframes blink { 0%, 100% { opacity: 1; transform: none; } 40% { opacity: 1; transform: scale(.6); } 60% { opacity: .25; transform: scale(.6); } 80% { opacity: 1; transform: none; } }
+
+
+
+/* ---------- 果冻玻璃：白字、名字带一点身份色；最新一条上沿有一点光慢慢流过 ---------- */
+.lk-jelly .tx { color: #fff; text-shadow: 0 1px 3px rgba(6,10,30,.55); }
+.lk-jelly .nm { background: none; padding: 0 calc(2px * var(--k)); color: var(--jn, #F2F6FF); text-shadow: 0 1px 3px rgba(6,10,30,.55); }
+.lk-jelly .row.lv-3 { --jn: #BFE0FF; } .lk-jelly .row.lv-2 { --jn: #E2D4FF; } .lk-jelly .row.lv-1 { --jn: #FFE7A6; } .lk-jelly .row.anchor { --jn: #FFD3E5; }
+.lk-jelly .medal { box-shadow: 0 0 0 calc(1.2px * var(--k)) rgba(255,255,255,.7); }
+.lk-jelly .fw .frm { filter: none; }
+.lk-jelly .bx > .frost { -webkit-backdrop-filter: blur(16px) saturate(175%); backdrop-filter: blur(16px) saturate(175%); }
+.bx > .jcap { position: absolute; z-index: 1; pointer-events: none; max-width: none; }
+.at-r .bx > .jcap { transform: scaleX(-1); }
+.bx > .jglint { position: absolute; z-index: 1; pointer-events: none; overflow: hidden; border-radius: 99px; }
+.at-r .bx > .jglint { left: auto !important; right: calc(26px * var(--k)); }
+.jglint i { position: absolute; top: 0; bottom: 0; width: 22%; left: 0; transform: translateX(-120%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); opacity: 0; }
+.row.live .jglint i { animation: glint 5.5s ease-in-out 1.6s infinite; }
+@keyframes glint { 0% { transform: translateX(-120%); opacity: 0; } 8% { opacity: 1; } 40% { transform: translateX(480%); opacity: 1; } 46%, 100% { transform: translateX(480%); opacity: 0; } }
+
+/* ---------- 青花瓷：钴蓝字、描线胶囊，素净 ---------- */
+.lk-porcelain .tx { color: #142F66; }
+.lk-porcelain .nm { background: rgba(255,255,255,.55); color: var(--pdeep, #1B3F8F); box-shadow: inset 0 0 0 calc(1.4px * var(--k)) var(--pline, rgba(45,93,181,.55)); }
+.lk-porcelain .row.lv-2 { --pdeep: #2F2C86; --pline: #C9A24A; }
+.lk-porcelain .row.lv-1 { --pdeep: #132E6E; --pline: #D4AF55; }
+.lk-porcelain .row.anchor { --pdeep: #8A2C4C; --pline: rgba(184,69,106,.6); }
+.lk-porcelain .medal { box-shadow: 0 0 0 calc(1.5px * var(--k)) #fff; }
+.lk-porcelain .fw .frm { filter: none; }
+.bx > .waves { position: absolute; z-index: 1; pointer-events: none; max-width: none; }
+.at-r .bx > .waves { transform: scaleX(-1); }
+
+/* 一次性的效果层：闪光粒子、扫光 */
+.fx { position: absolute; pointer-events: none; z-index: 6; }
+.sheen { position: absolute; z-index: 2; pointer-events: none; overflow: hidden; }
+.sheen i { position: absolute; top: -20%; bottom: -20%; width: 34%; left: 0; transform: translateX(-140%) skewX(-18deg); background: linear-gradient(90deg, transparent, var(--sh, rgba(255,255,255,.85)) 50%, transparent); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <h1><img src="assets/logo.svg" alt="">弹幕外观 · 新设计</h1>
+    <div class="sub">重新设计的三款外观。框里是自己的头像，小八坐在头像右下角，表情和小动作跟着弹幕内容变；进场第一秒小八先在框中间露脸，再跳到角上。大航海和主播进场时有专属效果。背景只是模拟的直播画面，实际页面是透明的。<a href="chat-looks-compare.html">和旧版并排对比 →</a></div>
+    <div class="grp"><b>外观</b><div class="seg" id="look"></div></div>
+    <div class="grp" id="cfg"><b>奶油贴纸的头像框</b><div class="seg" id="cframe"></div></div>
+    <div class="grp"><b>小八出场</b><div class="seg" id="intro"></div></div>
+    <div class="grp"><b>气泡宽度</b><div class="seg" id="width"></div></div>
+    <div class="grp"><b>气泡透明度（越往左越透明） <em id="bgav"></em></b><div class="rng"><input type="range" id="bga" min="30" max="100" step="5"><button class="btn" id="bgaAuto">默认</button></div></div>
+    <div class="grp"><b>直播画面</b><div class="seg" id="bg"></div></div>
+    <div class="grp"><b>背景模糊（老版直播姬可能不支持）</b><div class="seg" id="blur"></div></div>
+    <div class="grp"><b>放在哪边 · 字号 · 速度</b><div class="seg" id="side"></div><div class="seg" id="size" style="margin-top:6px"></div><div class="seg" id="speed" style="margin-top:6px"></div></div>
+    <div class="grp"><b>试一试</b>
+      <div class="row2" style="margin-top:0"><input class="say-in" id="say" placeholder="打字试试：哈哈哈、呜呜、无语…" maxlength="60"><button class="btn pri" id="send" style="flex:none;width:60px">发送</button></div>
+      <div class="row2"><button class="btn" data-k="3">舰长</button><button class="btn" data-k="2">提督</button><button class="btn" data-k="1">总督</button><button class="btn" data-k="anchor">主播</button></div>
+      <div class="row2"><button class="btn" data-k="mod">房管</button><button class="btn" data-k="sticker">表情包</button><button class="btn" data-k="long">长弹幕</button><button class="btn" data-k="longname">长昵称</button></div>
+      <div class="row2"><button class="btn" id="realb">真实弹幕回放</button><button class="btn" id="lineup">排一组身份对比</button></div>
+      <div class="row2"><button class="btn" id="slow">动画慢放</button><button class="btn" id="pause">暂停</button><button class="btn" id="clear">清空</button></div>
+    </div>
+    <div class="grp"><b>小八的表情（点一下发一条对应的弹幕）</b><div class="cats" id="cats"></div></div>
+    <div class="note" id="note"></div>
+  </aside>
+  <main class="view" id="view">
+    <div class="frame" id="frameBox">
+      <div class="stage sc-room" id="stage">
+        <div class="person"></div>
+        <div class="src at-l" id="src"><div class="chat" id="chat"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const MAX = 8;
+const A = 'assets/chat-looks/';
+// ---------- B 站资源（版权归 B 站，只在运行时加载） ----------
+const BADGE = 'https://s1.hdslb.com/bfs/static/blive/live-pay-mono/relation/relation/assets/';
+const BADGES = { 1: `${BADGE}governor-DpDXKEdA.png`, 2: `${BADGE}supervisor-u43ElIjU.png`, 3: `${BADGE}captain-Bjw5Byb5.png` };
+const HONOR = { 3: '5d5e873b7b0d1894c56c4843bfba4617ff22e490', 12: 'f5f0cb238bfa8a4481fc67ee7e99c32e3b62ce83', 18: '256d22fcb8375155a29b01709960bfa74124ae1b', 25: '7e3c647c9b6abea76703f43fe89f0dd729a63954', 33: '8d0656d3a7a74480b2faf6c9488794e54d0da026', 41: '2a956d7d87a2fa0af0c0874e9cb80202b4159516', 52: 'd89b1dbed63531c43b6b5ef903be3ddb6bee0b23', 68: 'ce6a2ca64b8cd945d14b49807124b7a8a4ea946d' };
+const EMOTS = { '[dog]': '4428c84e694fbf4e0ef6c06e958d9352c3582740', '[比心]': '4e029593562283f00d39b99e0557878c4199c71d', '[吃瓜]': 'ffb53c252b085d042173379ac724694ce3196194', '[笑哭]': 'c5436c6806c32b28d471bb23d42f0f8f164a187a', '[鼓掌]': 'd581d0bc30c8f9712b46ec02303579840c72c42d', '[花]': '7dd2ef03e13998575e4d8a803c6e12909f94e72b', '[赞]': '2dd666d3651bafe8683acf770b7f4163a5f49809' };
+const STICKERS = ['https://i0.hdslb.com/bfs/emote/777c32b3d36d88d7cc68408db9f3945c6e210ca4.png', 'https://i0.hdslb.com/bfs/emote/6781fd903f532c0ce8b48ad57e9e34f8dbdb79ad.png'];
+
+// ---------- 小八：按弹幕内容挑表情，每个表情配一个小动作 ----------
+// [表情, 名字, 匹配, 示例弹幕, 动作]
+const CATS = [
+  ['expression-laughing', '笑到拍桌', /哈{3,}|h{4,}|笑死|笑疯|233/i, '哈哈哈哈哈笑死我了', 'shake'],
+  ['laugh', '大笑', /哈哈|嘿嘿嘿|笑/, '哈哈这个好好笑', 'shake'],
+  ['expression-crying', '委屈哭哭', /呜呜|哭|555|泪奔|委屈|难过|伤心/, '呜呜呜太难了', 'shiver'],
+  ['expression-touched', '感动捂嘴', /感动|泪目|破防|好暖|心疼/, '感动，泪目了', 'pulse'],
+  ['expression-shocked', '震惊', /卧槽|我靠|震惊|啊[？?]|什么[!！]/, '卧槽！什么！', 'jump'],
+  ['expression-awkward', '汗颜', /尴尬|汗|囧|社死/, '好尴尬啊', 'sink'],
+  ['expression-exhausted', '灵魂出窍', /无语|…|\.{3}|寄了|麻了|好累|累死/, '无语……', 'droop'],
+  ['expression-pouting', '气鼓鼓', /气死|哼|生气|可恶/, '哼，气死我了', 'puff'],
+  ['expression-smug', '得意', /嘿嘿|懂了|好家伙|稳了/, '嘿嘿，我懂了', 'tilt'],
+  ['expression-shy', '害羞', /害羞|羞|脸红|嘤|夸我/, '有点害羞', 'shy'],
+  ['expression-sleepy', '困困', /困|睡觉|晚安|好晚|熬夜/, '好困，晚安', 'nod'],
+  ['heart', '抱爱心', /喜欢|爱你|比心|❤|♥|\[比心\]/, '喜欢主播[比心]', 'pulse'],
+  ['flower', '拿花', /花|\[花\]/, '给你一朵小花~', 'sway'],
+  ['cheer', '握拳加油', /加油|冲|干巴爹|fighting/i, '加油加油！', 'hop2'],
+  ['stareyes', '星星眼', /好看|好美|好帅|好可爱|厉害|牛/, '主播好可爱！', 'hop'],
+  ['puzzled', '疑惑', /[？?]|为什么|怎么/, '这是什么？', 'tilt2'],
+  ['surprise', '惊讶', /哇|[!！]|欸/, '哇！', 'jump'],
+  ['touched', '捧脸', /晚上好|早上好|来了|打卡/, '晚上好，来陪主播啦', 'hop'],
+];
+const IDLE = ['expression-happy', 'expression-wink', 'content'];
+const catSrc = (id) => `${A}${id.startsWith('expression-') ? 'cat2' : 'cat'}/${id}.png`;
+let idle = 0;
+const pickCat = (text) => { for (const c of CATS) if (c[2].test(text)) return { id: c[0], act: c[4] }; return { id: IDLE[idle++ % IDLE.length], act: 'hop' }; };
+// 爱心、星星这些会顺带撒一点
+const ACT_FX = { pulse: 'heart', hop: 'spark', hop2: 'star', jump: 'bang', sway: 'heart', shake: 'spark' };
+
+// ---------- 小图 ----------
+const svgUrl = (s) => 'data:image/svg+xml,' + encodeURIComponent(s);
+const SV = (vb, body) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${body}</svg>`;
+const f = (n) => +n.toFixed(2);
+function starPts(cx, cy, R, r) { const p = []; for (let i = 0; i < 10; i++) { const rr = i % 2 ? r : R, a = -Math.PI / 2 + i * Math.PI / 5; p.push(`${f(cx + rr * Math.cos(a))},${f(cy + rr * Math.sin(a))}`); } return p.join(' '); }
+// 五角星贴纸：白边 + 深色描边 + 一点高光
+function starSvg(c) {
+  const p = starPts(24, 25, 20, 9.5);
+  return SV('0 0 48 48', `<polygon points="${p}" fill="#fff" stroke="#fff" stroke-width="9" stroke-linejoin="round"/><polygon points="${p}" fill="${c}" stroke="#2A3366" stroke-width="2.6" stroke-linejoin="round"/><path d="M17 19l3-1" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".85"/>`);
+}
+function crownSvg() {
+  const d = 'M8 34 L5 12 L16 21 L25 5 L34 21 L45 12 L42 34 Z';
+  const gems = '<circle cx="25" cy="27" r="3.4" fill="#FF6F9E"/><circle cx="15" cy="28" r="2.3" fill="#6FB6FF"/><circle cx="35" cy="28" r="2.3" fill="#6FB6FF"/>';
+  return SV('0 0 50 40', `<path d="${d}" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round"/><path d="${d}" fill="#FFCC4D" stroke="#2A3366" stroke-width="2.6" stroke-linejoin="round"/><path d="M9 31h32" stroke="#E89B1E" stroke-width="4"/><path d="M12 14l2 9" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".8"/>${gems}<circle cx="5" cy="12" r="2.6" fill="#FFCC4D" stroke="#2A3366" stroke-width="1.6"/><circle cx="25" cy="5" r="2.8" fill="#FFCC4D" stroke="#2A3366" stroke-width="1.6"/><circle cx="45" cy="12" r="2.6" fill="#FFCC4D" stroke="#2A3366" stroke-width="1.6"/>`);
+}
+const HEART = 'M20 33 C8 25 2 18 2 11 C2 5.5 6.5 2 11 2 C15 2 18 4.5 20 8 C22 4.5 25 2 29 2 C33.5 2 38 5.5 38 11 C38 18 32 25 20 33Z';
+const heartSvg = (c) => SV('0 0 40 36', `<path d="${HEART}" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><path d="${HEART}" fill="${c}" stroke="#2A3366" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 9q2-3 5-2" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".9"/>`);
+const sparkSvg = (c) => SV('0 0 20 20', `<path d="M10 0 Q11.2 8.8 20 10 Q11.2 11.2 10 20 Q8.8 11.2 0 10 Q8.8 8.8 10 0Z" fill="${c}"/><circle cx="10" cy="10" r="2.2" fill="#fff"/>`);
+const bangSvg = () => SV('0 0 20 40', `<path d="M6 3h8l-2 22h-4z" fill="#FFD45E" stroke="#2A3366" stroke-width="2" stroke-linejoin="round"/><circle cx="10" cy="33" r="4" fill="#FFD45E" stroke="#2A3366" stroke-width="2"/>`);
+// 小八的尾巴：从气泡右下角后面伸出来往上卷（白边 + 深色描边 + 蓝色，尖上一点高光）
+const TAIL_D = 'M8 62 C30 64 47 52 48 32 C49 20 44 12 37 10';
+const tailSvg = () => SV('0 0 64 76', `<path d="${TAIL_D}" fill="none" stroke="#fff" stroke-width="19" stroke-linecap="round"/><path d="${TAIL_D}" fill="none" stroke="#25306A" stroke-width="14.5" stroke-linecap="round"/><path d="${TAIL_D}" fill="none" stroke="#5E9BEA" stroke-width="10" stroke-linecap="round"/><path d="M44 36 C45 26 42 19 38 16" fill="none" stroke="#B9D7FF" stroke-width="3" stroke-linecap="round"/>`);
+const ICONS = {};
+const icon = (key, mk) => (ICONS[key] ||= svgUrl(mk()));
+function mulberry(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+// ================= 星月夜空的小图：都带一圈柔光，不描深色边 =================
+// 身份色（框、描边、耳朵里、尾巴跟着变；气泡底色大家都一样）
+const NT = {
+  n: { main: '#6F8BFF', light: '#C3D1FF', deep: '#3346C0' },
+  3: { main: '#4F9DFF', light: '#C2E2FF', deep: '#1F57C8' },
+  2: { main: '#A57CFF', light: '#E6D8FF', deep: '#5A30C2' },
+  1: { main: '#FFC24D', light: '#FFF0C0', deep: '#C98A1C' },
+  anchor: { main: '#FF7FB0', light: '#FFD7E7', deep: '#C2457A' },
+};
+const spark4 = (x, y, r, c) => { const q = r * 0.13; return `<path d="M${f(x)},${f(y - r)} Q${f(x + q)},${f(y - q)} ${f(x + r)},${f(y)} Q${f(x + q)},${f(y + q)} ${f(x)},${f(y + r)} Q${f(x - q)},${f(y + q)} ${f(x - r)},${f(y)} Q${f(x - q)},${f(y - q)} ${f(x)},${f(y - r)}Z" fill="${c}"/>`; };
+const nSparkSvg = (c) => SV('-6 -6 32 32', `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"/></filter></defs><g filter="url(#g)" opacity=".9">${spark4(10, 10, 10, c)}</g>${spark4(10, 10, 9, c)}${spark4(10, 10, 5.5, '#FFFDF0')}<circle cx="10" cy="10" r="1.8" fill="#fff"/>`);
+const nStarSvg = (c) => SV('-6 -6 60 60', `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter><radialGradient id="s" cx=".42" cy=".38" r=".7"><stop offset="0" stop-color="#FFFBEA"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="#E9A23A"/></radialGradient></defs><polygon points="${starPts(24, 25, 21, 10)}" fill="${c}" filter="url(#g)" opacity=".9"/><polygon points="${starPts(24, 25, 20, 9.5)}" fill="url(#s)" stroke="#FFF4CF" stroke-width="1.6" stroke-linejoin="round"/>`);
+const nHeartSvg = (c) => SV('-6 -6 52 48', `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs><path d="${HEART}" fill="${c}" filter="url(#g)" opacity=".85"/><path d="${HEART}" fill="${c}" stroke="#FFE3EE" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 9q2-3 5-2" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".9"/>`);
+function nCrownSvg() {
+  const d = 'M8 34 L5 12 L16 21 L25 5 L34 21 L45 12 L42 34 Z';
+  return SV('-6 -6 62 52', `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter><linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF3C4"/><stop offset=".6" stop-color="#FFD25E"/><stop offset="1" stop-color="#E9A23A"/></linearGradient></defs><path d="${d}" fill="#FFC24A" filter="url(#g)"/><path d="${d}" fill="url(#c)" stroke="#FFF4CF" stroke-width="1.6" stroke-linejoin="round"/><circle cx="25" cy="27" r="3.4" fill="#FF6F9E"/><circle cx="15" cy="28" r="2.3" fill="#8FC8FF"/><circle cx="35" cy="28" r="2.3" fill="#8FC8FF"/>`);
+}
+// 猫爪（48×44）：白色、粉肉垫，外面一圈身份色的柔光
+const PAW = { toes: [[10, 15, 6.2], [19.5, 9, 6.4], [30, 9, 6.4], [39, 15, 6.2]], pad: [24.5, 29, 13, 11] };
+function nPawSvg(main) {
+  const shapes = (ex) => PAW.toes.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r + ex}"/>`).join('') + `<ellipse cx="${PAW.pad[0]}" cy="${PAW.pad[1]}" rx="${PAW.pad[2] + ex}" ry="${PAW.pad[3] + ex}"/>`;
+  const pads = PAW.toes.map(([x, y, r]) => `<ellipse cx="${x}" cy="${y + .6}" rx="${r * .5}" ry="${r * .58}"/>`).join('') + `<path d="M17,33 Q16.5,24 24.5,24.5 Q32.5,24 32,33 Q24.5,37 17,33Z"/>`;
+  return SV('-8 -8 64 60', `<defs><filter id="g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3.2"/></filter></defs><g fill="${main}" filter="url(#g)" opacity=".9">${shapes(3)}</g><g fill="#DCE6FF">${shapes(1.6)}</g><g fill="#fff">${shapes(0)}</g><g fill="#FF9DBF">${pads}</g>`);
+}
+// 月亮吊坠（26×46）：一串小金珠、一颗四角星，下面一弯月牙
+function nMoonSvg() {
+  const beads = [2, 6, 10, 17, 21].map((y) => `<circle cx="13" cy="${y}" r="1.1" fill="#FFE7A8"/>`).join('');
+  return SV('-8 -2 42 52', `<defs><filter id="g" x="-80%" y="-40%" width="260%" height="180%"><feGaussianBlur stdDeviation="2.6"/></filter>
+    <radialGradient id="m" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="#FFF6D2"/><stop offset=".6" stop-color="#FFDC86"/><stop offset="1" stop-color="#F2B850"/></radialGradient>
+    <mask id="c"><circle cx="13" cy="34" r="10" fill="#fff"/><circle cx="17.5" cy="30" r="8.6" fill="#000"/></mask></defs>
+    ${beads}${spark4(13, 13.5, 4, '#FFF2C4')}
+    <circle cx="13" cy="34" r="10" fill="#FFD27A" mask="url(#c)" filter="url(#g)" opacity=".95"/><circle cx="13" cy="34" r="10" fill="url(#m)" mask="url(#c)"/>`);
+}
+// 尾巴：同一个形状，深色底 + 身份色渐变，尖上一截白，外面一圈光
+function nTailSvg(T) {
+  return SV('-10 -10 84 96', `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter><linearGradient id="t" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${T.deep}"/><stop offset=".55" stop-color="${T.main}"/><stop offset="1" stop-color="${T.light}"/></linearGradient></defs>
+    <path d="${TAIL_D}" fill="none" stroke="${T.main}" stroke-width="20" stroke-linecap="round" filter="url(#g)" opacity=".8"/>
+    <path d="${TAIL_D}" fill="none" stroke="#0C1240" stroke-width="14.5" stroke-linecap="round"/>
+    <path d="${TAIL_D}" fill="none" stroke="url(#t)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M46.5 24 C46 17 42 12.5 37 10" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round"/>`);
+}
+// 描光：一颗亮点拖着尾巴，沿着头像框转一圈
+function traceSvg(c) {
+  // 光尾分 24 段，越往后越淡越细；每段多画 1° 和下一段接上，看不出接缝
+  let segs = '';
+  for (let i = 0; i < 24; i++) {
+    const a0 = (-90 - (i + 1) * 6 - 1) * Math.PI / 180, a1 = (-90 - i * 6) * Math.PI / 180, t = 1 - i / 24;
+    segs += `<path d="M${f(50 + 46.5 * Math.cos(a0))},${f(50 + 46.5 * Math.sin(a0))} A46.5,46.5 0 0 1 ${f(50 + 46.5 * Math.cos(a1))},${f(50 + 46.5 * Math.sin(a1))}" stroke-opacity="${f(t ** 1.8)}" stroke-width="${f(1 + 4 * t)}"/>`;
+  }
+  return SV('0 0 100 100', `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs><g fill="none" stroke="${c}" stroke-linecap="butt" filter="url(#g)" transform="scale(1)" style="stroke-width:8">${segs.replace(/stroke-width="[\d.]+"/g, 'stroke-width="9"')}</g><g fill="none" stroke="${c}" stroke-linecap="butt">${segs}</g><g fill="none" stroke="#fff" stroke-linecap="butt" opacity=".9">${segs.replace(/stroke-width="([\d.]+)"/g, (m, w) => `stroke-width="${f(w * 0.45)}"`)}</g><circle cx="50" cy="3.5" r="7" fill="${c}" filter="url(#g)"/><circle cx="50" cy="3.5" r="3.4" fill="#fff"/>`);
+}
+// 流星（大航海进场）：一条往后淡掉的光，头是亮点
+const meteorSvg = (c) => SV('0 0 160 16', `<defs><linearGradient id="m" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${c}" stop-opacity="0"/><stop offset=".75" stop-color="${c}" stop-opacity=".75"/><stop offset="1" stop-color="#fff"/></linearGradient><filter id="g" x="-10%" y="-100%" width="120%" height="300%"><feGaussianBlur stdDeviation="2.2"/></filter></defs><path d="M2 8 L150 5.2 A2.8 2.8 0 0 1 150 10.8 Z" fill="url(#m)" filter="url(#g)"/><path d="M30 8 L150 6.6 A1.4 1.4 0 0 1 150 9.4 Z" fill="url(#m)"/><circle cx="150" cy="8" r="5.5" fill="${c}" filter="url(#g)"/><circle cx="150" cy="8" r="2.6" fill="#fff"/>`);
+
+// 头像框（150×150，洞的中心 (75, 80)，半径 44）：发光圆环 + 金色细圈，左上一弯月牙，左下一颗星，左边垂一串星星珠子
+const FR = { cx: 75, cy: 80, R: 44 };
+const polar = (a, r) => [FR.cx + Math.cos(a * Math.PI / 180) * r, FR.cy + Math.sin(a * Math.PI / 180) * r];
+function crescentPath(cx, cy, r1, dx, dy, r2) {
+  const d = Math.hypot(dx, dy), a = (r1 * r1 - r2 * r2 + d * d) / (2 * d), hh = Math.sqrt(Math.max(0, r1 * r1 - a * a));
+  const ux = dx / d, uy = dy / d, x = cx + ux * a, y = cy + uy * a;
+  const p1 = [x - uy * hh, y + ux * hh], p2 = [x + uy * hh, y - ux * hh];
+  return `M${f(p1[0])},${f(p1[1])} A${r1},${r1} 0 1 1 ${f(p2[0])},${f(p2[1])} A${r2},${r2} 0 0 0 ${f(p1[0])},${f(p1[1])} Z`;
+}
+function frameNight(tier) {
+  const T = NT[tier], { cx, cy, R } = FR, rb = R + 5;
+  const moon = crescentPath(31, 37, 15, 7, -5.5, 12.2);
+  const [ha, hb] = [polar(198, rb + 1.6), polar(256, rb + 1.6)];
+  return SV('0 0 150 150', `<defs>
+    <linearGradient id="bd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".22" stop-color="${T.light}"/><stop offset=".62" stop-color="${T.main}"/><stop offset="1" stop-color="${T.deep}"/></linearGradient>
+    <radialGradient id="mn" cx=".3" cy=".3" r=".9"><stop offset="0" stop-color="#FFF8DC"/><stop offset=".55" stop-color="#FFDC86"/><stop offset="1" stop-color="#F0B04A"/></radialGradient>
+    <filter id="gw" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4.2"/></filter></defs>
+    <ellipse cx="${cx}" cy="${cy}" rx="${R + 21}" ry="${R + 8}" transform="rotate(-20 ${cx} ${cy})" fill="none" stroke="#DCE4FF" stroke-width="1.5" stroke-dasharray=".1 4.6" stroke-linecap="round" opacity=".85"/>
+    <circle cx="${cx}" cy="${cy}" r="${rb}" fill="none" stroke="${T.main}" stroke-width="15" filter="url(#gw)" opacity=".95"/>
+    <circle cx="${cx}" cy="${cy}" r="${rb}" fill="none" stroke="#0C1240" stroke-width="10.6"/>
+    <circle cx="${cx}" cy="${cy}" r="${rb}" fill="none" stroke="url(#bd)" stroke-width="7.2"/>
+    <path d="M${f(ha[0])},${f(ha[1])} A${rb + 1.6},${rb + 1.6} 0 0 1 ${f(hb[0])},${f(hb[1])}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".9"/>
+    <circle cx="${cx}" cy="${cy}" r="${R + 1.1}" fill="none" stroke="#F6D88E" stroke-width="1.2"/>
+    ${[45, 135, 225, 315].map((a) => { const [x, y] = polar(a, R + 1.1); return `<circle cx="${f(x)}" cy="${f(y)}" r="1.8" fill="#FFF0BE"/>`; }).join('')}
+    <path d="${moon}" fill="#FFD27A" filter="url(#gw)" opacity=".85"/>
+    <path d="${moon}" fill="url(#mn)" stroke="#FFF5D6" stroke-width="1.2" stroke-linejoin="round"/>
+    <polygon points="${starPts(26, 121, 11, 5.2)}" fill="#FFD27A" filter="url(#gw)" opacity=".8"/>
+    <polygon points="${starPts(26, 121, 10, 4.8)}" fill="url(#mn)" stroke="#FFF5D6" stroke-width="1.1" stroke-linejoin="round"/>
+    <g fill="#FFE7A8">${[60, 68, 76, 84].map((y) => `<circle cx="12" cy="${y}" r="1.2"/>`).join('')}</g>${spark4(12, 95, 5.5, '#FFE7A8')}
+    ${spark4(124, 128, 4.6, '#FFF2C4')}`);
+}
+
+// ================= 奶油贴纸「小八风」头像框：整个框就像小八的脑袋 =================
+// 白色粗圆环 + 深色粗轮廓（和小八的画法一样），顶上一段是小八头顶的蓝色、中间留出「八」字的白尖，两只蓝耳朵，两边一点腮红；外面一圈白色贴纸边
+const HT = {
+  n: { main: '#6AA6F0', light: '#BFD9FA' }, 3: { main: '#5B97F2', light: '#BFD6FF' }, 2: { main: '#A58BEA', light: '#DDD0FF' },
+  1: { main: '#F2B84B', light: '#FFE6A8' }, anchor: { main: '#F49AB8', light: '#FFD6E4' },
+};
+// 小八脑袋框的耳朵和头顶蓝色（150×150 坐标），矢量框和像素框共用
+function hachiFramePaths() {
+  const { R } = FR, r1 = R + 12.5, P = (a, r) => polar(a, r).map(f).join(',');
+  // 耳朵和表情图里一样：外侧长弧线从圆圈上升起，耳尖圆、往外斜，内侧短、陡陡落回圈上；右耳是左耳翻过来
+  const earL = (m) => { const A = (a) => (m < 0 ? -180 - a : a), Q = (a, r) => P(A(a), r);
+    return `M${Q(-161, r1 - 3)} C${Q(-157, r1 + 8)} ${Q(-147, r1 + 16)} ${Q(-139.5, r1 + 17.5)} C${Q(-136, r1 + 20.8)} ${Q(-130, r1 + 20.8)} ${Q(-127, r1 + 16.5)} C${Q(-122, r1 + 11)} ${Q(-117, r1 + 4)} ${Q(-112, r1 - 3)} Z`; };
+  // 头顶的蓝色：两侧斜着收进去，中间偏左留一个往上的白尖，右边的蓝多一点
+  const cap = `M${P(-176, R)} Q${P(-178, r1 - 1)} ${P(-168, r1)} A${r1},${r1} 0 0 1 ${P(-6, r1)} Q${P(4, r1 - 2)} ${P(0, R)} A${R},${R} 0 0 0 ${P(-82, R)} C${P(-86, R + 3)} ${P(-92, r1 - 3.5)} ${P(-99, r1 - 4)} C${P(-106, r1 - 3.5)} ${P(-111, R + 2)} ${P(-116, R)} A${R},${R} 0 0 0 ${P(-176, R)} Z`;
+  return { ears: [earL(1), earL(-1)], cap, r1 };
+}
+// 矢量路径 → 判断某个点在不在里面（像素外观拿它把矢量形状变成格子）
+const PCTX = document.createElement('canvas').getContext('2d');
+const inPath = (d) => { const p = new Path2D(d); return (x, y) => PCTX.isPointInPath(p, x, y); };
+// sty：cream 白色贴纸边 + 阴影；night 去掉贴纸边，外面一圈身份色的柔光，圈里一道金色细线，左边一弯月牙、左下一颗星
+function frameHachi(tier, sty = 'cream') {
+  const night = sty === 'night', porc = sty === 'porcelain', C = night ? NT[tier] : porc ? { ...PCT[tier], light: PCT[tier].wash } : HT[tier], { cx, cy, R } = FR, r1 = R + 12.5;
+  const ink = night ? '#141A48' : porc ? (C.gilt ? C.trim : C.main) : '#263159';
+  const band = night ? '#EEF1FF' : porc ? '#FBFCFF' : '#fff', shade = night ? '#C9D2F4' : porc ? '#E3EAF6' : '#E2EAF6';
+  const P = (a, r) => polar(a, r).map(f).join(',');
+  const { ears, cap } = hachiFramePaths();
+  const union = `<circle cx="${cx}" cy="${cy}" r="${r1}"/>${ears.map((d) => `<path d="${d}"/>`).join('')}`;
+  return SV('0 0 150 150', `<defs><filter id="s" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.6" stdDeviation="2.6" flood-color="#141B45" flood-opacity=".32"/></filter><mask id="h"><rect width="150" height="150" fill="#fff"/><circle cx="${cx}" cy="${cy}" r="${R - 0.8}" fill="#000"/></mask>
+    <filter id="gw" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4.2"/></filter>
+    <linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${porc ? C.deep : C.light}"/><stop offset=".55" stop-color="${C.main}"/><stop offset="1" stop-color="${porc ? C.wash : C.deep || C.main}"/></linearGradient>
+    <radialGradient id="mn" cx=".3" cy=".3" r=".9"><stop offset="0" stop-color="#FFF8DC"/><stop offset=".55" stop-color="#FFDC86"/><stop offset="1" stop-color="#F0B04A"/></radialGradient></defs><g mask="url(#h)">
+    ${night ? `<g fill="${C.main}" stroke="${C.main}" stroke-width="12" stroke-linejoin="round" filter="url(#gw)" opacity=".9">${union}</g>` : porc ? `<g fill="${band}" stroke="${band}" stroke-width="3" stroke-linejoin="round" filter="url(#s)">${union}</g>` : `<g fill="#fff" stroke="#fff" stroke-width="11" stroke-linejoin="round" filter="url(#s)">${union}</g>`}
+    <g fill="${ink}" stroke="${ink}" stroke-width="${porc ? 3.6 : 5.4}" stroke-linejoin="round">${union}</g>
+    <g fill="${night || porc ? 'url(#cg)' : C.main}">${ears.map((d) => `<path d="${d}"/>`).join('')}</g>
+    <circle cx="${cx}" cy="${cy}" r="${(R + r1) / 2}" fill="none" stroke="${band}" stroke-width="${r1 - R}"/>
+    <path d="M${P(25, R + 4)} A${R + 4},${R + 4} 0 0 1 ${P(155, R + 4)}" fill="none" stroke="${shade}" stroke-width="5" stroke-linecap="round"/>
+    <path d="${cap}" fill="${night || porc ? 'url(#cg)' : C.main}"/>
+    <path d="M${P(-150, R + 8.5)} A${R + 8.5},${R + 8.5} 0 0 1 ${P(-128, R + 8.5)}" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>
+    <circle cx="${cx}" cy="${cy}" r="${R + 0.6}" fill="none" stroke="${ink}" stroke-width="${porc ? 2 : 2.8}"/>
+    ${night ? `<circle cx="${cx}" cy="${cy}" r="${R + 2.6}" fill="none" stroke="#E9C46E" stroke-width="1.1"/>` : ''}
+    ${porc ? `<circle cx="${cx}" cy="${cy}" r="${R + 3}" fill="none" stroke="${C.trim || C.main}" stroke-opacity="${C.trim ? 1 : 0.6}" stroke-width="${C.trim ? 1.3 : 0.9}"/>${Array.from({ length: 13 }, (_, i) => { const [x, y] = polar(30 + i * 10, R + 8.5); return `<circle cx="${f(x)}" cy="${f(y)}" r="1.15" fill="${C.wash}"/>`; }).join('')}` : ''}
+    ${[162, 18].map((a) => { const [x, y] = polar(a, R + 6.3); return `<ellipse cx="${f(x)}" cy="${f(y)}" rx="5" ry="3.2" fill="#FF9FB9" opacity="${night ? 0.75 : porc ? 0.55 : 0.9}"/>`; }).join('')}</g>
+    ${night ? (() => { const moon = crescentPath(13, 96, 11, 5.5, -4, 9); return `<path d="${moon}" fill="#FFD27A" filter="url(#gw)" opacity=".85"/><path d="${moon}" fill="url(#mn)" stroke="#FFF5D6" stroke-width="1.1" stroke-linejoin="round"/><polygon points="${starPts(30, 132, 8, 3.8)}" fill="#FFD27A" filter="url(#gw)" opacity=".8"/><polygon points="${starPts(30, 132, 7.4, 3.5)}" fill="url(#mn)" stroke="#FFF5D6" stroke-width="1" stroke-linejoin="round"/>${spark4(10, 64, 3.6, '#FFF2C4')}`; })() : ''}`);
+}
+
+
+// ================= 青花瓷：小八本来就是蓝白两色，和青花瓷是一家 =================
+// 白釉底（半透明、带一层釉光），钴蓝画线；气泡边是青花瓷常见的两道「弦纹」；右下角一片「青海波」浪纹慢慢晕开；
+// 小八头顶用钴蓝晕染；猫爪换成一枚朱红印章；右上挂一个中国结。大航海「描金」：提督一道金线，总督金边
+const PCT = {
+  n: { main: '#2D5DB5', wash: '#7C9DDB', deep: '#1B3F8F' },
+  3: { main: '#2D5DB5', wash: '#7C9DDB', deep: '#1B3F8F' },
+  2: { main: '#4C4AB2', wash: '#9C98E0', deep: '#2F2C86', trim: '#C9A24A' },
+  1: { main: '#1F4596', wash: '#7290D2', deep: '#132E6E', trim: '#D4AF55', gilt: 1 },
+  anchor: { main: '#B8456A', wash: '#E39AB2', deep: '#8A2C4C' },
+};
+const SEAL = '#C4373D';
+// 印章：朱红方印，边略不齐，中间留白一只猫爪
+function sealSvg() {
+  const d = 'M6 3 Q20 1.5 34 3 Q37.6 3.6 37.2 7 Q38.8 20 37.4 33 Q36.8 37 33 37.2 Q20 38.8 7 37.3 Q3.2 36.8 3 33 Q1.4 20 2.8 7 Q3.2 3.4 6 3Z';
+  const toes = PAW.toes.map(([x, y, r]) => `<circle cx="${f(8 + x * 0.5)}" cy="${f(9 + y * 0.5)}" r="${f(r * 0.5)}"/>`).join('');
+  return SV('0 0 40 40', `<path d="${d}" fill="${SEAL}"/><path d="${d}" transform="translate(4 4) scale(.8)" fill="none" stroke="#FBE9E6" stroke-width="1.4" opacity=".8"/>
+    <g fill="#FBE9E6">${toes}<ellipse cx="${f(8 + PAW.pad[0] * 0.5)}" cy="${f(9 + PAW.pad[1] * 0.5)}" rx="${f(PAW.pad[2] * 0.5)}" ry="${f(PAW.pad[3] * 0.5)}"/></g>
+    <g fill="${SEAL}" opacity=".55"><circle cx="14" cy="27" r="1"/><circle cx="27" cy="12" r=".8"/><circle cx="30" cy="25" r="1.1"/></g>`);
+}
+// 中国结：一根线、一个盘长结、一颗朱红珠子、一束流苏
+function tasselSvg(C) {
+  return SV('0 0 26 66', `<path d="M13 0 V13" stroke="${C.main}" stroke-width="1.3"/>
+    <rect x="7.5" y="13.5" width="11" height="11" rx="1.6" transform="rotate(45 13 19)" fill="${C.main}"/><rect x="10" y="16" width="6" height="6" rx="1" transform="rotate(45 13 19)" fill="none" stroke="#F3F6FC" stroke-width="1.1"/>
+    <circle cx="13" cy="31" r="3.2" fill="${SEAL}"/><circle cx="12" cy="30" r="1" fill="#fff" opacity=".6"/>
+    <path d="M10.5 34 H15.5 L18 59 Q13 62 8 59 Z" fill="${C.main}"/><path d="M11.5 36 L10.5 58 M13 36 V59 M14.5 36 L15.5 58" stroke="${C.wash}" stroke-width=".8" opacity=".9"/>`);
+}
+function porcelainTailSvg(C) {
+  return SV('0 0 64 76', `<path d="${TAIL_D}" fill="none" stroke="${C.deep}" stroke-width="15" stroke-linecap="round"/><path d="${TAIL_D}" fill="none" stroke="${C.main}" stroke-width="11" stroke-linecap="round"/>
+    <path d="M44 38 C45 28 43 20 39 15" fill="none" stroke="${C.wash}" stroke-width="3.2" stroke-linecap="round"/><path d="M46.5 24 C46 17 42 12.5 37 10" fill="none" stroke="#F6F9FE" stroke-width="9" stroke-linecap="round"/>`);
+}
+// 青花四瓣小花（普通观众昵称前的小图标）
+const blossomSvg = (c) => SV('0 0 24 24', `${[0, 90, 180, 270].map((a) => `<ellipse cx="12" cy="6.2" rx="3.6" ry="5.6" transform="rotate(${a} 12 12)" fill="${c}" opacity=".9"/>`).join('')}<circle cx="12" cy="12" r="2.6" fill="#F6F9FE"/><circle cx="12" cy="12" r="1.2" fill="${c}"/>`);
+// 金箔碎片（描金进场时撒的）
+const giltSvg = (c) => SV('0 0 20 20', `<path d="M4 6 L13 3 L17 11 L9 17 L3 13 Z" fill="${c}"/><path d="M6 7 L12 5" stroke="#FFF4D0" stroke-width="1.4" opacity=".8"/>`);
+function porcelainBubble(w, hh, k, tier, a) {
+  const M = 16 * k, ET = 30 * k, W = w + 2 * M, H = hh + ET + 2 * M, x0 = M, y0 = ET + M;
+  const R = Math.min(hh * 0.42, 42 * k), rl = 24 * k, C = PCT[tier], id = `q${++seq}`;
+  const HE = hachiHead(x0 + w, y0, R, k);
+  const body = bodyPath(x0, y0, w, hh, R, rl, HE.seg), plain = bodyPath(x0, y0, w, hh, R, rl, null);
+  const ins = (d) => bodyPath(x0 + d, y0 + d, w - 2 * d, hh - 2 * d, R - d, Math.max(4 * k, rl - d), null);
+  return SV(`0 0 ${f(W)} ${f(H)}`, `<defs>
+    <filter id="${id}s" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="${f(5 * k)}"/></filter>
+    <linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FDFEFF"/><stop offset=".55" stop-color="#F4F7FC"/><stop offset="1" stop-color="#E8EEF8"/></linearGradient>
+    <radialGradient id="${id}l" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="${id}b" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0)}" x2="0" y2="${f(y0 + 44 * k)}"><stop offset="0" stop-color="${C.main}" stop-opacity=".82"/><stop offset=".4" stop-color="${C.main}" stop-opacity=".38"/><stop offset="1" stop-color="${C.wash}" stop-opacity=".1"/></linearGradient>
+    <linearGradient id="${id}e" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0 - 22 * k)}" x2="0" y2="${f(y0 + 2 * k)}"><stop offset="0" stop-color="${C.deep}"/><stop offset="1" stop-color="${C.main}"/></linearGradient>
+    <clipPath id="${id}c"><path d="${plain}"/></clipPath></defs>
+  <path d="${body}" fill="#0E1E4A" opacity=".24" transform="translate(0 ${f(4 * k)})" filter="url(#${id}s)"/>
+  <path d="${body}" fill="url(#${id}p)" fill-opacity="${a}"/>
+  <g clip-path="url(#${id}c)">
+    <ellipse cx="${f(x0 + w * 0.32)}" cy="${f(y0 + hh * 0.1)}" rx="${f(w * 0.34)}" ry="${f(hh * 0.36)}" fill="url(#${id}l)" opacity=".75"/>
+    <path d="${HE.cap}" fill="url(#${id}b)"/>
+    <path d="${plain}" fill="none" stroke="#fff" stroke-opacity=".95" stroke-width="${f(3 * k)}" transform="translate(0 ${f(2 * k)})"/>
+  </g>
+  <path d="${HE.fill}" fill="url(#${id}e)"/>
+  <path d="${body}" fill="none" stroke="${C.gilt ? C.trim : C.main}" stroke-width="${f(2.2 * k)}" stroke-linejoin="round"/>
+  <path d="${ins(5 * k)}" fill="none" stroke="${C.main}" stroke-opacity=".55" stroke-width="${f(1 * k)}"/>
+  ${C.trim ? `<path d="${ins(7.6 * k)}" fill="none" stroke="${C.trim}" stroke-width="${f(1.2 * k)}"/>` : ''}`);
+}
+// 青海波：一层层的半圆浪纹，从右下角往左上淡出去（单独一张图，进场时晚一点晕开）
+function wavesSvg(w, hh, k, tier) {
+  const M = 16 * k, ET = 30 * k, W = w + 2 * M, H = hh + ET + 2 * M, x0 = M, y0 = ET + M, R = Math.min(hh * 0.42, 42 * k), C = PCT[tier], id = `w${++seq}`;
+  const plain = bodyPath(x0, y0, w, hh, R, 24 * k, null), r = 11 * k, xs = x0 + w * 0.42, ys = y0 + hh * 0.38;
+  let g = '';
+  for (let j = 0, y = ys; y < y0 + hh + r; j++, y += r / 2) for (let x = xs + (j % 2 ? r : 0); x < x0 + w + r; x += 2 * r)
+    g += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="#F7F9FE"/>${[1, 0.7, 0.42].map((t) => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r * t)}" fill="none" stroke="${C.wash}" stroke-width="${f(0.9 * k)}"/>`).join('')}`;
+  return SV(`0 0 ${f(W)} ${f(H)}`, `<defs><clipPath id="${id}c"><path d="${plain}"/></clipPath>
+    <radialGradient id="${id}g" gradientUnits="userSpaceOnUse" cx="${f(x0 + w)}" cy="${f(y0 + hh)}" r="${f(Math.min(w * 0.55, 260 * k))}"><stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <mask id="${id}m"><rect width="${f(W)}" height="${f(H)}" fill="url(#${id}g)"/></mask></defs>
+    <g clip-path="url(#${id}c)" mask="url(#${id}m)" opacity=".8">${g}</g>`);
+}
+
+
+// ================= 果冻玻璃：一块有厚度的透明玻璃 + 一块小八造型的蓝色果冻 =================
+// 光从左上来：上沿一道高光、左上一条亮边，下沿一点内阴影和一丝彩色折射；身份只换「边缘光」的颜色，不加装饰
+const JT = {
+  n: { rim: '#FFFFFF', name: '#F2F6FF' },
+  3: { rim: '#8EC5FF', name: '#BFE0FF' },
+  2: { rim: '#C3A6FF', name: '#E2D4FF' },
+  1: { rim: '#FFD772', name: '#FFE7A6' },
+  anchor: { rim: '#FFA6CB', name: '#FFD3E5' },
+};
+const JB = ['#AEDBFF', '#5AA8F8', '#3A84EC'];        // 小八蓝果冻：上浅下深
+function jellyBubble(w, hh, k, tier, a) {
+  const M = 18 * k, ET = 30 * k, W = w + 2 * M, H = hh + ET + 2 * M, x0 = M, y0 = ET + M, x1 = x0 + w, y1 = y0 + hh;
+  const R = Math.min(hh * 0.42, 42 * k), rl = 24 * k, J = JT[tier], id = `j${++seq}`;
+  const HE = hachiHead(x1, y0, R, k);
+  const body = bodyPath(x0, y0, w, hh, R, rl, HE.seg), plain = bodyPath(x0, y0, w, hh, R, rl, null);
+  return SV(`0 0 ${f(W)} ${f(H)}`, `<defs>
+    <filter id="${id}d" x="-10%" y="-30%" width="120%" height="170%"><feGaussianBlur stdDeviation="${f(8 * k)}"/></filter>
+    <filter id="${id}b" x="-5%" y="-20%" width="110%" height="140%"><feGaussianBlur stdDeviation="${f(3 * k)}"/></filter>
+    <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1F284E" stop-opacity="${f(Math.min(1, a * 1.02))}"/><stop offset="1" stop-color="#0B1030" stop-opacity="${f(a)}"/></linearGradient>
+    <linearGradient id="${id}h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset=".3" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="${id}r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${J.rim}" stop-opacity=".95"/><stop offset=".35" stop-color="${J.rim}" stop-opacity=".38"/><stop offset=".7" stop-color="${J.rim}" stop-opacity=".14"/><stop offset="1" stop-color="${J.rim}" stop-opacity=".55"/></linearGradient>
+    <linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset=".15" stop-color="#7FE7FF" stop-opacity="0"/><stop offset=".55" stop-color="#7FE7FF" stop-opacity=".45"/><stop offset=".85" stop-color="#FF9AD5" stop-opacity=".4"/><stop offset="1" stop-color="#FF9AD5" stop-opacity="0"/></linearGradient>
+    <clipPath id="${id}k"><path d="${plain}"/></clipPath></defs>
+  <path d="${body}" fill="#050816" opacity=".4" transform="translate(0 ${f(7 * k)})" filter="url(#${id}d)"/>
+  <path d="${body}" fill="url(#${id}t)"/>
+  <g clip-path="url(#${id}k)">
+    <rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(hh)}" fill="url(#${id}h)"/>
+    <path d="${plain}" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="${f(6 * k)}" transform="translate(0 ${f(3 * k)})" filter="url(#${id}b)"/>
+    <path d="${plain}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="${f(9 * k)}" transform="translate(0 ${f(-5 * k)})" filter="url(#${id}b)"/>
+    <path d="${plain}" fill="none" stroke="url(#${id}c)" stroke-width="${f(2.4 * k)}" transform="translate(0 ${f(-2.6 * k)})"/>
+  </g>
+  <path d="${body}" fill="none" stroke="url(#${id}r)" stroke-width="${f(1.7 * k)}" stroke-linejoin="round"/>
+  <path d="M${f(x0 + rl + 6 * k)},${f(y0 + 4.5 * k)} L${f(x0 + Math.min(w * 0.42, rl + 150 * k))},${f(y0 + 4.5 * k)}" stroke="#fff" stroke-opacity=".7" stroke-width="${f(2.2 * k)}" stroke-linecap="round"/>
+  <path d="M${f(x1 - 6 * k)},${f(y0 + R * 0.7)} L${f(x1 - 6 * k)},${f(Math.max(y0 + R * 0.7, y1 - R * 0.9))}" stroke="#fff" stroke-opacity=".22" stroke-width="${f(1.6 * k)}" stroke-linecap="round"/>`);
+}
+// 小八果冻头顶（单独一张图，进场时能抖一下）：两只耳朵 + 气泡右上角一片蓝，往下越来越透明
+function jellyCapSvg(w, hh, k) {
+  const M = 18 * k, ET = 30 * k, W = w + 2 * M, H = hh + ET + 2 * M, x0 = M, y0 = ET + M;
+  const R = Math.min(hh * 0.42, 42 * k), id = `jc${++seq}`, HE = hachiHead(x0 + w, y0, R, k);
+  const plain = bodyPath(x0, y0, w, hh, R, 24 * k, null);
+  return SV(`0 0 ${f(W)} ${f(H)}`, `<defs>
+    <linearGradient id="${id}g" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0 - 22 * k)}" x2="0" y2="${f(y0 + 6 * k)}"><stop offset="0" stop-color="${JB[0]}"/><stop offset=".55" stop-color="${JB[1]}"/><stop offset="1" stop-color="${JB[2]}"/></linearGradient>
+    <linearGradient id="${id}c" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0)}" x2="0" y2="${f(y0 + 44 * k)}"><stop offset="0" stop-color="${JB[2]}" stop-opacity=".88"/><stop offset=".45" stop-color="${JB[1]}" stop-opacity=".42"/><stop offset="1" stop-color="${JB[0]}" stop-opacity=".06"/></linearGradient>
+    <filter id="${id}b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${f(1.6 * k)}"/></filter>
+    <clipPath id="${id}k"><path d="${plain}"/></clipPath><clipPath id="${id}e"><path d="${HE.fill}"/></clipPath></defs>
+  <path d="${HE.cap}" fill="url(#${id}c)" clip-path="url(#${id}k)"/>
+  <path d="${HE.fill}" fill="url(#${id}g)" opacity=".94"/>
+  <g clip-path="url(#${id}e)"><path d="${HE.line}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="${f(4 * k)}" transform="translate(${f(0.8 * k)} ${f(1.6 * k)})" filter="url(#${id}b)"/></g>
+  <path d="${HE.line}" fill="none" stroke="#E6F3FF" stroke-opacity=".85" stroke-width="${f(1.3 * k)}" stroke-linejoin="round" stroke-linecap="round"/>`);
+}
+function jellyTailSvg() {
+  return SV('-6 -6 76 88', `<defs><linearGradient id="t" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${JB[2]}"/><stop offset=".6" stop-color="${JB[1]}"/><stop offset="1" stop-color="${JB[0]}"/></linearGradient><filter id="b" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2"/></filter></defs>
+    <path d="${TAIL_D}" fill="none" stroke="#06102E" stroke-opacity=".35" stroke-width="15" stroke-linecap="round" transform="translate(0 3)" filter="url(#b)"/>
+    <path d="${TAIL_D}" fill="none" stroke="#E6F3FF" stroke-opacity=".8" stroke-width="13" stroke-linecap="round"/>
+    <path d="${TAIL_D}" fill="none" stroke="url(#t)" stroke-width="10.6" stroke-linecap="round"/>
+    <path d="M42 40 C45 30 43 20 38 15" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2.6" stroke-linecap="round"/>`);
+}
+// 玻璃小珠（大航海进场撒的）
+const beadSvg = (c) => SV('0 0 20 20', `<defs><radialGradient id="g" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="${c}" stop-opacity=".85"/><stop offset="1" stop-color="${c}" stop-opacity=".35"/></radialGradient></defs><circle cx="10" cy="10" r="8.6" fill="url(#g)" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/><ellipse cx="7" cy="6.2" rx="2.6" ry="1.6" fill="#fff" opacity=".9" transform="rotate(-30 7 6.2)"/>`);
+// 头像框：玻璃圈 + 小八果冻头顶和耳朵；边缘光按身份换色（大航海外面再加一圈同色柔光）
+function frameJelly(tier) {
+  const J = JT[tier], { cx, cy, R } = FR, { ears, cap, r1 } = hachiFramePaths(), glow = tier !== 'n';
+  const union = `<circle cx="${cx}" cy="${cy}" r="${r1}"/>${ears.map((d) => `<path d="${d}"/>`).join('')}`;
+  return SV('0 0 150 150', `<defs>
+    <filter id="d" x="-30%" y="-30%" width="160%" height="170%"><feGaussianBlur stdDeviation="4"/></filter>
+    <filter id="b" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4"/></filter>
+    <mask id="h"><rect width="150" height="150" fill="#fff"/><circle cx="${cx}" cy="${cy}" r="${R - 0.6}" fill="#000"/></mask>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${JB[0]}"/><stop offset=".5" stop-color="${JB[1]}"/><stop offset="1" stop-color="${JB[2]}"/></linearGradient>
+    <linearGradient id="r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${J.rim}" stop-opacity="1"/><stop offset=".4" stop-color="${J.rim}" stop-opacity=".4"/><stop offset=".75" stop-color="${J.rim}" stop-opacity=".18"/><stop offset="1" stop-color="${J.rim}" stop-opacity=".6"/></linearGradient>
+    <clipPath id="u"><circle cx="${cx}" cy="${cy}" r="${r1}"/>${ears.map((d) => `<path d="${d}"/>`).join('')}</clipPath></defs>
+  <g mask="url(#h)">
+    <g fill="#050816" opacity=".45" transform="translate(0 5)" filter="url(#d)">${union}</g>
+    ${glow ? `<g fill="none" stroke="${J.rim}" stroke-width="7" opacity=".55" filter="url(#d)">${union}</g>` : ''}
+    <g fill="#1B2348" opacity=".72">${union}</g>
+    <g clip-path="url(#u)">
+      <path d="${cap}" fill="url(#g)" opacity=".9"/>${ears.map((d) => `<path d="${d}" fill="url(#g)"/>`).join('')}
+      <circle cx="${cx}" cy="${cy - 6}" r="${r1 + 2}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="6" filter="url(#b)"/>
+    </g>
+    <g fill="none" stroke="url(#r)" stroke-width="1.8" stroke-linejoin="round">${union}</g>
+    <circle cx="${cx}" cy="${cy}" r="${R + 0.4}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2"/>
+  </g>
+  <path d="M${polar(-160, r1 - 3).map(f).join(',')} A${r1 - 3},${r1 - 3} 0 0 1 ${polar(-140, r1 - 3).map(f).join(',')}" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="2" stroke-linecap="round"/>`);
+}
+
+// ================= 像素小屋的小图：字符画 → 一格一格的方块 =================
+const PT = {
+  n: { main: '#4A7BFF', light: '#A9C8FF', deep: '#2A49B8' },
+  3: { main: '#3D86F5', light: '#BFDBFF', deep: '#1D4A9E' },
+  2: { main: '#9B6CF0', light: '#E2D2FF', deep: '#4E2A99' },
+  1: { main: '#F0A925', light: '#FFE6A6', deep: '#9A6108' },
+  anchor: { main: '#F06E9C', light: '#FFD3E2', deep: '#9C2D57' },
+};
+const PIX_DARK = '#0B1433';
+function pixRects(rows, pal) {
+  let r = '';
+  rows.forEach((line, y) => { let x = 0; while (x < line.length) { const ch = line[x]; let n = 1; while (line[x + n] === ch) n++; if (pal[ch]) r += `<rect x="${x}" y="${y}" width="${n + .02}" height="1.02" fill="${pal[ch]}"/>`; x += n; } });
+  return `<g shape-rendering="crispEdges">${r}</g>`;
+}
+const pixSvg = (rows, pal) => SV(`0 0 ${rows[0].length} ${rows.length}`, pixRects(rows, pal));
+const PIX_STAR = ['....o....', '...oYo...', '...oYo...', 'ooooYoooo', 'oYYYWYYYo', '.oYYYYYo.', '..oYYYo..', '.oYYoYYo.', '.oYo.oYo.', '.oo...oo.'];
+const PIX_PLUS = ['..Y..', '..Y..', 'YYWYY', '..Y..', '..Y..'];
+const PIX_HEART = ['.oo.oo.', 'oPPoWPo', 'oPPPPPo', 'oPPPPPo', '.oPPPo.', '..oPo..', '...o...'];
+const PIX_GEM = ['...o...', '..oWo..', '.oWLLo.', 'oWLLLBo', '.oLLBo.', '..oBo..', '...o...'];
+const PIX_MOON = ['..ooo..', '.oYYo..', 'oYYo...', 'oYYo...', 'oYYo...', 'oYYYo.o', '.oYYYYo', '..oooo.'];
+const PIX_PAW = ['.oo..ooo..oo.', 'oWWooWWWooWWo', 'oWPWoWPWoWPWo', 'oWWWoWWWoWWWo', '.ooWWWWWWWoo.', '.oWWWPPPWWWo.', 'oWWWPPPPPWWWo', 'oWWPPPPPPPWWo', 'oWWWPPPPPWWWo', '.oWWWWWWWWWo.', '..ooooooooo..'];
+const PIX_TAIL = ['.........ooo..', '........oWWWo.', '.......oWWWWWo', '.......oWWWWWo', '.......oBWWWo.', '.......oBBBBo.', '......oLBBBBo.', '......oLBBBBo.', '.....oLBBBBo..', '...ooLBBBBBo..', '.ooBBBBBBBo...', 'oBBBBBBBBo....', 'oBBBBBBoo.....', '.oooooo.......'];
+const PIX_CROWN = ['.o....o....o.', 'oYo..oYo..oYo', 'oYYooYRYooYYo', 'oYYYYYYYYYYYo', 'oYYBYYRYYBYYo', 'oYYYYYYYYYYYo', 'oDDDDDDDDDDDo', '.ooooooooooo.'];
+const PIX_BANG = ['.oo.', 'oYYo', 'oYYo', 'oYYo', 'oYYo', '.oo.', '....', '.oo.', 'oYYo', '.oo.'];
+const pixStarSvg = (y) => pixSvg(PIX_STAR, { o: PIX_DARK, Y: y, W: '#FFFFFF' });
+const pixPlusSvg = (c) => pixSvg(PIX_PLUS, { Y: c, W: '#FFFFFF' });
+const pixHeartSvg = (c) => pixSvg(PIX_HEART, { o: PIX_DARK, P: c, W: '#FFFFFF' });
+const pixCrownSvg = () => pixSvg(PIX_CROWN, { o: PIX_DARK, Y: '#FFD24A', D: '#E09A1C', R: '#FF6F9E', B: '#6FB6FF' });
+// 吊坠：一串金色小珠子下面挂一颗星 / 爱心 / 宝石 / 月亮（轮流换，相邻两条不重复）
+const PIX_CHARMS = [[PIX_STAR, { o: PIX_DARK, Y: '#FFD24A', W: '#FFF6D0' }], [PIX_HEART, { o: PIX_DARK, P: '#FF7FA8', W: '#FFFFFF' }], [PIX_GEM, { o: PIX_DARK, W: '#FFFFFF', L: '#8FD0FF', B: '#3D86F5' }], [PIX_MOON, { o: PIX_DARK, Y: '#FFD24A' }]];
+function pixCharmSvg(i) {
+  const [rows, pal] = PIX_CHARMS[i], wd = 9, pad = (wd - rows[0].length) >> 1;
+  const chain = ['....Y....', '.........', '....Y....', '.........', '....Y....', '.........'];
+  return pixSvg([...chain, ...rows.map((r) => '.'.repeat(pad) + r + '.'.repeat(wd - pad - r.length))], { ...pal, Y: pal.Y || '#FFD24A' });
+}
+let lastCharm = -1;
+const nextCharm = () => { let i; do i = Math.floor(Math.random() * PIX_CHARMS.length); while (i === lastCharm); return (lastCharm = i); };
+// 头像框：50×50 格（一格 3）＝像素版的小八脑袋：白色圈（左上亮、右下暗）+ 深色描边，头顶一片蓝（中间偏左留一个白尖），两只圆角小三角耳朵
+function framePixel(tier) {
+  const T = PT[tier], u = 3, N = 50, { cx, cy, R } = FR, { ears, cap, r1 } = hachiFramePaths();
+  const inEar = ears.map(inPath), inCap = inPath(cap);
+  const at = (x, y) => [x * u + u / 2, y * u + u / 2];
+  const inRing = (x, y) => { const [px, py] = at(x, y), d = Math.hypot(px - cx, py - cy); return d >= R && d < r1 + 1; };
+  const ear = (x, y) => { const [px, py] = at(x, y); return inEar.some((t) => t(px, py)); };
+  const inU = (x, y) => x >= 0 && y >= 0 && x < N && y < N && (inRing(x, y) || ear(x, y));
+  const cells = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    if (!inU(x, y)) continue;
+    const [px, py] = at(x, y), edge = !inU(x - 1, y) || !inU(x + 1, y) || !inU(x, y - 1) || !inU(x, y + 1);
+    const dx = px - cx, dy = py - cy, d = Math.hypot(dx, dy), lit = (-dx - dy) / (d * Math.SQRT2);
+    let c;
+    if (edge) c = PIX_DARK;
+    else if (ear(x, y) || inCap(px, py)) c = lit > .55 ? T.light : lit < -.35 ? T.deep : T.main;
+    else c = lit > .3 ? '#FFFFFF' : lit < -.35 ? '#B9C5E4' : '#E6ECF8';
+    cells.push([x, y, c]);
+  }
+  // 腮红：圈两边各两格
+  for (const cell of cells) { const [px, py] = at(cell[0], cell[1]), a = Math.atan2(py - cy, px - cx) * 180 / Math.PI, d = Math.hypot(px - cx, py - cy); if (cell[2] !== PIX_DARK && d > R + 3 && d < R + 9 && (Math.abs(a - 162) < 5 || Math.abs(a - 18) < 5)) cell[2] = '#FF9FB9'; }
+  const has = new Set(cells.map(([x, y]) => `${x},${y}`));
+  let sh = '', r = '';
+  for (const [x, y] of cells) if (!has.has(`${x + 1},${y + 1}`)) sh += `<rect x="${x * u + u}" y="${y * u + u}" width="${u + .04}" height="${u + .04}"/>`;
+  for (const [x, y, c] of cells) r += `<rect x="${x * u}" y="${y * u}" width="${u + .04}" height="${u + .04}" fill="${c}"/>`;
+  return SV('0 0 150 150', `<g shape-rendering="crispEdges"><g fill="#050A26" opacity=".45">${sh}</g>${r}</g>`);
+}
+function stamp(set, map, ox, oy, pal) { map.forEach((row, y) => [...row].forEach((ch, x) => { if (pal[ch]) set(ox + x, oy + y, pal[ch]); })); }
+// 像素化：缩成 cells 格，颜色收进 8 色的调色板，再在外面描一格深色边（不是简单缩小，不然线条会糊成灰色）
+const PIX_PAL = [[20, 25, 58], [255, 255, 255], [120, 180, 245], [52, 116, 214], [255, 150, 186], [255, 212, 94], [232, 80, 110]];
+const pixCache = new Map();
+function pixelArt(src, cells) {
+  const key = src + '|' + cells;
+  if (pixCache.has(key)) return pixCache.get(key);
+  const p = new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const w = cells, hh = Math.round(cells * im.naturalHeight / im.naturalWidth), W = w + 2, H = hh + 2;
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, 1, 1, w, hh);
+      const d = g.getImageData(0, 0, W, H), px = d.data, on = new Uint8Array(W * H);
+      for (let i = 0; i < W * H; i++) {
+        const o = i * 4; if (px[o + 3] < 100) { px[o + 3] = 0; continue; }
+        const r = px[o], gg = px[o + 1], b = px[o + 2], lum = r * .3 + gg * .59 + b * .11, sat = Math.max(r, gg, b) - Math.min(r, gg, b);
+        let best = PIX_PAL[0];
+        if (lum > 178 && sat < 72) best = PIX_PAL[1];                // 发灰的白边、抗锯齿都算白，身子才干净
+        else if (!(lum < 112 && sat < 110)) { let bd = 1e9; for (const q of PIX_PAL) { const dd = (r - q[0]) ** 2 * 2 + (gg - q[1]) ** 2 * 3 + (b - q[2]) ** 2; if (dd < bd) { bd = dd; best = q; } } }
+        px[o] = best[0]; px[o + 1] = best[1]; px[o + 2] = best[2]; px[o + 3] = 255; on[i] = 1;
+      }
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = y * W + x; if (on[i]) continue;
+        if ((x > 0 && on[i - 1]) || (x < W - 1 && on[i + 1]) || (y > 0 && on[i - W]) || (y < H - 1 && on[i + W])) { const o = i * 4; px[o] = 20; px[o + 1] = 25; px[o + 2] = 58; px[o + 3] = 255; }
+      }
+      g.putImageData(d, 0, 0); res(c.toDataURL());
+    };
+    im.onerror = () => res(src);
+    im.src = src;
+  });
+  pixCache.set(key, p); return p;
+}
+
+// ---------- 身份 ----------
+// 普通观众和舰长用蓝色，提督紫、总督金、主播粉（框、耳朵里的格子、缝线、昵称胶囊跟着变）
+const TIER = {
+  n: { g0: '#E3EDFC', g1: '#8FB4EE', st: '#93B5EC', frame: 'avatar-frame' },
+  3: { g0: '#DDE9FF', g1: '#6E9FF0', st: '#7DA6EE', frame: 'avatar-frame' },
+  2: { g0: '#EEE6FF', g1: '#A88BEA', st: '#AE95EC', frame: 'avatar-frame-lv2' },
+  1: { g0: '#FFF2CF', g1: '#EDB54A', st: '#E9B656', frame: 'avatar-frame-lv1', sheen: 'rgba(255,240,190,.9)' },
+  anchor: { g0: '#FFE6EF', g1: '#F49AB8', st: '#F3A3BF', frame: 'avatar-frame-anchor' },
+};
+const tierOf = (p) => (p.anchor ? 'anchor' : p.guard ? p.guard : 'n');
+
+// ---------- 尺寸（k = 字号倍数） ----------
+// 素材包的头像框 420×401，圆洞中心 (209.6, 196.2)，直径 263.7
+// 星月夜空、像素小屋的框是 150×150，洞的中心 (75, 80)、半径 44；缩放到和奶油贴纸一样大的洞
+function geo(k, look = st.look) {
+  let F, FH, hx, hy, hr;
+  if (look === 'cream' && st.cframe === 'lace') { F = 132 * k; FH = F * 401 / 420; hx = F * 209.6 / 420; hy = FH * 196.2 / 401; hr = F * 263.7 / 840; }
+  else { const s = (132 * 263.7 / 840) / 44 * k; F = FH = 150 * s; hx = 75 * s; hy = 80 * s; hr = 44 * s; }
+  const wr = hr * 1.03;
+  // 小八平时坐在头像右下角（放右边时在左下角，朝着气泡）；进场时先放大到框中间
+  const m = st.side === 'r' ? -1 : 1, sts = hr * 1.8;
+  const ccx = hx + m * hr * 0.9, ccy = hy + hr * 0.62, bcx = hx, bcy = hy + hr * 0.06, big = hr * 2.15;
+  return { k, F, FH, hx, hy, hr, wr, lap: hx, sts, stL: ccx - sts / 2, stT: ccy - sts / 2, ccx, ccy, bcx, bcy, big };
+}
+
+// ---------- 气泡：按实际大小画 ----------
+// 身体 (0,0)–(w,h)；右上角两只猫耳是轮廓的一部分；左端藏在头像框下面
+let seq = 0;
+function earsOf(x1, y0, R, k) {
+  const c2 = x1 - R * 0.85 - 14 * k, c1 = c2 - 46 * k;
+  return [{ cx: c1, lean: -3.5 * k }, { cx: c2, lean: 3.5 * k }].map((e) => ({ ...e, w: 40 * k, h: 25 * k, y: y0 }));
+}
+const earSeg = (e, s = 1, dy = 0) => {
+  const w = e.w * s, h = e.h * s, y = e.y + dy, tx = e.cx + e.lean * s, ty = y - h;
+  return `L${f(e.cx - w / 2)},${f(y)} C${f(e.cx - w * 0.3)},${f(y - h * 0.55)} ${f(tx - w * 0.16)},${f(ty)} ${f(tx)},${f(ty)} C${f(tx + w * 0.16)},${f(ty)} ${f(e.cx + w * 0.3)},${f(y - h * 0.55)} ${f(e.cx + w / 2)},${f(y)}`;
+};
+function bodyPath(x0, y0, w, h, R, rl, ears, seg = earSeg) {
+  const x1 = x0 + w, y1 = y0 + h;
+  return `M${f(x0 + rl)},${f(y0)} ${typeof ears === 'string' ? ears : ears ? ears.map((e) => seg(e)).join(' ') : ''} L${f(x1 - R)},${f(y0)} A${f(R)},${f(R)} 0 0 1 ${f(x1)},${f(y0 + R)} L${f(x1)},${f(y1 - R)} A${f(R)},${f(R)} 0 0 1 ${f(x1 - R)},${f(y1)} L${f(x0 + rl)},${f(y1)} A${f(rl)},${f(rl)} 0 0 1 ${f(x0)},${f(y1 - rl)} L${f(x0)},${f(y0 + rl)} A${f(rl)},${f(rl)} 0 0 1 ${f(x0 + rl)},${f(y0)} Z`;
+}
+// 小八的脑袋顶（照着表情图描的）：气泡右上角就是小八的头顶
+// 耳朵：小三角，耳尖稍圆、往外斜；外侧陡，内侧缓缓落回头顶（两只耳朵之间就是平的头顶）
+// 蓝色：盖住两只耳朵和右上角一块，下沿是波浪线，两耳中间偏左有一个往上顶的白尖（「八」字），右边那片蓝往下垂得多一点；蓝色和白色之间不描线
+function hachiHead(x1, y0, R, k) {
+  // 圆润的三角：两条边微微鼓出来，耳尖是一段圆弧，耳根顺滑地接回头顶
+  const h = 21 * k, rt = 4.6 * k, ear = (bx0, bx1, tx) => [
+    `L${f(bx0)},${f(y0)} C${f(bx0 + (tx - bx0) * 0.3)},${f(y0 - h * 0.28)} ${f(tx - (tx - bx0) * 0.42)},${f(y0 - h * 0.9)} ${f(tx - rt)},${f(y0 - h + rt * 0.55)}`,
+    `C${f(tx - rt * 0.45)},${f(y0 - h - rt * 0.15)} ${f(tx + rt * 0.45)},${f(y0 - h - rt * 0.15)} ${f(tx + rt)},${f(y0 - h + rt * 0.55)} C${f(tx + (bx1 - tx) * 0.42)},${f(y0 - h * 0.9)} ${f(bx1 - (bx1 - tx) * 0.3)},${f(y0 - h * 0.28)} ${f(bx1)},${f(y0)}`].join(' ');
+  const xr = x1 - R, eL = ear(xr - 92 * k, xr - 56 * k, xr - 80 * k), eR = ear(xr - 34 * k, xr, xr - 12 * k);
+  const cl = xr - 104 * k, Y = (v) => f(y0 + v * k), X = (v) => f(cl + v * k);
+  // 蓝色只占文字上方那一小条（不压在昵称下面，字的对比度才够）；最右边没有字的地方再顺着边往下垂
+  const xs = x1 - 64 * k;
+  const cap = `M${X(0)},${Y(-2)} C${X(5)},${Y(6)} ${X(15)},${Y(10)} ${X(30)},${Y(10)} C${X(42)},${Y(10)} ${X(49)},${Y(4)} ${X(57)},${Y(4)} C${X(66)},${Y(4)} ${X(72)},${Y(10.5)} ${X(84)},${Y(11)} L${f(xs)},${Y(11.5)} C${f(xs + 26 * k)},${Y(12)} ${f(x1 - 16 * k)},${Y(24)} ${f(x1 - 8 * k)},${Y(40)} L${f(x1 + 4 * k)},${Y(50)} L${f(x1 + 4 * k)},${Y(-4)} Z`;
+  const close = (e, bx0, bx1) => `M${f(bx0)},${f(y0 + 2 * k)} ${e} L${f(bx1)},${f(y0 + 2 * k)} Z`;
+  return {
+    seg: `${eL} ${eR}`,
+    fill: close(eL, xr - 92 * k, xr - 56 * k) + ' ' + close(eR, xr - 34 * k, xr),
+    line: eL.replace(/^L/, 'M') + ' ' + eR.replace(/^L/, 'M'),
+    cap,
+  };
+}
+function creamBubble(w, h, k, tier, a) {
+  const hachi = st.cframe !== 'lace', HC = HT[tier];
+  const M = 16 * k, ET = 30 * k, W = w + 2 * M, H = h + ET + 2 * M, x0 = M, y0 = ET + M;
+  const R = Math.min(h * 0.42, 42 * k), rl = 24 * k, T = TIER[tier], id = `c${++seq}`;
+  const ears = earsOf(x0 + w, y0, R, k);
+  const HE = hachi ? hachiHead(x0 + w, y0, R, k) : null;
+  const body = bodyPath(x0, y0, w, h, R, rl, hachi ? HE.seg : ears);
+  const plain = bodyPath(x0, y0, w, h, R, rl, null);
+  const d = 8.5 * k, stitch = bodyPath(x0 + d, y0 + d, w - 2 * d, h - 2 * d, R - d, Math.max(5 * k, rl - d), null);
+  // 耳朵：底色不透明（和气泡同一张纸），里面一块格子布，镶一圈细线
+  const earOuter = hachi ? HE.fill : ears.map((e) => `M${f(e.cx - e.w / 2)},${f(e.y + 6 * k)} ${earSeg(e)} L${f(e.cx + e.w / 2)},${f(e.y + 6 * k)} Z`).join(' ');
+  const earLine = hachi ? HE.line : '';
+  const earIn = ears.map((e) => `M${f(e.cx - e.w * 0.29)},${f(e.y + 1.5 * k)} ${earSeg({ ...e, w: e.w * 0.58, h: e.h * 0.66 }, 1, 1.5 * k).replace(/^L[^C]*/, '')} Z`).join(' ');
+  return SV(`0 0 ${f(W)} ${f(H)}`, `<defs>
+    <filter id="${id}s" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="${f(4.5 * k)}"/></filter>
+    <linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFEFA"/><stop offset=".6" stop-color="#FFF9EE"/><stop offset="1" stop-color="#FFF3E0"/></linearGradient>
+    <pattern id="${id}g" width="${f(7 * k)}" height="${f(7 * k)}" patternUnits="userSpaceOnUse"><rect width="${f(7 * k)}" height="${f(7 * k)}" fill="${T.g0}"/><rect width="${f(3.5 * k)}" height="${f(7 * k)}" fill="${T.g1}" opacity=".5"/><rect width="${f(7 * k)}" height="${f(3.5 * k)}" fill="${T.g1}" opacity=".5"/></pattern>
+    <filter id="${id}n" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="${f(1.3 / k)}" numOctaves="1" seed="${seq % 9}"/><feColorMatrix values="0 0 0 0 .55  0 0 0 0 .45  0 0 0 0 .3  0 0 0 1.4 -.66"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+    <clipPath id="${id}c"><path d="${plain}"/></clipPath>
+    <linearGradient id="${id}b" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0)}" x2="0" y2="${f(y0 + 40 * k)}"><stop offset="0" stop-color="${HC.main}" stop-opacity=".9"/><stop offset=".35" stop-color="${HC.main}" stop-opacity=".55"/><stop offset="1" stop-color="${HC.main}" stop-opacity=".32"/></linearGradient>
+  </defs>
+  <path d="${body}" fill="#141B45" opacity=".34" transform="translate(0 ${f(4 * k)})" filter="url(#${id}s)"/>
+  <path d="${body}" fill="none" stroke="#1C2550" stroke-opacity=".22" stroke-width="${f(12.5 * k)}" stroke-linejoin="round"/>
+  <path d="${body}" fill="none" stroke="#fff" stroke-width="${f(10 * k)}" stroke-linejoin="round"/>
+  <path d="${body}" fill="url(#${id}p)" fill-opacity="${a}"/>
+  ${hachi ? '' : `<path d="${earOuter}" fill="#FFFBF2"/>`}
+  <path d="${plain}" fill="#000" opacity="${f(0.22 * a)}" filter="url(#${id}n)"/>
+  <g clip-path="url(#${id}c)">
+    <path d="${plain}" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="${f(5 * k)}" transform="translate(0 ${f(2.2 * k)})"/>
+    <path d="${plain}" fill="none" stroke="#C9A066" stroke-opacity=".09" stroke-width="${f(6 * k)}" transform="translate(0 ${f(-2.5 * k)})"/>
+  </g>
+  <path d="${stitch}" fill="none" stroke="${T.st}" stroke-width="${f(2.2 * k)}" stroke-dasharray="${f(7 * k)} ${f(5.5 * k)}" stroke-linecap="round"/>
+  ${hachi ? `<path d="${HE.cap}" fill="url(#${id}b)" clip-path="url(#${id}c)"/><path d="${earOuter}" fill="${HC.main}"/><path d="${earLine}" fill="none" stroke="#263159" stroke-width="${f(2.6 * k)}" stroke-linejoin="round" stroke-linecap="round"/>` : `<path d="${earIn}" fill="url(#${id}g)" stroke="${T.g1}" stroke-width="${f(1.4 * k)}" stroke-linejoin="round"/>`}`);
+}
+const earInOf = (ears, k) => ears.map((e) => `M${f(e.cx - e.w * 0.29)},${f(e.y + 1.5 * k)} ${earSeg({ ...e, w: e.w * 0.58, h: e.h * 0.66 }, 1, 1.5 * k).replace(/^L[^C]*/, '')} Z`).join(' ');
+// 星月夜空：深蓝渐变（半透明）+ 上沿一层玻璃反光 + 底下几团星云 + 零星小星星；描边是身份色渐变到白，外面一圈柔光
+function nightBubble(w, hh, k, tier, a) {
+  const M = 20 * k, ET = 30 * k, W = w + 2 * M, H = hh + ET + 2 * M, x0 = M, y0 = ET + M;
+  const R = Math.min(hh * 0.42, 42 * k), rl = 24 * k, T = NT[tier], id = `n${++seq}`;
+  const HE = hachiHead(x0 + w, y0, R, k);
+  const body = bodyPath(x0, y0, w, hh, R, rl, HE.seg), plain = bodyPath(x0, y0, w, hh, R, rl, null);
+  const d = 4.5 * k, inner = bodyPath(x0 + d, y0 + d, w - 2 * d, hh - 2 * d, R - d, rl - d, null);
+  const rnd = mulberry(Math.round(w * 7 + hh));
+  let stars = '';
+  for (let i = 0; i < 18; i++) stars += `<circle cx="${f(x0 + 60 * k + rnd() * (w - 110 * k))}" cy="${f(y0 + hh * 0.55 + rnd() * (hh * 0.4))}" r="${f((0.5 + rnd() * 1) * k)}" fill="#fff" opacity="${f(0.3 + rnd() * 0.55)}"/>`;
+  const x1 = x0 + w, yb = y0 + hh;
+  return SV(`0 0 ${f(W)} ${f(H)}`, `<defs>
+    <filter id="${id}g" x="-15%" y="-40%" width="130%" height="180%"><feGaussianBlur stdDeviation="${f(6.5 * k)}"/></filter>
+    <filter id="${id}c" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="${f(10 * k)}"/></filter>
+    <linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D296E"/><stop offset=".5" stop-color="#131C55"/><stop offset="1" stop-color="#0B1140"/></linearGradient>
+    <linearGradient id="${id}h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D2DDFF" stop-opacity=".12"/><stop offset=".3" stop-color="#D2DDFF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="${id}r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${T.main}"/><stop offset=".6" stop-color="${T.light}"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>
+    <linearGradient id="${id}e" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0 - 22 * k)}" x2="0" y2="${f(y0 + 2 * k)}"><stop offset="0" stop-color="${T.light}"/><stop offset="1" stop-color="${T.main}"/></linearGradient>
+    <linearGradient id="${id}b" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0)}" x2="0" y2="${f(y0 + 42 * k)}"><stop offset="0" stop-color="${T.main}" stop-opacity=".85"/><stop offset=".4" stop-color="${T.main}" stop-opacity=".45"/><stop offset="1" stop-color="${T.main}" stop-opacity=".18"/></linearGradient>
+    <clipPath id="${id}k"><path d="${plain}"/></clipPath></defs>
+  <path d="${body}" fill="none" stroke="${T.main}" stroke-width="${f(11 * k)}" stroke-linejoin="round" filter="url(#${id}g)" opacity=".9"/>
+  <path d="${body}" fill="url(#${id}f)" fill-opacity="${a}"/>
+  <g clip-path="url(#${id}k)" opacity="${f(Math.min(1, a + 0.15))}">
+    <g filter="url(#${id}c)"><ellipse cx="${f(x1 - R * 1.7)}" cy="${f(yb + 4 * k)}" rx="${f(74 * k)}" ry="${f(22 * k)}" fill="#6153DA" opacity=".55"/><ellipse cx="${f(x1 - R * 3.8)}" cy="${f(yb + 9 * k)}" rx="${f(64 * k)}" ry="${f(18 * k)}" fill="#3F6FE8" opacity=".5"/><ellipse cx="${f(x0 + w * 0.4)}" cy="${f(yb + 12 * k)}" rx="${f(96 * k)}" ry="${f(16 * k)}" fill="#7B5CE2" opacity=".35"/></g>
+    ${stars}
+    <rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(hh)}" fill="url(#${id}h)"/>
+  </g>
+  <path d="${HE.cap}" fill="url(#${id}b)" clip-path="url(#${id}k)"/>
+  <path d="${HE.fill}" fill="url(#${id}e)"/>
+  <path d="${body}" fill="none" stroke="url(#${id}r)" stroke-width="${f(2.6 * k)}" stroke-linejoin="round"/>
+  <path d="${inner}" fill="none" stroke="${T.light}" stroke-opacity=".3" stroke-width="${f(1.1 * k)}"/>
+  ${spark4(x1 - R * 2.1, y0 + hh * 0.76, 4.2 * k, '#FFE7A8')}${spark4(x0 + w * 0.52, y0 + hh * 0.86, 2.8 * k, '#C9D8FF')}`);
+}
+// 像素小屋：3px 一格；最外一圈深色，两圈身份色（上、左亮，下、右暗），再一圈深色，里面是半透明底色；右下错开一格的硬影子
+// 像素小屋：3px 一格；最外一圈深色，两圈身份色（上、左亮，下、右暗），再一圈深色，里面是半透明底色；右下错开一格的硬影子
+// 右上角是像素版的小八头顶：两只圆角小三角耳朵，下面一片蓝，下沿波浪、中间偏左一个白尖，越往下越稀（棋盘格点点），不抢字
+const PIX_ET = 7;
+function pixelBubble(w, hh, k, tier, a) {
+  const u = 3 * k, cols = Math.max(8, Math.round(w / u)), rows = Math.max(8, Math.round(hh / u)), T = PT[tier], E = PIX_ET;
+  const cut = (dx, dy, n) => dx + dy < n;
+  const inB = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows && !cut(cols - 1 - c, r, 4) && !cut(cols - 1 - c, rows - 1 - r, 4) && !cut(c, r, 3) && !cut(c, rows - 1 - r, 3);
+  const depth = (c, r) => { let d = 0; for (; d < 4; d++) { const s = d + 1; if (!(inB(c + s, r) && inB(c - s, r) && inB(c, r + s) && inB(c, r - s))) break; } return d; };
+  // 小八头顶：和奶油贴纸同一条轮廓（hachiHead），按格子取样
+  const HE = hachiHead(cols * u, 0, Math.min(rows * u * 0.42, 42 * k), k), inEarP = inPath(HE.fill), inCapP = inPath(HE.cap);
+  const ctr = (c, r) => [(c + 0.5) * u, (r + 0.5) * u];
+  const isEar = (c, r) => r < 0 && r >= -E && inEarP(...ctr(c, r));
+  const isCap = (c, r) => inCapP(...ctr(c, r));
+  const color = (c, r) => {
+    const d = depth(c, r);
+    if (d === 0) return r === 0 && isEar(c - 1, -1) && isEar(c + 1, -1) ? T.main : PIX_DARK;   // 耳根和气泡上沿接上，不隔一条黑线
+    const lit = !inB(c, r - d - 1) || !inB(c - d - 1, r);
+    if (d === 1) return lit ? T.light : T.main;
+    if (d === 2) return lit ? T.main : T.deep;
+    if (d === 3) return '#0E1A4C';
+    if (isCap(c, r)) return isCap(c, r + 3) ? 'B' : (c + r) % 2 ? 'B' : 'F';      // 蓝色下沿三格用棋盘格点点过渡
+    return 'F';
+  };
+  const runs = (fn, dx, dy, style) => {
+    let s = '';
+    for (let r = 0; r < rows; r++) {
+      let run = null;
+      const flush = () => { if (run) s += `<rect x="${f((run.c + dx) * u)}" y="${f((r + dy + E) * u)}" width="${f(run.n * u + 0.03)}" height="${f(u + 0.03)}" ${style ? style(run.col) : `fill="${run.col}"`}/>`; run = null; };
+      for (let c = 0; c < cols; c++) { const col = inB(c, r) ? fn(c, r) : null; if (run && run.col === col) { run.n++; continue; } flush(); if (col) run = { c, n: 1, col }; }
+      flush();
+    }
+    return s;
+  };
+  const shadow = runs(() => 'S', 1, 1, () => 'fill="#050A26" fill-opacity=".5"');
+  const body = runs(color, 0, 0, (col) => (col === 'F' ? `fill="#16225E" fill-opacity="${a}"` : col === 'B' ? `fill="${T.main}" fill-opacity=".8"` : `fill="${col}"`));
+  // 耳朵：格子在耳朵形状里就涂蓝，挨着外面的那一圈涂深色描边
+  let ears = '', earSh = '';
+  for (let r = -E; r < 0; r++) for (let c = Math.max(0, cols - 60); c < cols; c++) {
+    if (!isEar(c, r)) continue;
+    const edge = !isEar(c - 1, r) || !isEar(c + 1, r) || (!isEar(c, r - 1));
+    ears += `<rect x="${f(c * u)}" y="${f((r + E) * u)}" width="${f(u + 0.03)}" height="${f(u + 0.03)}" fill="${edge ? PIX_DARK : T.main}"/>`;
+    earSh += `<rect x="${f((c + 1) * u)}" y="${f((r + E + 1) * u)}" width="${f(u + 0.03)}" height="${f(u + 0.03)}"/>`;
+  }
+  return SV(`0 0 ${f((cols + 1) * u)} ${f((rows + 1 + E) * u)}`, `<g shape-rendering="crispEdges"><g fill="#050A26" opacity=".5">${earSh}</g>${shadow}${body}${ears}</g>`);
+}
+// 每种外观的气泡图比气泡本身大多少（描边、柔光、耳朵）
+const BUB_PAD = { jelly: [18, 30], cream: [16, 30], night: [20, 30], pixel: [0, 0], porcelain: [16, 30] };
+// 气泡的外形（带猫耳），给后面的模糊层当遮罩用；和 creamBubble / nightBubble 里的 body 是同一条线
+function frostMask(look, w, hh, k) {
+  const [M, ET] = BUB_PAD[look].map((v) => v * k), x0 = M, y0 = ET + M, R = Math.min(hh * 0.42, 42 * k);
+  const hachi = look === 'night' || look === 'porcelain' || look === 'jelly' || (look === 'cream' && st.cframe !== 'lace');
+  const body = bodyPath(x0, y0, w, hh, R, 24 * k, hachi ? hachiHead(x0 + w, y0, R, k).seg : earsOf(x0 + w, y0, R, k));
+  return `url("${svgUrl(SV(`0 0 ${f(w + 2 * M)} ${f(hh + ET + 2 * M)}`, `<path d="${body}"/>`))}")`;
+}
+function bubbleOf(look, w, hh, k, tier, a) {
+  if (look === 'night') return nightBubble(w, hh, k, tier, a);
+  if (look === 'pixel') return pixelBubble(w, hh, k, tier, a);
+  if (look === 'porcelain') return porcelainBubble(w, hh, k, tier, a);
+  if (look === 'jelly') return jellyBubble(w, hh, k, tier, a);
+  return creamBubble(w, hh, k, tier, a);
+}
+
+// ---------- 示例观众（编的，头像是画的） ----------
+function face(seed) {
+  const hues = [[18, 340], [200, 250], [150, 190], [35, 12], [270, 310], [90, 140], [320, 20], [220, 180], [0, 30], [180, 220]];
+  const [a, b] = hues[seed % hues.length];
+  const dark = seed % 5 === 3;
+  return svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${a} ${dark ? '30% 22%' : '85% 78%'})"/><stop offset="1" stop-color="hsl(${b} ${dark ? '40% 12%' : '65% 55%'})"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="50" cy="41" r="18" fill="#fff" opacity="${dark ? .5 : .92}"/><circle cx="43" cy="39" r="2.6" fill="#333"/><circle cx="57" cy="39" r="2.6" fill="#333"/><path d="M18 94c4-20 18-30 32-30s28 10 32 30z" fill="#fff" opacity="${dark ? .5 : .92}"/></svg>`);
+}
+const PEOPLE = [
+  { name: '小八同学', medal: 12, honor: 12 },
+  { name: '蓝色小尾巴', medal: 8 },
+  { name: '奶油云朵', medal: 17, honor: 25 },
+  { name: '星星糖', medal: 23, honor: 18 },
+  { name: '一只小土豆' },
+  { name: '晚风与你', mod: true, medal: 26, honor: 33 },
+  { name: '柚子味的风', guard: 3, medal: 22, honor: 25 },
+  { name: '月下独酌', guard: 2, medal: 34, honor: 41 },
+  { name: '长夜未央', guard: 1, medal: 44, honor: 68, mod: true },
+  { name: 'momo酱', honor: 3 },
+  { name: '不吃香菜的人', medal: 31, honor: 25 },
+];
+PEOPLE.forEach((p, i) => (p.face = face(i)));
+const ANCHOR = { name: '喵酱', anchor: true, face: face(6), honor: 52 };
+const LONGNAME = { name: '今天也是想早点睡觉但是又睡不着的一天', medal: 29, honor: 33, face: face(4) };
+const LINES = ['晚上好，来陪主播啦！', '今天也要开开心心', '这个也太可爱了吧！', '给你一朵小花~', '哈哈哈哈哈哈', '呜呜呜好好听', '卧槽！', '无语……', '主播好可爱[比心]', '加油加油！', '打卡[花]', '这首歌叫什么？', '嘿嘿，我懂了', '哼，又输了', '好尴尬啊', '感动，泪目', '前排[吃瓜]', '刚下班，赶上了', '666', '晚安晚安'];
+const LONG = '主播我跟你说，今天路上看到一只超级可爱的蓝白小猫，一直跟着我走了两条街，最后被我带回家了，晚上还要给它洗澡哈哈哈';
+function medalColors(level) {
+  const t = level <= 10 ? '#5762A7' : level <= 20 ? '#C770A4' : level <= 30 ? '#3FB4F6' : level <= 40 ? '#4C7DFF' : level <= 50 ? '#A773F1' : '#EC4F6E';
+  return { bg: t, lv: t };
+}
+
+// ---------- 状态 ----------
+const NOTES = {
+  jelly: '<b>果冻玻璃</b>（新外观）：气泡是一块有厚度的透明玻璃，后面的直播画面被柔化后透出来；左上一道高光、一条亮边，下沿一点内阴影和一丝彩色折射。右上角是小八造型的蓝色果冻（头顶 + 耳朵），头像框是同材质的小八脑袋。只留小八头顶、尾巴、表情三样装饰。进场像果冻掉下来：压扁、弹起、晃两下停住，果冻耳朵跟着抖。大航海只换边缘光的颜色（舰长蓝、提督紫、总督金、主播粉），进场时扫一道同色的光、撒一把玻璃小珠。最新一条的上沿会有一点光慢慢流过。<br>不支持背景模糊的直播姬：左侧「背景模糊」选「不支持」可以看到那时的样子，实测字照样清楚',
+  porcelain: '<b>青花瓷</b>（新外观）：小八本来就是蓝白两色，和青花瓷一样。白釉底带一层釉光，气泡边是青花瓷的两道弦纹，小八头顶用钴蓝晕染，右下角一片青海波浪纹慢慢晕开，猫爪换成一枚朱红印章「啪」地盖上去，右上挂一个中国结。头像框像一只小青花盘，转着落下来。大航海是「描金」：提督多一道金线，总督整圈金边，进场撒金箔、扫一道金光',
+  common: '<b>头像和小八</b>：框里一律是自己的头像，小八坐在头像右下角，表情和小动作跟着弹幕内容变（哈哈哈 → 笑到发抖，呜呜 → 哭着缩一下，卧槽 → 吓一跳……）。进场第一秒小八先在框中间露脸做动作，再跳到角上，头像同时亮出来<br><b>昵称和弹幕</b>：一律完整显示，长了就换行<br><b>专属进场</b>：大航海和主播，同一个人 3 分钟内只放一次（点上面的按钮不受限制）<br><b>只有最新一条</b>会轻轻动，旧的都停住，不抢眼也不费电脑<br>',
+  cream: '<b>奶油贴纸</b>：框像贴纸一样「啪」地拍上去，气泡展开，胶带压下来，尾巴甩一下；大航海的框转着进来、气泡扫一道光、撒一把星星，总督的皇冠从上面掉下来；主播撒爱心',
+  night: '<b>星月夜空</b>：一颗光点绕着头像框转一圈把框点亮，星星从四周聚过来，月亮吊坠落下来晃两下；大航海多一颗流星划过气泡、一圈光晕和一把金星，总督的皇冠落下来；最新一条的星星会一闪一闪',
+  pixel: '<b>像素小屋</b>：所有动作都是一跳一跳的（像老游戏机），框像道具一样蹦出来，气泡一截一截拉开，字闪两下再亮，十字星「叮」一下；大航海多撒一把像素星、扫一道光，总督的皇冠掉下来；小吊坠星星、爱心、宝石、月亮轮流换',
+};
+const LOOKS = { jelly: { name: '果冻玻璃', alpha: 45 }, porcelain: { name: '青花瓷', alpha: 60 }, cream: { name: '奶油贴纸', alpha: 60 }, night: { name: '星月夜空', alpha: 70 }, pixel: { name: '像素小屋', alpha: 35 } };
+const st = { intro: 'hop', noblur: false, look: 'cream', cframe: 'hachi', width: 'fit', bga: null, bg: 'room', side: 'l', size: 'std', speed: 'mid', paused: false, slow: false };
+try { Object.assign(st, JSON.parse(localStorage.getItem('sf-chat-looks-v2') || '{}'), { paused: false, slow: false }); } catch {}
+if (!LOOKS[st.look]) st.look = 'cream';
+const save = () => { try { localStorage.setItem('sf-chat-looks-v2', JSON.stringify(st)); } catch {} };
+// 默认浓度按对比度实测选的：在暗、亮、花哨、透明四种直播画面上，弹幕和昵称都达到 4.5:1，再留一点余量；不支持背景模糊时实测也达标，不用另外加深
+const alpha = () => st.bga ?? LOOKS[st.look].alpha;
+const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const NR = 'referrerpolicy="no-referrer"';
+const richText = (s, em) => esc(s).replace(/\[[^\]]{1,16}\]/g, (m) => (em?.[m] ? `<img class="em" src="${em[m]}" alt="" ${NR} onerror="this.remove()">` : EMOTS[m] ? `<img class="em" src="https://i0.hdslb.com/bfs/live/${EMOTS[m]}.png" alt="" ${NR} onerror="this.remove()">` : esc(m)));
+const kOf = () => (st.size === 'big' ? 1.2 : 1);
+const px = (n) => `${f(n)}px`;
+const box = (el, x, y, w, hh) => { el.style.left = px(x); el.style.top = px(y); el.style.width = px(w); el.style.height = px(hh ?? w); return el; };
+
+// ---------- 一条弹幕 ----------
+function build(p, text, sticker) {
+  const tier = tierOf(p), k = kOf(), L = st.look, G = geo(k), T = TIER[tier];
+  const hero = tier === 'n';                         // 普通观众：框里是小八
+  const el = h('div', ['row', tier === 'n' ? '' : tier === 'anchor' ? 'anchor' : `lv-${tier}`].join(' '));
+  el._p = p; el._tier = tier; el._look = L;
+  // 头像框
+  const fw = h('div', 'fw'); fw.style.width = px(G.F); fw.style.height = px(G.FH);
+  const win = box(h('div', 'win'), G.hx - G.wr, G.hy - G.wr, G.wr * 2);
+  const frm = h('img', 'frm'); frm.alt = '';
+  frm.src = L === 'cream' && st.cframe === 'lace' ? `${A}pack/${T.frame}.png` : icon(`fr-${L}-${tier}`, () => (L === 'jelly' ? frameJelly(tier) : L === 'night' ? frameHachi(tier, 'night') : L === 'porcelain' ? frameHachi(tier, 'porcelain') : L === 'pixel' ? framePixel(tier) : frameHachi(tier)));
+  fw.append(win, frm);
+  // 框里一律是自己的头像
+  const av = h('img', 'av'); av.alt = ''; av.referrerPolicy = 'no-referrer'; av.src = p.face;
+  av.onerror = () => { av.replaceWith(h('span', 'ini', esc([...p.name][0] || '?'))); };
+  win.append(av);
+  win.style.background = L === 'jelly' ? '#1B2348' : L === 'cream' || L === 'porcelain' ? '#fff' : L === 'night' ? '#1A2468' : '#18256A';
+  // 小八：表情和小动作跟着弹幕内容变（大航海、主播也有）
+  const cat = sticker ? { id: 'heart', act: 'pulse' } : pickCat(text);
+  el._cat = cat;
+  const cw = box(h('div', 'catw'), G.stL, G.stT, G.sts);
+  cw.innerHTML = `<div class="br"><img alt=""${L === 'pixel' ? ' class="px"' : ` src="${catSrc(cat.id)}"`}></div>`;
+  // 像素小屋的小八现场转成像素画
+  if (L === 'pixel') pixelArt(catSrc(cat.id), 36).then((u) => { cw.querySelector('img').src = u; });
+  // 身份装饰：舰长一颗星、提督两颗、总督皇冠、主播爱心（每种外观各画一套）
+  const ORN = {
+    jelly: { star: () => icon('n-star', () => nStarSvg('#FFD27A')), crown: () => icon('n-crown', nCrownSvg), heart: () => icon('n-heart', () => nHeartSvg('#FF8DB3')) },
+    porcelain: { star: () => icon('star-y', () => starSvg('#E9C25A')), crown: () => icon('crown', crownSvg), heart: () => icon('heart-p', () => heartSvg('#E77A9C')) },
+    cream: { star: () => icon('star-y', () => starSvg('#FFD45E')), crown: () => icon('crown', crownSvg), heart: () => icon('heart-p', () => heartSvg('#FF8DB3')) },
+    night: { star: () => icon('n-star', () => nStarSvg('#FFD27A')), crown: () => icon('n-crown', nCrownSvg), heart: () => icon('n-heart', () => nHeartSvg('#FF8DB3')) },
+    pixel: { star: () => icon('p-star', () => pixStarSvg('#FFD24A')), crown: () => icon('p-crown', pixCrownSvg), heart: () => icon('p-heart', () => pixHeartSvg('#FF7FA8')) },
+  }[L];
+  const orn = (cls, src, x, y, w, hh) => { const o = box(h('img', `orn ${cls}${L === 'pixel' ? ' px' : ''}`), x, y, w, hh); o.alt = ''; o.src = src; fw.append(o); return o; };
+  const ob = L === 'night' || L === 'jelly' ? 1.25 : 1;                 // 夜空的图四周留了柔光，画大一点才和别的一样大
+  if (p.guard === 3 || p.guard === 2) orn('s1', ORN.star(), G.F * 0.74 - 3 * k * (ob - 1) * 10, G.FH * 0.02 - 3 * k * (ob - 1) * 10, 30 * k * ob);
+  if (p.guard === 2) orn('s2', ORN.star(), G.F * 0.9 - 2 * k * (ob - 1) * 10, G.FH * 0.24 - 2 * k * (ob - 1) * 10, 20 * k * ob);
+  if (p.guard === 1) { const cw = L === 'pixel' ? 52 * k : 52 * k * ob, ch = L === 'pixel' ? 32 * k : 42 * k * ob; orn('crown', ORN.crown(), G.hx - cw / 2, (L === 'pixel' ? -14 : -24) * k - (ch - 42 * k) / 2, cw, ch); }
+  if (p.anchor) orn('s1', ORN.heart(), G.F * 0.76, G.FH * 0.02, 28 * k * ob, 28 * k * ob * (L === 'pixel' ? 1 : 0.9));
+  // 夜空：两颗会一闪一闪的星；像素：两颗十字星（只有最新一条在闪）
+  if (L === 'night' || L === 'pixel') {
+    const tw = (cls, src, cx, cy, s) => orn(`twk ${cls}`, src, cx - s / 2, cy - s / 2, s);
+    if (L === 'night') {
+      tw('t1', icon('n-sp-y', () => nSparkSvg('#FFE29A')), G.F * 0.5, G.FH * 0.06, 22 * k);
+      if (!(p.guard === 3 || p.guard === 2 || p.anchor)) tw('t2', icon('n-sp-w', () => nSparkSvg('#E8EEFF')), G.F * 0.97, G.FH * 0.4, 15 * k);
+    } else {
+      if (!(p.guard === 3 || p.guard === 2 || p.anchor)) tw('t1', icon('p-plus-y', () => pixPlusSvg('#FFE7A8')), G.F * 0.84, G.FH * 0.13, 15 * k);
+      tw('t2', icon('p-plus-b', () => pixPlusSvg('#A9C8FF')), G.F * 0.08, G.FH * 0.66, 12 * k);
+    }
+  }
+  fw.append(cw);
+
+  // 气泡
+  const bw = h('div', 'bw');
+  const lap = G.lap;                                   // 气泡左端藏在框下面
+  bw.style.margin = st.side === 'r' ? `0 ${px(-lap)} 0 0` : `0 0 0 ${px(-lap)}`;
+  const bx = h('div', 'bx');
+  const padIn = lap + 18 * k, padOut = (L === 'cream' ? 50 : 62) * k;
+  bx.style.padding = st.side === 'r' ? `${px(13 * k)} ${px(padIn)} ${px(15 * k)} ${px(padOut)}` : `${px(13 * k)} ${px(padOut)} ${px(15 * k)} ${px(padIn)}`;
+  bx.style.minHeight = px(98 * k);
+  bx.style.minWidth = px(padIn + padOut + 210 * k);
+  let who = '';
+  if (L === 'jelly') {}
+  else if (hero && L === 'porcelain') who += `<img class="ic" src="${icon('blossom', () => blossomSvg('#2D5DB5'))}" alt="">`;
+  else if (hero) who += L === 'cream' ? `<img class="ic" src="${icon('star-y', () => starSvg('#FFD45E'))}" alt="">` : L === 'night' ? `<img class="ic" src="${icon('n-sp-b', () => nSparkSvg('#B9CCFF'))}" alt="">` : `<img class="ic px" src="${icon('p-star', () => pixStarSvg('#FFD24A'))}" alt="">`;
+  if (p.anchor) who += '<span class="zb">主播</span>';
+  if (p.guard) who += `<img class="badge" src="${BADGES[p.guard]}" alt="" ${NR} onerror="this.remove()">`;
+  if (p.mod) who += '<i class="fang">房</i>';
+  if (p.medal) { const c = p.medalC ? { bg: p.medalC.bg, lv: p.medalC.level } : medalColors(p.medal); who += `<span class="medal" style="--mbg:${c.bg};--mlv:${c.lv}"><span class="mn">${esc(p.medalName || '喵喵')}</span><span class="ml">${p.medal}</span></span>`; }
+  if (p.honorUrl) who += `<img class="honor" src="${p.honorUrl}" alt="" ${NR} onerror="this.remove()">`;
+  else if (p.honor && HONOR[p.honor]) who += `<img class="honor" src="https://i0.hdslb.com/bfs/live/${HONOR[p.honor]}.png" alt="" ${NR} onerror="this.remove()">`;
+  who += `<span class="nm"><span class="t">${esc(p.name)}</span></span>`;
+  bx.innerHTML = `<div class="who">${who}</div>${sticker ? `<img class="sticker" src="${sticker}" alt="" ${NR} onerror="this.remove()">` : `<div class="tx">${richText(text, p.emots)}</div>`}`;
+  // 尾巴（气泡后面）、猫爪（右下角），第三样：奶油是左上的胶带，夜空是月亮吊坠，像素是轮流换的小吊坠
+  const NTt = NT[tier], PTt = PT[tier];
+  const PCt = PCT[tier];
+  const tailSrc = L === 'jelly' ? icon('j-tail', jellyTailSvg) : L === 'porcelain' ? icon(`q-tail-${tier}`, () => porcelainTailSvg(PCt)) : L === 'cream' ? icon('tail', tailSvg) : L === 'night' ? icon(`n-tail-${tier}`, () => nTailSvg(NTt)) : icon(`p-tail-${tier}`, () => pixSvg(PIX_TAIL, { o: PIX_DARK, W: '#FFFFFF', B: PTt.main, L: PTt.light }));
+  const pawSrc = L === 'porcelain' ? icon('q-seal', sealSvg) : L === 'cream' ? `${A}pack/paw.png` : L === 'night' ? icon(`n-paw-${tier}`, () => nPawSvg(NTt.main)) : icon('p-paw', () => pixSvg(PIX_PAW, { o: PIX_DARK, W: '#FFFFFF', P: '#FF8FB1' }));
+  const pc = L === 'pixel' ? ' px' : '';
+  const tail = h('div', 'tail' + pc); tail.innerHTML = `<div class="sw"><img src="${tailSrc}" alt=""></div>`;
+  const paw = h('div', 'paw' + pc); paw.innerHTML = `<img src="${pawSrc}" alt="">`;
+  let deco;
+  if (L === 'jelly') { deco = h('div', 'charm'); deco.style.display = 'none'; }
+  else if (L === 'porcelain') { deco = h('div', 'charm'); deco.innerHTML = `<div class="sw"><img src="${icon(`q-tassel-${tier}`, () => tasselSvg(PCt))}" alt=""></div>`; }
+  else if (L === 'cream') { deco = h('div', 'tape'); deco.innerHTML = `<img src="${A}pack/pink-tape.png" alt="">`; }
+  else { const ci = L === 'pixel' ? nextCharm() : 0; deco = h('div', 'charm' + pc); deco.dataset.rows = L === 'pixel' ? 6 + PIX_CHARMS[ci][0].length : 0; deco.innerHTML = `<div class="sw"><img src="${L === 'night' ? icon('n-moon', nMoonSvg) : icon(`p-charm-${ci}`, () => pixCharmSvg(ci))}" alt=""></div>`; }
+  bw.append(tail, bx, paw, deco);
+  if (L === 'porcelain') { const wv = h('img', 'waves'); wv.alt = ''; bx.prepend(wv); }
+  if (L === 'jelly') { paw.style.display = 'none'; const jc = h('img', 'jcap'); jc.alt = ''; bx.prepend(jc); const gl = h('div', 'jglint'); gl.innerHTML = '<i></i>'; bx.append(gl); }
+  for (const im of bx.querySelectorAll('.who img')) im.addEventListener('load', () => { el._key = ''; layout(el); });
+  el.append(fw, bw);
+  el._parts = { fw, win, frm, bw, bx, tail, paw, deco, cat: cw };
+  return el;
+}
+
+// 第一行放不下时：先收起粉丝牌的名字（只留等级），再收起荣耀勋章，最后才截昵称
+// 第一行放不下时：先收起粉丝牌的名字（只留等级），再收起荣耀勋章；还是放不下就让昵称换到下一行，全部照常显示。昵称本身从不截断
+function fitWho(el) {
+  const who = el._parts.bx.querySelector('.who'); if (!who) return;
+  const mn = who.querySelector('.medal .mn'), hon = who.querySelector('.honor'), nm = who.querySelector('.nm');
+  const reset = () => { if (mn) { mn.style.display = ''; mn.parentNode.classList.remove('lv-only'); } if (hon) hon.style.display = ''; };
+  reset();
+  const wrapped = () => nm && nm.offsetTop > who.firstElementChild.offsetTop + 4;
+  if (!wrapped()) return;
+  if (mn) { mn.style.display = 'none'; mn.parentNode.classList.add('lv-only'); }
+  if (hon && wrapped()) hon.style.display = 'none';
+  if (wrapped()) reset();
+}
+// 量好气泡大小再画（字体、图片加载完尺寸会变，所以用 ResizeObserver）
+function layout(el) {
+  const { bx, tail, paw, deco } = el._parts, k = kOf(), r = st.side === 'r', L = el._look;
+  fitWho(el);
+  const w = bx.offsetWidth, hh = bx.offsetHeight;
+  if (!w || !hh) return;
+  const key = `${w}x${hh}x${alpha()}`;
+  if (el._key === key) return;
+  el._key = key;
+  let bub = bx.querySelector('.bub');
+  if (!bub) { bub = h('img', 'bub'); bub.alt = ''; bx.prepend(bub); }
+  const [M, ET] = BUB_PAD[L].map((v) => v * k);
+  bub.src = svgUrl(bubbleOf(L, w, hh, k, el._tier, alpha() / 100));
+  if (L === 'pixel') { const u = 3 * k; box(bub, 0, -PIX_ET * u, (Math.max(8, Math.round(w / u)) + 1) * u, (Math.max(8, Math.round(hh / u)) + 1 + PIX_ET) * u); }
+  else box(bub, -M, -(ET + M), w + 2 * M, hh + ET + 2 * M);
+  let fr = bx.querySelector('.frost');
+  if (L !== 'pixel') {
+    if (!fr) { fr = h('div', 'frost'); bx.prepend(fr); }
+    box(fr, -M, -(ET + M), w + 2 * M, hh + ET + 2 * M);
+    const mk = frostMask(L, w, hh, k); fr.style.webkitMaskImage = mk; fr.style.maskImage = mk;
+  }
+  const G = geo(k);
+  // 位置都按「放在左边」算，放右边时左右对调
+  const put = (node, x, y, ww, hh2) => { box(node, r ? w - x - ww : x, y, ww, hh2); };
+  const R = Math.min(hh * 0.42, 42 * k);
+  const sw = tail.querySelector('.sw');
+  if (L === 'cream') {
+    put(tail, w - 20 * k, hh - 82 * k, 58 * k, 58 * k * 76 / 64);
+    sw.style.transformOrigin = r ? '88% 82%' : '12% 82%';
+    put(paw, w - 52 * k, hh - 31 * k, 44 * k, 44 * k * 177 / 220);
+    put(deco, G.lap + 2 * k, -15 * k, 70 * k, 70 * k * 108 / 220);
+    deco.style.transform = `${r ? 'scaleX(-1) ' : ''}rotate(-9deg)`;
+  } else if (L === 'jelly') {
+    const s = 58 * k / 64;
+    put(tail, w - 20 * k - 6 * s, hh - 82 * k - 6 * s, 76 * s, 88 * s);
+    sw.style.transformOrigin = r ? '82% 77%' : '18% 77%';
+    const jc = bx.querySelector('.jcap');
+    if (jc) { jc.src = svgUrl(jellyCapSvg(w, hh, k)); box(jc, -M, -(ET + M), w + 2 * M, hh + ET + 2 * M); jc.style.transformOrigin = `${px(r ? M + R + 50 * k : M + w - R - 50 * k)} ${px(ET + M)}`; }
+    const gl = bx.querySelector('.jglint');
+    if (gl) box(gl, 26 * k, 2.5 * k, Math.max(40 * k, w * 0.6), 5 * k);
+  } else if (L === 'porcelain') {
+    put(tail, w - 20 * k, hh - 82 * k, 58 * k, 58 * k * 76 / 64);
+    sw.style.transformOrigin = r ? '88% 82%' : '12% 82%';
+    put(paw, w - 50 * k, hh - 34 * k, 36 * k, 36 * k);
+    paw.style.transform = `rotate(${r ? 6 : -6}deg)`;
+    put(deco, w - 40 * k, -2 * k, 24 * k, 24 * k * 66 / 26);
+    const wv = bx.querySelector('.waves');
+    if (wv) { wv.src = svgUrl(wavesSvg(w, hh, k, el._tier)); box(wv, -M, -(ET + M), w + 2 * M, hh + ET + 2 * M); }
+  } else if (L === 'night') {
+    // 尾巴的图四周留了柔光（viewBox 往外多 10），按同样大小换算
+    const s = 58 * k / 64;
+    put(tail, w - 20 * k - 10 * s, hh - 82 * k - 10 * s, 84 * s, 96 * s);
+    sw.style.transformOrigin = r ? '79% 75%' : '21% 75%';
+    put(paw, w - 56 * k, hh - 36 * k, 54 * k, 54 * k * 60 / 64);
+    put(deco, w - 44 * k, -1 * k, 40 * k, 40 * k * 52 / 42);
+  } else {
+    const u = 3 * k;
+    put(tail, w - 7 * u, hh - 19 * u, 14 * u * 1.5, 14 * u * 1.5);
+    sw.style.transformOrigin = r ? '93% 86%' : '7% 86%';
+    put(paw, w - 18 * u, hh - 9 * u, 13 * u * 1.05, 11 * u * 1.05);
+    put(deco, w - 16 * u, 2 * u, 9 * u, +deco.dataset.rows * u);
+  }
+  el._R = R;
+}
+const ro = new ResizeObserver((es) => { for (const e of es) { const el = e.target.closest('.row'); if (el) layout(el); } });
+
+// ---------- 动画 ----------
+const speed = () => (st.slow ? 0.3 : 1);
+// 像素小屋：所有动作都按大约 15 帧/秒一跳一跳地走（像老游戏机），不走平滑曲线
+function anim(el, kf, o) {
+  const opt = { fill: 'backwards', ...o };
+  if (st.look === 'pixel' && !o.smooth) opt.easing = `steps(${Math.max(2, Math.round((o.duration || 300) / 66))}, end)`;
+  const a = el.animate(kf, opt); a.playbackRate = speed(); return a;
+}
+const SPRING = 'cubic-bezier(.3,1.5,.5,1)', OUT = 'cubic-bezier(.2,.9,.3,1)';
+// 小八的小动作（落地以后做一次）
+const ACTS = {
+  shake: [[0, 'rotate(0)'], [.15, 'rotate(-8deg)'], [.32, 'rotate(7deg)'], [.5, 'rotate(-6deg)'], [.68, 'rotate(5deg)'], [.84, 'rotate(-2deg)'], [1, 'rotate(0)'], 700],
+  shiver: [[0, 'none'], [.12, 'translate(-2px,3px)'], [.24, 'translate(2px,3px)'], [.36, 'translate(-2px,3px)'], [.48, 'translate(2px,3px)'], [.6, 'translate(-1px,3px)'], [1, 'none'], 760],
+  pulse: [[0, 'none'], [.2, 'scale(1.12)'], [.4, 'scale(.98)'], [.6, 'scale(1.08)'], [1, 'none'], 760],
+  jump: [[0, 'none'], [.18, 'translateY(4%) scale(1.06,.92)'], [.45, 'translateY(-20%) scale(.96,1.06)'], [.72, 'translateY(2%) scale(1.05,.95)'], [1, 'none'], 640],
+  sink: [[0, 'none'], [.3, 'translateY(7%) rotate(-5deg)'], [.75, 'translateY(7%) rotate(-5deg)'], [1, 'none'], 1000],
+  droop: [[0, 'none'], [.35, 'translateY(5%) rotate(-7deg)'], [.7, 'translateY(5%) rotate(-4deg)'], [1, 'none'], 1300],
+  puff: [[0, 'none'], [.2, 'scale(1.12,.92)'], [.4, 'none'], [.6, 'scale(1.1,.94)'], [1, 'none'], 640],
+  tilt: [[0, 'none'], [.25, 'rotate(9deg)'], [.75, 'rotate(9deg)'], [1, 'none'], 1000],
+  shy: [[0, 'none'], [.25, 'rotate(-8deg) scale(.95)'], [.75, 'rotate(-8deg) scale(.95)'], [1, 'none'], 1000],
+  nod: [[0, 'none'], [.25, 'rotate(6deg)'], [.5, 'rotate(-2deg)'], [.75, 'rotate(5deg)'], [1, 'none'], 1500],
+  tilt2: [[0, 'none'], [.2, 'rotate(15deg)'], [.8, 'rotate(15deg)'], [1, 'none'], 1100],
+  sway: [[0, 'none'], [.25, 'rotate(-7deg)'], [.6, 'rotate(6deg)'], [1, 'none'], 900],
+  hop: [[0, 'none'], [.2, 'scale(1.05,.94)'], [.5, 'translateY(-10%)'], [.8, 'scale(1.03,.97)'], [1, 'none'], 560],
+  hop2: [[0, 'none'], [.15, 'translateY(-10%)'], [.3, 'scale(1.04,.95)'], [.5, 'translateY(-12%)'], [.7, 'scale(1.04,.95)'], [1, 'none'], 760],
+};
+const actKf = (name) => { const a = ACTS[name] || ACTS.hop; return [a.slice(0, -1).map(([o, t]) => ({ offset: o, transform: t })), a[a.length - 1]]; };
+
+// 撒一把小东西：从 (x, y) 往外飞，转着淡出（每种外观一套小图）
+function fxSrcs(kind) {
+  if (st.look === 'jelly') {
+    const bd = (c) => icon(`bead-${c}`, () => beadSvg(c)), ns = icon('n-star', () => nStarSvg('#FFD27A'));
+    return { heart: [icon('n-heart', () => nHeartSvg('#FF8DB3')), bd('#FFA6CB')], star: [ns, bd('#AEDBFF')], spark: [bd('#AEDBFF'), bd('#5AA8F8'), bd('#FFFFFF')], gold: [bd('#FFD772'), ns, bd('#FFF2C4')], purple: [bd('#C3A6FF'), ns, bd('#FFFFFF')], blue: [bd('#8EC5FF'), bd('#5AA8F8'), bd('#FFFFFF')], bang: [icon('bang', bangSvg)] }[kind];
+  }
+  if (st.look === 'porcelain') {
+    const gl = (c) => icon(`q-gilt-${c}`, () => giltSvg(c)), bl = (c) => icon(`blossom-${c}`, () => blossomSvg(c));
+    return { heart: [icon('heart-p', () => heartSvg('#E77A9C')), bl('#E77A9C')], star: [icon('star-y', () => starSvg('#E9C25A')), bl('#2D5DB5')], spark: [bl('#2D5DB5'), bl('#7C9DDB'), gl('#E2BC5A')], gold: [gl('#E2BC5A'), gl('#F3D98A'), gl('#C99A35')], purple: [gl('#E2BC5A'), bl('#4C4AB2'), gl('#F3D98A')], blue: [bl('#2D5DB5'), bl('#7C9DDB'), gl('#E2BC5A')], bang: [icon('bang', bangSvg)] }[kind];
+  }
+  if (st.look === 'night') {
+    const ns = icon('n-star', () => nStarSvg('#FFD27A')), sp = (c) => icon(`n-sp-${c}`, () => nSparkSvg(c));
+    return { heart: [icon('n-heart', () => nHeartSvg('#FF8DB3')), icon('n-heart-l', () => nHeartSvg('#FFB6CE'))], star: [ns, sp('#FFF2C4')], spark: [sp('#A9C4FF'), sp('#FFE29A'), sp('#FFB3D1')], gold: [ns, sp('#FFD27A'), sp('#FFF6D8')], purple: [ns, sp('#C7A8FF'), sp('#FFF6D8')], blue: [ns, sp('#9EC8FF'), sp('#FFF6D8')], bang: [icon('bang', bangSvg)] }[kind];
+  }
+  if (st.look === 'pixel') {
+    const ps = icon('p-star', () => pixStarSvg('#FFD24A')), pl = (c) => icon(`p-plus-${c}`, () => pixPlusSvg(c));
+    return { heart: [icon('p-heart', () => pixHeartSvg('#FF7FA8')), icon('p-heart-l', () => pixHeartSvg('#FFB6CE'))], star: [ps, pl('#FFE7A8')], spark: [pl('#FFE7A8'), pl('#A9C8FF'), pl('#FFB3D1')], gold: [ps, pl('#FFD24A'), pl('#FFF6D8')], purple: [ps, pl('#D2B8FF'), pl('#FFF6D8')], blue: [ps, pl('#A9C8FF'), pl('#FFF6D8')], bang: [icon('p-bang', () => pixSvg(PIX_BANG, { o: PIX_DARK, Y: '#FFD24A' }))] }[kind];
+  }
+  return { heart: [icon('heart-p', () => heartSvg('#FF8DB3')), icon('heart-l', () => heartSvg('#FFB6CE'))], star: [icon('star-y', () => starSvg('#FFD45E')), icon('star-w', () => starSvg('#FFF1B8'))], spark: [icon('sp-b', () => sparkSvg('#8FB4EE')), icon('sp-y', () => sparkSvg('#FFD45E')), icon('sp-p', () => sparkSvg('#FF9EC0'))], gold: [icon('star-y', () => starSvg('#FFD45E')), icon('sp-y', () => sparkSvg('#FFC93C')), icon('sp-w', () => sparkSvg('#FFF6D8'))], purple: [icon('star-y', () => starSvg('#FFD45E')), icon('sp-v', () => sparkSvg('#B79BFF')), icon('sp-w', () => sparkSvg('#FFF6D8'))], blue: [icon('star-y', () => starSvg('#FFD45E')), icon('sp-b', () => sparkSvg('#8FB4EE')), icon('sp-w', () => sparkSvg('#FFF6D8'))], bang: [icon('bang', bangSvg)] }[kind];
+}
+function burst(el, kind, x, y, n, spread = [-150, -20], dist = [36, 76], delay = 0) {
+  const k = kOf(), r = st.side === 'r';
+  const L = st.look, srcs = fxSrcs(kind), pxl = L === 'pixel';
+  for (let i = 0; i < n; i++) {
+    const s = (kind === 'bang' ? 24 : 15 + Math.random() * 13) * k * (L === 'night' && kind !== 'bang' ? 1.3 : 1), im = h('img', pxl ? 'fx px' : 'fx');
+    im.src = srcs[i % srcs.length]; im.alt = '';
+    const a = (spread[0] + (spread[1] - spread[0]) * (n > 1 ? i / (n - 1) : 0.5) + (Math.random() - 0.5) * 16) * Math.PI / 180;
+    const d = (dist[0] + Math.random() * (dist[1] - dist[0])) * k, dx = Math.cos(a) * d * (r ? -1 : 1), dy = Math.sin(a) * d;
+    box(im, (r ? el.offsetWidth - x : x) - s / 2, y - s / 2, s, kind === 'bang' ? s * (pxl ? 2.5 : 2) : s);
+    el.append(im);
+    const rot = pxl ? 0 : (Math.random() - 0.5) * 120;           // 像素图转起来就不是像素了
+    anim(im, [{ opacity: 0, transform: 'translate(0,0) scale(.2) rotate(0deg)' }, { opacity: 1, transform: `translate(${f(dx * 0.6)}px,${f(dy * 0.6)}px) scale(1.1) rotate(${f(rot * 0.6)}deg)`, offset: 0.35 }, { opacity: 1, transform: `translate(${f(dx * 0.9)}px,${f(dy * 0.9)}px) scale(1) rotate(${f(rot * 0.9)}deg)`, offset: 0.7 }, { opacity: 0, transform: `translate(${f(dx)}px,${f(dy + 10 * k)}px) scale(.7) rotate(${f(rot)}deg)` }], { duration: 900 + Math.random() * 300, delay: delay + i * 25, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'both' }).finished.then(() => im.remove());
+  }
+}
+// 落地时框后面荡开一圈光环
+function ring(el, color, delay, G, glow) {
+  const k = kOf(), r = st.side === 'r', s = G.hr * 2.9, x = G.hx, y = (el.offsetHeight - G.FH) / 2 + G.hy;
+  const o = h('div', 'fx ring');
+  box(o, (r ? el.offsetWidth - x : x) - s / 2, y - s / 2, s);
+  o.style.borderRadius = '50%'; o.style.zIndex = '2';
+  o.style.boxShadow = glow ? `0 0 ${px(14 * k)} ${px(3 * k)} ${color}, inset 0 0 ${px(10 * k)} ${px(2 * k)} ${color}, inset 0 0 0 ${px(1.5 * k)} rgba(255,255,255,.85)` : `0 0 0 ${px(3 * k)} ${color}, inset 0 0 0 ${px(2 * k)} rgba(255,255,255,.9)`;
+  el.prepend(o);
+  anim(o, [{ opacity: 0, transform: 'scale(.55)' }, { opacity: 1, transform: 'scale(.8)', offset: 0.2 }, { opacity: 0, transform: 'scale(1.45)' }], { duration: 700, delay, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'both' }).finished.then(() => o.remove());
+}
+// 大航海：一道光从气泡上扫过去
+function sheen(el, color, delay) {
+  const { bx } = el._parts, k = kOf();
+  const s = h('div', 'sheen'); s.innerHTML = '<i></i>';
+  const R = el._R || 40 * k;
+  box(s, 0, 0, bx.offsetWidth, bx.offsetHeight); s.style.borderRadius = st.side === 'r' ? `${px(R)} ${px(24 * k)} ${px(24 * k)} ${px(R)}` : `${px(24 * k)} ${px(R)} ${px(R)} ${px(24 * k)}`;
+  if (color) s.style.setProperty('--sh', color);
+  bx.append(s);
+  const from = st.side === 'r' ? 'translateX(330%) skewX(18deg)' : 'translateX(-140%) skewX(-18deg)', to = st.side === 'r' ? 'translateX(-140%) skewX(18deg)' : 'translateX(330%) skewX(-18deg)';
+  anim(s.firstChild, [{ transform: from }, { transform: to }], { duration: 950, delay, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'both' }).finished.then(() => s.remove());
+}
+
+// 夜空：一颗亮点拖着光尾沿头像框转一圈（框跟着「被点亮」）
+function trace(el, G, color, delay) {
+  const { fw } = el._parts, k = kOf(), s = (G.hr + 8 * k) * 2;
+  const o = box(h('img', 'fx'), G.hx - s / 2, G.hy - s / 2, s); o.alt = ''; o.src = icon(`trace-${color}`, () => traceSvg(color));
+  fw.append(o);
+  const turn = st.side === 'r' ? -1 : 1;
+  anim(o, [{ opacity: 0, transform: 'rotate(0deg)' }, { opacity: 1, offset: 0.12 }, { opacity: 1, offset: 0.82 }, { opacity: 0, transform: `rotate(${380 * turn}deg)` }], { duration: 760, delay, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'both' }).finished.then(() => o.remove());
+}
+// 夜空：几颗星星从四周飞过来，聚到框边上亮一下再消失
+function converge(el, G, n, delay, kind) {
+  const { fw } = el._parts, k = kOf(), srcs = fxSrcs(kind);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.6, r0 = G.hr * (2.3 + Math.random() * 0.8), r1 = G.hr * (1.16 + Math.random() * 0.14);
+    const s = (16 + Math.random() * 12) * k, x1 = G.hx + Math.cos(a) * r1, y1 = G.hy + Math.sin(a) * r1;
+    const dx = Math.cos(a) * (r0 - r1), dy = Math.sin(a) * (r0 - r1);
+    const o = box(h('img', 'fx'), x1 - s / 2, y1 - s / 2, s); o.alt = ''; o.src = srcs[i % srcs.length];
+    fw.append(o);
+    anim(o, [{ opacity: 0, transform: `translate(${f(dx)}px,${f(dy)}px) scale(.4) rotate(-120deg)` }, { opacity: 1, transform: 'translate(0,0) scale(1) rotate(0deg)', offset: 0.62 }, { opacity: 1, transform: 'scale(1.55)', offset: 0.78 }, { opacity: 0, transform: 'scale(0)' }], { duration: 860, delay: delay + i * 45, easing: 'cubic-bezier(.3,.6,.3,1)', fill: 'both' }).finished.then(() => o.remove());
+  }
+}
+// 夜空大航海：一颗流星从框上方斜着划过气泡
+function meteor(el, G, color, delay) {
+  const k = kOf(), r = st.side === 'r', W = el.offsetWidth, len = 170 * k;
+  const sx = G.F * 0.7, sy = -26 * k, ex = Math.min(W - 40 * k, sx + 420 * k), ey = el.offsetHeight * 0.55;
+  const x0 = r ? W - sx : sx, x1 = r ? W - ex : ex, ang = Math.atan2(ey - sy, x1 - x0) * 180 / Math.PI;
+  const o = box(h('img', 'fx'), x0 - len, sy - 8 * k, len, 16 * k); o.alt = ''; o.src = icon(`meteor-${color}`, () => meteorSvg(color));
+  o.style.transformOrigin = '100% 50%'; o.style.zIndex = '7';
+  el.append(o);
+  anim(o, [{ opacity: 0, transform: `translate(0,0) rotate(${f(ang)}deg) scaleX(.3)` }, { opacity: 1, transform: `translate(${f((x1 - x0) * 0.25)}px,${f((ey - sy) * 0.25)}px) rotate(${f(ang)}deg) scaleX(1)`, offset: 0.25 }, { opacity: 0, transform: `translate(${f(x1 - x0)}px,${f(ey - sy)}px) rotate(${f(ang)}deg) scaleX(.6)` }], { duration: 820, delay, easing: 'cubic-bezier(.4,0,.7,1)', fill: 'both' }).finished.then(() => o.remove());
+}
+// 像素：框四周的十字星「叮」地亮一下
+function blinkStars(el, G, n, delay) {
+  const { fw } = el._parts, k = kOf(), cs = ['#FFE7A8', '#FFFFFF', '#A9C8FF', '#FFB3D1'];
+  for (let i = 0; i < n; i++) {
+    const a = -150 + i * (300 / Math.max(1, n - 1)) + (Math.random() - 0.5) * 20, rr = G.hr * (1.45 + (i % 2) * 0.2);
+    const s = (i % 2 ? 12 : 17) * k, x = G.hx + Math.cos(a * Math.PI / 180) * rr, y = G.hy + Math.sin(a * Math.PI / 180) * rr;
+    const o = box(h('img', 'fx px'), x - s / 2, y - s / 2, s); o.alt = ''; o.src = icon(`p-plus-${cs[i % 4]}`, () => pixPlusSvg(cs[i % 4]));
+    fw.append(o);
+    anim(o, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1.3)', offset: 0.3 }, { opacity: 1, transform: 'scale(.7)', offset: 0.55 }, { opacity: 1, transform: 'scale(1)', offset: 0.75 }, { opacity: 0, transform: 'scale(.3)' }], { duration: 660, delay: delay + i * 90, fill: 'both' }).finished.then(() => o.remove());
+  }
+}
+
+// 大航海、主播的专属进场：同一个人 3 分钟内只放一次（常说话的舰长不会一直刷特效）；手动点按钮的不算
+const SPECIAL_GAP = 3 * 60 * 1000;
+const lastSpecial = new Map();
+function enter(el, force) {
+  const tier = el._tier, now = Date.now(), who = el._p.name;
+  const special = tier !== 'n' && (force || now - (lastSpecial.get(who) || -Infinity) > SPECIAL_GAP);
+  if (special) lastSpecial.set(who, now);
+  const sp = { special, guard: special && tier !== 'anchor' };
+  if (el._look === 'jelly') enterJelly(el, sp);
+  else if (el._look === 'night') enterNight(el, sp);
+  else if (el._look === 'porcelain') enterPorcelain(el, sp);
+  else if (el._look === 'pixel') enterPixel(el, sp);
+  else enterCream(el, sp);
+}
+// 字一行一行浮上来
+function textIn(el, d, dur = 300, kf = [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }]) {
+  for (const part of el._parts.bx.querySelectorAll(':scope > .who, :scope > .tx, :scope > .sticker')) { anim(part, kf, { duration: dur, delay: d, easing: OUT }); d += 70; }
+}
+// 进场第一秒：小八放大挡在框中间，冒出来做个小动作；然后跳到头像右下角坐好，头像同时亮出来
+const CAT_HOLD = 1150, CAT_T = 1700;
+function catIn(el, G, d0) {
+  const { cat: cw, win } = el._parts, k = kOf();
+  if (!cw) return;
+  // 原版：小八一直坐在右下角，进场时从头像后面探出来，头像一开始就在
+  if (st.intro === 'corner') {
+    const m = st.side === 'r' ? 1 : -1;
+    anim(cw, [{ opacity: 0, transform: `translate(${m * 18}%, 22%) scale(.35) rotate(${m * 20}deg)` }, { opacity: 1, transform: 'translate(0, -6%) scale(1.12)', offset: 0.55 }, { transform: 'scale(.96, 1.04)', offset: 0.78 }, { opacity: 1, transform: 'none' }], { duration: 520, delay: d0, easing: 'ease-out' });
+    const [kf2, dur2] = actKf(el._cat.act);
+    anim(cw.firstChild, kf2, { duration: dur2, delay: d0 + 540, easing: 'ease-in-out', fill: 'none' });
+    const fx2 = ACT_FX[el._cat.act];
+    if (fx2 === 'bang') burst(el, 'bang', G.ccx + G.sts * 0.3, G.ccy - G.sts * 0.6, 1, [-60, -60], [16, 16], d0 + 500);
+    else if (fx2) burst(el, fx2, G.ccx, G.ccy - G.sts * 0.3, fx2 === 'heart' ? 5 : 6, [-125, 5], [40, 84], d0 + 480);
+    return;
+  }
+  const s = G.big / G.sts, dx = G.bcx - G.ccx, dy = G.bcy - G.ccy, P = (ms) => ms / CAT_T;
+  const bigT = `translate(${f(dx)}px,${f(dy)}px) scale(${f(s)})`;
+  anim(cw, [
+    { offset: 0, opacity: 0, transform: `${bigT} translateY(30%) scale(.6)` },
+    { offset: P(300), opacity: 1, transform: `${bigT} translateY(-5%) scale(1.03)` },
+    { offset: P(460), opacity: 1, transform: bigT },
+    { offset: P(CAT_HOLD), opacity: 1, transform: bigT },
+    { offset: P(1420), opacity: 1, transform: `translate(${f(dx * 0.35)}px,${f(dy * 0.35 - 34 * k)}px) scale(${f(1 + (s - 1) * 0.3)})` },
+    { offset: P(1590), opacity: 1, transform: 'translateY(3%) scale(1.08, .92)' },
+    { offset: 1, opacity: 1, transform: 'none' },
+  ], { duration: CAT_T, delay: d0, easing: 'ease-in-out' });
+  const face = win.firstElementChild;
+  if (face) anim(face, [{ opacity: 0, transform: 'scale(.7)' }, { opacity: 0, transform: 'scale(.7)', offset: P(CAT_HOLD + 60) }, { opacity: 1, transform: 'scale(1.06)', offset: P(1480) }, { opacity: 1, transform: 'none' }], { duration: CAT_T, delay: d0, easing: 'ease-out' });
+  const [kf, dur] = actKf(el._cat.act);
+  anim(cw.firstChild, kf, { duration: Math.min(dur, CAT_HOLD - 480), delay: d0 + 470, easing: 'ease-in-out', fill: 'none' });
+  const fx = ACT_FX[el._cat.act];
+  if (fx === 'bang') burst(el, 'bang', G.F * 0.88, G.FH * 0.12, 1, [-60, -60], [16, 16], d0 + 460);
+  else if (fx) burst(el, fx, G.F * 0.78, G.FH * 0.18, fx === 'heart' ? 5 : 6, [-125, 5], [40, 84], d0 + 420);
+}
+const guardColor = (tier) => (tier === 1 ? 'gold' : tier === 2 ? 'purple' : 'blue');
+function crownDrop(el, delay) {
+  const crown = el._parts.fw.querySelector('.crown');
+  if (crown) anim(crown, [{ opacity: 0, transform: 'translateY(-70px) rotate(-30deg) scale(1.3)' }, { opacity: 1, transform: 'translateY(4px) rotate(6deg) scale(1)', offset: 0.55 }, { transform: 'translateY(-6px) rotate(-3deg)', offset: 0.75 }, { opacity: 1, transform: 'none' }], { duration: 760, delay, easing: 'ease-in' });
+}
+function ornPop(el, delay) {
+  for (const s of el._parts.fw.querySelectorAll('.orn.s1, .orn.s2')) anim(s, [{ opacity: 0, transform: 'scale(0) rotate(-120deg)' }, { opacity: 1, transform: 'scale(1.4) rotate(20deg)', offset: 0.6 }, { opacity: 1, transform: 'none' }], { duration: 520, delay: delay + (s.classList.contains('s2') ? 120 : 0), easing: 'ease-out' });
+}
+
+// ---------- 奶油贴纸：贴纸「啪」地拍上去，胶带压下来 ----------
+function enterCream(el, { special, guard }) {
+  const { fw, bw, tail, paw, deco } = el._parts, k = kOf(), r = st.side === 'r', G = geo(k);
+  const tier = el._tier;
+  const m = r ? -1 : 1, flip = r ? 'scaleX(-1) ' : '';
+  // 1. 头像框：普通观众像贴纸「啪」地拍上去；大航海转着进来
+  fw.style.transformOrigin = '50% 55%';
+  if (guard) anim(fw, [{ opacity: 0, transform: `rotate(${-140 * m}deg) scale(.3)` }, { opacity: 1, transform: `rotate(${10 * m}deg) scale(1.08)`, offset: 0.6 }, { transform: `rotate(${-3 * m}deg) scale(.98)`, offset: 0.82 }, { opacity: 1, transform: 'none' }], { duration: 640, easing: 'ease-out' });
+  else anim(fw, [{ opacity: 0, transform: `translateY(-10px) scale(1.4) rotate(${-14 * m}deg)` }, { opacity: 1, transform: `scale(.9) rotate(${3 * m}deg)`, offset: 0.42 }, { transform: `scale(1.05) rotate(${-1 * m}deg)`, offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 520, easing: 'ease-out' });
+  // 2. 气泡从框后面「展开」（外层管位移缩放，里面的字晚一点浮上来）
+  bw.style.transformOrigin = r ? '100% 60%' : '0 60%';
+  anim(bw, [{ opacity: 0, transform: `translateX(${-26 * m}px) scale(.55, .8)` }, { opacity: 1, transform: `translateX(${2 * m}px) scale(1.025, 1.01)`, offset: 0.62 }, { opacity: 1, transform: 'none' }], { duration: 480, delay: 90, easing: OUT });
+  textIn(el, 230);
+  // 3. 胶带拍下来、尾巴甩一下、爪子弹出来
+  const tr = `${flip}rotate(-9deg)`;
+  anim(deco, [{ opacity: 0, transform: `${flip}translate(-6px,-16px) rotate(-34deg) scale(1.6)` }, { opacity: 1, transform: `${flip}rotate(-5deg) scale(.94)`, offset: 0.6 }, { opacity: 1, transform: tr }], { duration: 360, delay: 330, easing: 'ease-out' });
+  anim(tail.firstChild, [{ transform: 'rotate(-50deg) scale(.6)' }, { transform: 'rotate(16deg) scale(1.05)', offset: 0.45 }, { transform: 'rotate(-8deg)', offset: 0.75 }, { transform: 'rotate(-4deg)' }], { duration: 760, delay: 300, easing: 'ease-out' });
+  anim(tail, [{ opacity: 0 }, { opacity: 1 }], { duration: 120, delay: 300 });
+  anim(paw, [{ opacity: 0, transform: `${flip}scale(0) rotate(-30deg)` }, { opacity: 1, transform: `${flip}scale(1.25) rotate(8deg)`, offset: 0.6 }, { opacity: 1, transform: `${flip}none` }], { duration: 420, delay: 420, easing: 'ease-out' });
+  // 4. 小八
+  catIn(el, G, 220);
+  // 5. 身份的专属效果
+  if (guard) {
+    burst(el, guardColor(tier), G.hx + G.hr * 0.4, G.hy - G.hr * 0.3, tier === 1 ? 14 : 10, [-140, 15], [70, 130], 420);
+    ring(el, tier === 1 ? 'rgba(255,200,80,.9)' : tier === 2 ? 'rgba(180,150,255,.9)' : 'rgba(120,170,255,.9)', 380, G);
+    sheen(el, TIER[tier].sheen, 520);
+    crownDrop(el, 560);
+    ornPop(el, 620);
+  } else if (special && tier === 'anchor') {
+    burst(el, 'heart', G.hx + G.hr * 0.4, G.hy - G.hr * 0.4, 8, [-140, 10], [56, 104], 420);
+    ring(el, 'rgba(255,150,190,.9)', 380, G);
+    sheen(el, 'rgba(255,220,235,.85)', 520);
+    const hs = el._parts.fw.querySelector('.orn'); if (hs) anim(hs, [{ opacity: 0, transform: 'scale(0)' }, { opacity: 1, transform: 'scale(1.35)', offset: 0.6 }, { opacity: 1, transform: 'none' }], { duration: 480, delay: 600, easing: 'ease-out' });
+  }
+}
+
+// ---------- 星月夜空：一道光把框描出来，星星从四周聚过来，月亮吊坠落下来晃一晃 ----------
+function enterNight(el, { special, guard }) {
+  const { fw, frm, bw, tail, paw, deco } = el._parts, k = kOf(), r = st.side === 'r', G = geo(k);
+  const tier = el._tier, m = r ? -1 : 1, flip = r ? 'scaleX(-1) ' : '', T = NT[tier];
+  // 1. 框先暗着浮现，光点转一圈，转过的地方亮起来
+  fw.style.transformOrigin = '50% 55%';
+  anim(fw, [{ opacity: 0, transform: 'scale(.84)' }, { opacity: 1, transform: 'scale(1.02)', offset: 0.55 }, { opacity: 1, transform: 'none' }], { duration: 620, easing: OUT });
+  anim(frm, [{ opacity: 0.12 }, { opacity: 0.12, offset: 0.15 }, { opacity: 1 }], { duration: 760, easing: 'ease-in' });
+  trace(el, G, T.light, 60);
+  // 2. 星星聚过来
+  converge(el, G, guard ? 9 : 6, 200, guard ? guardColor(tier) : tier === 'anchor' && special ? 'heart' : 'spark');
+  // 3. 气泡从框后面慢慢亮出来，字浮上来
+  bw.style.transformOrigin = r ? '100% 60%' : '0 60%';
+  anim(bw, [{ opacity: 0, transform: `translateX(${-22 * m}px) scaleX(.82)` }, { opacity: 1, transform: `translateX(${1 * m}px) scaleX(1.01)`, offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 620, delay: 180, easing: OUT });
+  textIn(el, 360, 420);
+  // 4. 月亮吊坠从上面落下来晃两下，尾巴扫一下，爪子亮出来
+  anim(deco, [{ opacity: 0, transform: `translateY(-28px) rotate(${-26 * m}deg)` }, { opacity: 1, transform: `translateY(2px) rotate(${16 * m}deg)`, offset: 0.45 }, { transform: `rotate(${-8 * m}deg)`, offset: 0.72 }, { opacity: 1, transform: 'none' }], { duration: 1000, delay: 480, easing: 'ease-out' });
+  anim(tail.firstChild, [{ transform: 'rotate(-46deg) scale(.7)' }, { transform: 'rotate(12deg) scale(1.04)', offset: 0.5 }, { transform: 'rotate(-4deg)' }], { duration: 820, delay: 420, easing: 'ease-out' });
+  anim(tail, [{ opacity: 0 }, { opacity: 1 }], { duration: 260, delay: 420 });
+  anim(paw, [{ opacity: 0, transform: `${flip}scale(.4)` }, { opacity: 1, transform: `${flip}scale(1.12)`, offset: 0.6 }, { opacity: 1, transform: `${flip}none` }], { duration: 520, delay: 560, easing: 'ease-out' });
+  // 5. 小八
+  catIn(el, G, 300);
+  // 6. 身份：流星划过、光环、金星撒开，总督的皇冠落下来
+  if (guard) {
+    meteor(el, G, T.light, 380);
+    burst(el, guardColor(tier), G.hx + G.hr * 0.4, G.hy - G.hr * 0.3, tier === 1 ? 12 : 8, [-140, 15], [70, 130], 640);
+    ring(el, T.main, 560, G, true);
+    sheen(el, 'rgba(210,225,255,.55)', 700);
+    crownDrop(el, 640);
+    ornPop(el, 720);
+  } else if (special && tier === 'anchor') {
+    meteor(el, G, '#FFC9DE', 380);
+    ring(el, T.main, 560, G, true);
+    sheen(el, 'rgba(255,215,235,.5)', 700);
+    const hs = el._parts.fw.querySelector('.orn'); if (hs) anim(hs, [{ opacity: 0, transform: 'scale(0)' }, { opacity: 1, transform: 'scale(1.35)', offset: 0.6 }, { opacity: 1, transform: 'none' }], { duration: 480, delay: 700, easing: 'ease-out' });
+  }
+}
+
+
+// ---------- 果冻玻璃：像果冻一样掉下来——压扁、弹起、晃两下停住；小八果冻耳朵跟着抖 ----------
+const JELLY = (dy) => [{ opacity: 0, transform: `translateY(${dy}px) scale(.82, .82)` }, { opacity: 1, transform: 'translateY(0) scale(1.1, .86)', offset: 0.38 }, { transform: 'scale(.95, 1.06)', offset: 0.6 }, { transform: 'scale(1.025, .975)', offset: 0.8 }, { opacity: 1, transform: 'none' }];
+function enterJelly(el, { special, guard }) {
+  const { fw, bw, bx, tail } = el._parts, k = kOf(), r = st.side === 'r', G = geo(k), tier = el._tier, J = JT[tier];
+  fw.style.transformOrigin = '50% 90%';
+  anim(fw, JELLY(-28), { duration: 640, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  bw.style.transformOrigin = r ? '100% 90%' : '0 90%';
+  anim(bw, JELLY(-20), { duration: 680, delay: 90, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  textIn(el, 300, 360);
+  const jc = bx.querySelector('.jcap');
+  if (jc) anim(jc, [{ transform: 'scale(1, .4)' }, { transform: 'scale(.94, 1.18)', offset: 0.35 }, { transform: 'scale(1.04, .9)', offset: 0.58 }, { transform: 'scale(.99, 1.04)', offset: 0.8 }, { transform: 'none' }], { duration: 760, delay: 260, easing: 'ease-out' });
+  anim(tail.firstChild, [{ transform: 'rotate(-40deg) scale(.7)' }, { transform: 'rotate(12deg) scale(1.05)', offset: 0.5 }, { transform: 'rotate(-4deg)' }], { duration: 760, delay: 380, easing: 'ease-out' });
+  anim(tail, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 380 });
+  catIn(el, G, 280);
+  if (guard) {
+    sheen(el, J.rim + 'CC', 520);
+    ring(el, J.rim, 460, G, true);
+    burst(el, guardColor(tier), G.hx + G.hr * 0.4, G.hy - G.hr * 0.3, tier === 1 ? 12 : 9, [-150, 20], [70, 140], 520);
+    crownDrop(el, 600);
+    ornPop(el, 680);
+  } else if (special && tier === 'anchor') {
+    sheen(el, '#FFD3E5CC', 520);
+    ring(el, J.rim, 460, G, true);
+    burst(el, 'heart', G.hx + G.hr * 0.4, G.hy - G.hr * 0.4, 8, [-140, 10], [56, 104], 520);
+  }
+}
+
+// ---------- 青花瓷：头像框像一只小青花盘转着落下来，气泡浮出，浪纹慢慢晕开，印章「啪」地盖上，中国结落下来晃一晃 ----------
+function enterPorcelain(el, { special, guard }) {
+  const { fw, bw, bx, tail, paw, deco } = el._parts, k = kOf(), r = st.side === 'r', G = geo(k);
+  const tier = el._tier, m = r ? -1 : 1, rot = r ? 6 : -6;
+  fw.style.transformOrigin = '50% 53%';
+  anim(fw, [{ opacity: 0, transform: `rotate(${-150 * m}deg) scale(.55)` }, { opacity: 1, transform: `rotate(${12 * m}deg) scale(1.04)`, offset: 0.62 }, { transform: `rotate(${-4 * m}deg) scale(.99)`, offset: 0.84 }, { opacity: 1, transform: 'none' }], { duration: 820, easing: 'cubic-bezier(.25,.8,.3,1)' });
+  bw.style.transformOrigin = r ? '100% 60%' : '0 60%';
+  anim(bw, [{ opacity: 0, transform: `translate(${-18 * m}px, 10px) scale(.92)` }, { opacity: 1, transform: 'none' }], { duration: 560, delay: 160, easing: OUT });
+  textIn(el, 320, 380);
+  const wv = bx.querySelector('.waves');
+  if (wv) anim(wv, [{ opacity: 0 }, { opacity: 0.2, offset: 0.3 }, { opacity: 1 }], { duration: 1100, delay: 420, easing: 'ease-out' });
+  // 印章：高高举起，盖下去压扁一下再弹回来
+  anim(paw, [{ opacity: 0, transform: `translateY(-30px) rotate(${rot - 18}deg) scale(1.9)` }, { opacity: 1, transform: `rotate(${rot}deg) scale(.86, .8)`, offset: 0.55 }, { transform: `rotate(${rot}deg) scale(1.06)`, offset: 0.78 }, { opacity: 1, transform: `rotate(${rot}deg)` }], { duration: 440, delay: 780, easing: 'cubic-bezier(.5,0,.6,1)' });
+  anim(deco, [{ opacity: 0, transform: `translateY(-30px) rotate(${-22 * m}deg)` }, { opacity: 1, transform: `translateY(2px) rotate(${14 * m}deg)`, offset: 0.45 }, { transform: `rotate(${-6 * m}deg)`, offset: 0.72 }, { opacity: 1, transform: 'none' }], { duration: 1000, delay: 520, easing: 'ease-out' });
+  anim(tail.firstChild, [{ transform: 'rotate(-46deg) scale(.7)' }, { transform: 'rotate(12deg) scale(1.04)', offset: 0.5 }, { transform: 'rotate(-4deg)' }], { duration: 820, delay: 460, easing: 'ease-out' });
+  anim(tail, [{ opacity: 0 }, { opacity: 1 }], { duration: 260, delay: 460 });
+  catIn(el, G, 300);
+  if (guard) {
+    burst(el, 'gold', G.hx + G.hr * 0.4, G.hy - G.hr * 0.3, tier === 1 ? 14 : 10, [-150, 20], [70, 140], 520);
+    ring(el, PCT[tier].trim || 'rgba(90,130,220,.85)', 460, G);
+    sheen(el, 'rgba(255,226,150,.75)', 640);
+    crownDrop(el, 640);
+    ornPop(el, 720);
+  } else if (special && tier === 'anchor') {
+    burst(el, 'heart', G.hx + G.hr * 0.4, G.hy - G.hr * 0.4, 8, [-140, 10], [56, 104], 520);
+    ring(el, 'rgba(230,120,160,.85)', 460, G);
+    sheen(el, 'rgba(255,220,235,.7)', 640);
+  }
+}
+
+// ---------- 像素小屋：一跳一跳地蹦出来（约 15 帧/秒），字像老屏幕一样闪两下，十字星「叮」一下 ----------
+function enterPixel(el, { special, guard }) {
+  const { fw, bw, tail, paw, deco } = el._parts, k = kOf(), r = st.side === 'r', G = geo(k);
+  const tier = el._tier, flip = r ? 'scaleX(-1) ' : '';
+  // 1. 框像游戏里的道具一样蹦出来
+  fw.style.transformOrigin = '50% 55%';
+  anim(fw, [{ opacity: 0, transform: 'scale(.2)' }, { opacity: 1, transform: 'scale(1.2)', offset: 0.5 }, { transform: 'scale(.92)', offset: 0.75 }, { opacity: 1, transform: 'none' }], { duration: 460 });
+  // 2. 气泡一截一截横着拉出来
+  bw.style.transformOrigin = r ? '100% 50%' : '0 50%';
+  anim(bw, [{ opacity: 0, transform: 'scale(.06, .4)' }, { opacity: 1, transform: 'scale(.18, 1)', offset: 0.2 }, { opacity: 1, transform: 'none' }], { duration: 460, delay: 140 });
+  // 3. 字闪两下再亮
+  textIn(el, 520, 330, [{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0.15, offset: 0.55 }, { opacity: 1 }]);
+  // 4. 吊坠掉下来弹一下、尾巴甩、爪子蹦出来
+  anim(deco, [{ opacity: 0, transform: 'translateY(-26px)' }, { opacity: 1, transform: 'translateY(4px)', offset: 0.6 }, { opacity: 1, transform: 'none' }], { duration: 400, delay: 540 });
+  anim(tail.firstChild, [{ transform: 'rotate(-40deg)' }, { transform: 'rotate(12deg)', offset: 0.5 }, { transform: 'rotate(0deg)' }], { duration: 520, delay: 480 });
+  anim(tail, [{ opacity: 0 }, { opacity: 1 }], { duration: 140, delay: 480 });
+  anim(paw, [{ opacity: 0, transform: `${flip}scale(0)` }, { opacity: 1, transform: `${flip}scale(1.3)`, offset: 0.6 }, { opacity: 1, transform: `${flip}none` }], { duration: 330, delay: 600 });
+  // 5. 小八跳出来
+  catIn(el, G, 260);
+  // 6. 十字星叮一下；大航海多几颗，再撒一把像素星、扫一道光，总督的皇冠掉下来
+  blinkStars(el, G, guard ? 6 : 3, 480);
+  if (guard) {
+    burst(el, guardColor(tier), G.hx + G.hr * 0.4, G.hy - G.hr * 0.3, tier === 1 ? 12 : 8, [-140, 15], [70, 130], 420);
+    sheen(el, 'rgba(255,255,255,.55)', 560);
+    crownDrop(el, 560);
+    ornPop(el, 640);
+  } else if (special && tier === 'anchor') {
+    burst(el, 'heart', G.hx + G.hr * 0.4, G.hy - G.hr * 0.4, 8, [-140, 10], [56, 104], 420);
+    sheen(el, 'rgba(255,220,235,.6)', 560);
+    const hs = el._parts.fw.querySelector('.orn'); if (hs) anim(hs, [{ opacity: 0, transform: 'scale(0)' }, { opacity: 1, transform: 'scale(1.35)', offset: 0.6 }, { opacity: 1, transform: 'none' }], { duration: 400, delay: 620 });
+  }
+}
+
+// ---------- 加一条：FLIP（旧的往上挪），最老的一条像贴纸一样被揭掉 ----------
+const chat = $('#chat');
+const log = [];
+function setLive() { const rows = [...chat.children].filter((r) => !r.dataset.out); rows.forEach((r, i) => r.classList.toggle('live', i === rows.length - 1)); rows.forEach((r, i) => { const age = rows.length - 1 - i; r.style.opacity = age >= 7 ? 0.55 : age >= 6 ? 0.8 : 1; }); }
+function add(p, text, sticker, quiet, force) {
+  log.push([p, text, sticker]); if (log.length > MAX) log.shift();
+  const before = new Map([...chat.children].map((r) => [r, r.getBoundingClientRect().top]));
+  const el = build(p, text, sticker);
+  chat.append(el);
+  layout(el);
+  ro.observe(el._parts.bx);
+  const sc = $('#stage').getBoundingClientRect().height / 1920;
+  const avail = $('#src').clientHeight;
+  const leaving = [];
+  let live = [...chat.children].filter((r) => !r.dataset.out);
+  while (live.length > 1 && (live.length > MAX || chat.offsetHeight > avail)) {
+    const old = live.shift(); old.dataset.out = '1'; leaving.push(old);
+    old.style.position = 'absolute'; old.style.left = st.side === 'r' ? 'auto' : '6px'; old.style.right = st.side === 'r' ? '6px' : 'auto';
+  }
+  const top0 = chat.getBoundingClientRect().top;
+  for (const old of leaving) {
+    old.style.top = `${(before.get(old) - top0) / sc}px`;
+    old.style.transformOrigin = st.side === 'r' ? '100% 0' : '0 0';
+    const m = st.side === 'r' ? -1 : 1;
+    anim(old, [{ opacity: old.style.opacity || 1, transform: 'none' }, { opacity: 0, transform: `translate(${-10 * m}px,-34px) rotate(${-5 * m}deg) scale(.92)` }], { duration: 460, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' }).finished.then(() => old.remove());
+  }
+  for (const [r, y0] of before) {
+    if (r.dataset.out) continue;
+    const dy = (y0 - r.getBoundingClientRect().top) / sc;
+    if (Math.abs(dy) > 0.5) anim(r, [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }], { duration: 480, easing: 'cubic-bezier(.22,1,.36,1)' });
+  }
+  setLive();
+  if (!quiet) enter(el, force);
+  return el;
+}
+function redraw() { const items = log.splice(0); chat.innerHTML = ''; idle = 0; for (const [p, t, s] of items) add(p, t, s, true); }
+
+// ---------- 自动来弹幕 ----------
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+let timer = 0;
+const GAP = { slow: [2600, 4000], mid: [1300, 2300], fast: [350, 750] };
+function randomOne() {
+  const r = Math.random();
+  if (r < 0.05) return add(ANCHOR, pick(['谢谢大家~', '欢迎新来的朋友[比心]', '下一首唱什么呀？']));
+  const p = pick(PEOPLE);
+  if (r < 0.1) return add(p, '', pick(STICKERS));
+  add(p, pick(LINES));
+}
+function loop() { clearTimeout(timer); if (st.paused) return; if (real.on) return realNext(); const [a, b] = GAP[st.speed]; timer = setTimeout(() => { randomOne(); loop(); }, (a + Math.random() * (b - a)) / speed()); }
+
+// ---------- 真实弹幕回放：最近一场直播的弹幕（已匿名：昵称换成「观众N」，头像是画的），按原来的间隔播 ----------
+const real = { on: false, items: null, i: 0 };
+const REAL_X = { slow: 1, mid: 3, fast: 10 };
+const realPeople = new Map();
+function realPerson(v) {
+  const key = v.name + '|' + v.guard;
+  if (!realPeople.has(key)) {
+    const n = +(v.name.match(/\d+/)?.[0] || 0);
+    realPeople.set(key, { name: v.name, guard: v.guard, mod: v.mod, anchor: v.anchor, face: face(n * 7 + 3), medal: v.medal?.level, medalName: v.medal?.name, medalC: v.medal?.colors, honorUrl: v.honor });
+  }
+  return realPeople.get(key);
+}
+async function realStart() {
+  if (!real.items) { try { real.items = (await (await fetch(`${A}real.json`, { cache: 'no-store' })).json()).items; } catch { real.items = []; } }
+  if (!real.items.length) { $('#realb').textContent = '没有数据'; return; }
+  real.on = true; real.i = +(new URLSearchParams(location.search).get('realat') || 0); st.paused = false; chat.innerHTML = ''; log.length = 0; sync(); realNext(true);
+}
+function realNext(first) {
+  clearTimeout(timer);
+  if (!real.on || st.paused) return;
+  const it = real.items[real.i % real.items.length], prev = real.items[(real.i - 1 + real.items.length) % real.items.length];
+  const gap = first || real.i % real.items.length === 0 ? 300 : Math.max(150, Math.min(6000, (it.ts - prev.ts) / REAL_X[st.speed]));
+  timer = setTimeout(() => {
+    add({ ...realPerson(it.v), emots: it.emots }, it.text, it.sticker?.url);
+    real.i++; $('#realb').textContent = `回放中 ${real.i % real.items.length || real.items.length}/${real.items.length}`;
+    realNext();
+  }, gap / speed());
+}
+
+// ---------- 控制面板 ----------
+function segs() {
+  const mk = (id, items, key, after) => { const el = $(id); el.innerHTML = ''; for (const [v, label, dis] of items) { const bt = h('button', st[key] === v ? 'on' : '', label); if (dis) { bt.disabled = true; bt.title = '奶油贴纸定下来以后再做'; } else bt.onclick = () => { st[key] = v; save(); sync(); if (after) after(); }; el.append(bt); } };
+  mk('#look', [['jelly', '果冻玻璃（新）'], ['porcelain', '青花瓷'], ['cream', '奶油贴纸'], ['night', '星月夜空'], ['pixel', '像素小屋']], 'look', redraw);
+  mk('#cframe', [['hachi', '小八风（新）'], ['lace', '格子花边（原来的）']], 'cframe', redraw);
+  $('#cfg').style.display = st.look === 'cream' ? '' : 'none';
+  mk('#intro', [['hop', '先在框中间露脸'], ['corner', '一直在右下角（原版）']], 'intro');
+  mk('#width', [['fit', '跟着内容'], ['uni', '统一宽度']], 'width', redraw);
+  mk('#bg', [['room', '暗'], ['light', '亮'], ['busy', '花哨'], ['clear', '透明格']], 'bg');
+  mk('#blur', [[false, '支持'], [true, '不支持']], 'noblur', relayout);
+  mk('#side', [['l', '左边'], ['r', '右边']], 'side', redraw);
+  mk('#size', [['std', '标准字号'], ['big', '大字号']], 'size', redraw);
+  mk('#speed', [['slow', '慢'], ['mid', '正常'], ['fast', '刷屏']], 'speed', loop);
+}
+function sync() {
+  segs();
+  document.body.classList.toggle('nofrost', !!st.noblur);
+  $('#stage').className = `stage sc-${st.bg}`;
+  $('#src').className = `src at-${st.side}`;
+  chat.classList.toggle('big', st.size === 'big');
+  for (const l of Object.keys(LOOKS)) chat.classList.toggle(`lk-${l}`, st.look === l);
+  $('#note').innerHTML = NOTES.common + NOTES[st.look];
+  chat.classList.toggle('uni', st.width === 'uni');
+  const a = alpha();
+  $('#bga').value = a; $('#bgav').textContent = `${a}%${st.bga == null ? '（默认）' : ''}`;
+  $('#bgaAuto').classList.toggle('on', st.bga == null);
+  $('#pause').textContent = st.paused ? '继续' : '暂停';
+  $('#pause').classList.toggle('on', st.paused); $('#slow').classList.toggle('on', st.slow);
+}
+// crop：只看弹幕那一块（对比页用），放大一些
+function fit() {
+  const v = $('#view'), fb = $('#frameBox'), s = $('#stage');
+  const R = new URLSearchParams(location.search).has('crop') ? { x: st.side === 'r' ? 400 : 0, y: 170, w: 680, h: 1070 } : { x: 0, y: 0, w: 1080, h: 1920 };
+  const k = Math.min((v.clientWidth - 24) / R.w, (v.clientHeight - 24) / R.h);
+  fb.style.width = `${R.w * k}px`; fb.style.height = `${R.h * k}px`; fb.style.overflow = 'hidden';
+  s.style.transform = `translate(${-R.x * k}px, ${-R.y * k}px) scale(${k})`;
+}
+const relayout = () => { for (const r of chat.children) { r._key = ''; layout(r); } };
+$('#bga').oninput = (e) => { st.bga = +e.target.value; save(); sync(); relayout(); };
+$('#bgaAuto').onclick = () => { st.bga = null; save(); sync(); relayout(); };
+const send = () => { const t = $('#say').value.trim(); if (!t) return; add(PEOPLE[1], t); $('#say').value = ''; };
+$('#send').onclick = send;
+$('#say').onkeydown = (e) => { if (e.key === 'Enter') send(); };
+for (const b of document.querySelectorAll('[data-k]')) b.onclick = () => {
+  const k = b.dataset.k;
+  if (k === 'anchor') add(ANCHOR, '谢谢大家的礼物[比心]', undefined, false, true);
+  else if (k === 'mod') add(PEOPLE[5], '大家文明发言哦');
+  else if (k === 'sticker') add(pick(PEOPLE.filter((p) => !p.guard)), '', pick(STICKERS));
+  else if (k === 'long') add(PEOPLE[3], LONG);
+  else if (k === 'longname') add(LONGNAME, '名字太长时末尾变成省略号');
+  else add(PEOPLE.find((p) => p.guard === +k), pick(['晚上好，来陪主播啦！', '今天的歌单好棒[鼓掌]', '冲冲冲！']), undefined, false, true);
+};
+function lineup() {
+  st.paused = true; sync(); loop(); log.length = 0; chat.innerHTML = '';
+  [[PEOPLE[4], '晚上好呀，来啦'], [PEOPLE[0], '哈哈哈哈哈笑死我了'], [PEOPLE[5], '大家文明发言哦'], [PEOPLE[6], '给你一朵小花~'], [PEOPLE[7], '这个也太可爱了吧！'], [PEOPLE[8], '今天的歌单好棒[鼓掌]'], [ANCHOR, '谢谢大家[比心]']].forEach(([p, t], i) => setTimeout(() => add(p, t, undefined, false, true), i * 700));
+}
+$('#lineup').onclick = lineup;
+$('#realb').onclick = () => { if (real.on) { real.on = false; $('#realb').textContent = '真实弹幕回放'; $('#realb').classList.remove('on'); loop(); } else { $('#realb').classList.add('on'); realStart(); } };
+$('#pause').onclick = () => { st.paused = !st.paused; sync(); loop(); };
+$('#slow').onclick = () => { st.slow = !st.slow; sync(); loop(); };
+$('#clear').onclick = () => { chat.innerHTML = ''; log.length = 0; };
+const cats = $('#cats');
+for (const [id, label, , sample] of CATS) { const b = h('button', '', `<img src="${catSrc(id)}" alt="">${label}`); b.title = sample; b.onclick = () => add(pick(PEOPLE.filter((p) => !p.guard)), sample); cats.append(b); }
+addEventListener('resize', fit);
+document.fonts?.ready.then(relayout);
+const q = new URLSearchParams(location.search);
+if (q.has('embed')) document.body.classList.add('embed');
+if (q.has('nofrost')) st.noblur = true;
+for (const key of ['look', 'intro', 'cframe', 'bg', 'side', 'size', 'speed', 'width']) if (q.has(key)) st[key] = q.get(key);
+if (!LOOKS[st.look]) st.look = 'cream';
+if (q.has('bga')) st.bga = +q.get('bga');
+sync(); fit();
+if (q.has('real')) $('#realb').click();
+else if (q.has('lineup')) lineup();
+else if (q.has('mix')) { st.paused = true; sync(); [[LONGNAME, '名字太长时末尾变成省略号'], [PEOPLE[3], LONG], [PEOPLE[1], '', STICKERS[0]], [PEOPLE[2], '呜呜呜好好听'], [PEOPLE[9], '无语……'], [PEOPLE[10], '卧槽！主播好可爱[比心]']].forEach(([p, t, k]) => add(p, t, k, true)); }
+else if (q.has('still')) { st.paused = true; sync(); [[PEOPLE[4], '晚上好呀，来啦'], [PEOPLE[0], '哈哈哈哈哈笑死我了'], [PEOPLE[5], '大家文明发言哦'], [PEOPLE[6], '给你一朵小花~'], [PEOPLE[7], '这个也太可爱了吧！'], [PEOPLE[8], '今天的歌单好棒[鼓掌]'], [ANCHOR, '谢谢大家[比心]']].forEach(([p, t]) => add(p, t, undefined, true)); }
+else {
+  [[PEOPLE[0], '晚上好，来陪主播啦！'], [PEOPLE[1], '今天也要开开心心'], [PEOPLE[2], '这个也太可爱了吧！'], [PEOPLE[3], '给你一朵小花~'], [PEOPLE[9], '哈哈哈哈哈哈']].forEach(([p, t], n) => setTimeout(() => add(p, t), 300 + n * 420));
+  setTimeout(loop, 2600);
+}
+</script>
+</body>
+</html>

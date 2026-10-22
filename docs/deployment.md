@@ -194,10 +194,10 @@ systemctl start starfall
   curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/chrismaxluo/starfall/main/deploy/starfall.sh | bash -s install
   ```
 
-  之后下载代码（安装和 `starfall update`）都会先直连 GitHub，连不上或太慢（连续 15 秒平均每秒不到 200KB）时自动依次换内置的几个公共加速站（gh-proxy.com、ghfast.top、gh.llkk.cc、ghproxy.net）。这些加速站是别人免费提供的，随时可能停用；自己找到能用的，可以加 `--mirror 地址` 让它排在最前面（`starfall update --mirror 地址` 会记下来，以后更新也先试它）。
-- **安全**：从加速站下载的代码，装之前会和 GitHub 核对版本，对不上就不装。连 GitHub 核对都连不上时也不装，确认信任这个加速站的话可以加 `--no-verify`。
+  之后下载代码（安装和 `starfall update`）都会先直连 GitHub，连不上或太慢（连续 15 秒平均每秒不到 200KB）时自动依次换：用 `--mirror` 指定的加速站、星临的备用下载地址（`https://dl.maasky.com/`，每次发布时自动上传代码包）、内置的几个公共加速站（gh-proxy.com、ghfast.top、gh.llkk.cc、ghproxy.net）。公共加速站是别人免费提供的，随时可能停用；自己找到能用的，可以加 `--mirror 地址` 让它排在最前面（`starfall update --mirror 地址` 会记下来，以后更新也先试它）。星临的备用下载地址里只有正式版本和 main，`starfall update dev` 要能连上 GitHub 或加速站。
+- **安全**：从加速站下载的代码，装之前会和 GitHub 核对版本，对不上就不装。连 GitHub 核对都连不上时也不装，确认信任这个加速站的话可以加 `--no-verify`。星临的备用下载地址是发布时自己上传的，不用核对。
 - **下载依赖慢**：没指定 `--registry` 时，会先测一下 npm 官方源，太慢或连不上就自动改用国内镜像 npmmirror（依赖文件都带校验值，换镜像不影响安全）。
-- GitHub 和加速站都连不上时，可以先在别处下载代码，用第 10.1 节的方法手动安装。
+- GitHub、备用下载地址和加速站都连不上时，可以先在别处下载代码，用第 10.1 节的方法手动安装。
 - **域名要备案**：境内服务器用域名开放 80、443 端口需要先完成 ICP 备案，没备案时只能用 `http://IP:端口` 访问。
 - **B 站连接**：境内外服务器都能正常连接 B 站直播间，无需特别设置。
 

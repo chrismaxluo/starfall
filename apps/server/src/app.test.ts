@@ -115,7 +115,10 @@ describe('桌面版（STARFALL_DESKTOP=1）', () => {
     expect((await req({ 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
     expect((await req({ 'sec-fetch-site': 'same-site' })).statusCode).toBe(403);
     expect((await req({ origin: 'null' })).statusCode).toBe(403);
-    expect((await req({ origin: 'https://evil.example' }, '/%61pi/playback/clear')).statusCode).toBe(403);
+    // 地址里任意字母写成 %xx 也绕不过（路由匹配前会解码）
+    for (const url of ['/%61pi/playback/clear', '/a%70i/playback/clear', '/ap%69/outputs/1/reset-key', '/api/%70layback/clear', '/%77s/admin']) {
+      expect((await req({ origin: 'https://evil.example' }, url)).statusCode, url).toBe(403);
+    }
     expect((await app.inject({ method: 'GET', url: '/ws/admin', headers: { host, origin: 'https://evil.example' } })).statusCode).toBe(403);
     // 同源页面、本机程序（没有 Origin）照常
     expect((await app.inject({ method: 'GET', url: '/api/outputs', headers: { host, origin: `http://${host}`, 'sec-fetch-site': 'same-origin' } })).statusCode).toBe(200);

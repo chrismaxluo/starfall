@@ -84,7 +84,14 @@ async function pickLyric(s: LocalSong, e: Event): Promise<void> {
   const f = input.files?.[0];
   input.value = '';
   if (!f) return;
-  const text = await f.text();
+  // 老的 .lrc 常是 GBK 编码：不是正常的 UTF-8 就按 GBK 读（和上传 .lrc 时一样），不然存下来全是乱码
+  const buf = await f.arrayBuffer();
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    text = new TextDecoder('gbk').decode(buf);
+  }
   const r = await attempt(() => put<{ song: LocalSong }>(`/api/music/local/${s.id}`, { lyric: text }), `《${s.title}》配上歌词了`);
   if (r) Object.assign(s, r.song);
 }

@@ -562,7 +562,8 @@ function redraw(): void {
 
 function applyConfig(next: OverlayConfig): void {
   const keys = ['giftsSize', 'giftsMax', 'giftsTitle', 'giftsLook', 'giftsMotion'] as const;
-  const redrawNeeded = keys.some((k) => next[k] !== config[k]) || (next.giftsSpeed === 'off') !== (config.giftsSpeed === 'off') || JSON.stringify(next.giftsFilter) !== JSON.stringify(config.giftsFilter);
+  // 关掉期间名单是隐藏的（量出来的高度是 0）：重新打开时也要重新排，不然滚动、翻页不对
+  const redrawNeeded = keys.some((k) => next[k] !== config[k]) || (next.giftsEnabled && !config.giftsEnabled) || (next.giftsSpeed === 'off') !== (config.giftsSpeed === 'off') || JSON.stringify(next.giftsFilter) !== JSON.stringify(config.giftsFilter);
   config = next;
   const lite = q.get('lite') === '1' || config.liteMode === 'on' || (config.liteMode === 'auto' && !env.blur);
   root.className = `gl-root look-${config.giftsLook} motion-${config.giftsMotion} side-${config.giftsSide}${config.giftsSize === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${config.giftsEnabled ? '' : ' off'}`;

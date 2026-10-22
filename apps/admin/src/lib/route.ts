@@ -23,9 +23,14 @@ addEventListener('hashchange', () => {
   lastHash = location.hash;
   route.value = parse();
 });
+/** 只在刷新、关闭页面时检查的没保存修改（素材设置这类弹窗：换页面时由弹窗自己处理） */
+export const unloadGuards = new Set<() => boolean>();
+const unsavedOnUnload = () => hasUnsaved() || [...unloadGuards].some((dirty) => dirty());
 addEventListener('beforeunload', (e) => {
-  if (hasUnsaved()) e.preventDefault();
+  if (unsavedOnUnload()) e.preventDefault();
 });
+// 桌面版退出、安装更新前先问一下页面有没有没保存的修改（直接关窗时 Electron 不会弹提示，只会悄悄取消退出）
+(window as unknown as { __starfallUnsaved?: () => boolean }).__starfallUnsaved = unsavedOnUnload;
 
 export function go(page: Page, sub = ''): void {
   location.hash = sub ? `${page}/${sub}` : page;

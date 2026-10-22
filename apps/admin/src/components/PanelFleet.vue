@@ -18,11 +18,19 @@ const loading = ref(false);
 let timer: ReturnType<typeof setTimeout> | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
 
+// 舰队名单读得慢（最多 40 页）：读的时候不重复发；期间要读的范围变了，读完再按最新的范围补读一次
+let again = false;
 async function load(): Promise<void> {
-  if (loading.value) return;
+  if (loading.value) return void (again = true);
   loading.value = true;
-  data.value = await get<FleetDto>(`/api/stats/fleet?scope=${props.scope}`).catch(() => data.value);
+  const scope = props.scope;
+  const r = await get<FleetDto>(`/api/stats/fleet?scope=${scope}`).catch(() => null);
   loading.value = false;
+  if (r && scope === props.scope) data.value = r;
+  if (again || scope !== props.scope) {
+    again = false;
+    return load();
+  }
   if (data.value) emit('summary', data.value.came.length, data.value.fleet?.total ?? null);
 }
 watch(() => [props.scope, state.status?.room?.roomId, state.status?.live.liveSince], () => void load());

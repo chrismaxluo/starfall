@@ -30,6 +30,12 @@ async function submit(): Promise<void> {
     await post('/api/auth/login', { password: password.value });
     state.value = 'ok';
     setTimeout(() => emit('done'), 520);
+    // 登录成功但后台没能打开（读取失败、浏览器没存下登录状态）：还停在这一页时恢复按钮，说明原因
+    setTimeout(() => {
+      if (state.value !== 'ok') return;
+      state.value = 'idle';
+      error.value = '密码是对的，但没能打开后台（网络不稳或浏览器没保存登录状态），请再试一次';
+    }, 4000);
   } catch (e) {
     state.value = 'idle';
     error.value = e instanceof ApiError && e.status === 429 ? '尝试次数太多，请 1 分钟后再试' : e instanceof Error ? e.message : String(e);

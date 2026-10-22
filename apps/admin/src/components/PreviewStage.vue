@@ -75,8 +75,8 @@ function geom(): { stage: Rect; media: Rect | null; base: Rect | null; pos: Posi
   const pos = (POSITIONS.find((p) => slot?.classList.contains(`pos-${p}`)) ?? 'center') as Position;
   if (!m || !slot) return { stage, media: null, base: null, pos };
   const media = map(m.getBoundingClientRect());
-  // 挪动写在 .slot 的 translate 上（画布像素），大小写在 .media 的 data-k 上
-  const [tx = 0, ty = 0] = slot.style.translate.split(' ').map((x) => parseFloat(x) || 0);
+  // 挪动写在 .slot 的 transform: translate(x, y) 上（画布像素），大小写在 .media 的 data-k 上
+  const [tx = 0, ty = 0] = (/translate\(([^,]+),\s*([^)]+)\)/.exec(slot.style.transform)?.slice(1) ?? []).map((x) => parseFloat(x) || 0);
   const s = st.offsetWidth ? stage.w / st.offsetWidth : 1;
   const unmoved = { ...media, x: media.x - tx * s, y: media.y - ty * s };
   return { stage, media, base: scaleRect(unmoved, 1 / (Number(m.dataset.k) || 1), pos), pos };

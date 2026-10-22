@@ -26,6 +26,8 @@ import type { ViewerStore } from './viewers.ts';
 /** 会触发特效的事件（醒目留言现在只记录） */
 export type TriggerEvent = Exclude<StdEvent, { kind: 'live' | 'sc' }>;
 /** 醒目留言编号记多久（同一条可能推送两次） */
+/** 有全屏动画、还没读到的礼物马上要播时，最多等多久把动画读好 */
+const FX_WAIT_MS = 2000;
 const SC_DEDUPE_MS = 10 * 60_000;
 /** 欢迎语变量（除观众以外） */
 export type Vars = Omit<TextVars, 'viewer'> & {
@@ -133,7 +135,7 @@ export interface PipelineDeps {
   /** 查礼物图；测试里可以不传 */
   gifts?: Pick<GiftCatalog, 'find'>;
   /** 查 B站礼物全屏动画；测试里可以不传 */
-  giftFx?: Pick<GiftEffects, 'forGift'>;
+  giftFx?: Pick<GiftEffects, 'forGift'> & Partial<Pick<GiftEffects, 'waitFor'>>;
   /** 查荣耀等级勋章图；测试里可以不传 */
   honor?: Pick<HonorMedals, 'urlFor'>;
   room: RoomStore;
@@ -162,6 +164,11 @@ export class Pipeline {
   private combo = new GiftComboMerger();
   private guards = new GuardDeduper();
   private unsubscribeRoom: (() => void) | null = null;
+  /** 在等官方动画读好的礼物（按收到的顺序）；后到的礼物排在它们后面，不会抢先播、先记 */
+  private held: TriggerEvent[] = [];
+  private heldChain: Promise<void> = Promise.resolve();
+  /** 停止、换直播间时加一：之前在等的礼物读好后不再处理 */
+  private heldGen = 0;
   private readonly cooldowns = new Cooldowns();
   private readonly once = new OncePerLive();
   private readonly queue = new PlayQueue<Queued>();
@@ -176,6 +183,8 @@ export class Pipeline {
   readonly giftBoards: GiftBoards;
   private unsubscribeOutputs: (() => void) | null = null;
   private seq = 0;
+  private recordWarnAt = 0;
+  private readonly faceMemo = new Map<number, { face: string; at: number }>();
   private readonly dayFmt: Intl.DateTimeFormat;
 
   constructor(deps: PipelineDeps) {
@@ -205,8 +214,9 @@ export class Pipeline {
     this.guard('恢复送礼名单', () => this.giftBoards.restore());
     this.unsubscribeOutputs = this.d.outputs.onChange((o, change) => this.guard('更新送礼名单', () => this.giftBoards.outputChanged(o, change)));
     this.unsubscribe = this.d.live.onEvent((ev, raw) => this.handle(ev, raw));
-    // 换了直播间：还在合并中（等待中的进场、连击中的礼物、等待确认的上舰）属于上一个直播间，丢掉，不要记到新直播间名下
+    // 换了直播间：还在合并中（等待中的进场、连击中的礼物、在等官方动画的礼物、等待确认的上舰）属于上一个直播间，丢掉，不要记到新直播间名下
     this.unsubscribeRoom = this.d.room.onChange(() => {
+      this.dropHeld();
       this.merger = new EnterMerger();
       this.combo = new GiftComboMerger();
       this.guards = new GuardDeduper();
@@ -235,6 +245,13 @@ export class Pipeline {
     this.flushTimer = null;
     if (this.current) clearTimeout(this.current.timer);
     this.current = null;
+    // 还在合并中的礼物连击、上舰、进场：记下来（不播），不然这份礼物不进事件记录和送礼名单
+    for (const e of [...this.dropHeld(), ...this.combo.flush(Infinity), ...this.guards.flush(Infinity), ...this.merger.flush(Infinity)]) {
+      this.guard('记下合并中的事件', () => {
+        const j = this.judge(e);
+        this.record(e, j.hit, j.status === 'queued' ? 'cleared' : j.status);
+      });
+    }
     // 还在排队的没有播出来：写明原因（服务重启后不会被当作本场已播）
     for (const q of this.queue.clear()) this.unplayed(q, 'cleared');
   }
@@ -254,7 +271,8 @@ export class Pipeline {
     if (ev.kind === 'live') return;
     const now = this.now();
     if (raw !== undefined) this.raws.set(ev.id, { raw, at: now });
-    this.remember(ev.viewer);
+    // 写数据库出错（例如磁盘满）时只写日志：不能拦住特效、弹幕列表和送礼名单
+    this.guard('记住观众', () => this.remember(ev.viewer));
     switch (ev.kind) {
       case 'enter':
         for (const e of this.merger.push(ev, now)) this.process(e);
@@ -263,7 +281,10 @@ export class Pipeline {
         const g = this.d.giftRules.get();
         this.combo.windowMs = g.comboSec * 1000;
         this.combo.enabled = g.comboEnabled;
-        for (const e of this.combo.push(ev, now)) this.process(e);
+        // 有 B 站全屏动画、还没读到的礼物（盲盒里爆出的权杖这类不在礼物面板上，启动时不会提前读）：一收到就开始读，
+        // 连击合并要等几秒，一般来得及；马上就要播的最多等 2 秒，第一次也能用上官方动画
+        const loading = this.d.giftFx?.waitFor?.(this.d.gifts?.find(ev.giftId), FX_WAIT_MS) ?? null;
+        this.gifts(this.combo.push(ev, now), loading);
         break;
       }
       case 'guard':
@@ -289,11 +310,39 @@ export class Pipeline {
   }
   private readonly scSeen = new Map<string, number>();
 
+  /** 处理礼物：loading 不为空（官方动画还在读）或前面还有在等的礼物时，排在后面等它们处理完 */
+  private gifts(evs: TriggerEvent[], loading: Promise<void> | null): void {
+    if (!loading && !this.held.length) {
+      for (const e of evs) this.process(e);
+      return;
+    }
+    if (!evs.length) return;
+    const gen = this.heldGen;
+    this.held.push(...evs);
+    this.heldChain = this.heldChain
+      .then(() => loading ?? undefined)
+      .then(() => {
+        if (gen !== this.heldGen) return;
+        for (const e of evs) {
+          this.held.splice(this.held.indexOf(e), 1);
+          this.guard('处理礼物', () => this.process(e));
+        }
+      });
+  }
+
+  /** 取出还在等的礼物，之后读好了也不再处理 */
+  private dropHeld(): TriggerEvent[] {
+    this.heldGen++;
+    const evs = this.held;
+    this.held = [];
+    return evs;
+  }
+
   /** 取出等待超时的进场、连击结束的礼物、单独到达的 GUARD_BUY（定时调用） */
   flush(): void {
     const now = this.now();
     for (const e of this.merger.flush(now)) this.process(e);
-    for (const e of this.combo.flush(now)) this.process(e);
+    this.gifts(this.combo.flush(now), null);
     for (const e of this.guards.flush(now)) this.process(e);
     this.giftBoards.sync();
     for (const [id, r] of this.raws) if (now - r.at > RAW_TTL_MS) this.raws.delete(id);
@@ -305,23 +354,24 @@ export class Pipeline {
   /** 送礼名单的一条：付费礼物（连击合成后的）、上舰、醒目留言；免费礼物不算 */
   giftListItem(ev: GiftEvent | GuardEvent | ScEvent): GiftListItem | null {
     const v = ev.viewer;
-    const face = v.face || this.d.viewers.cached(v.uid)?.face || '';
+    const face = v.face || this.cachedFace(v.uid);
     const base = { id: ev.id, ts: ev.ts, viewer: { uid: v.uid, name: v.name, ...(face ? { face } : {}), guard: v.guard } };
     if (ev.kind === 'gift') {
       const value = ev.unitPrice * ev.count;
       if (!ev.paid || value <= 0) return null;
-      const g = this.giftOf({ giftId: ev.giftId, ...(ev.icon ? { giftImg: ev.icon } : {}) });
-      return { ...base, kind: 'gift', value, gift: { id: ev.giftId, name: ev.giftName, count: ev.count, ...(g.img ? { img: g.img } : {}) } };
+      // 只要礼物图，不查全屏动画（装一个月的名单时一条条查会很慢，还会去拉动画）
+      const img = this.giftImgOf(ev.giftId, ev.icon);
+      return { ...base, kind: 'gift', value, gift: { id: ev.giftId, name: ev.giftName, count: ev.count, ...(img ? { img } : {}) } };
     }
     if (ev.kind === 'guard') return { ...base, kind: 'guard', value: ev.priceGold ?? 0, guard: { level: ev.level, months: ev.months, op: ev.op } };
     return { ...base, kind: 'sc', value: Math.round(ev.priceYuan * 1000), sc: { text: ev.text, price: ev.priceYuan } };
   }
 
   /** 推给送礼名单：编号用事件记录的编号（和服务重启后从记录里装回来的一样，挂上的记录也认得） */
-  private pushGift(ev: GiftEvent | GuardEvent | ScEvent, eventId: number): void {
+  private pushGift(ev: GiftEvent | GuardEvent | ScEvent, eventId: number | null): void {
     this.guard('推送送礼名单', () => {
       const item = this.giftListItem(ev);
-      if (item) this.giftBoards.push({ ...item, id: `log-${eventId}` });
+      if (item) this.giftBoards.push({ ...item, id: eventId ? `log-${eventId}` : `ev-${ev.id}` });
     });
   }
 
@@ -341,6 +391,7 @@ export class Pipeline {
         anchor: anchorUid > 0 && v.uid === anchorUid,
         ...(v.medal && v.medal.level > 0 ? { medal: { name: v.medal.name, level: v.medal.level, own: isOwnMedal(v, anchorUid), ...(v.medal.colors ? { colors: v.medal.colors } : {}) } } : {}),
         ...(v.honor ? { honor: honorOf(v.honor, this.d.honor?.urlFor(v.honor)) } : {}),
+        ...(this.d.blacklist.reason(v.uid) === 'list' ? { blocked: true as const } : {}),
       },
       text: ev.text,
       ...(ev.emots ? { emots: ev.emots } : {}),
@@ -358,10 +409,20 @@ export class Pipeline {
     this.d.viewers.remember({ uid: v.uid, name: v.name, face: v.face ?? '', ...(v.honor ? { honor: v.honor } : {}) }, roomId ? { level: v.guard, roomId } : undefined);
   }
 
-  private record(ev: TriggerEvent | Extract<StdEvent, { kind: 'sc' }>, hit: Judgement['hit'], status: PlayStatus): number {
+  /** 写事件记录；写不进（例如磁盘满）时返回 null，照样往下播（每分钟最多写一次日志） */
+  private record(ev: TriggerEvent | Extract<StdEvent, { kind: 'sc' }>, hit: Judgement['hit'], status: PlayStatus): number | null {
     const raw = this.raws.get(ev.id)?.raw;
     this.raws.delete(ev.id);
-    return this.d.log.record(ev, { roomId: this.d.room.get()?.roomId ?? null, sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
+    try {
+      return this.d.log.record(ev, { roomId: this.d.room.get()?.roomId ?? null, sessionId: this.d.live.status().sessionId, rule: hit?.label ?? null, effectId: hit?.effectId ?? null, status, raw }).id;
+    } catch (e) {
+      const now = this.now();
+      if (now - this.recordWarnAt > 60_000) {
+        this.recordWarnAt = now;
+        console.error('[播放调度] 写事件记录出错（特效照常播）：', e);
+      }
+      return null;
+    }
   }
 
   // ---------- 判断 ----------
@@ -525,10 +586,27 @@ export class Pipeline {
   /** 礼物图（设置里选了动图并且有动图时用动图）和 B站全屏动画 */
   private giftOf(vars: Vars): { img?: string; fx?: GiftFxHit } {
     const g = vars.giftId ? this.d.gifts?.find(vars.giftId) : undefined;
-    const anim = this.d.settings.get('giftAnimImg') ? g?.webp || g?.gif : undefined;
-    const img = anim || g?.icon || vars.giftImg;
+    const img = this.giftImgOf(vars.giftId, vars.giftImg);
     const fx = this.d.giftFx?.forGift(g);
     return { ...(img ? { img } : {}), ...(fx ? { fx } : {}) };
+  }
+
+  /** 礼物图：打开了动图礼物图时用动图，没有就用礼物面板的图，再没有用消息里带的 */
+  private giftImgOf(giftId: number | undefined, fallback: string | undefined): string | undefined {
+    const g = giftId ? this.d.gifts?.find(giftId) : undefined;
+    const anim = this.d.settings.get('giftAnimImg') ? g?.webp || g?.gif : undefined;
+    return anim || g?.icon || fallback;
+  }
+
+  /** 消息里没带头像时用记下的（短时间内记住查过的，装名单时同一个人的很多条不用每条都查一次） */
+  private cachedFace(uid: number): string {
+    const now = this.now();
+    const hit = this.faceMemo.get(uid);
+    if (hit && now - hit.at < 60_000) return hit.face;
+    if (this.faceMemo.size > 5000) this.faceMemo.clear();
+    const face = this.d.viewers.cached(uid)?.face ?? '';
+    this.faceMemo.set(uid, { face, at: now });
+    return face;
   }
 
   private playItem(effect: EffectDto, viewer: Viewer, kind: TriggerKind, vars: Vars = {}, test = false): PlayItem {
@@ -611,7 +689,7 @@ export class Pipeline {
   private play(q: QueueItem<Queued>): void {
     const { item, eventId } = q.payload;
     this.d.hub.toOverlays({ type: 'play', item });
-    if (eventId) this.d.log.setStatus(eventId, 'played');
+    if (eventId) this.guard('更新事件记录', () => this.d.log.setStatus(eventId, 'played'));
     const timer = setTimeout(() => {
       this.current = null;
       this.guard('播放下一个', () => {
@@ -625,7 +703,8 @@ export class Pipeline {
   /** 排队的特效没播出来：写明原因，并撤销冷却 / 每场一次的记录（下次还能播） */
   private unplayed(q: QueueItem<Queued>, status: PlayStatus): void {
     q.payload.undo?.();
-    if (q.payload.eventId) this.d.log.setStatus(q.payload.eventId, status);
+    const eventId = q.payload.eventId;
+    if (eventId) this.guard('更新事件记录', () => this.d.log.setStatus(eventId, status));
   }
 
   /** 紧急暂停：立即停止画面、清空队列；暂停期间的事件照常记录（F-PL-05） */
@@ -642,8 +721,9 @@ export class Pipeline {
   }
 
   /** 跳过正在播的特效，马上播下一个 */
-  skip(): boolean {
-    if (!this.current) return false;
+  /** 跳过正在播的；带 id 时只在正在播的还是这一个时才跳（双击「跳过」不会把下一个也跳掉） */
+  skip(id?: string): boolean {
+    if (!this.current || (id !== undefined && this.current.q.id !== id)) return false;
     this.stopCurrent();
     this.pump();
     this.emitQueue();

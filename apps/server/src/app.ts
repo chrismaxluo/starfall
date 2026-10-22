@@ -86,8 +86,15 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   if (ctx.config.desktop) {
     app.addHook('onRequest', async (req) => {
       if (!isLocalHost(req.headers.host)) throw new HttpError(403, 'forbidden', '只能用本机地址访问');
-      const p = req.url.toLowerCase();
-      if (!p.startsWith('/api') && !p.startsWith('/%') && !p.startsWith('/ws/')) return;
+      // 路由匹配前会解码 %xx（/a%70i/... 也会匹配到 /api/...）：按匹配到的路由和解码后的地址判断，解不开的一律当作接口
+      const route = req.routeOptions.url ?? '';
+      let p: string;
+      try {
+        p = decodeURIComponent(req.url.split('?')[0]!).toLowerCase();
+      } catch {
+        p = '/api';
+      }
+      if (!route.startsWith('/api') && !route.startsWith('/ws/') && !p.startsWith('/api') && !p.startsWith('/ws/')) return;
       const origin = req.headers.origin;
       const site = req.headers['sec-fetch-site'];
       if ((origin && !sameHost(origin, req.headers.host)) || (site && site !== 'same-origin' && site !== 'none')) throw new HttpError(403, 'forbidden', '不接受其他网站的请求');

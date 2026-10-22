@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // 送礼名单「只要这几种礼物」：从直播间礼物面板里点选礼物种类（按礼物编号，名字只用来显示）
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useGiftCatalog } from '../lib/gift-catalog.ts';
+import { useGiftSearch } from '../lib/gift-search.ts';
 import { battery } from '../lib/preview.ts';
 import type { GiftConfig } from '../lib/types.ts';
 import GiftCatalogError from './GiftCatalogError.vue';
@@ -27,11 +28,20 @@ const groups = computed(() => {
     if (!tabs.has(g.tab)) tabs.set(g.tab, []);
     tabs.get(g.tab)!.push(g);
   }
-  return [...tabs].map(([tab, list]) => ({ title: tab, list: list.sort((a, b) => a.panel! - b.panel!) }));
+  const out = [...tabs].map(([tab, list]) => ({ title: tab, list: list.sort((a, b) => a.panel! - b.panel!) }));
+  // 打字搜索时：礼物面板上没有的（盲盒里爆出的、活动礼物等），在全站礼物里找到的
+  const more = [...catalog.value.filter((g) => g.paid && !g.tab && q.value && g.name.includes(q.value)), ...found.value];
+  if (more.length) out.push({ title: `礼物面板上没有的（${more.length}）`, list: more });
+  return out;
 });
-const iconOf = (id: number) => catalog.value.find((g) => g.id === id)?.icon;
+// 打字搜索时也在全站礼物里找
+const { extra: found, searching } = useGiftSearch(q, () => catalog.value);
+/** 选过的、面板上没有的礼物：记住礼物图 */
+const seen = reactive(new Map<number, string>());
+const iconOf = (id: number) => catalog.value.find((g) => g.id === id)?.icon ?? seen.get(id);
 
-function toggle(g: { id: number; name: string }): void {
+function toggle(g: { id: number; name: string; icon?: string }): void {
+  if (g.icon) seen.set(g.id, g.icon);
   const on = chosen.value.has(g.id);
   emit('change', on ? props.modelValue.filter((x) => x.id !== g.id) : [...props.modelValue, { id: g.id, name: g.name }], on ? `不再显示「${g.name}」` : `会显示「${g.name}」`);
 }
@@ -45,13 +55,14 @@ function toggle(g: { id: number; name: string }): void {
       <button v-else class="btn" type="button" :aria-expanded="picking" @click="picking = !picking"><Icon :name="picking ? 'i-chev' : 'i-plus'" />{{ picking ? '收起' : modelValue.length ? '再选几种' : '选礼物' }}</button>
     </div>
     <div v-if="picking && !catalogErr" class="rl-gpick">
-      <div class="h"><input v-model.trim="q" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板；点一下选上，再点一下取消</span></div>
+      <div class="h"><input v-model.trim="q" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板；打字搜索时也会在 B 站全站礼物里找（盲盒里爆出的、活动礼物等）。点一下选上，再点一下取消</span></div>
       <div class="grid">
         <template v-for="grp in groups" :key="grp.title">
           <div class="sep">{{ grp.title }}</div>
           <button v-for="g in grp.list" :key="g.id" type="button" :class="{ on: chosen.has(g.id) }" :aria-pressed="chosen.has(g.id)" @click="toggle(g)"><img :src="g.icon" alt="" referrerpolicy="no-referrer" /><b>{{ g.name }}</b><span>{{ battery(g.price) }}</span></button>
         </template>
-        <span v-if="!groups.length" class="hint">没有可选的礼物</span>
+        <span v-if="searching" class="hint">正在全站礼物里找…</span>
+        <span v-else-if="!groups.length" class="hint">{{ q ? '没有找到这个礼物' : '没有可选的礼物' }}</span>
       </div>
     </div>
   </div>

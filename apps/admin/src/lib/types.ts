@@ -1,5 +1,5 @@
 // 接口返回的数据格式（与服务端 apps/server 的返回值一致）
-import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, GiftsFilter, GiftsLook, GiftsMotion, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
+import type { DanmuRule, DanmuWho, Effect, EnterRules, Exclusive, GiftBand, GiftRules, GiftSpecific, ChatCreamFrame, ChatLook, ChatMascot, GiftsFilter, GiftsLook, GiftsMotion, GuardLevel, GuardRules, HonorBand, Medal, MedalBand, OverlayConfig, PlayStatus, QuickButton, Tier, TierRule, TriggerKind, Viewer } from '@starfall/shared';
 
 export type { Tier, TierRule, HonorBand, MedalBand, PlayStatus, TriggerKind, Viewer, Medal, GuardLevel, OverlayConfig, DanmuRule, DanmuWho, GiftRules, GiftBand, GiftSpecific, GuardRules, QuickButton };
 
@@ -68,6 +68,13 @@ export interface OutputDto {
   chatMax: number;
   /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示 */
   chatFadeSec: number;
+  /** 外观；主题外观的大航海头像框、小八怎么出场、奶油贴纸的头像框、气泡浓淡（0 = 跟随外观）；黑名单的人不显示 */
+  chatLook: ChatLook;
+  chatGuardFrame: 'theme' | 'bili';
+  chatMascot: ChatMascot;
+  chatCreamFrame: ChatCreamFrame;
+  chatAlpha: number;
+  chatHideBlocked: boolean;
   giftsEnabled: boolean;
   giftsSide: 'left' | 'right';
   giftsSize: 'normal' | 'large';
@@ -107,6 +114,8 @@ export interface LiveStatus {
   reason: 'ok' | 'no_room' | 'not_logged_in' | 'offline';
   /** B站说登录已失效，要重新扫码 */
   loginInvalid?: boolean;
+  /** 查开播状态一直失败（被 B 站风控、网络不通）：从什么时候开始、原因 */
+  checkError?: { since: number; text: string } | null;
   adminCount: number;
 }
 
@@ -180,6 +189,8 @@ export interface GiftConfig {
   tab?: string;
   /** 在这一页里的位置 */
   panel?: number;
+  /** B站全屏动画的编号（有动画的大礼物才有） */
+  effectId?: number;
 }
 
 export interface EventDto {

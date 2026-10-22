@@ -26,9 +26,9 @@ import { pauseOnly, togglePause } from './lib/actions.ts';
 import { get, post, setUnauthorizedHandler } from './lib/api.ts';
 import { desktop } from './lib/desktop.ts';
 import type { FxHint } from './lib/desktop.ts';
-import { duration } from './lib/format.ts';
+import { clock as clockText, duration } from './lib/format.ts';
 import { startLive, stopLive } from './lib/live.ts';
-import { go, route } from './lib/route.ts';
+import { confirmLeave, go, route } from './lib/route.ts';
 import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
 import { loadMusic, neteaseIssues } from './lib/music.ts';
@@ -80,6 +80,8 @@ setUnauthorizedHandler(() => {
 });
 
 async function logout(): Promise<void> {
+  // 有没保存的修改：先问一下（退出图标就在主题按钮旁边，容易点错）
+  if (!confirmLeave()) return;
   await attempt(() => post('/api/auth/logout'));
   stopLive();
   state.authed = false;
@@ -115,12 +117,18 @@ watch(
 );
 
 /** 顶栏的连接状态：只写短词，完整原因放在鼠标悬停提示里 */
+/** 查开播状态连着失败 3 分钟以上（偶尔一次不算） */
+const checkFailing = computed(() => {
+  const e = state.status?.live.checkError;
+  return Boolean(e && now.value - e.since >= 3 * 60_000);
+});
 const conn = computed((): { cls: string; text: string; title?: string } => {
   const l = state.status?.live;
   if (!state.wsOnline) return wsDownLong.value ? { cls: 'warn', text: '和星临的连接断了' } : { cls: 'off', text: '正在连接…' };
   if (!l) return { cls: 'off', text: '…' };
   if (l.reason === 'no_room') return { cls: 'warn', text: '未设置直播间' };
   if (l.reason === 'not_logged_in') return { cls: 'warn', text: '未登录 B站' };
+  if (l.reason === 'offline' && checkFailing.value) return { cls: 'warn', text: '查不到开播状态', title: l.checkError!.text };
   if (l.reason === 'offline') return { cls: 'off', text: '待机 · 开播后自动连接' };
   if (l.loginInvalid) return { cls: 'warn', text: 'B站登录失效', title: l.connectionDetail ?? undefined };
   if (l.connection === 'connected') return { cls: '', text: '已连接' };
@@ -168,6 +176,7 @@ const alerts = computed((): Alert[] => {
   if (s.live.loginInvalid) out.push({ key: 'login', level: 'red', title: 'B站登录失效了', text: '收不到直播间的消息，特效不会播放。扫码重新登录就能恢复。', action: rescan });
   else if (days !== null && days < 0) out.push({ key: 'login', level: 'red', title: 'B站登录已过期', text: '收不到直播间的消息，特效不会播放。扫码重新登录就能恢复。', action: rescan });
   else if (s.room && !a.loggedIn && s.live.live) out.push({ key: 'login', level: 'red', title: '还没登录 B站', text: '收不到直播间的消息，特效不会播放。', action: { label: '扫码登录', run: () => (ui.qr = true) } });
+  if (checkFailing.value && !s.live.live) out.push({ key: 'check', level: 'amber', title: '查不到开播状态', text: `从 ${clockText(s.live.checkError!.since).slice(0, 5)} 起一直查不到（${s.live.checkError!.text}）。这期间开播了也发现不了，特效不会播放。多半是 B 站暂时限制了这台服务器，通常会自己恢复；一直不好可以在设置里把「连接直播间」改成「一直连接」。` });
   else if (days !== null && days <= 3) out.push({ key: `expire${days}`, level: 'amber', title: `B站登录还剩 ${days} 天`, text: '到期后收不到直播间的消息，建议现在就重新扫码。', action: rescan });
   // 点歌页自己会提醒
   if (route.value.page !== 'music' && neteaseIssues(now.value).some((x) => x.key === 'invalid')) out.push({ key: 'netease', level: 'amber', title: '网易云登录失效了', text: '点歌时会员歌放不了，免费歌照常。重新扫码就能恢复。', action: { label: '去看看', run: () => go('music') } });

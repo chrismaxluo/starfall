@@ -13,6 +13,14 @@ const Cmd = z
 export const MUSIC_BANNED_MAX = 500;
 export const MUSIC_STYLES = ['card', 'vinyl', 'capsule', 'glass', 'journal', 'minimal'] as const;
 export const MUSIC_WORDS_MAX = 100;
+/** 歌词显示哪种语言：双语、只显示原文、只显示翻译 */
+export const MUSIC_LYRICS_LANGS = ['both', 'original', 'translation'] as const;
+export type MusicLyricsLang = (typeof MUSIC_LYRICS_LANGS)[number];
+
+/** 旧的「显示歌词翻译」开关换成歌词语言（旧版本保存的设置、以前导出的配置） */
+export function lyricsLangOf(s: { lyricsLang?: MusicLyricsLang; lyricsTrans?: boolean }): MusicLyricsLang | undefined {
+  return s.lyricsLang ?? (s.lyricsTrans === undefined ? undefined : s.lyricsTrans ? 'both' : 'original');
+}
 
 export const MusicSettingsSchema = z
   .object({
@@ -60,9 +68,16 @@ export const MusicSettingsSchema = z
     size: z.enum(['normal', 'large']),
     showQueue: z.number().int().min(0).max(5),
     lyrics: z.boolean(),
-    lyricsTrans: z.boolean(),
+    /** 歌词显示哪种语言：both 双语（下面一行是翻译）、original 只显示原文、translation 只显示翻译（没有翻译的歌照常显示原文） */
+    lyricsLang: z.enum(MUSIC_LYRICS_LANGS),
+    /** 旧版本的「显示歌词翻译」开关：只在旧版本保存的设置、以前导出的配置里出现，读的时候换成 lyricsLang */
+    lyricsTrans: z.boolean().optional(),
+    /** 点歌窗口的精简模式：auto 直播软件里卡顿时自动打开、on 一直开、off 不开。精简时不做模糊和复杂动画、不做音量均衡 */
+    liteMode: z.enum(['auto', 'on', 'off']),
     /** 不收的歌：歌名或歌手里有这些字 */
     blockWords: z.array(z.string().trim().min(1).max(30)).max(MUSIC_WORDS_MAX),
+    /** 不收的某一首歌（列表、历史里点「这首歌以后不收」）：按这一首本身记，别的版本、名字相近的歌不受影响 */
+    blockSongs: z.array(z.object({ source: z.enum(['netease', 'local']), id: z.string().min(1).max(40), name: z.string().max(200) }).strict()).max(MUSIC_WORDS_MAX),
     /** 不让点歌的观众 */
     bannedUids: z.array(z.number().int().positive()).max(MUSIC_BANNED_MAX),
     /** 桌面版的全局快捷键：切歌、暂停 / 继续（例如 Ctrl+Alt+N），不用时为 null */
@@ -101,8 +116,10 @@ export const MUSIC_DEFAULTS: MusicSettings = {
   size: 'normal',
   showQueue: 3,
   lyrics: true,
-  lyricsTrans: true,
+  lyricsLang: 'both',
+  liteMode: 'auto',
   blockWords: [],
+  blockSongs: [],
   bannedUids: [],
   hotkeySkip: null,
   hotkeyPause: null,

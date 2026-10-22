@@ -1,4 +1,5 @@
 // 弹幕 / 礼物 / 上舰规则、礼物面板（需求 F-DM、F-GF、F-GD）
+import type { GiftConfig } from '@starfall/bili';
 import type { DanmuRule } from '@starfall/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -45,7 +46,18 @@ export function eventRuleRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.put('/api/rules/gift', async (req) => ctx.giftRules.set(parseBody(GiftRulesInputSchema, req.body)));
   /** 荣耀等级勋章（每级一张 B 站的图） */
   app.get('/api/honor-medals', async () => ctx.honor.list());
-  app.get<{ Querystring: { refresh?: string } }>('/api/gifts', async (req) => ({ gifts: await ctx.gifts.list(req.query.refresh === '1') }));
+  app.get<{ Querystring: { refresh?: string } }>('/api/gifts', async (req) => {
+    const gifts = await ctx.gifts.list(req.query.refresh === '1');
+    // 专属礼物规则、礼物列表筛选里用到、但不在礼物面板上的礼物（例如盲盒里爆出的权杖）：从全站礼物里补上，刷新后台后图标还在
+    const used = new Set([...ctx.giftRules.get().specific.map((s) => s.giftId), ...ctx.outputs.list().flatMap((o) => o.giftsFilter.gifts.map((g) => g.id))]);
+    const extra = [...used].filter((id) => !gifts.some((g) => g.id === id)).map((id) => ctx.gifts.find(id)).filter((g): g is GiftConfig => Boolean(g));
+    return { gifts: [...gifts, ...extra] };
+  });
+  // 在全站礼物里按名字找（模拟送礼时选面板上没有的礼物，例如盲盒里爆出来的）
+  app.get('/api/gifts/search', async (req) => {
+    const { q } = parseBody(z.object({ q: z.string().max(40).default('') }), req.query);
+    return { gifts: await ctx.gifts.search(q) };
+  });
 
   app.get('/api/rules/guard', async () => ctx.guardRules.get());
   app.put('/api/rules/guard', async (req) => ctx.guardRules.set(parseBody(GuardRulesInputSchema, req.body)));

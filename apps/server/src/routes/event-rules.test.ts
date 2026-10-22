@@ -79,6 +79,31 @@ describe('礼物规则接口', () => {
     t.ctx.db.delete(room).run();
     expect((await t.req({ method: 'GET', url: '/api/gifts' })).statusCode).toBe(409);
   });
+
+  it('按名字在全站礼物里找（模拟送礼时找面板上没有的，例如盲盒里爆出的权杖）', async () => {
+    const t = await setup();
+    vi.stubGlobal('fetch', async (url: string) =>
+      new Response(JSON.stringify(String(url).includes('giftConfig')
+        ? { code: 0, data: { list: [{ id: 32281, name: '绮彩权杖', price: 40000, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/q.png', effect_id: 99 }, { id: 1, name: '辣条', price: 100, coin_type: 'silver', img_basic: 'https://i0.hdslb.com/l.png' }] } }
+        : { code: 0, data: { gift_config: { base_config: { list: [{ id: 31036, name: '小花花', price: 100, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/g.png' }] } } } })));
+    await t.req({ method: 'GET', url: '/api/gifts' });
+    const r = (await t.req({ method: 'GET', url: `/api/gifts/search?q=${encodeURIComponent('权杖')}` })).json();
+    expect(r.gifts).toMatchObject([{ id: 32281, name: '绮彩权杖', price: 40000, effectId: 99 }]);
+    expect((await t.req({ method: 'GET', url: `/api/gifts/search?q=${encodeURIComponent('辣条')}` })).json().gifts).toEqual([]);
+  });
+
+  it('专属礼物规则用到的、面板上没有的礼物：礼物面板接口从全站礼物里补上（刷新后台后还有图标）', async () => {
+    const t = await setup();
+    vi.stubGlobal('fetch', async (url: string) =>
+      new Response(JSON.stringify(String(url).includes('giftConfig')
+        ? { code: 0, data: { list: [{ id: 32281, name: '绮彩权杖', price: 40000, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/q.png' }] } }
+        : { code: 0, data: { gift_config: { base_config: { list: [{ id: 31036, name: '小花花', price: 100, coin_type: 'gold', img_basic: 'https://i0.hdslb.com/g.png' }] } } } })));
+    await t.req({ method: 'GET', url: '/api/gifts/search?q=x' });
+    const g = t.ctx.giftRules.get();
+    t.ctx.giftRules.set({ ...g, specific: [{ giftId: 32281, giftName: '绮彩权杖', effectId: null, enabled: true }] });
+    const ids = (await t.req({ method: 'GET', url: '/api/gifts' })).json().gifts.map((x: { id: number }) => x.id);
+    expect(ids).toEqual([31036, 32281]);
+  });
 });
 
 describe('上舰规则接口', () => {

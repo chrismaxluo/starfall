@@ -21,9 +21,11 @@ watch(() => route.value.page, close);
 function close(): void {
   ui.preview = null;
 }
+/** 发到直播画面：和这里预览的一样（同一个事件类型、示例观众、礼物和数量）。以前只发了特效编号，直播画面上按进场、默认观众播，和预览对不上 */
 async function sendLive(): Promise<void> {
-  if (!ui.preview?.effectId) return;
-  await attempt(() => post('/api/playback/test', { effectId: ui.preview!.effectId }), '已发送到直播画面');
+  const p = ui.preview;
+  if (!p?.effectId) return;
+  await attempt(() => post('/api/playback/test', { effectId: p.effectId, kind: p.kind ?? 'enter', viewer: p.viewer, ...(p.vars ? { vars: p.vars } : {}) }), '已发送到直播画面');
 }
 const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
 onMounted(() => {

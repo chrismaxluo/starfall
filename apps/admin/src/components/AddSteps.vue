@@ -6,7 +6,7 @@ import type { OutputDto } from '../lib/types.ts';
 
 const props = withDefaults(defineProps<{ output: OutputDto; chat?: boolean }>(), { chat: true });
 const emit = defineEmits<{ copyCheck: [] }>();
-const wh = computed(() => ({ w: CHAT_WIDTH, h: chatHeight(props.output.chatMax, props.output.chatSize) }));
+const wh = computed(() => ({ w: CHAT_WIDTH, h: chatHeight(props.output.chatMax, props.output.chatSize, props.output.chatLook) }));
 </script>
 
 <template>

@@ -4,7 +4,7 @@ import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
-import { go, route } from '../lib/route.ts';
+import { go, route, unloadGuards } from '../lib/route.ts';
 import { checkFile } from '../lib/upload-check.ts';
 import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
 import { builtinThumb, thumbOf } from '../lib/thumbs.ts';
@@ -190,8 +190,12 @@ function openEditor(id: number): void {
   if (!renameKey.value) ui.editorId = id;
 }
 const bars = (id: number) => Array.from({ length: 28 }, (_, i) => 20 + Math.abs(Math.sin((id + 1) * 7.3 + i * 1.7)) * 70);
+// 还有文件在传、在排队时刷新或关闭页面：先问一下（换到别的页面不影响，会接着传）
+const uploadGuard = () => uploads.some((u) => !u.err);
+unloadGuards.add(uploadGuard);
 // 离开素材库时停掉正在试听的音效
 onBeforeUnmount(() => {
+  unloadGuards.delete(uploadGuard);
   audio?.pause();
   audio = null;
 });

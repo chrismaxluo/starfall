@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import { KEEP_BACKUPS, KEEP_MANUAL } from '../services/backup.ts';
 import { formFile, media, testApp } from '../testing.ts';
@@ -219,11 +219,24 @@ describe('导入配置', () => {
     const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
     expect(f.outputs[1]).toMatchObject({ chatEnabled: true, chatSide: 'right', chatSize: 'normal', chatMedal: 'all', chatMax: 12 });
     const old = structuredClone(f);
-    for (const o of old.outputs) for (const k of ['chatEnabled', 'chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec']) delete o[k];
+    for (const o of old.outputs) for (const k of ['chatEnabled', 'chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec', 'chatLook', 'chatGuardFrame', 'chatMascot', 'chatCreamFrame', 'chatAlpha', 'chatHideBlocked']) delete o[k];
     const dst = await setup();
     const { token } = (await importFile(dst, 'old.json', JSON.stringify(old))).json();
     expect((await dst.req({ method: 'POST', url: `/api/backup/import/${token}` })).statusCode).toBe(200);
-    expect(dst.ctx.outputs.list()[1]).toMatchObject({ name: '横屏录播', chatEnabled: true, chatSide: 'left', chatMedal: 'own', chatMax: 8, chatFadeSec: 0 });
+    expect(dst.ctx.outputs.list()[1]).toMatchObject({ name: '横屏录播', chatEnabled: true, chatSide: 'left', chatMedal: 'own', chatMax: 8, chatFadeSec: 0, chatLook: 'glass', chatGuardFrame: 'theme', chatMascot: 'hop', chatCreamFrame: 'hachi', chatAlpha: 0, chatHideBlocked: false });
+  });
+
+  it('1.9 开发期间导出的文件里小八还是「放哪」的旧设置：换成对应的出场方式', async () => {
+    const src = await setup();
+    await populate(src);
+    const f = JSON.parse((await src.req({ method: 'GET', url: '/api/backup/export' })).body);
+    f.outputs[0].chatMascot = 'big';
+    f.outputs[1].chatMascot = 'end';
+    delete f.outputs[1].chatCreamFrame;
+    const dst = await setup();
+    const { token } = (await importFile(dst, 'dev.json', JSON.stringify(f))).json();
+    expect((await dst.req({ method: 'POST', url: `/api/backup/import/${token}` })).statusCode).toBe(200);
+    expect(dst.ctx.outputs.list().map((o) => [o.chatMascot, o.chatCreamFrame])).toEqual([['hop', 'hachi'], ['corner', 'hachi']]);
   });
 
   it('取消导入；无效的文件给出能看懂的错误', async () => {
@@ -308,6 +321,35 @@ describe('自动备份', () => {
     expect(list.filter((x) => x.manual)[0]!.stamp).toBe('20260903-120007-m');
     await b.run(at(4, 2), true);
     expect(await b.tick(at(4, 5))).toBe(true);
+  });
+});
+
+describe('备份时磁盘不够', () => {
+  it('剩余空间不够放一份数据库：不备份，说明原因，不留半截文件', async () => {
+    const t = await setup();
+    const spy = vi.spyOn(fs, 'statfsSync').mockReturnValue({ bavail: 10, bsize: 4096 } as fs.StatsFs);
+    try {
+      await expect(t.ctx.backups.run(Date.now(), true)).rejects.toThrow('磁盘剩余空间不够');
+    } finally {
+      spy.mockRestore();
+    }
+    expect(t.ctx.backups.list()).toEqual([]);
+  });
+
+  it('备份写到一半出错（例如磁盘满）：删掉半截的 .part，不占着空间', async () => {
+    const t = await setup();
+    const client = t.ctx.db.$client;
+    const spy = vi.spyOn(client, 'backup').mockImplementation(async (file: string) => {
+      fs.writeFileSync(file, 'half');
+      throw new Error('SQLITE_FULL');
+    });
+    try {
+      await expect(t.ctx.backups.run(Date.now(), true)).rejects.toThrow('SQLITE_FULL');
+    } finally {
+      spy.mockRestore();
+    }
+    const dir = path.join(t.ctx.config.dataDir, 'backups');
+    expect(fs.existsSync(dir) ? fs.readdirSync(dir) : []).toEqual([]);
   });
 });
 

@@ -105,6 +105,8 @@ export interface ScEvent extends EventBase {
 export interface LiveEvent extends EventBase {
   kind: 'live';
   live: boolean;
+  /** 消息里写的直播间（下播消息里有，是字符串）：和连着的直播间对不上时不理 */
+  roomId?: number;
 }
 
 export type StdEvent = EnterEvent | DanmuEvent | GiftEvent | GuardEvent | ScEvent | LiveEvent;

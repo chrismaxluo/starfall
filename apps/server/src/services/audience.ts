@@ -44,8 +44,10 @@ export class AudienceService {
   private readonly d: Required<Omit<AudienceDeps, 'room' | 'live' | 'anon'>> & AudienceDeps;
   private onlineCache: { roomId: number; at: number; value: OnlineList } | null = null;
   private onlineLoading: Promise<OnlineList> | null = null;
+  private onlineLoadingRoom: number | null = null;
   private fleetCache: { roomId: number; value: FleetList } | null = null;
   private fleetLoading: Promise<FleetList> | null = null;
+  private fleetLoadingRoom: number | null = null;
 
   constructor(deps: AudienceDeps) {
     this.d = { fetchOnline: getOnlineRank, fetchGuards: getGuardPage, now: Date.now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), ...deps };
@@ -63,6 +65,9 @@ export class AudienceService {
     if (!this.d.live.status().live) return { live: false, count: 0, items: [], updatedAt: null };
     const c = this.onlineCache;
     if (c && c.roomId === r.roomId && this.d.now() - c.at < ONLINE_TTL_MS) return c.value;
+    // 正在读的是别的直播间（刚换了直播间）：另起一个
+    if (this.onlineLoading && this.onlineLoadingRoom !== r.roomId) this.onlineLoading = null;
+    this.onlineLoadingRoom = r.roomId;
     this.onlineLoading ??= (async () => {
       // 高能榜是公开的，不用登录（登录了拿到的也一样）
       const http = this.d.anon();
@@ -78,7 +83,10 @@ export class AudienceService {
         if (c && c.roomId === r.roomId) return c.value;
         throw new HttpError(502, 'bili_error', `读取在线观众失败：${e.message}`);
       })
-      .finally(() => (this.onlineLoading = null));
+      .finally(() => {
+        // 期间换了直播间、另起了新的：不动新的那个
+        if (this.onlineLoadingRoom === r.roomId) this.onlineLoading = null;
+      });
     return this.onlineLoading;
   }
 
@@ -87,6 +95,9 @@ export class AudienceService {
     const r = this.room();
     const c = this.fleetCache;
     if (c && c.roomId === r.roomId && this.d.now() - c.value.updatedAt < FLEET_TTL_MS) return c.value;
+    // 正在读的是别的直播间（刚换了直播间）：另起一个
+    if (this.fleetLoading && this.fleetLoadingRoom !== r.roomId) this.fleetLoading = null;
+    this.fleetLoadingRoom = r.roomId;
     this.fleetLoading ??= (async () => {
       const http = this.d.anon();
       const members: FleetList['members'] = [];
@@ -106,7 +117,10 @@ export class AudienceService {
         if (c && c.roomId === r.roomId) return c.value;
         throw new HttpError(502, 'bili_error', `读取舰队名单失败：${e.message}`);
       })
-      .finally(() => (this.fleetLoading = null));
+      .finally(() => {
+        // 期间换了直播间、另起了新的：不动新的那个
+        if (this.fleetLoadingRoom === r.roomId) this.fleetLoading = null;
+      });
     return this.fleetLoading;
   }
 }

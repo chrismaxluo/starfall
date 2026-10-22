@@ -38,7 +38,10 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.post('/api/playback/clear', async () => ({ cleared: ctx.pipeline.clear() }));
 
-  app.post('/api/playback/skip', async () => ({ skipped: ctx.pipeline.skip() }));
+  app.post('/api/playback/skip', async (req) => {
+    const { id } = parseBody(z.object({ id: z.string().min(1).max(64).optional() }).strict(), req.body ?? {});
+    return { skipped: ctx.pipeline.skip(id) };
+  });
 
   app.delete('/api/playback/queue/:id', async (req) => {
     const { id } = parseBody(z.object({ id: z.string().min(1).max(64) }), req.params);

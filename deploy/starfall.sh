@@ -31,6 +31,9 @@ starfall_main() {
   # GitHub 公共加速站：直连 GitHub 连不上或太慢时依次试（自己填的 MIRROR 排在最前面）。
   # 都是别人免费提供的，随时可能停用；桌面版 apps/desktop/src/sources.ts 里有同样的一份，改的时候两边一起改
   local GH_MIRRORS=(https://gh-proxy.com/ https://ghfast.top/ https://gh.llkk.cc/ https://ghproxy.net/)
+  # 星临自己的备用下载地址（Cloudflare R2）：每次发布时自动上传一份代码包（main 和全部版本标签），
+  # 排在自己填的加速站后面、公共加速站前面。只有正式版本和 main，没有 dev。桌面版 sources.ts 里也有这个地址
+  local R2_BUNDLE=https://dl.maasky.com/server/starfall.bundle
   # 太慢的标准（和桌面版一样）：连续 15 秒平均每秒不到 200KB
   local SLOW_BPS=204800 SLOW_SEC=15
   # 这次的代码是从哪个加速站拉的（空为直连）；--no-verify 时不和 GitHub 核对
@@ -103,32 +106,67 @@ EOF
     printf '%s' "$m"
   }
 
-  # 拉代码：先直连 GitHub；连不上或太慢时依次换加速站（最后一个不限速，慢也拉完）。
+  # 拉代码：先直连 GitHub；连不上或太慢时依次换自己填的加速站、星临的备用下载地址、公共加速站（最后一个不限速，慢也拉完）。
   # 用了加速站时记在 FETCHED_VIA，装之前要和 GitHub 核对版本（verify_target）。quiet：不打印换地址的提示
   fetch_code() {
     local quiet=${1:-} src n=0
     local -a srcs=('')
     if [[ $REPO_URL == https://github.com/* ]]; then
       [[ -n $MIRROR ]] && srcs+=("$MIRROR")
+      [[ $REPO_URL == https://github.com/chrismaxluo/starfall.git ]] && srcs+=(r2)
       for src in "${GH_MIRRORS[@]}"; do [[ $src != "$MIRROR" ]] && srcs+=("$src"); done
     fi
     for src in "${srcs[@]}"; do
       n=$((n + 1))
       local -a limit=(-c "http.lowSpeedLimit=$SLOW_BPS" -c "http.lowSpeedTime=$SLOW_SEC")
       ((n == ${#srcs[@]})) && limit=()
-      if git_in "${limit[@]}" fetch -q --tags --force "$src$REPO_URL" '+refs/heads/*:refs/remotes/origin/*'; then
+      if [[ $src == r2 ]]; then
+        if fetch_bundle "${#limit[@]}"; then
+          FETCHED_VIA=r2
+          [[ -z $quiet ]] && warn "GitHub 直连连不上或太慢，这次代码从星临的备用下载地址下载"
+          return 0
+        fi
+      elif git_in "${limit[@]}" fetch -q --tags --force "$src$REPO_URL" '+refs/heads/*:refs/remotes/origin/*'; then
         FETCHED_VIA=$src
         [[ -n $src && -z $quiet ]] && warn "GitHub 直连连不上或太慢，这次代码从加速站 $src 下载"
         return 0
       fi
-      [[ -z $quiet ]] && warn "从${src:-GitHub 直连}下载代码失败或太慢，换下一个"
+      [[ -z $quiet ]] && warn "从$(source_name "$src")下载代码失败或太慢，换下一个"
     done
     return 1
+  }
+
+  source_name() {
+    case $1 in
+      '') echo 'GitHub 直连' ;;
+      r2) echo '星临的备用下载地址' ;;
+      *) echo "$1" ;;
+    esac
+  }
+
+  # 从星临的备用下载地址拉代码：先下载整个代码包，再从包里取出 main 和版本标签。limited 不为 0 时太慢就放弃
+  fetch_bundle() {
+    local limited=$1 tmp rc=0
+    local -a limit=(--speed-limit "$SLOW_BPS" --speed-time "$SLOW_SEC")
+    ((limited)) || limit=()
+    tmp=$(mktemp)
+    if curl -fsSL --connect-timeout 15 "${limit[@]}" -o "$tmp" "$R2_BUNDLE" && git_in bundle verify -q "$tmp" >/dev/null 2>&1; then
+      git_in fetch -q --tags --force "$tmp" '+refs/heads/*:refs/remotes/origin/*' || rc=1
+    else
+      rc=1
+    fi
+    rm -f "$tmp"
+    return "$rc"
   }
 
   # 从加速站拉的代码：要装的版本必须和 GitHub 上的一致（先用 git 问，再问 GitHub 的接口），核对不了就不装
   verify_target() {
     local target=$1 ref have want repo
+    if [[ $FETCHED_VIA == r2 ]]; then
+      # 星临自己上传的，不用再核对；但里面的 dev 是上次发布时的，不能当成最新的装
+      [[ $target == origin/dev ]] && die "星临的备用下载地址里没有最新的 dev，要等 GitHub 能连上再装"
+      return 0
+    fi
     [[ -z $FETCHED_VIA || $NO_VERIFY == 1 ]] && return 0
     if [[ $target == origin/* ]]; then
       ref=refs/heads/${target#origin/}
@@ -241,13 +279,17 @@ EOF
   backup_db() {
     local tag=$1 db=$DIR/data/starfall.db out
     [[ -f $db ]] || return 0
+    # data 目录归服务账号所有：这里用 root 写文件、改所有者，不能跟着里面的符号链接走到别处
+    if [[ -L $DIR/data/backups ]]; then warn "data/backups 是一个链接，为了安全不在这里备份"; return 1; fi
     mkdir -p "$DIR/data/backups"
     out=$DIR/data/backups/update-$(date +%Y%m%d-%H%M%S)-$tag.db
+    if [[ -e $out || -L $out ]]; then warn "$out 已经存在，跳过这次备份"; return 1; fi
     (cd "$DIR/apps/server" && node -e '
       const D = require("better-sqlite3");
       const db = new D(process.argv[1], { readonly: true, fileMustExist: true });
       db.backup(process.argv[2]).then(() => db.close(), (e) => { console.error(e.message); process.exit(1); });' "$db" "$out") || return 1
-    chown starfall:starfall "$out" 2>/dev/null || true
+    [[ -L $out ]] && { rm -f -- "$out"; return 1; }
+    chown -h starfall:starfall "$out" 2>/dev/null || true
     chmod 600 "$out"
     # 退回要用的那一份（上一次更新前的备份）一直留着，不算在里面
     local keep='' f n=0
@@ -337,7 +379,7 @@ EOF
     mkdir -p "$DIR"
     git -c init.defaultBranch=main init -q "$DIR"
     git_in remote add origin "$REPO_URL"
-    fetch_code || die "下载代码失败：GitHub 直连和几个加速站都不行。可以稍后重试，或用 --mirror 指定一个能用的加速站（先删掉 $DIR）"
+    fetch_code || die "下载代码失败：GitHub 直连、备用下载地址和几个加速站都不行。可以稍后重试，或用 --mirror 指定一个能用的加速站（先删掉 $DIR）"
     local target
     target=$(resolve_target "$version")
     verify_target "$target"
@@ -435,7 +477,7 @@ EOF
     [[ -z $(git_in status --porcelain --untracked-files=no) ]] || die "$DIR 里有改动过的文件，先处理掉（git -C $DIR status 查看）"
 
     step "检查新版本"
-    fetch_code || die "下载代码失败：GitHub 直连和几个加速站都不行。可以稍后重试，或用 --mirror 指定一个能用的加速站"
+    fetch_code || die "下载代码失败：GitHub 直连、备用下载地址和几个加速站都不行。可以稍后重试，或用 --mirror 指定一个能用的加速站"
     local target from from_label to_label
     target=$(resolve_target "$version")
     from=$(git_in rev-parse HEAD)

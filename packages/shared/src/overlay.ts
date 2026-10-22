@@ -48,6 +48,18 @@ export interface OverlayConfig {
   chatMax: number;
   /** 弹幕列表每条显示多少秒后自动消失；0 为一直显示（只被新弹幕顶走） */
   chatFadeSec: number;
+  /** 弹幕列表外观：玻璃（原来的样子）或五种小八主题 */
+  chatLook: ChatLook;
+  /** 主题外观里大航海的头像框：主题自己的框（按身份换色）/ B 站的大航海框（其他人照样用主题的框） */
+  chatGuardFrame: 'theme' | 'bili';
+  /** 主题外观里的小八：先在框中间露脸再跳到头像右下角 / 一直在头像右下角 / 不显示 */
+  chatMascot: ChatMascot;
+  /** 奶油贴纸的头像框：小八风（小八的脑袋）/ 格子花边（素材包的框） */
+  chatCreamFrame: ChatCreamFrame;
+  /** 主题外观气泡底色的浓淡（%）；0 为跟随外观 */
+  chatAlpha: number;
+  /** 黑名单里的人不显示在弹幕列表里 */
+  chatHideBlocked: boolean;
   /** 送礼名单：开关、对齐（靠左 / 靠右）、字号、最多显示几条、显示哪些 */
   giftsEnabled: boolean;
   giftsSide: 'left' | 'right';
@@ -74,9 +86,24 @@ export const CHAT_FADE_OPTIONS = [5, 10, 15, 30, 60];
 /** 弹幕列表浏览器源的建议宽度 */
 export const CHAT_WIDTH = 600;
 
-/** 弹幕列表浏览器源的建议高度：普通长度的弹幕每条约 110（字号大时 1.2 倍），上下留边，按 50 取整，至少 300 */
-export function chatHeight(max: number, size: 'normal' | 'large'): number {
-  const row = size === 'large' ? 132 : 110;
+export const CHAT_LOOKS = ['glass', 'jelly', 'porcelain', 'cream', 'night', 'pixel'] as const;
+export type ChatLook = (typeof CHAT_LOOKS)[number];
+export const CHAT_MASCOTS = ['hop', 'corner', 'off'] as const;
+export type ChatMascot = (typeof CHAT_MASCOTS)[number];
+/** 1.9 以前的小八设置（头像旁边、气泡右端、头像右下角）对应到现在的哪一种：导入旧配置时用 */
+export const CHAT_MASCOT_OLD: Record<string, ChatMascot> = { big: 'hop', end: 'corner', small: 'corner' };
+export const CHAT_CREAM_FRAMES = ['hachi', 'lace'] as const;
+export type ChatCreamFrame = (typeof CHAT_CREAM_FRAMES)[number];
+/** 主题外观气泡底色浓淡：30 – 100%；每种外观的默认值（0 = 跟随外观时用它）。
+ * 默认值是实测选的：暗、亮、花哨、透明四种直播画面上，弹幕和昵称的对比度都达到 4.5:1，再留一点余量 */
+export const CHAT_ALPHA_MIN = 30;
+export const CHAT_ALPHA_MAX = 100;
+export const CHAT_LOOK_ALPHA: Record<Exclude<ChatLook, 'glass'>, number> = { jelly: 45, porcelain: 60, cream: 60, night: 70, pixel: 35 };
+
+/** 弹幕列表浏览器源的建议高度：普通长度的弹幕每条约 110（主题外观约 155，字号大时 1.2 倍），上下留边，按 50 取整，至少 300 */
+export function chatHeight(max: number, size: 'normal' | 'large', look: ChatLook = 'glass'): number {
+  const base = look === 'glass' ? 110 : 155;
+  const row = size === 'large' ? base * 1.2 : base;
   return Math.max(300, Math.ceil((32 + max * row - 14) / 50) * 50);
 }
 
@@ -95,6 +122,8 @@ export interface ChatItem {
     /** own：本直播间的粉丝牌（设置成「只显示本直播间的」时只显示这种） */
     medal?: { name: string; level: number; own: boolean; colors?: { bg: string; level: string; border: string; text: string } };
     honor?: { level: number; url?: string };
+    /** 在黑名单里（设置成「黑名单的人不显示」时弹幕列表不显示这条） */
+    blocked?: true;
   };
   text: string;
   /** 文字里的小表情：写法 → 图片地址 */
@@ -208,6 +237,8 @@ export type OverlayToServer =
   /** 点歌窗口（出声音的那个）：开始出声了、播放到哪里（每几秒报一次）、放完了、放不了 */
   | { type: 'music_started'; id: number; load: number }
   | { type: 'music_pos'; id: number; pos: number }
+  /** 浏览器拦住了声音（要先点一下页面）：不算放不了，等人点 */
+  | { type: 'music_blocked'; id: number; load: number }
   | { type: 'music_ended'; id: number }
   | { type: 'music_error'; id: number; load: number; message: string };
 

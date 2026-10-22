@@ -18,6 +18,7 @@ const OverlayMsg = z.discriminatedUnion('type', [
   z.object({ type: z.literal('alive') }),
   z.object({ type: z.literal('music_started'), id: z.number().int(), load: z.number().int() }),
   z.object({ type: z.literal('music_pos'), id: z.number().int(), pos: z.number().min(0).max(1e8) }),
+  z.object({ type: z.literal('music_blocked'), id: z.number().int(), load: z.number().int() }),
   z.object({ type: z.literal('music_ended'), id: z.number().int() }),
   z.object({ type: z.literal('music_error'), id: z.number().int(), load: z.number().int(), message: z.string().max(500) }),
 ]);
@@ -128,9 +129,15 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
         const r = ctx.hub.playStarted(client, msg.id);
         if (r) log.info(`特效页已播放：${r.label}（${r.ms} ms）`);
       }
-      else if (msg.type === 'report') ctx.hub.report(client, { env: msg.env });
+      else if (msg.type === 'report') {
+        // 点歌窗口发现自己卡（直播软件里的浏览器忙不过来，音乐像慢放）：记一笔，方便排查
+        const e = msg.env;
+        if (e.lag === true && client.env?.lag !== true) log.warn(`${what}卡顿：${typeof e.lagWhy === 'string' ? e.lagWhy : '页面被拖慢'}，${e.lite === false ? '精简模式设为「关」，没有切换' : '已切到精简模式'}（${typeof e.host === 'string' ? e.host : '?'}，Chrome ${e.chrome ?? '?'}）`);
+        ctx.hub.report(client, { env: e });
+      }
       else if (msg.type === 'music_started') ctx.music.playerStarted(client, msg.id, msg.load);
       else if (msg.type === 'music_pos') ctx.music.playerPos(client, msg.id, msg.pos);
+      else if (msg.type === 'music_blocked') ctx.music.playerBlocked(client, msg.id, msg.load);
       else if (msg.type === 'music_ended') ctx.music.playerEnded(client, msg.id);
       else if (msg.type === 'music_error') ctx.music.playerError(client, msg.id, msg.load, msg.message);
       else if (msg.type === 'error') {
@@ -163,8 +170,11 @@ export function wsRoutes(app: FastifyInstance, ctx: AppContext): void {
     ctx.hub.addAdmin(socket);
     socket.send(JSON.stringify({ type: 'hello', status: statusSnapshot(ctx), queue: ctx.pipeline.snapshot(), overlays: ctx.hub.overlayList(), roomInfo: ctx.roomInfo.get(), build: ctx.adminBuild.current(), chat: ctx.hub.recentChat(), gifts: Object.fromEntries(ctx.outputs.list().map((o) => [o.id, ctx.hub.giftBoard(o.id)])), pins: ctx.hub.pins() }));
     const stop = keepAlive(socket, () => ctx.hub.removeAdmin(socket));
+    // 应用层心跳：后台页面据此发现悄悄断掉的连接（浏览器里看不到协议层的 ping），和特效页一样
+    const ping = setInterval(() => socket.send(JSON.stringify({ type: 'ping' })), OVERLAY_TIMING.pingMs);
     socket.on('close', () => {
       stop();
+      clearInterval(ping);
       ctx.hub.removeAdmin(socket);
     });
   });

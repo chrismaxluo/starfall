@@ -32,6 +32,24 @@ describe('歌词', () => {
     ]);
   });
 
+  it('同一时间的几句都是同一种文字（对唱）：连成一句，不当成翻译', () => {
+    const lrc = '[01:00.00]男：我在这里\n[01:00.00]女：我也在这里\n[01:05.00]Hello\n[01:05.00]World';
+    expect(parseLrc(lrc)).toEqual([
+      { t: 60_000, text: '男：我在这里 女：我也在这里' },
+      { t: 65_000, text: 'Hello World' },
+    ]);
+  });
+
+  it('一句翻译只配给离它最近的一句原文（快歌里挨得很近的两句不会显示同一句翻译）', () => {
+    const lrc = '[00:10.00]one\n[00:10.40]two\n[00:11.00]three';
+    const tr = '[00:10.25]一';
+    expect(parseLrc(lrc, tr)).toEqual([
+      { t: 10_000, text: 'one' },
+      { t: 10_400, text: 'two', tr: '一' },
+      { t: 11_000, text: 'three' },
+    ]);
+  });
+
   it('现在唱到第几句', () => {
     const lines = [{ t: 1000, text: 'a' }, { t: 2000, text: 'b' }, { t: 3000, text: 'c' }];
     expect(lyricIndex(lines, 500)).toBe(-1);

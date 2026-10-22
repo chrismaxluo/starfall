@@ -13,6 +13,16 @@ const AV_GRADS = [
   'linear-gradient(135deg,#F0B45A,#B26A24)',
 ];
 
+/** B 站的图（表情、勋章、礼物等）：不带来源，加载失败就不显示 */
+export function img(cls: string, src: string, alt = ''): HTMLImageElement {
+  const el = h('img', { class: cls });
+  el.alt = alt;
+  el.referrerPolicy = 'no-referrer';
+  el.onerror = () => el.remove();
+  el.src = src;
+  return el;
+}
+
 /** 头像：有头像地址用图片（加载失败时换成首字），否则用昵称首字 */
 export function avatar(v: PlayViewer, size?: number): HTMLElement {
   const initial = [...(v.name || '?')][0] ?? '?';

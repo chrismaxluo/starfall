@@ -8,7 +8,7 @@
 // - 黑名单：合并（只添加）
 // - 输出：按名称匹配，更新画布设置，地址（访问密钥）不变；没有的新建；本机多出来的保留
 import { eq } from 'drizzle-orm';
-import { DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_ALPHA_DEFAULT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
+import { DANMU_WHO_OLD, DanmuWhoSchema, MusicSettingsSchema, EffectTextsSchema, FADE_DEFAULT_MS, FADE_MAX_MS, FADE_MIN_MS, FEATHER_DEFAULT, FEATHER_MAX, FEATHER_MODES, GIFTS_ALPHA_DEFAULT, GIFTS_FILTER_DEFAULT, GIFTS_MAX_DEFAULT, HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX, lyricsLangOf, OFFSET_MAX, POSITIONS, SIZE_MAX, SIZE_MIN, QUICK_MAX, QuickButtonSchema, SVGA_ROLES, TIERS, danmuWhoFromOld } from '@starfall/shared';
 import type { GiftRules, GuardRules, Tier } from '@starfall/shared';
 import { z } from 'zod';
 import type { Db } from '../db/index.ts';
@@ -558,7 +558,11 @@ export class ConfigIO {
     // 点歌设置（整体替换；旧版本导出的文件里没有，不动）
     if (file.music && this.d.music) {
       const curMusic = this.d.music.cfg() as Record<string, unknown>;
-      const keys = Object.entries(file.music).filter(([k, v]) => !same(curMusic[k], v)).map(([k]) => MUSIC_NAMES[k] ?? k);
+      // 旧版本导出的文件里是「显示翻译」开关：换成现在的歌词语言再比较，没变就不报修改
+      const { lyricsTrans: _old, ...fileMusic } = file.music as Record<string, unknown> & { lyricsTrans?: boolean };
+      const lang = lyricsLangOf(file.music);
+      if (lang) fileMusic.lyricsLang = lang;
+      const keys = Object.entries(fileMusic).filter(([k, v]) => !same(curMusic[k], v)).map(([k]) => MUSIC_NAMES[k] ?? k);
       sections.push({ key: 'music', label: '点歌设置', summary: keys.length ? `修改 ${keys.length} 项` : '没有变化', changed: keys.length > 0, details: clip(keys) });
     }
 

@@ -26,10 +26,12 @@ const browse = q.get('view') === '1' && !preview;
 const env = detect();
 /** 发现直播软件里的浏览器忙不过来了（音乐像慢放、页面变卡）：之后都用精简模式，直到页面刷新 */
 let lagging = false;
-/** 精简模式：不做模糊和复杂动画、刷新慢一点、不做音量均衡（直接原生播放） */
+/** 最近一次网络缓冲（歌停下来等数据）的时间：缓冲不算卡顿 */
+let waitedAt = -Infinity;
+/** 精简模式：不做模糊和复杂动画、刷新慢一点、不做音量均衡（直接原生播放）；设成「关」时一律不用 */
 function liteActive(): boolean {
   const mode = state?.display.liteMode ?? 'auto';
-  return q.get('lite') === '1' || !env.blur || mode === 'on' || (mode === 'auto' && lagging);
+  return q.get('lite') === '1' || mode === 'on' || (mode === 'auto' && (lagging || !env.blur));
 }
 
 document.getElementById('stage')?.remove();
@@ -441,7 +443,8 @@ function render(): void {
   const s = state;
   if (!s) return;
   const d = s.display;
-  const lite = liteActive();
+  // 不支持模糊的浏览器：样式总是用实色底（不然半透明的底看不清字）
+  const lite = liteActive() || !env.blur;
   root.className = `mu-root st-${d.style} side-${d.side}${d.size === 'large' ? ' large' : ''}${lite ? ' lite' : ''}${s.enabled ? '' : ' off'}`;
   renderCard(s);
   renderQueue(s);
@@ -689,7 +692,10 @@ function makeAudio(cors: boolean): HTMLAudioElement {
       conn?.send({ type: 'music_error', id: loaded.id, load: loaded.load, message: '网络卡住了，十几秒没有数据' });
     }, STALL_MS);
   };
-  a.addEventListener('waiting', stalled);
+  a.addEventListener('waiting', () => {
+    if (a === audio) waitedAt = performance.now();
+    stalled();
+  });
   a.addEventListener('stalled', stalled);
   a.addEventListener('timeupdate', () => {
     if (a !== audio || !loaded || !startedSent) return;
@@ -738,14 +744,15 @@ setInterval(() => {
   let why = '';
   // 直播软件把看不见的源暂停时也会晚：那时不算
   if (!document.hidden && dt > 1800) why = `页面被拖慢（本该 1 秒一次，隔了 ${(dt / 1000).toFixed(1)} 秒）`;
-  else if (playing && lagMedia >= 0 && media > lagMedia && media - lagMedia < dt * 0.8) why = `音乐像慢放（1 秒只放了 ${((media - lagMedia) / dt).toFixed(2)} 秒）`;
+  // 这一秒里缓冲过（网络慢，歌停下来等数据）时歌也走得慢：那不是页面卡，不算
+  else if (playing && lagMedia >= 0 && wall - waitedAt > dt && media > lagMedia && media - lagMedia < dt * 0.8) why = `音乐像慢放（1 秒只放了 ${((media - lagMedia) / dt).toFixed(2)} 秒）`;
   lagAt = wall;
   lagMedia = media;
   lagMarks.push(Boolean(why));
   if (lagMarks.length > 10) lagMarks.shift();
   if (lagging || lagMarks.filter(Boolean).length < 3) return;
   lagging = true;
-  conn?.send({ type: 'report', env: { ...detect(), music: true, build: build0, lag: true, lagWhy: why || '页面被拖慢', ...(browse ? { view: true } : {}) } });
+  conn?.send({ type: 'report', env: { ...detect(), music: true, build: build0, lag: true, lagWhy: why || '页面被拖慢', lite: liteActive(), ...(browse ? { view: true } : {}) } });
   if (state?.display.liteMode === 'off') return;
   render();
   goNative();

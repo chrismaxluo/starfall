@@ -599,7 +599,7 @@ describe('礼物', () => {
       live: t.live,
       hub: hub2,
       gifts: { find: (id: number) => GIFTS[id] },
-      giftFx: { forGift: (x) => (loaded && x?.effectId === 699 ? { fx: CAR_FX, durationMs: 5700 } : undefined), ready: async () => void (loaded = true) },
+      giftFx: { forGift: (x) => (loaded && x?.effectId === 699 ? { fx: CAR_FX, durationMs: 5700 } : undefined), waitFor: () => (loaded ? null : Promise.resolve().then(() => void (loaded = true))) },
       timeZone: 'Asia/Shanghai',
       rng: () => 0,
     });
@@ -607,10 +607,49 @@ describe('礼物', () => {
     p2.start();
     cleanup.push(() => p2.stop());
     t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
     const play = sock2.sent.filter((m) => m.type === 'play').at(-1) as Extract<ServerToOverlay, { type: 'play' }> | undefined;
     expect(play?.item).toMatchObject({ effect: { visual: { style: 'bili-gift' } }, gift: { name: '极速超跑', fx: CAR_FX } });
+  });
+
+  it('等官方动画的大礼物后面来的礼物排在它后面（顺序不乱）；等的时候停止服务，这份礼物照样记下来、读好后不再播', async () => {
+    const t = await setup();
+    t.ctx.giftRules.set({ ...t.ctx.giftRules.get(), comboEnabled: false });
+    let done = (): void => undefined;
+    const wait = new Promise<void>((r) => (done = r));
+    const p2 = new Pipeline({
+      ...t.ctx,
+      live: t.live,
+      hub: t.hub,
+      gifts: { find: (id: number) => GIFTS[id] },
+      giftFx: { forGift: () => undefined, waitFor: (x) => (x?.effectId === 699 ? wait : null) },
+      timeZone: 'Asia/Shanghai',
+      rng: () => 0,
+    });
+    t.p.stop();
+    p2.start();
+    cleanup.push(() => p2.stop());
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 1 }));
+    t.live.emit(gf({ unitPrice: 20_000 }, { uid: 2 }));
+    vi.advanceTimersByTime(500);
+    expect(t.events().map((e) => e.uid)).toEqual([]);
+    done();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(t.events().map((e) => e.uid)).toEqual([1, 2]);
+
+    let done2 = (): void => undefined;
+    const wait2 = new Promise<void>((r) => (done2 = r));
+    const p3 = new Pipeline({ ...t.ctx, live: t.live, hub: t.hub, gifts: { find: (id: number) => GIFTS[id] }, giftFx: { forGift: () => undefined, waitFor: () => wait2 }, timeZone: 'Asia/Shanghai', rng: () => 0 });
+    p2.stop();
+    p3.start();
+    t.live.emit(gf({ giftId: 32089, giftName: '极速超跑', unitPrice: 100_000 }, { uid: 3 }));
+    p3.stop();
+    expect(t.events().at(-1)).toMatchObject({ uid: 3 });
+    const n = t.plays().length;
+    done2();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(t.events().filter((e) => e.uid === 3)).toHaveLength(1);
+    expect(t.plays()).toHaveLength(n);
   });
 
   it('「B站·礼物动画」：有官方全屏动画的礼物按动画长度播；没有动画时 100 元以上显示晶·大礼物、以下显示晶·礼物', async () => {

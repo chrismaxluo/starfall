@@ -10,7 +10,7 @@ import type { Conn } from './conn.ts';
 import { segments } from './chat-text.ts';
 import { h } from './dom.ts';
 import { detect } from './env.ts';
-import { avatar, fallbackColors, withGuardFrame } from './parts.ts';
+import { avatar, fallbackColors, img, withGuardFrame } from './parts.ts';
 import { buildThemed, isTheme, mountThemed, themeAlpha, themeClass } from './chat-theme.ts';
 import { DEFAULT_CONFIG } from './stage.ts';
 import { autoUpdate, pageBuild } from './update.ts';
@@ -31,15 +31,6 @@ document.body.append(root);
 document.documentElement.classList.add('chat-page');
 // 在浏览器里查看（&view=1）：深色背景，看得清
 if (q.get('view') === '1' && !preview) document.documentElement.classList.add('chat-view');
-
-function img(cls: string, src: string, alt = ''): HTMLImageElement {
-  const el = h('img', { class: cls });
-  el.alt = alt;
-  el.referrerPolicy = 'no-referrer';
-  el.onerror = () => el.remove();
-  el.src = src;
-  return el;
-}
 
 // ---------- 一条弹幕 ----------
 

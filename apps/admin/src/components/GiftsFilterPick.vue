@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 送礼名单「只要这几种礼物」：从直播间礼物面板里点选礼物种类（按礼物编号，名字只用来显示）
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useGiftCatalog } from '../lib/gift-catalog.ts';
 import { useGiftSearch } from '../lib/gift-search.ts';
 import { battery } from '../lib/preview.ts';
@@ -37,7 +37,7 @@ const groups = computed(() => {
 // 打字搜索时也在全站礼物里找
 const { extra: found, searching } = useGiftSearch(q, () => catalog.value);
 /** 选过的、面板上没有的礼物：记住礼物图 */
-const seen = new Map<number, string>();
+const seen = reactive(new Map<number, string>());
 const iconOf = (id: number) => catalog.value.find((g) => g.id === id)?.icon ?? seen.get(id);
 
 function toggle(g: { id: number; name: string; icon?: string }): void {

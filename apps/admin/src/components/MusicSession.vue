@@ -33,7 +33,7 @@ onBeforeUnmount(() => timer && clearInterval(timer));
 <template>
   <div class="card ss">
     <div class="card-h">
-      <h2>{{ !s || s.live ? '本场' : '上一场' }}</h2>
+      <h2><span class="hicon"><Icon name="i-chart" /></span>{{ !s || s.live ? '本场' : '上一场' }}</h2>
       <span v-if="s" class="aside">{{ s.live ? `开播 ${duration(now - s.startedAt)}` : `${when(s.startedAt, now)} – ${clock(s.endedAt!).slice(0, 5)}` }}</span>
     </div>
     <p v-if="loaded && !s" class="inline-hint">还没有直播记录。开播后这里会显示本场点了几首歌、谁点得最多。</p>

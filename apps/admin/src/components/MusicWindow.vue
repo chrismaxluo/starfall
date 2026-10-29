@@ -14,7 +14,7 @@ const cover = computed(() => music.state?.now?.item.song.cover ?? '');
 
 <template>
   <div class="card ow">
-    <div class="card-h"><h2>点歌窗口</h2><span class="aside"><a class="linkish" href="#music/look" @click.prevent="go('music', 'look')">换样式 →</a></span></div>
+    <div class="card-h"><h2><span class="hicon"><Icon name="i-screen" /></span>点歌窗口</h2><span class="aside"><a class="linkish" href="#music/look" @click.prevent="go('music', 'look')">换样式 →</a></span></div>
     <div class="ow-body">
       <!-- 示意：正在放的歌的封面铺底，和直播画面上的窗口差不多 -->
       <span class="ow-thumb" aria-hidden="true">

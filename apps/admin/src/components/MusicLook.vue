@@ -114,7 +114,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 <template>
   <div v-if="music.settings" class="ml-grid">
     <div class="card">
-      <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示，不出声</span></div>
+      <div class="card-h"><h2><span class="hicon"><Icon name="i-eye" /></span>预览</h2><span class="aside">只在这里显示，不出声</span></div>
       <div class="ml-pv" :style="{ width: `${MUSIC_WIDTH * K}px`, height: `${MUSIC_HEIGHT * K}px` }">
         <iframe ref="frame" src="/overlay/?music=1&preview=1" title="点歌窗口预览" :style="{ width: `${MUSIC_WIDTH}px`, height: `${MUSIC_HEIGHT}px`, transform: `scale(${K})` }" />
       </div>
@@ -127,7 +127,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 
     <div class="ml-col">
       <div class="card">
-        <div class="card-h"><h2>外观</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-spark" /></span>外观</h2></div>
         <template v-for="g in STYLE_GROUPS" :key="g.name">
           <h3 class="ml-grp">{{ g.name }}</h3>
           <div class="ml-styles" role="radiogroup" :aria-label="`${g.name}样子`">
@@ -188,7 +188,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>声音</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-music" /></span>声音</h2></div>
         <div class="srows">
           <div class="srow">
             <span class="lb">音量</span>
@@ -227,7 +227,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>点歌窗口地址</h2><span class="aside">宽高填 {{ MUSIC_WIDTH }} × {{ MUSIC_HEIGHT }}</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-copy" /></span>点歌窗口地址</h2><span class="aside">宽高填 {{ MUSIC_WIDTH }} × {{ MUSIC_HEIGHT }}</span></div>
         <div v-for="o in state.outputs" :key="o.id" class="ml-url">
           <span class="ml-on" :class="{ on: online(o.id) }"><i />{{ o.name }} · {{ online(o.id) ? '已加上' : '还没加' }}</span>
           <button class="btn sm primary" @click="copy(o.musicPath)"><Icon name="i-copy" />复制地址</button>

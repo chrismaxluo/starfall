@@ -196,7 +196,7 @@ async function simulate(): Promise<void> {
         <Transition name="mp-bgfade">
           <div v-if="cover" :key="cover" class="mp-bg" aria-hidden="true"><img :src="cover" alt="" referrerpolicy="no-referrer" /></div>
         </Transition>
-        <div class="card-h"><h2>正在放</h2><span class="aside">{{ holding ? (paused ? '已暂停' : '没在放') : now ? '播放中' : '' }}</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-play" /></span>正在放</h2><span class="aside">{{ holding ? (paused ? '已暂停' : '没在放') : now ? '播放中' : '' }}</span></div>
         <div v-if="now" class="mp-now" :class="{ paused: now.paused }">
           <img v-if="now.item.song.cover" class="mp-cover" :src="now.item.song.cover" alt="" referrerpolicy="no-referrer" />
           <span v-else class="mp-cover blank"><Icon name="i-music" /></span>
@@ -239,7 +239,7 @@ async function simulate(): Promise<void> {
 
       <div class="card">
         <div class="card-h">
-          <h2>列表 {{ queue.length }} 首</h2>
+          <h2><span class="hicon"><Icon name="i-queue" /></span>列表 {{ queue.length }} 首</h2>
           <span class="aside">
             拖动左边的序号调整顺序
             <ConfirmButton v-if="queue.length" label="清空" confirm-label="确认清空？" cls="btn" @confirm="clearQueue" />
@@ -274,7 +274,7 @@ async function simulate(): Promise<void> {
 
     <div class="mp-col">
       <div class="card">
-        <div class="card-h"><h2>加歌</h2><span class="aside">不受点歌规则限制</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-plus" /></span>加歌</h2><span class="aside">不受点歌规则限制</span></div>
         <form class="mp-search" @submit.prevent="search">
           <input v-model="q" class="inp" placeholder="歌名，或者 歌名 歌手" aria-label="搜歌" maxlength="60" />
           <button class="btn primary" type="submit" :disabled="searching || !q.trim()"><Icon name="i-search" />{{ searching ? '搜索中…' : '搜索' }}</button>
@@ -300,7 +300,7 @@ async function simulate(): Promise<void> {
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>模拟点歌</h2><span class="aside">按点歌规则判断，不用开播</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-demo" /></span>模拟点歌</h2><span class="aside">按点歌规则判断，不用开播</span></div>
         <form class="mp-sim" @submit.prevent="simulate">
           <input v-model="simText" class="inp" :placeholder="`${music.settings?.cmdRequest ?? '点歌'} 起风了`" aria-label="模拟的弹幕" maxlength="100" />
           <select v-model.number="simGuard" class="sel" aria-label="以什么身份发">
@@ -316,7 +316,7 @@ async function simulate(): Promise<void> {
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>最近的点歌消息</h2><span class="aside">直播画面上也会提示</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-chat" /></span>最近的点歌消息</h2><span class="aside">直播画面上也会提示</span></div>
         <Empty v-if="!music.notices.length" compact icon="i-chat" title="还没有点歌消息" />
         <div v-else class="mp-notes">
           <div v-for="n in music.notices" :key="n.id" class="mp-note" :class="{ bad: !n.ok }">

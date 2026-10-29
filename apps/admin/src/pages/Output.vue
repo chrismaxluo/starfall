@@ -6,6 +6,7 @@ import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
+import Tip from '../components/Tip.vue';
 import { del, post, put } from '../lib/api.ts';
 import { CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsSourceSize } from '@starfall/shared/overlay';
 import { useDraft } from '../lib/draft.ts';
@@ -244,7 +245,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
     <div class="page-head">
       <div>
         <h1>直播软件输出</h1>
-        <p>把特效页和弹幕列表加到直播软件里。每个输出对应直播软件里的一个画面，比如竖屏直播、横屏录播。</p>
+        <p>把特效页、弹幕列表、送礼名单和点歌窗口加到直播软件里。</p>
       </div>
     </div>
 
@@ -295,13 +296,13 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                 <ConfirmButton label="重置密钥" confirm-label="确认重置？两个地址都会失效" cls="linkish dim" armed-cls="delb" @confirm="resetKey" />
               </span>
             </div>
-            <div v-if="viewing.length && !overlays.length" class="src-note">浏览器里正在查看特效页，但这不算加到了直播软件：直播画面里要另外添加上面的地址</div>
+            <div v-if="viewing.length && !overlays.length" class="src-note">浏览器里打开的特效页只用来查看，直播软件里还要另外添加上面的地址</div>
             <div v-if="capIssues(fxEnv).length" class="src-note">{{ capIssues(fxEnv).map((c) => `${c.name}：${c.tip}`).join('；') }}</div>
             <div v-if="fxError" class="src-err">最近的问题：{{ plainError(fxError) }}</div>
             <div v-if="overlays.length" class="src-test">
               <ConfirmButton v-if="state.status?.live.live" label="发一个测试特效到直播画面" confirm-label="确认？观众会看到" cls="btn" armed-cls="btn live-send" @confirm="sendTest" />
               <button v-else class="btn" type="button" @click="sendTest">发一个测试特效到直播画面</button>
-              <span class="inline-hint">直播软件里真的会出现一次，用来确认加对了</span>
+              <span class="inline-hint">直播画面上会真的播放一次</span>
             </div>
           </div>
 
@@ -404,27 +405,27 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               </div>
             </div>
             <div v-if="v.orient === 'portrait'" class="srow">
-              <span class="lb">竖屏安全区<small>特效自动避开</small></span>
+              <span class="lb">竖屏安全区<Tip text="B站手机端竖屏直播时，顶部是主播信息，底部是弹幕和礼物栏，特效会自动避开。默认按实测：顶部 12%、底部 40%。" /></span>
               <div class="ctl">
                 <div class="slider-row"><label for="st">顶部</label><input id="st" :value="v.safeTop" type="range" min="0" max="25" @input="fx.set({ safeTop: num($event) })" /><output>{{ v.safeTop }}%</output></div>
                 <div class="slider-row"><label for="sb">底部</label><input id="sb" :value="v.safeBottom" type="range" min="0" max="45" @input="fx.set({ safeBottom: num($event) })" /><output>{{ v.safeBottom }}%</output></div>
-                <span class="hint">B站手机端竖屏直播时，顶部是主播信息，底部是弹幕和礼物栏。默认按实测：顶部 12%、底部 40%。<label class="inline-ck"><input v-model="showSafe" type="checkbox" />预览里显示</label></span>
+                <span class="hint"><label class="inline-ck"><input v-model="showSafe" type="checkbox" />在预览里显示</label></span>
               </div>
             </div>
             <div class="srow">
-              <span class="lb">特效大小<small>作用于所有规则</small></span>
+              <span class="lb">特效大小</span>
               <div class="ctl">
                 <div class="slider-row"><label for="scale">整体缩放</label><input id="scale" :value="v.scale" type="range" min="60" max="160" step="5" @input="fx.set({ scale: num($event) })" /><output>{{ v.scale }}%</output></div>
                 <div class="slider-row"><label for="mx">左右边距</label><input id="mx" :value="v.marginX" type="range" min="0" max="15" @input="fx.set({ marginX: num($event) })" /><output>{{ v.marginX }}%</output></div>
               </div>
             </div>
             <div class="srow">
-              <span class="lb">兼容模式</span>
+              <span class="lb">兼容模式<Tip text="关掉毛玻璃、粒子等较重的效果，弹幕列表也跟着用。电脑性能一般时可以开启；「自动」在直播软件不支持毛玻璃时自动开启。" /></span>
               <div class="ctl"><div class="line">
                 <select class="sel" aria-label="兼容模式" :value="v.liteMode" @change="(e) => fx.set({ liteMode: (e.target as HTMLSelectElement).value as OutputDto['liteMode'] })">
                   <option value="auto">自动</option><option value="on">始终开启</option><option value="off">关闭</option>
                 </select>
-                <span class="hint">关掉毛玻璃、粒子等较重的效果。电脑性能一般或直播软件版本旧时用（弹幕列表也跟着用）。</span>
+                
               </div></div>
             </div>
           </div>

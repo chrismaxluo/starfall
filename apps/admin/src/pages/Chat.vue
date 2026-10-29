@@ -96,7 +96,7 @@ const online = computed(() => state.overlays.filter((x) => x.outputId === o.valu
 <template>
   <section v-if="o && cfg" class="page">
     <div class="page-head">
-      <div><h1>弹幕列表</h1><p>把直播间里所有人的弹幕排成一列，显示在直播画面上。</p></div>
+      <div><h1>弹幕列表</h1><p>所有人的弹幕排成一列，显示在直播画面上。</p></div>
       <div class="wp-head-r">
         <select v-if="state.outputs.length > 1" class="sel" aria-label="输出" :value="o.id" @change="pickOutput"><option v-for="x in state.outputs" :key="x.id" :value="x.id">{{ x.name }}</option></select>
         <span class="live" :class="o.chatEnabled && online ? '' : 'off'"><i />{{ !o.chatEnabled ? '已关闭' : online ? '直播软件里已加上' : '直播软件里还没加' }}</span>

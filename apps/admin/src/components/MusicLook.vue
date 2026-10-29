@@ -7,6 +7,7 @@ import type { MusicState } from '@starfall/shared/overlay';
 import DraftBar from './DraftBar.vue';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
+import Tip from './Tip.vue';
 import { useDraft } from '../lib/draft.ts';
 import { MUSIC_STYLE_NAMES, music, saveMusic } from '../lib/music.ts';
 import { state } from '../lib/store.ts';
@@ -144,7 +145,6 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
                 <button :aria-pressed="v.side === 'left'" @click="look.set({ side: 'left' })">靠左</button>
                 <button :aria-pressed="v.side === 'right'" @click="look.set({ side: 'right' })">靠右</button>
               </span>
-              <span class="hint">放在画面哪边就选哪边</span>
             </div></div>
           </div>
           <div class="srow">
@@ -201,7 +201,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
             <span class="lb">音量均衡</span>
             <div class="ctl"><div class="line">
               <Switch :model-value="s.normalize" label="音量均衡" @change="(v) => set({ normalize: v }, v ? '音量均衡已打开：从下一首开始生效' : '音量均衡已关闭')" />
-              <span class="hint">有的歌录得特别响，打开后自动调小到差不多的音量，换歌时不会突然很大声（偏轻的歌保持原样，不会因为调大而破音）</span>
+              <span class="hint">把录得特别响的歌调小，换歌时音量更一致</span>
             </div></div>
           </div>
           <div class="srow">
@@ -220,7 +220,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
                 <button :aria-pressed="s.liteMode === 'on'" @click="set({ liteMode: 'on' }, '精简模式已打开')">一直开</button>
                 <button :aria-pressed="s.liteMode === 'off'" @click="set({ liteMode: 'off' }, '精简模式已关闭')">关</button>
               </span>
-              <span class="hint">直播软件里的浏览器忙不过来时，音乐会像慢放、歌词变慢。精简模式去掉模糊和动画，也不做音量均衡，直接原生播放。「自动」发现卡顿就切过去</span>
+              <span class="hint">去掉模糊和动画，直接原生播放<Tip text="直播软件里的浏览器忙不过来时，音乐会像慢放、歌词变慢。精简模式去掉模糊和动画，也不做音量均衡；选「自动」时，发现卡顿就自动切换。" /></span>
             </div></div>
           </div>
         </div>
@@ -233,7 +233,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
           <button class="btn sm primary" @click="copy(o.musicPath)"><Icon name="i-copy" />复制地址</button>
           <a class="linkish" :href="`${o.musicPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看，不出声；直播软件里请用复制的地址">在浏览器里查看</a>
         </div>
-        <p class="inline-hint">在直播姬或 OBS 里加一个浏览器源，粘贴地址，拖到画面一侧。加了好几个也只有一个出声音。</p>
+        <p class="inline-hint">在直播软件里加一个浏览器源，粘贴地址，拖到画面一侧；加了好几个时只有一个出声音。</p>
       </div>
     </div>
   </div>

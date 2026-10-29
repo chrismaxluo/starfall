@@ -46,8 +46,8 @@ async function toggleAuto(on: boolean): Promise<void> {
       </div>
       <div class="toggle-line" style="margin-top: 16px">备用下载地址</div>
       <div class="add-user" style="margin-top: 8px"><input v-model="mirrorIn" class="inp" placeholder="不填也可以，例如 https://ghfast.top/" aria-label="备用下载地址" spellcheck="false" @keydown.enter="saveMirror" @blur="saveMirror" /></div>
-      <p class="hint" style="margin: 6px 0 0; font-size: var(--fs-cap); color: var(--t3)">下载新版本时先直连 GitHub；连不上或太慢时先试这个地址，再试内置的几个加速地址。</p>
-      <p class="hint" style="margin: 12px 0 0; font-size: var(--fs-cap); color: var(--t3)">关闭窗口时星临会缩到右下角托盘，直播特效照常播放；要退出请右键托盘图标 →「退出星临」。素材、规则和设置都在数据文件夹里，卸载或升级不会删除。</p>
+      <p class="hint" style="margin: 6px 0 0; font-size: var(--fs-cap); color: var(--t3)">GitHub 连不上或太慢时，先试这个地址</p>
+      <p class="hint" style="margin: 12px 0 0; font-size: var(--fs-cap); color: var(--t3)">关闭窗口时缩到右下角托盘，特效照常播放；退出请右键托盘图标 →「退出星临」。卸载或升级不会删除素材和设置。</p>
     </template>
     <p v-else style="margin: 0; font-size: var(--fs-sec); color: var(--t2)">开机自动启动、检查更新等设置，请在星临桌面版的窗口里修改。</p>
   </div>

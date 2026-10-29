@@ -21,6 +21,7 @@ import Icon from './Icon.vue';
 import PreviewStage from './PreviewStage.vue';
 import Seg from './Seg.vue';
 import Switch from './Switch.vue';
+import Tip from './Tip.vue';
 
 const props = defineProps<{ effectId: number }>();
 const emit = defineEmits<{ close: [] }>();
@@ -483,7 +484,7 @@ onBeforeUnmount(() => {
             <button class="btn" @click="replay(true)"><Icon name="i-replay" />重播（带声音）</button>
             <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :title="dirty ? '发送的是现在预览里的样子（包括还没保存的修改）' : ''" @confirm="sendLive" />
           </div>
-          <span v-if="a && !ro" class="hint" style="font-size: var(--fs-cap); color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>
+          <span v-if="a && !ro" class="hint" style="font-size: var(--fs-cap); color: var(--t3)">按住素材可以直接拖动位置</span>
           <div class="pv-opts">
             <div class="pv-opt"><span>按</span><Seg v-model="pvKind" label="按哪类事件预览" :options="KIND_OPTIONS" /><span>预览</span></div>
             <div class="pv-opt"><span>示例观众</span><Seg v-model="who" label="示例观众" :options="WHO_OPTIONS" /></div>
@@ -491,7 +492,7 @@ onBeforeUnmount(() => {
           <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
         </div>
         <div class="ed-set" :class="{ readonly: ro }">
-          <div v-if="ro" class="ro-banner" style="pointer-events: auto; opacity: 1"><Icon name="i-lock" />内置素材不能直接修改。点右下角「复制并编辑」，就能在副本上自由调整。</div>
+          <div v-if="ro" class="ro-banner" style="pointer-events: auto; opacity: 1"><Icon name="i-lock" />内置素材不能直接修改，点右下角「复制并编辑」在副本上调整。</div>
 
           <div class="ed-sec">
             <h3><span class="n">1</span>画面</h3>
@@ -508,7 +509,7 @@ onBeforeUnmount(() => {
               </div>
               <input ref="repIn" type="file" hidden accept=".webm,.mp4,.svga,.json,.gif,.png,.apng,.webp,.jpg,.jpeg" @change="replaceFile" />
               <template v-if="slots.length">
-                <div class="toggle-line">动态图层 <span class="hint">SVGA 里预留的图层，播放时换成这位观众的头像、昵称等</span></div>
+                <div class="toggle-line">动态图层<Tip text="SVGA 里预留的图层，播放时换成这位观众的头像、昵称等。头像框、身份图标只给大航海观众显示；荣耀等级勋章按观众的等级换图，没有等级时不显示。图层名字写得明白的（avatar、nickname 这类）已经自动对应好。" /></div>
                 <div class="svga-slots">
                   <label v-for="s in slots" :key="s.key" class="svga-slot">
                     <span class="sthumb"><img v-if="slotImgs[s.key]" :src="slotImgs[s.key]" alt="" /></span>
@@ -518,7 +519,7 @@ onBeforeUnmount(() => {
                     </select>
                   </label>
                 </div>
-                <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来；荣耀等级勋章按观众的等级换图，没有等级时藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
+                
               </template>
               <details class="ed-more">
                 <summary><Icon name="i-chev" />边缘慢慢变透明（上下羽化）<span class="hint">{{ featherOptions.find((x) => x.value === d!.feather)?.label }}</span></summary>
@@ -543,7 +544,7 @@ onBeforeUnmount(() => {
               <div class="slider-row off"><label for="edOffX">左右挪动</label><input id="edOffX" v-model.number="d.offsetX" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetX, '往左', '往右') }}</output></div>
               <div class="slider-row off"><label for="edSize">大小</label><input id="edSize" v-model.number="d.sizePct" type="range" :min="SIZE_MIN" :max="SIZE_MAX" step="1" /><output>{{ clampSize(d.sizePct) }}%</output></div>
               <div class="toggle-line">
-                <span class="hint">也可以在左边预览里按住素材直接拖。在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算；大小 100% 是自动算出的大小</span>
+                <span class="hint">在「{{ POSITION_NAMES[d.position] }}」的基础上挪动，按画面宽、高的百分比算</span>
                 <button class="btn" type="button" style="margin-left: auto; flex: none" :disabled="!adjusted" @click="resetOffset">回到原位</button>
               </div>
               <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B站的信息、弹幕，或者被挡住。</div>
@@ -555,10 +556,10 @@ onBeforeUnmount(() => {
           <div class="ed-sec">
             <h3><span class="n">3</span>头像和欢迎语</h3>
             <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">{{ svgaHasPerson ? 'SVGA 里已经放了头像或昵称，一般不用再叠加' : '素材里已经画好文字的话可以关掉' }}</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
-            <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
-            <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前面放上 B站的荣耀等级勋章（和弹幕里的一样），没有荣耀等级的观众不显示</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
+            <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督套上 B站头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
+            <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前显示 B站荣耀等级勋章</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
             <template v-if="!a || d.showText">
-              <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
+              <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">每行一句，随机选一句；没单独写的事件用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
               <div class="vars"><span class="vars-l">插入</span><button v-for="v in VARS_OF[txTab]" :key="v.key" type="button" :title="`插入 {${v.key}}`" @click="insertVar(`{${v.key}}`)">{{ v.label }}</button></div>
@@ -567,7 +568,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="ed-sec">
-            <h3><span class="n">4</span>音效 <span class="hint">音效在素材库的「音效」里管理，可以被多个素材共用</span></h3>
+            <h3><span class="n">4</span>音效<Tip text="音效在素材库的「音效」里管理，可以被多个素材共用。" /></h3>
             <div class="snd">
               <select class="sel" :value="d.soundAssetId ?? ''" aria-label="音效" @change="onSound">
                 <option value="">无音效</option>

@@ -515,7 +515,6 @@ onMounted(() => void refreshRules());
         </div>
         <Empty v-if="!exList.length" icon="i-user" :title="state.exclusives.length ? '没有匹配的专属用户' : '还没有专属用户'" :desc="state.exclusives.length ? undefined : '点右上角「添加专属用户」，或者在总览的实时动态里点某个观众'" />
       </div>
-      <p v-if="state.exclusives.length" class="rt-note">在总览的实时动态里点某个观众，也能直接设置专属特效。</p>
     </template>
 
     <RulesDanmu v-else-if="ev === 'danmu'" v-model:help="help" @preview="onPreview" />

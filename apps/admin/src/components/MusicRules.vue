@@ -95,7 +95,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
   <div v-if="music.settings" class="mr-grid">
     <div class="mr-col">
       <div class="card">
-        <div class="card-h"><h2>弹幕指令</h2><span class="aside">改了立即保存</span></div>
+        <div class="card-h"><h2>弹幕指令</h2></div>
         <div class="mr-cmds">
           <label v-for="(name, k) in CMD_NAMES" :key="k" class="field">
             <span class="flabel">{{ name }}</span>
@@ -155,7 +155,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
             <span class="lb">同一首歌</span>
             <div class="ctl"><div class="line">
               <select class="sel" aria-label="同一首歌放过之后多久才能再点" :value="s.repeatMin" @change="set({ repeatMin: Number(($event.target as HTMLSelectElement).value) }, '已保存')"><option v-for="v in REPEAT_OPTIONS" :key="v" :value="v">{{ repeatText(v) }}</option></select>
-              <span class="hint">放过之后隔多久才能再点（防止同一首被反复点；主播不受限制）</span>
+              <span class="hint">放过之后隔多久才能再点（主播不受限制）</span>
             </div></div>
           </div>
           <div class="srow">

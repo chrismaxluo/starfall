@@ -222,7 +222,7 @@ const COLS = '78px minmax(140px, 1fr) minmax(120px, 1fr) minmax(160px, 1.3fr) mi
     <div class="page-head">
       <div>
         <h1>事件记录</h1>
-        <p>进场、弹幕、礼物、上舰都会记录，包括命中了哪条规则、有没有播放、没播的原因。保留期可以在设置里修改。</p>
+        <p>每条进场、弹幕、礼物和上舰，以及有没有播放特效、没播的原因。</p>
       </div>
     </div>
     <div class="toolbar">

@@ -98,10 +98,10 @@ function pickAuto(): void {
 const range = computed(() => giftsRange(f.value));
 const RANGES: Array<{ value: GiftsRange; label: string; hint: string }> = [
   { value: 'live', label: '本场直播', hint: '下次开播时清空；没开播时显示上一场的' },
-  { value: 'today', label: '今天', hint: '每天 0 点清空，一天播几场都算在一起；跨夜直播过了 0 点也会清空' },
+  { value: 'today', label: '今天', hint: '每天 0 点清空，一天播几场都算在一起' },
   { value: 'week', label: '本周', hint: '每周一 0 点清空' },
   { value: 'month', label: '本月', hint: '每月 1 号 0 点清空' },
-  { value: 'since', label: '从某个时间起', hint: '从你定的时间开始一直累积，适合生日会、周年、活动，直到你换掉' },
+  { value: 'since', label: '从某个时间起', hint: '从指定的时间开始一直累积，适合生日会、周年、活动' },
 ];
 const rangeName = (r: GiftsRange) => RANGES.find((x) => x.value === r)!.label;
 function setRange(r: GiftsRange): void {
@@ -319,7 +319,7 @@ function onDrop(to: number): void {
 <template>
   <section v-if="o && cfg" class="page">
     <div class="page-head">
-      <div><h1>送礼名单</h1><p>把收到的礼物、上舰、醒目留言排成一列显示在直播画面上。</p></div>
+      <div><h1>送礼名单</h1><p>收到的礼物、上舰和醒目留言排成一列，显示在直播画面上。</p></div>
       <div class="wp-head-r">
         <select v-if="state.outputs.length > 1" class="sel" aria-label="输出" :value="o.id" @change="pickOutput"><option v-for="x in state.outputs" :key="x.id" :value="x.id">{{ x.name }}</option></select>
         <span class="live" :class="o.giftsEnabled && online ? '' : 'off'"><i />{{ !o.giftsEnabled ? '已关闭' : online ? '直播软件里已加上' : '直播软件里还没加' }}</span>
@@ -356,7 +356,7 @@ function onDrop(to: number): void {
                   <button class="btn sm" type="button" @click="sinceNow">从现在开始算</button>
                 </div>
                 <span class="hint">{{ RANGES.find((r) => r.value === range)?.hint }}</span>
-                <span v-if="tooOld" class="hint warn">事件记录只保留 {{ tooOld }} 天，更早的礼物已经删掉了，算不进来（可以在「设置」里改保留天数）</span>
+                <span v-if="tooOld" class="hint warn">事件记录只保留 {{ tooOld }} 天，更早的礼物算不进来</span>
               </div>
             </div>
             <div class="srow">
@@ -377,7 +377,7 @@ function onDrop(to: number): void {
                 <div v-else class="line">
                   <Switch :model-value="f.amount !== false" label="显示总金额" @change="(v) => setFilter({ amount: v }, v ? '名单显示每人的总金额（电池）' : '名单不显示金额，只排名次')" /><span>显示总金额（电池）</span>
                 </div>
-                <span class="hint">{{ view === 'viewer' ? '每人一条，按这段时间送的总价值从多到少排，前三名有金银铜标记；有人再送，数字往上涨、名次跟着变' : f.sort === 'value' ? '大礼物排在上面；一屏放不下又不滚动时，留下最大的几条' : '旧的在上、新的在下' }}{{ view === 'item' && f.merge ? '；同一个人分几次送的同一种礼物合成一条，数量加起来' : '' }}</span>
+                <span class="hint">{{ view === 'viewer' ? '每人一条，按送出的总价值排名，前三名有金银铜标记' : f.sort === 'value' ? '大礼物排在上面' : '旧的在上、新的在下' }}{{ view === 'item' && f.merge ? '；同一个人送的同一种礼物合成一条' : '' }}</span>
               </div>
             </div>
             <div class="srow">
@@ -389,7 +389,7 @@ function onDrop(to: number): void {
                     <button :aria-pressed="f.mode === 'only'" @click="setFilter({ mode: 'only' }, '名单只显示选中的几种礼物')">只要这几种</button>
                   </span>
                   <select v-if="f.mode === 'all'" class="sel" aria-label="最低金额" :value="listMin" @change="setMin(Number(($event.target as HTMLSelectElement).value))"><option v-for="g in GIFTS_MIN_OPTIONS" :key="g" :value="g">{{ g ? `${yuanOf(g)}以上` : '金额不限' }}</option></select>
-                  <span class="hint">{{ f.mode === 'all' ? (listMin ? `一次送出（连击合起来算）满 ${yuanOf(listMin)}才显示，小礼物不进名单` : '所有付费礼物都显示（免费礼物不显示）') : '只显示下面选中的礼物，谁送的都算' }}</span>
+                  <span class="hint">{{ f.mode === 'all' ? (listMin ? `一次送出满 ${yuanOf(listMin)}才显示（连击合起来算）` : '所有付费礼物都显示') : '只显示下面选中的礼物，谁送的都算' }}</span>
                 </div>
                 <GiftsFilterPick v-if="f.mode === 'only'" :model-value="f.gifts" @change="(gifts, msg) => setFilter({ gifts }, msg)" />
               </div>
@@ -406,7 +406,7 @@ function onDrop(to: number): void {
               <span class="lb">置顶</span>
               <div class="ctl">
                 <div class="line"><Switch :model-value="Boolean(f.pinTop)" label="置顶我挑的记录" @change="(v) => setFilter({ pinTop: v }, v ? '挑好的记录固定在名单最上面' : '不再置顶')" /><span>把我挑的记录固定在最上面</span></div>
-                <span class="hint">在下面的送礼记录里挑，固定在名单最上面不滚动，下面接着放自动名单；最多占一屏少一条</span>
+                <span class="hint">从下面的送礼记录里挑，固定在名单最上面</span>
               </div>
             </div>
           </div>
@@ -448,7 +448,7 @@ function onDrop(to: number): void {
             <input v-model.trim="q" class="inp" placeholder="观众名、UID、礼物名" aria-label="搜观众名、UID、礼物名" />
             <select v-model.number="minGold" class="sel amt" aria-label="金额"><option v-for="g in MIN_OPTIONS" :key="g" :value="g">{{ g ? `${g / 1000} 元以上` : '金额不限' }}</option></select>
           </div>
-          <div v-if="!sessions.length" class="inline-hint">还没有直播记录。开播后收到的礼物会出现在这里。</div>
+          <div v-if="!sessions.length" class="inline-hint">还没有直播记录</div>
           <div v-else-if="loading && !records.length" class="inline-hint">读取中…</div>
           <div v-else-if="!records.length" class="inline-hint">{{ q || minGold ? '没有符合的记录' : sessId === 'all' ? '还没有收到付费礼物、上舰或醒目留言' : '这一场没有收到付费礼物、上舰或醒目留言' }}</div>
           <div v-else class="gl-recs" :class="{ all: sessId === 'all' }">
@@ -491,7 +491,7 @@ function onDrop(to: number): void {
                 <input id="gl-alpha" class="alpha" type="range" :min="GIFTS_ALPHA_MIN" :max="GIFTS_ALPHA_MAX" step="5" :value="v.giftsAlpha" aria-label="弥散卡片的透明度" @input="look.set({ giftsAlpha: Number(($event.target as HTMLInputElement).value) })" />
                 <output for="gl-alpha" class="alpha-v">{{ v.giftsAlpha }}%</output>
               </div>
-              <span class="hint">越透越能看到后面的直播画面；画面很亮或很花时调低一点，字更清楚</span>
+              <span class="hint">画面很亮或很花时调低一点，字更清楚</span>
             </div>
           </div>
           <div class="srow">
@@ -511,7 +511,6 @@ function onDrop(to: number): void {
                 <input :key="`t${o.id}`" class="inp title" :value="v.giftsTitle" :maxlength="GIFTS_TITLE_MAX" placeholder="不加标题就留空" aria-label="名单标题" @input="look.set({ giftsTitle: ($event.target as HTMLInputElement).value })" />
                 <button v-for="t in titleIdeas.filter((x) => x !== v.giftsTitle)" :key="t" class="btn sm" type="button" @click="look.set({ giftsTitle: t })">用「{{ t }}」</button>
               </div>
-              <span class="hint">显示在名单最上面</span>
             </div>
           </div>
           <div class="srow">
@@ -530,7 +529,6 @@ function onDrop(to: number): void {
                 <button :aria-pressed="v.giftsSide === 'left'" @click="look.set({ giftsSide: 'left' })">靠左</button>
                 <button :aria-pressed="v.giftsSide === 'right'" @click="look.set({ giftsSide: 'right' })">靠右</button>
               </span>
-              <span class="hint">放在画面哪边就选哪边</span>
             </div></div>
           </div>
           <div class="srow">

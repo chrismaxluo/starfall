@@ -6,6 +6,7 @@ import EffectPicker from '../components/EffectPicker.vue';
 import Empty from '../components/Empty.vue';
 import Icon from '../components/Icon.vue';
 import QuickPad from '../components/QuickPad.vue';
+import Tip from '../components/Tip.vue';
 import { put } from '../lib/api.ts';
 import { desktop, reloadHotkeys } from '../lib/desktop.ts';
 import { keyOf, quickName, useQuickHotkeys } from '../lib/quick.ts';
@@ -181,7 +182,7 @@ onBeforeUnmount(() => {
     <div class="page-head">
       <div>
         <h1>素材快捷播放</h1>
-        <p>点一下按钮或按快捷键，马上在直播画面上播放。正在播的观众特效会先停下，播完再从头播。</p>
+        <p>点一下按钮或按快捷键，马上在直播画面上播放。<Tip text="正在播放的观众特效会先停下，快捷播放的素材播完后再从头播放。快捷键只在这个页面或「总览」是当前窗口时有用，在输入框里打字时不会触发。" /></p>
       </div>
       <div class="actions">
         <template v-if="editing">
@@ -196,7 +197,6 @@ onBeforeUnmount(() => {
     <template v-else-if="!editing">
       <div v-if="state.quick.length" class="card">
         <QuickPad big />
-        <p class="qp-tip">快捷键只在这个页面或「总览」是当前窗口时有用；在输入框里打字时不会触发。</p>
       </div>
       <div v-else class="card">
         <Empty icon="i-bolt" title="还没有按钮" desc="把常用的素材做成按钮，直播时点一下就能播，不用再发弹幕触发。">

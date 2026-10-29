@@ -211,7 +211,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
     <div class="page-head">
       <div>
         <h1>素材库</h1>
-        <p>上传的动画和图片就是进场特效，在触发规则里直接选用。音效单独管理，可以被多个素材共用。</p>
+        <p>上传的动画和图片可以在触发规则里选用；音效可以被多个素材共用。</p>
       </div>
       <div class="actions">
         <span class="usage"><span class="num">已用 {{ fileSize(totalSize) }}</span></span>

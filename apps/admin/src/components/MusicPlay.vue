@@ -312,7 +312,7 @@ async function simulate(): Promise<void> {
           <button class="btn" type="submit" :disabled="simBusy">发送</button>
         </form>
         <p v-if="simResult" class="mp-simr" :class="{ bad: !simResult.ok }"><Icon :name="simResult.ok ? 'i-check' : 'i-info'" />{{ simResult.text }}</p>
-        <p class="inline-hint">用「测试观众」的身份发一条弹幕，点到的歌会真的进列表（直播画面上也会放）。</p>
+        <p class="inline-hint">以「测试观众」的身份发一条弹幕，点到的歌会真的进列表并播放。</p>
       </div>
 
       <div class="card">

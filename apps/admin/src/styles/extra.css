@@ -866,3 +866,11 @@ body:has(.editor) .toasts { bottom: 92px; }
 @media (max-width: 1360px) { .top .search .kbd { display: none; } }
 /* 总览右栏窄时，面板标签去掉图标，四个标签放得下 */
 @media (max-width: 1360px) { .ov-panel .ptabs button svg.i { display: none; } }
+/* 「ⓘ」小提示（Tip.vue）：停上去显示说明 */
+.tip { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 2px; border-radius: 50%; color: var(--t3); cursor: help; vertical-align: -3px; outline: none; }
+.tip svg.i { width: 14px; height: 14px; }
+.tip:hover, .tip:focus-visible { color: var(--accent); }
+.tip .tip-b { position: absolute; left: -10px; bottom: calc(100% + 8px); z-index: 30; width: max-content; max-width: 280px; padding: 8px 11px; border-radius: var(--r-sm);
+  background: var(--t1); color: var(--l1); font-size: var(--fs-cap); font-weight: 400; line-height: 1.6; text-align: left; white-space: normal; letter-spacing: 0;
+  box-shadow: var(--shadow-pop); opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .15s, transform .15s; }
+.tip:hover .tip-b, .tip:focus-visible .tip-b { opacity: 1; transform: none; }

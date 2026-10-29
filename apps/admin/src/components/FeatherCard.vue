@@ -9,6 +9,7 @@ import type { Settings } from '../lib/types.ts';
 import Icon from './Icon.vue';
 import PreviewStage from './PreviewStage.vue';
 import Switch from './Switch.vue';
+import Tip from './Tip.vue';
 
 const stage = ref<InstanceType<typeof PreviewStage> | null>(null);
 const pct = ref(state.settings?.featherPct ?? FEATHER_DEFAULT);
@@ -51,12 +52,12 @@ async function onChange(): Promise<void> {
 
 <template>
   <div v-if="state.settings" class="card">
-    <div class="card-h"><h2>素材显示</h2><span class="aside">对所有上传的素材生效，单个素材可以在素材设置里另外设置</span></div>
+    <div class="card-h"><h2>素材显示<Tip text="对所有上传的素材生效，单个素材可以在素材设置里另外设置。" /></h2></div>
     <div class="fc">
       <div class="fc-set">
         <div class="toggle-line">视频上下羽化 <span class="hint">边缘慢慢变透明，不再一刀切</span><Switch v-model="state.settings.featherOn" label="视频上下羽化" @change="toggle" /></div>
         <div v-if="state.settings.featherOn" class="slider-row off"><label for="fcPct">羽化宽度</label><input id="fcPct" v-model.number="pct" type="range" min="0" :max="FEATHER_MAX" step="1" @input="onInput" @change="onChange" /><output>{{ pct }}%</output></div>
-        <span class="hint">按素材高度算。只对没有透明通道的视频和图片生效（MP4、JPG 等）；透明 WebM 本身边缘就是透明的，不受影响。</span>
+        <span class="hint">只对没有透明背景的视频和图片生效（MP4、JPG 等）</span>
         <span class="hint">现在有 {{ followers.length }} 个素材跟随这里的设置。</span>
         <button v-if="sample" class="btn" type="button" style="align-self: flex-start" @click="replay"><Icon :name="played ? 'i-replay' : 'i-play'" />{{ played ? '重播演示' : '播放演示' }}</button>
       </div>

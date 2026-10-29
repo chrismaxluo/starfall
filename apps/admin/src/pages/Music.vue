@@ -48,7 +48,7 @@ const issues = computed(() => (tab.value === 'play' ? [] : neteaseIssues()));
     <div class="page-head">
       <div>
         <h1>弹幕点歌</h1>
-        <p>观众发弹幕「{{ music.settings?.cmdRequest ?? '点歌' }} 歌名」，歌会排进列表，在直播画面上的点歌窗口里播放。</p>
+        <p>观众发弹幕「{{ music.settings?.cmdRequest ?? '点歌' }} 歌名」点歌，在直播画面的点歌窗口里播放。</p>
       </div>
       <div v-if="music.settings" class="mu-head-r">
         <button class="btn" :title="`在直播软件里加一个浏览器源，宽高填 ${MUSIC_WIDTH} × ${MUSIC_HEIGHT}`" @click="copyMusicUrl"><Icon name="i-copy" />复制点歌窗口地址</button>

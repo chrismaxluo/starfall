@@ -131,10 +131,10 @@ async function retry(): Promise<void> {
       </div>
       <template v-if="st === 'soon' && days !== null">
         <div class="nc-left" aria-hidden="true"><i :style="{ width: `${Math.max(4, (days / 30) * 100)}%` }" /></div>
-        <div class="nc-tip">还剩 {{ days }} 天。到期后会员歌放不了（点到会提示观众），免费歌照常。在网易云 App 里续费后点右上角的刷新。</div>
+        <div class="nc-tip">还剩 {{ days }} 天，到期后会员歌放不了，免费歌照常。续费后点右上角的刷新。</div>
       </template>
       <div v-else-if="st === 'expired'" class="nc-tip bad">在网易云 App 里续费后点右上角的刷新，会员歌马上就能放。</div>
-      <div v-else-if="st === 'invalid'" class="nc-tip bad">可能是在别的地方退出了，或者改了密码。重新扫码就好，列表不受影响。</div>
+      <div v-else-if="st === 'invalid'" class="nc-tip bad">可能在别处退出了或改了密码，重新扫码即可，列表不受影响。</div>
       <div class="nc-sep" />
       <div class="nc-foot">
         <span class="nc-conn" :class="{ bad: urlsBad }"><i class="dot" :class="conn.dot" /><span>{{ conn.text }}</span></span>

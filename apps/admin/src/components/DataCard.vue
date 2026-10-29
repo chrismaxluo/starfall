@@ -82,7 +82,7 @@ onMounted(load);
       </div>
       <div class="bk-t">
         <div v-for="b in showAll ? backups : backups.slice(0, 2)" :key="b.stamp" class="r">
-          <span class="num">{{ when(b.stamp) }}<span v-if="b.manual" class="tag nor" style="margin-left: 6px; font-size: 11px">手动</span></span>
+          <span class="num">{{ when(b.stamp) }}<span v-if="b.manual" class="tag nor" style="margin-left: 6px; font-size: var(--fs-badge)">手动</span></span>
           <span class="sz">{{ fileSize(b.dbSize + b.configSize) }}</span>
           <button v-if="b.config" type="button" class="linkish" @click="restore(b)">恢复到这份</button><span v-else />
           <a v-if="b.config" class="linkish" :href="`/api/backup/files/${b.config}`" download title="下载这份配置文件">下载</a><span v-else />
@@ -99,7 +99,7 @@ onMounted(load);
         </select>
         <span />
       </div>
-      <span class="hint" style="font-size: 12px; color: var(--t3)">原始消息只保留 7 天，用于排查问题。</span>
+      <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">原始消息只保留 7 天，用于排查问题。</span>
     </div>
     <div class="field" style="margin-top: 14px">
       <span class="flabel">导出 / 导入配置</span>
@@ -109,7 +109,7 @@ onMounted(load);
         <button class="btn" :disabled="uploading !== null" @click="fileIn?.click()">{{ uploading !== null ? `正在上传 ${Math.round(uploading * 100)}%` : '导入配置' }}</button>
         <input ref="fileIn" type="file" accept=".json,.zip,application/json,application/zip" hidden @change="pick" />
       </div>
-      <span class="hint" style="font-size: 12px; color: var(--t3)">配置包括规则、素材设置、输出和播放设置，不含 B站登录信息和后台密码。导出的文件桌面版和服务器版都能导入；换电脑时建议用「含素材文件」的 zip。导入或恢复前会自动备份一份现在的配置，导错了可以在上面的备份列表里点「恢复到这份」。</span>
+      <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">配置包括规则、素材设置、输出和播放设置，不含 B站登录信息和后台密码。导出的文件桌面版和服务器版都能导入；换电脑时建议用「含素材文件」的 zip。导入或恢复前会自动备份一份现在的配置，导错了可以在上面的备份列表里点「恢复到这份」。</span>
     </div>
     <ImportDialog v-if="preview" :preview="preview" @close="preview = null" @done="(preview = null), load()" />
   </div>

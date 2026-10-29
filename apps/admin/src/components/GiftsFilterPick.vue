@@ -71,12 +71,12 @@ function toggle(g: { id: number; name: string; icon?: string }): void {
 <style scoped>
 .gfp { display: flex; flex-direction: column; gap: 10px; }
 .gfp-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.gfp-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 6px; border-radius: 8px; background: var(--l3); box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; }
+.gfp-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 6px; border-radius: var(--r-sm); background: var(--l3); box-shadow: inset 0 0 0 1px var(--line); font-size: var(--fs-sec); }
 .gfp-chip img { width: 22px; height: 22px; object-fit: contain; }
-.gfp-chip button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 6px; background: none; color: var(--t3); }
+.gfp-chip button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: var(--r-xs); background: none; color: var(--t3); }
 .gfp-chip button:hover { background: var(--hover); color: var(--t1); }
 .gfp-chip button svg { width: 12px; height: 12px; }
 .rl-gpick { margin-top: 0; }
 .rl-gpick .grid button.on { border-color: var(--accent); background: var(--accent-soft); }
-.hint { font-size: 12px; color: var(--t3); }
+.hint { font-size: var(--fs-cap); color: var(--t3); }
 </style>

@@ -168,35 +168,35 @@ async function retry(): Promise<void> {
 .nc-name { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 16px; font-weight: 600; color: var(--t1); }
 .nc-name .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 会员标签：深底金字 */
-.vip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 6px; background: var(--vip-bg); color: var(--vip-fg); font-size: 11.5px; font-weight: 600; letter-spacing: .02em; flex: none; }
+.vip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--r-xs); background: var(--vip-bg); color: var(--vip-fg); font-size: var(--fs-cap); font-weight: 600; letter-spacing: .02em; flex: none; }
 .vip svg { width: 11px; height: 11px; }
 .vip.off { background: var(--hover); color: var(--t3); }
-.nc-say { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--t2); }
+.nc-say { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sec); color: var(--t2); }
 .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--ok); }
 .dot.warn { background: var(--gov); }
 .dot.bad { background: var(--bad); }
 .dot.off { background: var(--line-strong); }
 .nc-days { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
 .nc-days b { font-size: 34px; font-weight: 600; letter-spacing: -0.04em; color: var(--t1); }
-.nc-days b small { font-family: var(--font-sans); font-size: 13px; font-weight: 500; letter-spacing: 0; margin-left: 3px; color: var(--t2); }
-.nc-days span { font-size: 12px; color: var(--t3); }
+.nc-days b small { font-family: var(--font-sans); font-size: var(--fs-sec); font-weight: 500; letter-spacing: 0; margin-left: 3px; color: var(--t2); }
+.nc-days span { font-size: var(--fs-cap); color: var(--t3); }
 .nc-days.warn b, .nc-days.warn b small { color: var(--gov); }
 .nc-days.bad b { color: var(--bad); font-size: 20px; letter-spacing: 0; }
 /* 会员还剩多少：30 天内才出现，越短越急 */
 .nc-left { position: relative; height: 3px; margin-top: 14px; border-radius: 2px; background: var(--hover); overflow: hidden; }
 .nc-left i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--gov); }
-.nc-tip { margin-top: 12px; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.6; color: var(--t1); background: var(--gov-soft); }
+.nc-tip { margin-top: 12px; padding: 9px 12px; border-radius: var(--r-sm); font-size: var(--fs-sec); line-height: 1.6; color: var(--t1); background: var(--gov-soft); }
 .nc-tip.bad { background: var(--bad-soft); }
 .nc-sep { height: 1px; background: var(--line); margin: 16px -20px 0; }
 .nc-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: auto; padding-top: 14px; }
 .nc-foot .acts { display: flex; gap: 6px; margin-left: auto; }
-.nc-foot .btn, .nc-foot :deep(.btn), .nc-foot :deep(.delb) { height: 30px; padding: 0 12px; font-size: 12.5px; }
-.nc-conn { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; color: var(--t2); }
+.nc-foot .btn, .nc-foot :deep(.btn), .nc-foot :deep(.delb) { height: 30px; padding: 0 12px; font-size: var(--fs-sec); }
+.nc-conn { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-sec); color: var(--t2); }
 .nc-conn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nc-conn.bad { color: var(--bad); }
 .nc-empty { display: flex; align-items: center; gap: 14px; }
-.nc-ico { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.nc-ico { width: 52px; height: 52px; border-radius: var(--r-md); display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
 .nc-ico svg { width: 24px; height: 24px; }
-.nc-empty b { display: block; font-size: 15px; font-weight: 600; margin-bottom: 3px; }
-.nc-empty span span { font-size: 12.5px; color: var(--t2); line-height: 1.6; }
+.nc-empty b { display: block; font-size: var(--fs-title); font-weight: 600; margin-bottom: 3px; }
+.nc-empty span span { font-size: var(--fs-sec); color: var(--t2); line-height: 1.6; }
 </style>

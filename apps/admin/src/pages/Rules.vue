@@ -5,6 +5,7 @@ import { HONOR_LEVEL_MAX, MEDAL_LEVEL_MAX } from '@starfall/shared';
 import Avatar from '../components/Avatar.vue';
 import CdPick from '../components/CdPick.vue';
 import EffectPicker from '../components/EffectPicker.vue';
+import Empty from '../components/Empty.vue';
 import Icon from '../components/Icon.vue';
 import HonorMedal from '../components/HonorMedal.vue';
 import IdTag from '../components/IdTag.vue';
@@ -481,7 +482,7 @@ onMounted(() => void refreshRules());
         <div class="r1">
           <input id="exUid" v-model="draft.uid" class="inp num" inputmode="numeric" placeholder="输入 B站 UID，回车查询" aria-label="B站 UID" @keydown.enter="lookup" />
           <button class="btn" :disabled="draft.busy" @click="lookup"><span v-if="draft.busy" class="spin" />{{ draft.busy ? '查询中' : '查询' }}</button>
-          <span style="color: var(--t3); font-size: 12.5px">或</span>
+          <span style="color: var(--t3); font-size: var(--fs-sec)">或</span>
           <button class="linkish" @click="showRecent = !showRecent">从最近进场的观众里选</button>
           <button class="icon-btn" style="margin-left: auto; box-shadow: none" aria-label="取消添加" @click="draft = null"><Icon name="i-x" /></button>
         </div>
@@ -490,12 +491,12 @@ onMounted(() => void refreshRules());
             <input type="radio" name="expk" :disabled="state.exclusives.some((x) => x.uid === v.uid)" @change="((draft!.uid = String(v.uid)), (showRecent = false), lookup())" />
             <Avatar :name="v.name" :face="v.face" :guard="v.guard" />{{ v.name }}<span class="ids"><HonorMedal :level="v.honor" /><IdTag :viewer="v" /></span><span class="uid num">{{ state.exclusives.some((x) => x.uid === v.uid) ? '已是专属' : v.uid }}</span>
           </label>
-          <div v-if="!recentViewers.length" style="padding: 10px; color: var(--t3); font-size: 12.5px">还没有进场记录，开播后这里会列出最近进场的观众</div>
+          <div v-if="!recentViewers.length" style="padding: 10px; color: var(--t3); font-size: var(--fs-sec)">还没有进场记录，开播后这里会列出最近进场的观众</div>
         </div>
         <div v-if="draft.msg" class="lookup" :class="{ ok: draft.ok }">{{ draft.msg }}</div>
         <div v-if="draft.found" class="found">
           <span class="who"><Avatar :name="draft.found.name" :face="draft.found.face" :guard="draft.found.guard" />{{ draft.found.name }}</span>
-          <span class="num" style="font-size: 12px; color: var(--t3)">UID {{ draft.found.uid }}</span>
+          <span class="num" style="font-size: var(--fs-cap); color: var(--t3)">UID {{ draft.found.uid }}</span>
           <EffectPicker v-model="draft.effectId" />
           <CdPick v-model="draft.cooldownMin" />
           <button class="btn primary" style="margin-left: auto" @click="addExclusive">添加</button>
@@ -512,7 +513,7 @@ onMounted(() => void refreshRules());
           <div class="c-cd"><button class="untilb" :class="x.until ? (x.until < todayStr ? 'expired' : 'set') : ''" :title="x.until ? '到期后自动停用' : '一直有效'" @click.stop="(e) => openDate(e, x)">{{ x.until ? `${x.until < todayStr ? '已过期 ' : '至 '}${x.until.slice(5)}` : '长期' }}</button></div>
           <div class="c-act"><button class="icon-btn play" aria-label="预览" title="预览" @click="preview(x.effectId, { name: x.name ?? '专属观众', guard: 0, isMod: false, medalLevel: null }, x.name ?? String(x.uid))"><svg><use href="#i-play" /></svg></button><RowMenu :items="exMenu(x)" :label="`${x.name ?? x.uid}：更多操作`" /></div>
         </div>
-        <div v-if="!exList.length" class="rt-empty">{{ state.exclusives.length ? '没有匹配的专属用户' : '还没有专属用户。点右上角「添加专属用户」，或者在总览的实时动态里点某个观众' }}</div>
+        <Empty v-if="!exList.length" icon="i-user" :title="state.exclusives.length ? '没有匹配的专属用户' : '还没有专属用户'" :desc="state.exclusives.length ? undefined : '点右上角「添加专属用户」，或者在总览的实时动态里点某个观众'" />
       </div>
       <p v-if="state.exclusives.length" class="rt-note">在总览的实时动态里点某个观众，也能直接设置专属特效。</p>
     </template>
@@ -527,7 +528,7 @@ onMounted(() => void refreshRules());
       <template v-if="datePop">
         <div style="position: fixed; inset: 0; z-index: 45" @click="datePop = null" />
         <div class="datepop" :style="{ left: `${datePop.left}px`, top: `${datePop.top}px` }">
-          <b style="font-weight: 500">有效期</b><span style="color: var(--t3); font-size: 12px">到期后自动停用，改回按身份的规则播放（含当天）</span>
+          <b style="font-weight: 500">有效期</b><span style="color: var(--t3); font-size: var(--fs-cap)">到期后自动停用，改回按身份的规则播放（含当天）</span>
           <input v-model="datePop.value" class="inp" type="date" aria-label="截止日期" />
           <div class="row"><button class="btn" @click="setUntil(null)">设为长期</button><button class="btn primary" @click="setUntil(datePop.value)">确定</button></div>
         </div>

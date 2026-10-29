@@ -6,6 +6,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { GIFTS_ALPHA_MAX, GIFTS_ALPHA_MIN, GIFTS_KEEP, GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_PAGE_HOLD, GIFTS_STEP_HOLD, GIFTS_TITLE_MAX, giftsRange, giftsSourceSize, giftsView } from '@starfall/shared/overlay';
 import type { GiftListItem, GiftsFilter, GiftsLook, GiftsMotion, GiftsRange, GiftsSpeed } from '@starfall/shared/overlay';
 import Avatar from '../components/Avatar.vue';
+import Empty from '../components/Empty.vue';
 import DraftBar from '../components/DraftBar.vue';
 import GiftsFilterPick from '../components/GiftsFilterPick.vue';
 import GiftsPreview from '../components/GiftsPreview.vue';
@@ -413,7 +414,7 @@ function onDrop(to: number): void {
         <template v-if="showRecords">
         <div class="card">
           <div class="card-h"><h2>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
-          <div v-if="!pins.length" class="inline-hint">还没有。在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」。</div>
+          <Empty v-if="!pins.length" compact icon="i-pin" title="还没有挑选的记录" desc="在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」" />
           <div v-else class="gl-recs">
             <div
               v-for="(p, i) in pins"
@@ -565,50 +566,50 @@ function onDrop(to: number): void {
 /* 名单放什么：两个大选项 */
 .gl-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
 @media (max-width: 640px) { .gl-modes { grid-template-columns: 1fr; } }
-.gl-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
+.gl-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border-radius: var(--r-md); border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
 .gl-mode:hover { border-color: var(--line-strong); }
 .gl-mode[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-ring); }
-.gl-mode b { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.gl-mode b { display: flex; align-items: center; gap: 8px; font-size: var(--fs-body); font-weight: 600; }
 .gl-mode b svg { width: 16px; height: 16px; color: var(--accent); }
-.gl-mode span { font-size: 12.5px; color: var(--t2); line-height: 1.6; }
+.gl-mode span { font-size: var(--fs-sec); color: var(--t2); line-height: 1.6; }
 .srow .line .gap { width: 12px; }
-.srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: 13px; color: var(--t2); }
+.srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: var(--fs-sec); color: var(--t2); }
 
 /* 现在画面上显示 */
-.gl-sum { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--ok-soft, rgba(52, 199, 123, .1)); color: var(--t1); font-size: 13px; line-height: 1.6; }
+.gl-sum { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--ok-soft, rgba(52, 199, 123, .1)); color: var(--t1); font-size: var(--fs-sec); line-height: 1.6; }
 .gl-sum svg { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--ok, #34C77B); }
 .gl-sum b { font-weight: 600; }
 .gl-sum.bad { background: rgba(214, 69, 69, .1); }
 .gl-sum.bad svg { color: #D64545; }
 
 .gl-pv { display: grid; place-items: center; padding: 6px 0; }
-.gl-sub { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--t2); }
-.gl-sub small { font-size: 12px; font-weight: 400; color: var(--t3); }
+.gl-sub { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 2px; font-size: var(--fs-sec); font-weight: 600; color: var(--t2); }
+.gl-sub small { font-size: var(--fs-cap); font-weight: 400; color: var(--t3); }
 .gl-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .gl-tools .inp { width: 180px; height: 32px; }
 .gl-tools .sel { height: 32px; min-width: 240px; max-width: 100%; }
 .gl-tools .sel.amt { min-width: 0; width: 120px; }
 .seg.wrap { flex-wrap: wrap; }
 .alpha { width: min(240px, 100%); accent-color: var(--accent); }
-.alpha-v { min-width: 3em; font-family: var(--font-mono); font-size: 12.5px; color: var(--t1); }
+.alpha-v { min-width: 3em; font-variant-numeric: tabular-nums; font-size: var(--fs-sec); color: var(--t1); }
 .inp.dt { width: 200px; height: 32px; }
 /* 手动时有两个标题建议：输入框先缩一点，一行放得下 */
 .inp.title { flex: 1 1 120px; max-width: 200px; height: 32px; }
 .hint.warn { color: var(--gov); }
 .gl-recs.all .gl-rec { grid-template-columns: 112px 30px minmax(0, 1fr) 34px 96px 100px; }
 .gl-recs { display: flex; flex-direction: column; max-height: 560px; overflow: auto; margin: 0 -6px; }
-.gl-rec { display: grid; grid-template-columns: 62px 30px minmax(0, 1fr) 34px 96px 100px; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; font-size: 13px; }
+.gl-rec { display: grid; grid-template-columns: 62px 30px minmax(0, 1fr) 34px 96px 100px; align-items: center; gap: 10px; padding: 8px 6px; border-radius: var(--r-sm); font-size: var(--fs-sec); }
 .gl-rec + .gl-rec { border-top: 1px solid var(--line); }
 .gl-rec:hover { background: var(--hover); }
 .gl-rec.on { background: var(--accent-soft); }
-.gl-rec .t { color: var(--t3); font-size: 12px; }
+.gl-rec .t { color: var(--t3); font-size: var(--fs-cap); }
 .gl-rec .who { display: flex; flex-direction: column; min-width: 0; }
 .gl-rec .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gl-rec .who span { color: var(--t2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gl-rec .who span { color: var(--t2); font-size: var(--fs-cap); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gl-rec .gimg { width: 32px; height: 32px; object-fit: contain; }
-.gl-rec .v { color: var(--t2); font-size: 12px; text-align: right; white-space: nowrap; }
+.gl-rec .v { color: var(--t2); font-size: var(--fs-cap); text-align: right; white-space: nowrap; }
 .gl-rec .ord { display: flex; gap: 2px; }
-.gl-rec .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; justify-content: center; }
+.gl-rec .btn.sm { height: 28px; padding: 0 10px; font-size: var(--fs-sec); justify-content: center; }
 .gl-rec .btn.on { color: var(--accent); }
 .gl-recs .gl-rec.pin { grid-template-columns: 44px 112px 30px minmax(0, 1fr) 34px 64px 72px; }
 .gl-rec.pin.dragging { opacity: .45; }

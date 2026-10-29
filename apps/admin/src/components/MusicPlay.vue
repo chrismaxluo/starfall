@@ -4,6 +4,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import type { MusicItem, MusicSong } from '@starfall/shared/overlay';
 import Avatar from './Avatar.vue';
+import Empty from './Empty.vue';
 import ConfirmButton from './ConfirmButton.vue';
 import Icon from './Icon.vue';
 import MusicNetease from './MusicNetease.vue';
@@ -244,7 +245,7 @@ async function simulate(): Promise<void> {
             <ConfirmButton v-if="queue.length" label="清空" confirm-label="确认清空？" cls="btn" @confirm="clearQueue" />
           </span>
         </div>
-        <div v-if="!queue.length" class="inline-hint">列表是空的。</div>
+        <Empty v-if="!queue.length" compact icon="i-queue" title="列表是空的" desc="观众点的歌和手动添加的歌会排在这里" />
         <div v-else class="mp-list">
           <div
             v-for="(it, i) in queue"
@@ -316,7 +317,7 @@ async function simulate(): Promise<void> {
 
       <div class="card">
         <div class="card-h"><h2>最近的点歌消息</h2><span class="aside">直播画面上也会提示</span></div>
-        <div v-if="!music.notices.length" class="inline-hint">还没有。</div>
+        <Empty v-if="!music.notices.length" compact icon="i-chat" title="还没有点歌消息" />
         <div v-else class="mp-notes">
           <div v-for="n in music.notices" :key="n.id" class="mp-note" :class="{ bad: !n.ok }">
             <span class="t num">{{ clock(n.ts) }}</span><Icon :name="n.ok ? 'i-check' : 'i-x'" /><span><b>{{ n.who }}</b> {{ n.text }}<em v-if="n.quiet" class="mp-quiet" title="同一个人反复失败、点得太快这类，不在直播画面上提示，免得刷屏">只在后台</em></span>
@@ -348,78 +349,78 @@ async function simulate(): Promise<void> {
 @media (max-width: 1100px) { .mp-grid { grid-template-columns: 1fr; } }
 
 .mp-now { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: center; }
-.mp-cover { width: 96px; height: 96px; border-radius: 14px; object-fit: cover; box-shadow: var(--shadow-card), 0 0 0 1px var(--line); }
+.mp-cover { width: 96px; height: 96px; border-radius: var(--r-md); object-fit: cover; box-shadow: var(--shadow-card), 0 0 0 1px var(--line); }
 .mp-cover.blank, .mp-thumb.blank { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .mp-cover.blank svg { width: 36px; height: 36px; }
 .mp-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mp-title { font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mp-artist { font-size: 13px; color: var(--t2); display: flex; align-items: center; gap: 8px; min-width: 0; }
-.mp-src { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: var(--hover); color: var(--t3); flex: none; }
-.mp-by { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--t2); }
+.mp-artist { font-size: var(--fs-sec); color: var(--t2); display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mp-src { font-size: var(--fs-badge); padding: 1px 6px; border-radius: var(--r-xs); background: var(--hover); color: var(--t3); flex: none; }
+.mp-by { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sec); color: var(--t2); }
 .mp-bar { position: relative; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--hover); overflow: hidden; }
 .mp-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--accent); transition: width .5s linear; }
 .mp-now.paused .mp-bar i { background: var(--t3); }
-.mp-time { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--t3); }
-.mp-empty { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; background: var(--hover); font-size: 13px; color: var(--t2); line-height: 1.6; }
+.mp-time { display: flex; justify-content: space-between; font-size: var(--fs-cap); color: var(--t3); }
+.mp-empty { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: var(--r-md); background: var(--hover); font-size: var(--fs-sec); color: var(--t2); line-height: 1.6; }
 .mp-empty svg { width: 24px; height: 24px; flex: none; color: var(--accent); }
 /* 歌词：唱到哪里，字就亮到哪里（和直播画面上的一样） */
-.ly { position: relative; margin-top: 14px; padding: 12px 16px 12px 40px; border-radius: 12px; background: var(--hover); overflow: hidden; }
+.ly { position: relative; margin-top: 14px; padding: 12px 16px 12px 40px; border-radius: var(--r-md); background: var(--hover); overflow: hidden; }
 .ly > svg { position: absolute; left: 14px; top: 15px; width: 15px; height: 15px; color: var(--accent); }
 .ly.paused { opacity: .6; }
-.ly-cur { position: relative; display: block; font-size: 15px; font-weight: 600; line-height: 1.5; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ly-cur { position: relative; display: block; font-size: var(--fs-title); font-weight: 600; line-height: 1.5; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ly-cur::after { content: attr(data-t); position: absolute; left: 0; top: 0; white-space: nowrap; color: var(--t1); clip-path: inset(0 calc(100% - var(--k, 0%)) 0 0); transition: clip-path .5s linear; }
 .ly-cur.dim { font-weight: 500; }
-.ly-next { display: block; margin-top: 2px; font-size: 12.5px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ly-next { display: block; margin-top: 2px; font-size: var(--fs-sec); color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ly-cur, .ly-next { animation: ly-in .35s cubic-bezier(.2, .8, .2, 1); }
 @keyframes ly-in { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .ly-cur, .ly-next { animation: none; } .ly-cur::after { transition: none; } }
 .mp-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-.mp-vol { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 12.5px; color: var(--t2); }
+.mp-vol { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: var(--fs-sec); color: var(--t2); }
 .mp-vol input { width: 140px; accent-color: var(--accent); }
 .mp-vol .num { width: 26px; text-align: right; }
 .mp-tip { margin: 8px 0 0; }
 
 .mp-list { display: flex; flex-direction: column; margin: 0 -6px; max-height: 620px; overflow: auto; }
-.mp-row, .mp-hit { display: grid; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; font-size: 13px; }
+.mp-row, .mp-hit { display: grid; align-items: center; gap: 10px; padding: 7px 6px; border-radius: var(--r-sm); font-size: var(--fs-sec); }
 .mp-row { grid-template-columns: 44px 36px minmax(0, 1fr) minmax(0, 9em) 40px 96px; }
 .mp-row + .mp-row, .mp-hit + .mp-hit { border-top: 1px solid var(--line); }
 .mp-row:hover, .mp-hit:hover { background: var(--hover); }
 .mp-row.dragging { opacity: .4; }
 .mp-row.dropto { box-shadow: inset 0 2px 0 var(--accent); }
-.mp-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.mp-thumb { width: 36px; height: 36px; border-radius: var(--r-sm); object-fit: cover; }
 .mp-thumb.blank svg { width: 16px; height: 16px; }
 .mp-t { display: flex; flex-direction: column; min-width: 0; }
 .mp-t b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mp-t span { font-size: 12px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mp-who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--t2); }
+.mp-t span { font-size: var(--fs-cap); color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sec); color: var(--t2); }
 .mp-who span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mp-d { font-size: 12px; color: var(--t3); text-align: right; }
+.mp-d { font-size: var(--fs-cap); color: var(--t3); text-align: right; }
 .mp-acts { display: flex; gap: 4px; justify-content: flex-end; }
-.mp-acts .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.mp-acts .btn.sm { height: 28px; padding: 0 10px; font-size: var(--fs-sec); }
 
 .mp-search, .mp-sim { display: flex; gap: 8px; }
 .mp-search .inp, .mp-sim .inp { flex: 1; min-width: 0; }
 .mp-sim .sel { width: 108px; }
-.mp-sub { margin: 16px 0 4px; font-size: 12.5px; font-weight: 600; color: var(--t2); }
+.mp-sub { margin: 16px 0 4px; font-size: var(--fs-sec); font-weight: 600; color: var(--t2); }
 .mp-hit { grid-template-columns: 36px minmax(0, 1fr) 40px auto; margin: 0 -6px; }
 .mp-hit.dim { opacity: .55; }
-.mp-in { font-size: 12px; color: var(--t3); }
+.mp-in { font-size: var(--fs-cap); color: var(--t3); }
 .err { color: #D64545; }
-.mp-simr { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--ok-soft); font-size: 13px; }
+.mp-simr { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 8px 12px; border-radius: var(--r-sm); background: var(--ok-soft); font-size: var(--fs-sec); }
 .mp-simr svg { width: 15px; height: 15px; color: var(--ok); flex: none; }
 .mp-simr.bad { background: var(--gov-soft); }
 .mp-simr.bad svg { color: var(--gov); }
 
 .mp-notes { display: flex; flex-direction: column; max-height: 320px; overflow: auto; }
-.mp-note { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12.5px; color: var(--t2); }
+.mp-note { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: var(--fs-sec); color: var(--t2); }
 .mp-note + .mp-note { border-top: 1px solid var(--line); }
-.mp-note .t { width: 58px; flex: none; color: var(--t3); font-size: 11.5px; }
+.mp-note .t { width: 58px; flex: none; color: var(--t3); font-size: var(--fs-cap); }
 .mp-note svg { width: 14px; height: 14px; flex: none; color: var(--ok); }
 .mp-note.bad svg { color: var(--gov); }
 .mp-note b { color: var(--t1); font-weight: 600; }
-.mp-quiet { margin-left: 6px; padding: 0 6px; border-radius: 5px; font-style: normal; font-size: 11px; color: var(--t3); background: var(--hover); }
+.mp-quiet { margin-left: 6px; padding: 0 6px; border-radius: var(--r-xs); font-style: normal; font-size: var(--fs-badge); color: var(--t3); background: var(--hover); }
 .mp-hk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-.mp-hkl { font-size: 12.5px; color: var(--t2); margin-right: 4px; }
-.mp-hk .btn.sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.mp-hkl { font-size: var(--fs-sec); color: var(--t2); margin-right: 4px; }
+.mp-hk .btn.sm { height: 30px; padding: 0 12px; font-size: var(--fs-sec); }
 .mp-hk .btn.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 </style>

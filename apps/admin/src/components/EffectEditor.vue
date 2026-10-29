@@ -483,12 +483,12 @@ onBeforeUnmount(() => {
             <button class="btn" @click="replay(true)"><Icon name="i-replay" />重播（带声音）</button>
             <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :title="dirty ? '发送的是现在预览里的样子（包括还没保存的修改）' : ''" @confirm="sendLive" />
           </div>
-          <span v-if="a && !ro" class="hint" style="font-size: 12px; color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>
+          <span v-if="a && !ro" class="hint" style="font-size: var(--fs-cap); color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>
           <div class="pv-opts">
             <div class="pv-opt"><span>按</span><Seg v-model="pvKind" label="按哪类事件预览" :options="KIND_OPTIONS" /><span>预览</span></div>
             <div class="pv-opt"><span>示例观众</span><Seg v-model="who" label="示例观众" :options="WHO_OPTIONS" /></div>
           </div>
-          <span class="hint" style="font-size: 12px; color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
+          <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
         </div>
         <div class="ed-set" :class="{ readonly: ro }">
           <div v-if="ro" class="ro-banner" style="pointer-events: auto; opacity: 1"><Icon name="i-lock" />内置素材不能直接修改。点右下角「复制并编辑」，就能在副本上自由调整。</div>
@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
                 <span class="vt" :class="{ alpha: a.hasAlpha }">
                   <video v-if="a.kind === 'video'" :src="a.url" muted loop autoplay playsinline />
                   <img v-else-if="a.kind === 'image'" :src="a.url" alt="" />
-                  <span v-else class="thumb-icon" style="position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.6); font-size: 11px">{{ a.ext.toUpperCase() }}</span>
+                  <span v-else class="thumb-icon" style="position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.6); font-size: var(--fs-badge)">{{ a.ext.toUpperCase() }}</span>
                 </span>
                 <span><b>{{ a.filename }}</b><span>{{ meta }}</span></span>
                 <ConfirmButton v-if="eff.usedBy.length" label="替换文件" confirm-label="确认替换？马上生效、旧文件删除" cls="btn" armed-cls="btn live-send" :disabled="busy" :title="`正在用于 ${eff.usedBy.map((u) => u.label).join('、')}：替换后马上生效，不用点保存，也撤不回`" @confirm="repIn?.click()"><Icon name="i-replay" />替换文件</ConfirmButton>
@@ -518,13 +518,13 @@ onBeforeUnmount(() => {
                     </select>
                   </label>
                 </div>
-                <span class="hint" style="font-size: 12px; color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来；荣耀等级勋章按观众的等级换图，没有等级时藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
+                <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来；荣耀等级勋章按观众的等级换图，没有等级时藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
               </template>
               <details class="ed-more">
                 <summary><Icon name="i-chev" />边缘慢慢变透明（上下羽化）<span class="hint">{{ featherOptions.find((x) => x.value === d!.feather)?.label }}</span></summary>
                 <div class="toggle-line fe-line">上下羽化 <Seg v-model="d.feather" label="上下羽化" :options="featherOptions" /></div>
                 <div v-if="d.feather === 'custom'" class="slider-row off"><label for="edFe">羽化宽度</label><input id="edFe" v-model.number="d.featherPct" type="range" min="0" :max="FEATHER_MAX" step="1" /><output>{{ d.featherPct }}%</output></div>
-                <span class="hint" style="font-size: 12px; color: var(--t3)">{{ featherHint }}</span>
+                <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">{{ featherHint }}</span>
               </details>
               <div v-if="a.warnings.includes('no_alpha')" class="warnbox">这个文件没有透明通道，在直播软件里会带背景色，挡住直播画面。建议导出成带透明通道的 WebM（VP9）。</div>
               <div v-if="a.warnings.includes('large')" class="warnbox">文件超过 10 MB，首次加载可能会慢一点，建议压缩。</div>
@@ -549,7 +549,7 @@ onBeforeUnmount(() => {
               <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B站的信息、弹幕，或者被挡住。</div>
               <div v-if="adjusted && outOfStage" class="warnbox">素材有一部分超出了画面，超出的部分直播时看不到。</div>
             </template>
-            <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
+            <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: var(--fs-cap); color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>
 
           <div class="ed-sec">
@@ -558,7 +558,7 @@ onBeforeUnmount(() => {
             <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
             <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前面放上 B站的荣耀等级勋章（和弹幕里的一样），没有荣耀等级的观众不显示</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
             <template v-if="!a || d.showText">
-              <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
+              <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
               <div class="vars"><span class="vars-l">插入</span><button v-for="v in VARS_OF[txTab]" :key="v.key" type="button" :title="`插入 {${v.key}}`" @click="insertVar(`{${v.key}}`)">{{ v.label }}</button></div>
@@ -583,8 +583,8 @@ onBeforeUnmount(() => {
 
           <div class="ed-sec">
             <h3><span class="n">5</span>时长和渐入渐出</h3>
-            <span v-if="timed && !d.durationCustom" class="hint" style="font-size: 13px; color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
-            <div v-else class="row2"><span class="hint" style="font-size: 13px; color: var(--t2)">显示多久</span><div class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div></div>
+            <span v-if="timed && !d.durationCustom" class="hint" style="font-size: var(--fs-sec); color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
+            <div v-else class="row2"><span class="hint" style="font-size: var(--fs-sec); color: var(--t2)">显示多久</span><div class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div></div>
             <template v-if="a">
               <div v-if="timed" class="toggle-line">手动设置时长 <span class="hint">{{ d.durationCustom ? `最长 ${maxSeconds} 秒，到时间就结束` : '关着时按素材完整播放' }}</span><Switch v-model="d.durationCustom" label="手动设置时长" /></div>
               <div class="toggle-line">

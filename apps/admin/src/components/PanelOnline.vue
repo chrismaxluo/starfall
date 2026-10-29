@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 总览右侧面板「在线观众」：在线人数和名单（B站只给前 100 位，按贡献排，没贡献的也在），开着这一页时每 30 秒刷新
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import Empty from './Empty.vue';
 import PersonRow from './PersonRow.vue';
 import Seg from './Seg.vue';
 import { get } from '../lib/api.ts';
@@ -48,8 +49,8 @@ const rows = computed(() =>
 </script>
 
 <template>
-  <div v-if="!state.status?.room" class="ov-qempty"><b>还没设置直播间</b>在设置里填好直播间号后显示</div>
-  <div v-else-if="data && !data.live" class="ov-qempty"><b>开播后显示</b>在线观众来自 B站直播间的在线名单，按贡献排序</div>
+  <Empty v-if="!state.status?.room" compact icon="i-screen" title="还没设置直播间" desc="在设置里填好直播间号后显示" />
+  <Empty v-else-if="data && !data.live" compact icon="i-users" title="开播后显示" desc="在线观众来自 B站直播间的在线名单，按贡献排序" />
   <template v-else>
     <div class="phead">
       <span v-if="data">在线 <b class="num">{{ data.count.toLocaleString('zh-CN') }}</b> 人<template v-if="data.items.length < data.count"> · 名单里 <b class="num">{{ data.items.length }}</b> 人</template> · 每 30 秒刷新</span>
@@ -59,7 +60,7 @@ const rows = computed(() =>
     <div v-if="error" class="warnbox" style="margin-bottom: 10px">{{ error }}</div>
     <div class="plist">
       <PersonRow v-for="x in rows" :key="x.uid" :viewer="x.viewer" :rank="x.rank" :sub="roleText(x.viewer, anchorUid)" :value="x.score ? `${x.score.toLocaleString('zh-CN')} 电池` : '—'" :unit="x.score ? '贡献' : '还没有贡献'" @pick="(v, px, py) => emit('pick', v, px, py)" />
-      <div v-if="data && !rows.length" class="pempty">{{ filter === 'all' ? '现在没有在线的观众' : '没有符合的观众' }}</div>
+      <Empty v-if="data && !rows.length" compact icon="i-users" :title="filter === 'all' ? '现在没有在线的观众' : '没有符合的观众'" />
     </div>
     <div class="pfoot">
       <span>{{ data && data.count > 100 ? 'B站只给前 100 位（按贡献排）' : 'B站的在线名单：隐身、没登录的观众看不到' }}</span>

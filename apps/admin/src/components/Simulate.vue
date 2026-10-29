@@ -176,8 +176,8 @@ onMounted(async () => {
           <select v-model.number="who.uidGuard" class="sel" aria-label="这位观众的大航海身份"><option :value="0">不是大航海</option><option :value="3">舰长</option><option :value="2">提督</option><option :value="1">总督</option></select>
           <datalist id="simExUids"><option v-for="x in state.exclusives" :key="x.uid" :value="x.uid">{{ x.name ?? '' }}（专属用户）</option></datalist>
         </div>
-        <span v-if="who.identity === 'uid'" class="inline-hint" style="font-size: 12px">可以直接选专属用户，测 TA 的专属特效；也能测弹幕规则里填了 UID 的「指定观众」{{ uidMsg ? `　${uidMsg}` : '' }}</span>
-        <label class="toggle-line" style="font-size: 12.5px"><input v-model="who.own" type="checkbox" style="accent-color: var(--accent)" />牌子是本直播间的（0 级表示没戴牌子）</label>
+        <span v-if="who.identity === 'uid'" class="inline-hint" style="font-size: var(--fs-cap)">可以直接选专属用户，测 TA 的专属特效；也能测弹幕规则里填了 UID 的「指定观众」{{ uidMsg ? `　${uidMsg}` : '' }}</span>
+        <label class="toggle-line" style="font-size: var(--fs-sec)"><input v-model="who.own" type="checkbox" style="accent-color: var(--accent)" />牌子是本直播间的（0 级表示没戴牌子）</label>
         <div class="suffix"><input v-model.number="who.honor" class="inp num" type="number" min="0" :max="HONOR_LEVEL_MAX" aria-label="荣耀等级" /><span>级荣耀等级（0 表示没有）</span></div>
       </template>
       <button class="btn primary" style="justify-content: center" @click="run">{{ { enter: '模拟进场', danmu: '模拟弹幕', gift: '模拟送礼', guard: '模拟上舰' }[kind] }}</button>

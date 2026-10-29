@@ -42,7 +42,7 @@ onBeforeUnmount(() => off?.());
 </template>
 
 <style scoped>
-.verbar.inline { margin-top: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.verbar.inline { margin-top: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .updbar-n { font-variant-numeric: tabular-nums; }
 .updbar-act { display: flex; gap: 8px; margin-left: auto; }
 .updbar-track { flex-basis: 100%; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }

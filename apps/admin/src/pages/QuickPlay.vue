@@ -3,6 +3,7 @@
 // 在桌面版窗口里还能设全局快捷键（带 Ctrl / Alt / Shift，在别的窗口里按也能播）
 import { computed, onBeforeUnmount, ref } from 'vue';
 import EffectPicker from '../components/EffectPicker.vue';
+import Empty from '../components/Empty.vue';
 import Icon from '../components/Icon.vue';
 import QuickPad from '../components/QuickPad.vue';
 import { put } from '../lib/api.ts';
@@ -197,10 +198,10 @@ onBeforeUnmount(() => {
         <QuickPad big />
         <p class="qp-tip">快捷键只在这个页面或「总览」是当前窗口时有用；在输入框里打字时不会触发。</p>
       </div>
-      <div v-else class="card qp-empty">
-        <b>还没有按钮</b>
-        <span>把常用的素材做成按钮，直播时点一下就能播，不用再发弹幕触发。</span>
-        <button class="btn primary" @click="startEdit"><Icon name="i-plus" />添加按钮</button>
+      <div v-else class="card">
+        <Empty icon="i-bolt" title="还没有按钮" desc="把常用的素材做成按钮，直播时点一下就能播，不用再发弹幕触发。">
+          <button class="btn primary" @click="startEdit"><Icon name="i-plus" />添加按钮</button>
+        </Empty>
       </div>
     </template>
 

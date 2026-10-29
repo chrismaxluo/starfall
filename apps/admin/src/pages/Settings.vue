@@ -4,6 +4,7 @@ import Avatar from '../components/Avatar.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import DataCard from '../components/DataCard.vue';
 import DesktopCard from '../components/DesktopCard.vue';
+import Empty from '../components/Empty.vue';
 import FeatherCard from '../components/FeatherCard.vue';
 import Icon from '../components/Icon.vue';
 import QrLogin from '../components/QrLogin.vue';
@@ -121,7 +122,7 @@ onMounted(() => {
           </div>
         </template>
         <template v-else>
-          <p style="margin: 0 0 12px; font-size: 13px; color: var(--t2)">还没有登录。不登录的话 B站会隐藏观众昵称和 UID，特效无法按身份播放。建议用 <b>小号</b> 扫码。</p>
+          <p style="margin: 0 0 12px; font-size: var(--fs-sec); color: var(--t2)">还没有登录。不登录的话 B站会隐藏观众昵称和 UID，特效无法按身份播放。建议用 <b>小号</b> 扫码。</p>
           <button class="btn primary" @click="qr = true"><Icon name="i-qr" />扫码登录</button>
         </template>
       </div>
@@ -140,12 +141,12 @@ onMounted(() => {
         <div class="field">
           <span class="flabel">未开播时</span>
           <Seg :model-value="state.settings.offlinePolicy" label="未开播时" :options="[{ value: 'mute', label: '不播放' }, { value: 'play', label: '照常播放（排练用）' }]" @change="(v) => saveSetting({ offlinePolicy: v }, v === 'play' ? '未开播时也会播放（排练模式）' : '未开播时不播放')" />
-          <span class="hint" style="font-size: 12px; color: var(--t3)">默认只在开播时播放。打开「照常播放」后，没开播也会连接直播间、播放特效，用来排练。</span>
+          <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">默认只在开播时播放。打开「照常播放」后，没开播也会连接直播间、播放特效，用来排练。</span>
         </div>
         <div class="field" style="margin-top: 14px">
           <span class="flabel">连接直播间</span>
           <Seg :model-value="state.settings.connectMode" label="连接时机" :options="[{ value: 'live_only', label: '只在开播时（推荐）' }, { value: 'always', label: '一直连接' }]" @change="(v) => saveSetting({ connectMode: v }, v === 'always' ? '会一直连接直播间' : '只在开播时连接直播间')" />
-          <span class="hint" style="font-size: 12px; color: var(--t3)">{{ state.settings.offlinePolicy === 'play' ? '现在开着排练模式：会一直连接，这里的选择暂时不起作用。' : state.settings.connectMode === 'live_only' ? '开播后 1 分钟内自动连上；没开播时不连接、也不记录，账号不在线，更安全。' : '没开播时也一直连着直播间，进场、弹幕照常记录（但不播放特效）。' }}</span>
+          <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">{{ state.settings.offlinePolicy === 'play' ? '现在开着排练模式：会一直连接，这里的选择暂时不起作用。' : state.settings.connectMode === 'live_only' ? '开播后 1 分钟内自动连上；没开播时不连接、也不记录，账号不在线，更安全。' : '没开播时也一直连着直播间，进场、弹幕照常记录（但不播放特效）。' }}</span>
         </div>
       </div>
 
@@ -173,7 +174,7 @@ onMounted(() => {
             <Avatar :name="x.name || String(x.uid)" :size="24" />{{ x.name || '（昵称未知）' }}<span class="uid">{{ x.uid }}</span><span class="note">{{ x.note }}</span>
             <ConfirmButton label="" confirm-label="移出" cls="mvb" :aria-label="`移出 ${x.name || x.uid}`" @confirm="removeBl(x)"><Icon name="i-x" /></ConfirmButton>
           </div>
-          <span v-if="!bl.length" class="inline-hint">还没有。事件记录、实时动态里点观众也可以直接加入黑名单。</span>
+          <Empty v-if="!bl.length" compact icon="i-ban" title="黑名单是空的" desc="事件记录、实时动态里点观众，也可以直接加入黑名单" />
         </div>
       </div>
 

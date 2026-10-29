@@ -249,6 +249,8 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
     </div>
 
     <div v-if="tab === 'anim'">
+      <!-- 一个自己的素材都没有时，上面的大拖放框就是入口，这里不再放一张空的「上传素材」卡片 -->
+      <template v-if="!empty">
       <div class="a-sec" style="margin-top: 4px"><h2>我的素材</h2><span>{{ mine.length }} 个</span></div>
       <div class="ecards">
         <button class="ecard new" @click="fileIn?.click()"><div><Icon name="i-upload" />上传素材</div></button>
@@ -289,6 +291,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
           </div>
         </div>
       </div>
+      </template>
       <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span></div>
       <div class="ecards">
         <div v-for="e in builtin" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)">

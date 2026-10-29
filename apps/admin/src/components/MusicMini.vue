@@ -55,19 +55,19 @@ const pct = computed(() => (now.value?.item.song.durationMs ? Math.min(100, (pos
 .mm .card-h { margin-bottom: 10px; }
 .mm .card-h .aside { gap: 12px; }
 .mm-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.mm-cover { flex: none; width: 48px; height: 48px; border-radius: 10px; object-fit: cover; box-shadow: 0 0 0 1px var(--line); }
+.mm-cover { flex: none; width: 48px; height: 48px; border-radius: var(--r-sm); object-fit: cover; box-shadow: 0 0 0 1px var(--line); }
 .mm-cover.blank { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .mm-cover.blank svg { width: 20px; height: 20px; }
 .mm-t { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.mm-t b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mm-t b span { font-weight: 400; color: var(--t2); font-size: 13px; }
-.mm-by { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--t2); white-space: nowrap; }
+.mm-t b { font-size: var(--fs-body); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm-t b span { font-weight: 400; color: var(--t2); font-size: var(--fs-sec); }
+.mm-by { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-cap); color: var(--t2); white-space: nowrap; }
 .mm-bar { position: relative; height: 3px; border-radius: 2px; background: var(--hover); overflow: hidden; margin-top: 2px; }
 .mm-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); transition: width 1s linear; }
-.mm-empty { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 13px; color: var(--t2); }
+.mm-empty { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: var(--fs-sec); color: var(--t2); }
 .mm-empty svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
 .mm-acts { display: flex; gap: 6px; flex: none; }
-.mm-acts .btn.sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.mm-acts .btn.sm { height: 30px; padding: 0 12px; font-size: var(--fs-sec); }
 .mm-hold { color: var(--gov); }
 .mm-warn { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px; background: var(--gov-soft); color: var(--gov); font-weight: 500; }
 .mm-warn.bad { background: var(--bad-soft); color: var(--bad); }

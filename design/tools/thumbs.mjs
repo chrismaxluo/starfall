@@ -58,7 +58,11 @@ for (const [style, at] of Object.entries(AT).filter(([s]) => !only || only.inclu
   const b = !FULL.has(style) && box ? box : { x0: 0, y0: 0, x1: W, y1: H };
   const cx = (Math.max(0, b.x0) + Math.min(W, b.x1)) / 2;
   const cy = (Math.max(0, b.y0) + Math.min(H, b.y1)) / 2;
-  let w = Math.min(W, Math.max(520, (Math.min(W, b.x1) - Math.max(0, b.x0)) * 1.12));
+  // 横条一类的小特效：把两团柔光挪到特效后面，像舞台打光；不然裁出来的是画面中间那块，几乎全黑，卡片看着像空的
+  if (!FULL.has(style) && box) {
+    await page.addStyleTag({ content: `html,body{background:radial-gradient(300px 230px at ${cx + 60}px ${cy - 70}px,rgba(111,110,255,.5),transparent 70%),radial-gradient(260px 200px at ${cx - 90}px ${cy + 90}px,rgba(236,120,170,.32),transparent 70%),linear-gradient(170deg,#1A1B2E,#0C0D16)!important}` });
+  }
+  let w = Math.min(W, Math.max(380, (Math.min(W, b.x1) - Math.max(0, b.x0)) * 1.12));
   let h = (w * 14) / 9;
   if (h > H) { h = H; w = (h * 9) / 14; }
   const x = Math.round(Math.min(W - w, Math.max(0, cx - w / 2)));

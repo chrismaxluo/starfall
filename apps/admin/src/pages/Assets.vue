@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
+import Empty from '../components/Empty.vue';
 import Icon from '../components/Icon.vue';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
@@ -329,7 +330,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
           <ConfirmButton v-else label="删除" confirm-label="确认删除？" cls="danger" armed-cls="delb" @confirm="removeSound(s)"><Icon name="i-trash" />删除</ConfirmButton>
         </div>
       </div>
-      <div v-if="!sounds.length" class="soon-box" style="grid-column: 1 / -1"><b>还没有音效</b>把 MP3 / WAV / OGG 拖到上面就能添加，然后在素材设置的「音效」里选用</div>
+      <Empty v-if="!sounds.length" style="grid-column: 1 / -1" icon="i-music" title="还没有音效" desc="把 MP3、WAV、OGG 拖到这个页面就能添加，然后在素材设置的「音效」里选用" />
     </div>
   </section>
 </template>

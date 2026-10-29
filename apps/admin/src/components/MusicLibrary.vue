@@ -2,6 +2,7 @@
 // 点歌 · 歌库：上传音乐（可以一次选多个，歌词用同名的 .lrc 一起传）、改歌名歌手、配歌词、删除；电脑版还能直接用一个文件夹里的歌
 import { computed, onMounted, ref, watch } from 'vue';
 import ConfirmButton from './ConfirmButton.vue';
+import Empty from './Empty.vue';
 import Icon from './Icon.vue';
 import { del, get, post, put, upload } from '../lib/api.ts';
 import { desktop } from '../lib/desktop.ts';
@@ -168,7 +169,7 @@ async function rescan(): Promise<void> {
         <span class="aside"><input v-model="q" class="inp mlb-q" placeholder="搜歌名、歌手" aria-label="在歌库里搜" /></span>
       </div>
       <div v-if="!loaded" class="inline-hint">读取中…</div>
-      <div v-else-if="!songs.length" class="inline-hint">歌库是空的。上传后，观众点歌时会先在这里找（规则里可以改成先找网易云）。</div>
+      <Empty v-else-if="!songs.length" compact icon="i-music" title="歌库是空的" desc="上传后，观众点歌时会先在这里找（规则里可以改成先找网易云）" />
       <div v-else-if="!shown.length" class="inline-hint">没有符合的歌。</div>
       <div v-else class="mlb-list">
         <div v-for="s in shown" :key="s.id" class="mlb-row">

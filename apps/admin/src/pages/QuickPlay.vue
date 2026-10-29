@@ -206,7 +206,7 @@ onBeforeUnmount(() => {
     </template>
 
     <div v-else class="card">
-      <div class="card-h"><h2>按钮</h2><span class="aside">拖动左边的序号调整顺序；名字不填时显示素材名</span></div>
+      <div class="card-h"><h2><span class="hicon"><Icon name="i-grid" /></span>按钮</h2><span class="aside">拖动左边的序号调整顺序；名字不填时显示素材名</span></div>
       <div v-if="rows.length" class="qp-rows">
         <div
           v-for="(r, i) in rows"

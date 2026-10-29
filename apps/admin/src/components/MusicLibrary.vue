@@ -145,7 +145,7 @@ async function rescan(): Promise<void> {
       </label>
 
       <div v-if="state.desktop" class="card mlb-folder">
-        <div class="card-h"><h2>用电脑上的文件夹</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-music" /></span>用电脑上的文件夹</h2></div>
         <template v-if="folder">
           <p class="mlb-path" :title="folder"><Icon name="i-image" />{{ folder }}</p>
           <div class="mlb-fa">
@@ -165,7 +165,7 @@ async function rescan(): Promise<void> {
 
     <div class="card">
       <div class="card-h">
-        <h2>歌库 {{ songs.length }} 首</h2>
+        <h2><span class="hicon"><Icon name="i-list" /></span>歌库 {{ songs.length }} 首</h2>
         <span class="aside"><input v-model="q" class="inp mlb-q" placeholder="搜歌名、歌手" aria-label="在歌库里搜" /></span>
       </div>
       <div v-if="!loaded" class="inline-hint">读取中…</div>

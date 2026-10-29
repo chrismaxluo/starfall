@@ -143,7 +143,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>运行信息</h2><span class="aside"><button class="btn" :disabled="!info" @click="copyInfo"><Icon name="i-copy" />复制运行信息</button></span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-info" /></span>运行信息</h2><span class="aside"><button class="btn" :disabled="!info" @click="copyInfo"><Icon name="i-copy" />复制运行信息</button></span></div>
         <div v-if="failed" class="inline-hint">没读到运行信息（可能是和星临的连接断了）。<button class="linkish" @click="load()">重试</button></div>
         <dl v-else class="about-kv">
           <template v-for="[k, v] in shown" :key="k"><dt>{{ k }}</dt><dd>{{ v }}</dd></template>
@@ -153,7 +153,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
     </div>
 
     <div class="card cl">
-      <div class="card-h"><h2>更新记录</h2><span class="aside">最近两个版本改了什么</span></div>
+      <div class="card-h"><h2><span class="hicon"><Icon name="i-update" /></span>更新记录</h2><span class="aside">最近两个版本改了什么</span></div>
       <div v-for="(s, i) in sections" :key="s.title" class="cl-sec" :class="{ open: open.has(i) }">
         <button type="button" class="cl-h" :aria-expanded="open.has(i)" @click="toggle(i)"><Icon name="i-chev" />{{ titleOf(s.title) }}</button>
         <!-- 内容来自打包进来的 CHANGELOG.md，已经转义过 -->

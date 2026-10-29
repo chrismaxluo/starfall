@@ -264,7 +264,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
         <!-- ① 加到直播软件 -->
         <div class="card">
           <div class="card-h">
-            <h2>加到直播软件</h2>
+            <h2><span class="hicon"><Icon name="i-screen" /></span>加到直播软件</h2>
             <span class="aside">
               <span class="seg" role="group" aria-label="直播软件">
                 <button :aria-pressed="o.app === 'livehime'" @click="save({ app: 'livehime' })">B站直播姬</button>
@@ -377,7 +377,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
 
         <!-- ② 特效页设置 -->
         <div class="card">
-          <div class="card-h"><h2>特效页设置</h2></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-gear" /></span>特效页设置</h2></div>
           <div class="srows">
             <div class="srow">
               <span class="lb">画布方向</span>
@@ -438,7 +438,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
       <!-- 右侧：实时预览 -->
       <div class="o2-prev">
         <div class="card">
-          <div class="card-h"><h2>预览</h2><span class="aside">{{ v.width }} × {{ v.height }} · 只在这里播放</span></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-eye" /></span>预览</h2><span class="aside">{{ v.width }} × {{ v.height }} · 只在这里播放</span></div>
           <div class="ostage-wrap">
             <PreviewStage ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && v.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
           </div>

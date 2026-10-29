@@ -23,7 +23,7 @@ const pct = computed(() => (now.value?.item.song.durationMs ? Math.min(100, (pos
 <template>
   <div class="card mm">
     <div class="card-h">
-      <h2>弹幕点歌</h2>
+      <h2><span class="hicon"><Icon name="i-music" /></span>弹幕点歌</h2>
       <span class="aside">
         <a v-if="issue" class="mm-warn" :class="issue.level" href="#music"><Icon name="i-info" />{{ issue.short }}</a>
         <span v-if="hold && hold !== 'disabled'" class="mm-hold">{{ HOLD_TEXT[hold] }}</span>

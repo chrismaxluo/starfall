@@ -108,7 +108,7 @@ onMounted(() => {
     <div class="set-cols">
       <div>
       <div class="card">
-        <div class="card-h"><h2>B站账号<Tip text="用来读取直播间消息里的昵称和 UID，特效按身份播放需要它。建议用小号扫码。" /></h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-user" /></span>B站账号<Tip text="用来读取直播间消息里的昵称和 UID，特效按身份播放需要它。建议用小号扫码。" /></h2></div>
         <template v-if="acct?.loggedIn">
           <div class="acct" style="background: none; border: 0; box-shadow: none; padding: 0">
             <Avatar :name="acct.name" :face="acct.face" :size="44" />
@@ -129,7 +129,7 @@ onMounted(() => {
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>直播间</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-screen" /></span>直播间</h2></div>
         <div class="field">
           <label for="roomIn">房间号 <span class="hint">短号、长号都可以</span></label>
           <div class="url"><input id="roomIn" v-model="roomIn" class="inp num" :placeholder="room ? String(room.shortId || room.roomId) : '例如 21452505'" inputmode="numeric" @keydown.enter="setRoom" /><button class="btn" :disabled="roomBusy" @click="setRoom">{{ room ? '更换' : '连接' }}</button></div>
@@ -138,7 +138,7 @@ onMounted(() => {
       </div>
 
       <div v-if="state.settings" class="card">
-        <div class="card-h"><h2>播放</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-play" /></span>播放</h2></div>
         <div class="field">
           <span class="flabel">未开播时</span>
           <Seg :model-value="state.settings.offlinePolicy" label="未开播时" :options="[{ value: 'mute', label: '不播放' }, { value: 'play', label: '照常播放（排练用）' }]" @change="(v) => saveSetting({ offlinePolicy: v }, v === 'play' ? '未开播时也会播放（排练模式）' : '未开播时不播放')" />
@@ -153,7 +153,7 @@ onMounted(() => {
 
       <DesktopCard v-if="state.desktop" />
       <div v-else class="card">
-        <div class="card-h"><h2>管理后台</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-lock" /></span>管理后台</h2></div>
         <div class="field">
           <label for="pw1">修改登录密码</label>
           <div class="row2"><input id="pw1" v-model="pw.current" class="inp" type="password" placeholder="当前密码" autocomplete="current-password" /><input v-model="pw.next" class="inp" type="password" placeholder="新密码（至少 8 位）" autocomplete="new-password" /></div>
@@ -164,7 +164,7 @@ onMounted(() => {
       </div>
       <div>
       <div class="card">
-        <div class="card-h"><h2>黑名单<Tip text="黑名单里的人不会触发任何特效，事件照常记录。" /></h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-ban" /></span>黑名单<Tip text="黑名单里的人不会触发任何特效，事件照常记录。" /></h2></div>
         <template v-if="state.settings">
           <div class="toggle-line">主播本人不触发 <Switch v-model="state.settings.blockAnchor" label="主播本人不触发" @change="(v) => saveSetting({ blockAnchor: v }, v ? '主播本人不会触发特效' : '主播本人也会触发特效')" /></div>
           <div class="toggle-line" style="margin-top: 8px">登录的 B站账号不触发 <span class="hint">通常是小号</span><Switch v-model="state.settings.blockAccount" label="登录的账号不触发" @change="(v) => saveSetting({ blockAccount: v }, v ? '登录的账号不会触发特效' : '登录的账号也会触发特效')" /></div>

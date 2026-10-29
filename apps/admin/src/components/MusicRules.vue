@@ -95,7 +95,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
   <div v-if="music.settings" class="mr-grid">
     <div class="mr-col">
       <div class="card">
-        <div class="card-h"><h2>弹幕指令</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-chat" /></span>弹幕指令</h2></div>
         <div class="mr-cmds">
           <label v-for="(name, k) in CMD_NAMES" :key="k" class="field">
             <span class="flabel">{{ name }}</span>
@@ -109,7 +109,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>点歌规则</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-wand" /></span>点歌规则</h2></div>
         <div class="srows">
           <div class="srow">
             <span class="lb">谁能点歌</span>
@@ -181,7 +181,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
 
     <div class="mr-col">
       <div class="card">
-        <div class="card-h"><h2>歌从哪里找</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-search" /></span>歌从哪里找</h2></div>
         <div class="srows">
           <div class="srow">
             <span class="lb">网易云音乐</span>
@@ -215,7 +215,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>不收的歌</h2><span class="aside">歌名或歌手里有这些字的不收</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-x" /></span>不收的歌</h2><span class="aside">歌名或歌手里有这些字的不收</span></div>
         <div class="mr-add"><input v-model="wordIn" class="inp" maxlength="30" placeholder="例如 DJ、伴奏、某个歌名，回车添加" aria-label="不收的字" @keydown.enter="addWord" /><button class="btn" @click="addWord">添加</button></div>
         <div class="mr-chips">
           <span v-for="w in s.blockWords" :key="w" class="mr-chip">{{ w }}<button type="button" :aria-label="`去掉 ${w}`" @click="set({ blockWords: s.blockWords.filter((x) => x !== w) }, `「${w}」去掉了`)"><Icon name="i-x" /></button></span>
@@ -230,7 +230,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>不让点歌的观众</h2><span class="aside">{{ s.bannedUids.length }} 人</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-ban" /></span>不让点歌的观众</h2><span class="aside">{{ s.bannedUids.length }} 人</span></div>
         <div class="mr-add"><input v-model="uidIn" class="inp num" placeholder="输入 UID，回车添加" inputmode="numeric" aria-label="不让点歌的观众 UID" @keydown.enter="addBan" /><button class="btn" @click="addBan">添加</button></div>
         <div class="mr-people">
           <div v-for="uid in s.bannedUids" :key="uid" class="mr-person">

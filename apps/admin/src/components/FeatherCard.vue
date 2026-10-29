@@ -52,7 +52,7 @@ async function onChange(): Promise<void> {
 
 <template>
   <div v-if="state.settings" class="card">
-    <div class="card-h"><h2>素材显示<Tip text="对所有上传的素材生效，单个素材可以在素材设置里另外设置。" /></h2></div>
+    <div class="card-h"><h2><span class="hicon"><Icon name="i-image" /></span>素材显示<Tip text="对所有上传的素材生效，单个素材可以在素材设置里另外设置。" /></h2></div>
     <div class="fc">
       <div class="fc-set">
         <div class="toggle-line">视频上下羽化 <span class="hint">边缘慢慢变透明，不再一刀切</span><Switch v-model="state.settings.featherOn" label="视频上下羽化" @change="toggle" /></div>

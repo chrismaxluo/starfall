@@ -1,23 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import CdPick from '../components/CdPick.vue';
 import DraftBar from '../components/DraftBar.vue';
-import ChatPreview from '../components/ChatPreview.vue';
 import AddSteps from '../components/AddSteps.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import Icon from '../components/Icon.vue';
 import PreviewStage from '../components/PreviewStage.vue';
 import Seg from '../components/Seg.vue';
-import Switch from '../components/Switch.vue';
+import Tip from '../components/Tip.vue';
 import { del, post, put } from '../lib/api.ts';
-import { CHAT_ALPHA_MAX, CHAT_ALPHA_MIN, CHAT_FADE_MAX, CHAT_FADE_OPTIONS, CHAT_LOOK_ALPHA, CHAT_MAX_LIMIT, CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsSourceSize } from '@starfall/shared/overlay';
+import { CHAT_WIDTH, GIFTS_WIDTH, MUSIC_HEIGHT, MUSIC_WIDTH, chatHeight, giftsSourceSize } from '@starfall/shared/overlay';
 import { useDraft } from '../lib/draft.ts';
 import { clock, gcd } from '../lib/format.ts';
 import { SAMPLES } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { isFxLive, isFxView, loadAll, overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
 import { loadMusic, music, saveMusic } from '../lib/music.ts';
-import { confirmLeave, go } from '../lib/route.ts';
+import { confirmLeave } from '../lib/route.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import type { OutputDto, OverlayConfig, OverlayInfo } from '../lib/types.ts';
 
@@ -41,28 +39,19 @@ watch(selId, (id) => {
 const o = computed(() => state.outputs.find((x) => x.id === selId.value) ?? state.outputs[0]);
 const online = (id: number) => state.overlays.some((x) => x.outputId === id && isFxLive(x));
 
-// 特效页设置、弹幕列表设置先改草稿，点「保存」才到直播画面；预览照着草稿显示
+// 特效页设置先改草稿，点「保存」才到直播画面；预览照着草稿显示（弹幕列表的设置在「弹幕列表」页）
 const fx = useDraft(() => o.value, ['orient', 'width', 'height', 'safeTop', 'safeBottom', 'marginX', 'scale', 'liteMode'] as const, (p): Promise<boolean> =>
   save(p, 'width' in p || 'height' in p ? '已保存：分辨率改了，直播软件里的浏览器源宽高也要一起改' : '已保存，直播画面已更新'),
 );
-const chat = useDraft(() => o.value, ['chatSide', 'chatSize', 'chatMedal', 'chatMax', 'chatFadeSec', 'chatLook', 'chatGuardFrame', 'chatMascot', 'chatCreamFrame', 'chatAlpha', 'chatHideBlocked'] as const, (p): Promise<boolean> => {
-  const x = { ...o.value!, ...p };
-  const tall = chatHeight(x.chatMax, x.chatSize, x.chatLook) !== chatHeight(o.value!.chatMax, o.value!.chatSize, o.value!.chatLook);
-  return save(p, tall ? `已保存：浏览器源的高度建议改成 ${chatHeight(x.chatMax, x.chatSize, x.chatLook)}` : '已保存，直播画面已更新');
-},
-);
-/** 已保存 + 两张卡片的草稿（模板里只在有输出时用） */
-const v = computed(() => ({ ...o.value!, ...fx.pending.value, ...chat.pending.value }));
+/** 已保存 + 草稿（模板里只在有输出时用） */
+const v = computed(() => ({ ...o.value!, ...fx.pending.value }));
 const cfg = computed<OverlayConfig | null>(() => (o.value ? overlayConfigOf(v.value) : null));
 /** 换输出：草稿是上一个输出的，先问再丢掉 */
 function pickOutput(id: number): void {
   if (id === selId.value || !confirmLeave()) return;
   selId.value = id;
 }
-watch(() => o.value?.id, () => {
-  fx.reset();
-  chat.reset();
-});
+watch(() => o.value?.id, () => fx.reset());
 
 async function addOutput(): Promise<void> {
   if (!confirmLeave()) return;
@@ -96,31 +85,12 @@ async function removeOutput(): Promise<void> {
   }
 }
 const stage = ref<InstanceType<typeof PreviewStage> | null>(null);
-const chatPv = ref<InstanceType<typeof ChatPreview> | null>(null);
 const showSafe = ref(true);
 const showKey = ref(false);
 const showChatKey = ref(false);
 const showGiftsKey = ref(false);
 const alphaBg = ref(false);
 
-// 右侧预览：特效页 / 弹幕列表 / 送礼名单（记住上次看的）
-const TAB_KEY = 'sf-out-tab';
-type PTab = 'fx' | 'chat';
-const readTab = (): PTab => {
-  try {
-    return localStorage.getItem(TAB_KEY) === 'chat' ? 'chat' : 'fx';
-  } catch {
-    return 'fx';
-  }
-};
-const ptab = ref<PTab>(readTab());
-watch(ptab, (t) => {
-  try {
-    localStorage.setItem(TAB_KEY, t);
-  } catch {
-    /* 隐私模式下不记住 */
-  }
-});
 
 const PRESETS = {
   portrait: [[1080, 1920, '推荐'], [720, 1280, '省性能'], [1440, 2560, '2K']],
@@ -173,33 +143,6 @@ const shownGiftsUrl = computed(() => mask(giftsUrl.value, showGiftsKey.value));
 const giftsWh = computed(() => (o.value ? giftsSourceSize(o.value) : { w: GIFTS_WIDTH, h: 650 }));
 /** 弹幕列表浏览器源的建议宽高（高度随条数、字号变） */
 const chatWh = computed(() => (o.value ? { w: CHAT_WIDTH, h: chatHeight(o.value.chatMax, o.value.chatSize, o.value.chatLook) } : { w: CHAT_WIDTH, h: 900 }));
-/** 弹幕列表外观：玻璃是原来的样子，另外五种是小八主题（头像框是小八的脑袋，气泡右上角是小八的头顶） */
-const CHAT_LOOK_OPTS: Array<{ value: OutputDto['chatLook']; label: string; hint: string }> = [
-  { value: 'glass', label: '玻璃', hint: '毛玻璃气泡，大航海观众使用 B站头像框（默认外观）' },
-  { value: 'jelly', label: '果冻玻璃', hint: '有厚度的透明玻璃气泡，小八头顶是蓝色果冻；大航海以边缘光的颜色区分' },
-  { value: 'porcelain', label: '青花瓷', hint: '白釉气泡，钴蓝弦纹和青海波浪纹，朱红印章；提督、总督为描金' },
-  { value: 'cream', label: '奶油贴纸', hint: '奶油色贴纸气泡，带蓝色缝线和粉色格子胶带' },
-  { value: 'night', label: '星月夜空', hint: '深蓝色夜空气泡，带发光描边、月亮和星星' },
-  { value: 'pixel', label: '像素小屋', hint: '像素风格气泡，小八同样显示为像素画，动作按像素游戏的节奏播放' },
-];
-const MASCOT_OPTS: Array<{ value: OutputDto['chatMascot']; label: string; hint: string }> = [
-  { value: 'hop', label: '先在框中间露脸', hint: '每条弹幕进来时，小八先在头像框中间出现约 1 秒，再移到头像右下角，头像随后显示' },
-  { value: 'corner', label: '一直在右下角', hint: '头像一开始就显示，小八从头像后面探出，停在头像右下角' },
-  { value: 'off', label: '不显示', hint: '不显示小八' },
-];
-const themed = computed(() => o.value && v.value.chatLook !== 'glass');
-/** 气泡浓淡：0 为跟随外观，滑块显示外观的默认值 */
-const alphaShown = computed(() => (o.value && v.value.chatLook !== 'glass' ? v.value.chatAlpha || CHAT_LOOK_ALPHA[v.value.chatLook] : 0));
-function setChatMax(x: number): void {
-  if (!o.value) return;
-  const n = Math.round(x);
-  if (!(n >= 1 && n <= CHAT_MAX_LIMIT)) return toast(`条数要在 1 – ${CHAT_MAX_LIMIT} 之间`, 'err');
-  chat.set({ chatMax: n });
-}
-/** 弹幕自动消失：0 为一直显示；打开时用上次选的秒数（默认 10 秒） */
-const lastFade = ref(10);
-watch(() => (o.value ? v.value.chatFadeSec : 0), (x) => x && (lastFade.value = x), { immediate: true });
-const setChatFade = (x: number) => chat.set({ chatFadeSec: x });
 async function copy(which: 'fx' | 'chat' | 'gifts' | 'music'): Promise<void> {
   try {
     await navigator.clipboard.writeText(which === 'chat' ? chatUrl.value : which === 'gifts' ? giftsUrl.value : which === 'music' ? musicUrl.value : url.value);
@@ -302,7 +245,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
     <div class="page-head">
       <div>
         <h1>直播软件输出</h1>
-        <p>把特效页和弹幕列表加到直播软件里。每个输出对应直播软件里的一个画面，比如竖屏直播、横屏录播。</p>
+        <p>把特效页、弹幕列表、送礼名单和点歌窗口加到直播软件里。</p>
       </div>
     </div>
 
@@ -353,13 +296,13 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
                 <ConfirmButton label="重置密钥" confirm-label="确认重置？两个地址都会失效" cls="linkish dim" armed-cls="delb" @confirm="resetKey" />
               </span>
             </div>
-            <div v-if="viewing.length && !overlays.length" class="src-note">浏览器里正在查看特效页，但这不算加到了直播软件：直播画面里要另外添加上面的地址</div>
+            <div v-if="viewing.length && !overlays.length" class="src-note">浏览器里打开的特效页只用来查看，直播软件里还要另外添加上面的地址</div>
             <div v-if="capIssues(fxEnv).length" class="src-note">{{ capIssues(fxEnv).map((c) => `${c.name}：${c.tip}`).join('；') }}</div>
             <div v-if="fxError" class="src-err">最近的问题：{{ plainError(fxError) }}</div>
             <div v-if="overlays.length" class="src-test">
               <ConfirmButton v-if="state.status?.live.live" label="发一个测试特效到直播画面" confirm-label="确认？观众会看到" cls="btn" armed-cls="btn live-send" @confirm="sendTest" />
               <button v-else class="btn" type="button" @click="sendTest">发一个测试特效到直播画面</button>
-              <span class="inline-hint">直播软件里真的会出现一次，用来确认加对了</span>
+              <span class="inline-hint">直播画面上会真的播放一次</span>
             </div>
           </div>
 
@@ -380,7 +323,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
             <div class="src-f">
               <span class="wh2">宽高填 <code>{{ chatWh.w }} × {{ chatWh.h }}</code></span>
               <span>高度按 {{ o.chatMax }} 条算好了，矮了就少显示几条</span>
-              <span class="links"><a class="linkish" :href="`${o.chatPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
+              <span class="links"><a class="linkish" href="#chat">外观、显示设置 →</a><a class="linkish" :href="`${o.chatPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看；直播软件里请用上面的地址">在浏览器里查看</a></span>
             </div>
           </div>
 
@@ -434,7 +377,7 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
 
         <!-- ② 特效页设置 -->
         <div class="card">
-          <div class="card-h"><h2>特效页设置</h2><span class="aside">改完点「保存」才到直播画面，不用刷新直播软件</span></div>
+          <div class="card-h"><h2>特效页设置</h2></div>
           <div class="srows">
             <div class="srow">
               <span class="lb">画布方向</span>
@@ -462,179 +405,48 @@ const fxError = computed(() => overlays.value.find((x) => x.lastError)?.lastErro
               </div>
             </div>
             <div v-if="v.orient === 'portrait'" class="srow">
-              <span class="lb">竖屏安全区<small>特效自动避开</small></span>
+              <span class="lb">竖屏安全区<Tip text="B站手机端竖屏直播时，顶部是主播信息，底部是弹幕和礼物栏，特效会自动避开。默认按实测：顶部 12%、底部 40%。" /></span>
               <div class="ctl">
                 <div class="slider-row"><label for="st">顶部</label><input id="st" :value="v.safeTop" type="range" min="0" max="25" @input="fx.set({ safeTop: num($event) })" /><output>{{ v.safeTop }}%</output></div>
                 <div class="slider-row"><label for="sb">底部</label><input id="sb" :value="v.safeBottom" type="range" min="0" max="45" @input="fx.set({ safeBottom: num($event) })" /><output>{{ v.safeBottom }}%</output></div>
-                <span class="hint">B站手机端竖屏直播时，顶部是主播信息，底部是弹幕和礼物栏。默认按实测：顶部 12%、底部 40%。<label class="inline-ck"><input v-model="showSafe" type="checkbox" />预览里显示</label></span>
+                <span class="hint"><label class="inline-ck"><input v-model="showSafe" type="checkbox" />在预览里显示</label></span>
               </div>
             </div>
             <div class="srow">
-              <span class="lb">特效大小<small>作用于所有规则</small></span>
+              <span class="lb">特效大小</span>
               <div class="ctl">
                 <div class="slider-row"><label for="scale">整体缩放</label><input id="scale" :value="v.scale" type="range" min="60" max="160" step="5" @input="fx.set({ scale: num($event) })" /><output>{{ v.scale }}%</output></div>
                 <div class="slider-row"><label for="mx">左右边距</label><input id="mx" :value="v.marginX" type="range" min="0" max="15" @input="fx.set({ marginX: num($event) })" /><output>{{ v.marginX }}%</output></div>
               </div>
             </div>
             <div class="srow">
-              <span class="lb">兼容模式</span>
+              <span class="lb">兼容模式<Tip text="关掉毛玻璃、粒子等较重的效果，弹幕列表也跟着用。电脑性能一般时可以开启；「自动」在直播软件不支持毛玻璃时自动开启。" /></span>
               <div class="ctl"><div class="line">
                 <select class="sel" aria-label="兼容模式" :value="v.liteMode" @change="(e) => fx.set({ liteMode: (e.target as HTMLSelectElement).value as OutputDto['liteMode'] })">
                   <option value="auto">自动</option><option value="on">始终开启</option><option value="off">关闭</option>
                 </select>
-                <span class="hint">关掉毛玻璃、粒子等较重的效果。电脑性能一般或直播软件版本旧时用（弹幕列表也跟着用）。</span>
+                
               </div></div>
             </div>
           </div>
           <DraftBar :dirty="fx.dirty.value" :saving="fx.saving.value" @save="fx.commit" @discard="fx.reset" />
         </div>
 
-        <!-- ③ 弹幕列表设置 -->
-        <div class="card" :class="{ dimmed: !o.chatEnabled }">
-          <div class="card-h"><h2>弹幕列表设置</h2><span class="aside">{{ o.chatEnabled ? '改完点「保存」才到直播画面' : '弹幕列表已关闭' }}</span></div>
-          <div class="srows">
-            <div class="srow">
-              <span class="lb">外观</span>
-              <div class="ctl">
-                <span class="seg wrap" role="group" aria-label="外观">
-                  <button v-for="x in CHAT_LOOK_OPTS" :key="x.value" :aria-pressed="v.chatLook === x.value" @click="chat.set({ chatLook: x.value })">{{ x.label }}</button>
-                </span>
-                <span class="hint">{{ CHAT_LOOK_OPTS.find((x) => x.value === v.chatLook)?.hint }}。效果见右侧预览</span>
-              </div>
-            </div>
-            <template v-if="themed">
-              <div class="srow">
-                <span class="lb">小八出场</span>
-                <div class="ctl">
-                  <span class="seg wrap" role="group" aria-label="小八出场">
-                    <button v-for="x in MASCOT_OPTS" :key="x.value" :aria-pressed="v.chatMascot === x.value" @click="chat.set({ chatMascot: x.value })">{{ x.label }}</button>
-                  </span>
-                  <span class="hint">{{ MASCOT_OPTS.find((x) => x.value === v.chatMascot)?.hint }}。小八的表情和动作随弹幕内容变化</span>
-                </div>
-              </div>
-              <div v-if="v.chatLook === 'cream'" class="srow">
-                <span class="lb">头像框</span>
-                <div class="ctl">
-                  <span class="seg" role="group" aria-label="奶油贴纸的头像框">
-                    <button :aria-pressed="v.chatCreamFrame === 'hachi'" @click="chat.set({ chatCreamFrame: 'hachi' })">小八风</button>
-                    <button :aria-pressed="v.chatCreamFrame === 'lace'" @click="chat.set({ chatCreamFrame: 'lace' })">格子花边</button>
-                  </span>
-                  <span class="hint">{{ v.chatCreamFrame === 'hachi' ? '头像框和气泡右上角都画成小八的脑袋' : '蓝白格子花边头像框，气泡右上角为格子猫耳' }}</span>
-                </div>
-              </div>
-              <div class="srow">
-                <span class="lb">大航海头像框</span>
-                <div class="ctl">
-                  <span class="seg" role="group" aria-label="大航海头像框">
-                    <button :aria-pressed="v.chatGuardFrame === 'theme'" @click="chat.set({ chatGuardFrame: 'theme' })">主题头像框</button>
-                    <button :aria-pressed="v.chatGuardFrame === 'bili'" @click="chat.set({ chatGuardFrame: 'bili' })">B站头像框</button>
-                  </span>
-                  <span class="hint">{{ v.chatGuardFrame === 'theme' ? '舰长、提督、总督使用当前外观的头像框，按身份区分颜色，并分别加上星星或皇冠' : '舰长、提督、总督使用 B站头像框（无法加载时改用当前外观的头像框）；其他观众和主播使用当前外观的头像框' }}</span>
-                </div>
-              </div>
-              <div class="srow">
-                <span class="lb">气泡浓淡</span>
-                <div class="ctl">
-                  <div class="slider-row"><label for="cAlpha">底色</label><input id="cAlpha" :value="alphaShown" type="range" :min="CHAT_ALPHA_MIN" :max="CHAT_ALPHA_MAX" step="5" @input="chat.set({ chatAlpha: num($event) })" /><output>{{ alphaShown }}%</output></div>
-                  <div class="line"><button class="btn sm" type="button" :disabled="v.chatAlpha === 0" @click="chat.set({ chatAlpha: 0 })">跟随外观</button><span class="hint">{{ v.chatAlpha === 0 ? `当前跟随外观（${alphaShown}%）` : '已自定义' }}。只有气泡底色为半透明，文字、头像框和小八不透明。各外观的默认值在亮、暗和花哨的直播画面上都能看清文字；调得比默认值更低时，较亮的画面上文字可能不够清楚</span></div>
-                </div>
-              </div>
-            </template>
-            <div class="srow">
-              <span class="lb">对齐</span>
-              <div class="ctl"><div class="line">
-                <span class="seg" role="group" aria-label="对齐">
-                  <button :aria-pressed="v.chatSide === 'left'" @click="chat.set({ chatSide: 'left' })">靠左</button>
-                  <button :aria-pressed="v.chatSide === 'right'" @click="chat.set({ chatSide: 'right' })">靠右</button>
-                </span>
-                <span class="hint">放在画面左边选靠左，右边选靠右（头像跟着换边）</span>
-              </div></div>
-            </div>
-            <div class="srow">
-              <span class="lb">字号</span>
-              <div class="ctl"><div class="line">
-                <span class="seg" role="group" aria-label="字号">
-                  <button :aria-pressed="v.chatSize === 'normal'" @click="chat.set({ chatSize: 'normal' })">标准</button>
-                  <button :aria-pressed="v.chatSize === 'large'" @click="chat.set({ chatSize: 'large' })">大</button>
-                </span>
-                <span class="hint">字号改了，浏览器源的高度也跟着变（上面「宽高填」已经算好）</span>
-              </div></div>
-            </div>
-            <div class="srow">
-              <span class="lb">粉丝牌</span>
-              <div class="ctl">
-                <div class="line">
-                  <span class="seg" role="group" aria-label="粉丝牌">
-                    <button :aria-pressed="v.chatMedal === 'own'" @click="chat.set({ chatMedal: 'own' })">只显示本直播间的</button>
-                    <button :aria-pressed="v.chatMedal === 'all'" @click="chat.set({ chatMedal: 'all' })">戴什么显示什么</button>
-                  </span>
-                </div>
-                <span class="hint">{{ v.chatMedal === 'own' ? '戴别的直播间粉丝牌的观众，列表里不显示牌子' : '和 B站直播间里一样，戴哪个直播间的牌子就显示哪个' }}</span>
-              </div>
-            </div>
-            <div class="srow">
-              <span class="lb">条数</span>
-              <div class="ctl">
-                <div class="line">
-                  <span class="stepper">
-                    <button type="button" aria-label="少一条" :disabled="v.chatMax <= 1" @click="setChatMax(v.chatMax - 1)">−</button>
-                    <input :key="`${o.id}-${v.chatMax}`" class="inp num" type="number" min="1" :max="CHAT_MAX_LIMIT" :value="v.chatMax" aria-label="最多显示几条" @change="(e) => setChatMax(Number((e.target as HTMLInputElement).value))" />
-                    <button type="button" aria-label="多一条" :disabled="v.chatMax >= CHAT_MAX_LIMIT" @click="setChatMax(v.chatMax + 1)">+</button>
-                  </span>
-                  <span class="hint">最多显示几条（1 – {{ CHAT_MAX_LIMIT }}）</span>
-                </div>
-                <span class="hint">条数改了，浏览器源的高度也要跟着改（上面「宽高填」已经算好）。放不下时从最上面开始少显示几条。</span>
-              </div>
-            </div>
-            <div class="srow">
-              <span class="lb">自动消失</span>
-              <div class="ctl">
-                <div class="line">
-                  <Switch :model-value="v.chatFadeSec > 0" label="弹幕自动消失" @change="(v) => setChatFade(v ? lastFade : 0)" />
-                  <template v-if="v.chatFadeSec > 0">
-                    <span class="hint">没人发弹幕</span>
-                    <CdPick :model-value="v.chatFadeSec" unit="sec" :options="CHAT_FADE_OPTIONS" :max="CHAT_FADE_MAX" :allow-zero="false" hint="最后一条弹幕之后过多久开始消失" after="后开始消失" @change="setChatFade" />
-                  </template>
-                </div>
-                <span class="hint">{{ v.chatFadeSec > 0 ? `没人发弹幕 ${v.chatFadeSec} 秒后，从最上面最旧的那条开始，每 2 秒淡出一条；有新弹幕来就重新计时。满 ${v.chatMax} 条时，新弹幕照样会把最旧的顶走。` : '关着时弹幕一直显示，只被新弹幕顶走（没人说话时最后几条一直留在画面上）。' }}</span>
-              </div>
-            </div>
-            <div class="srow">
-              <span class="lb">黑名单</span>
-              <div class="ctl">
-                <div class="line"><Switch :model-value="v.chatHideBlocked" label="黑名单里的人不显示在弹幕列表" @change="(x) => chat.set({ chatHideBlocked: x })" /></div>
-                <span class="hint">开启后，黑名单中的账号（例如直播间的欢迎机器人）发送的弹幕不显示在弹幕列表中。黑名单在<a href="#settings" @click.prevent="go('settings')">「设置」</a>中管理；关闭时显示所有人的弹幕</span>
-              </div>
-            </div>
-          </div>
-          <DraftBar :dirty="chat.dirty.value" :saving="chat.saving.value" @save="chat.commit" @discard="chat.reset" />
-        </div>
 
       </div>
 
       <!-- 右侧：实时预览 -->
       <div class="o2-prev">
         <div class="card">
-          <div class="ptabs" role="tablist" aria-label="预览">
-            <button role="tab" :aria-selected="ptab === 'fx'" @click="ptab = 'fx'">特效页</button>
-            <button role="tab" :aria-selected="ptab === 'chat'" @click="ptab = 'chat'">弹幕列表</button>
-            <span class="aside">{{ ptab === 'fx' ? `${v.width} × ${v.height} · 只在这里播放` : o.chatEnabled ? `${CHAT_WIDTH} × ${chatHeight(v.chatMax, v.chatSize, v.chatLook)} · 实时弹幕` : '弹幕列表已关闭' }}</span>
-          </div>
+          <div class="card-h"><h2>预览</h2><span class="aside">{{ v.width }} × {{ v.height }} · 只在这里播放</span></div>
           <div class="ostage-wrap">
-            <PreviewStage v-if="ptab === 'fx'" ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && v.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
-            <ChatPreview v-else-if="cfg" ref="chatPv" :key="`c${o.id}`" :config="cfg" :alpha="alphaBg" />
+            <PreviewStage ref="stage" :key="o.id" cls="ostage" :config="cfg" :safe="showSafe && v.orient === 'portrait'" :alpha="alphaBg" :style="stageStyle" />
           </div>
           <div class="prev-tools">
-            <template v-if="ptab === 'fx'">
-              <button v-for="id in (['gov', 'adm', 'cap', 'mod', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" :title="tierEffect(id) ? '' : '这个身份还没选特效'" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', fan: '粉丝牌', nor: '其他' }[id as 'gov'] }}</button>
-            </template>
-            <template v-else>
-              <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('normal')"><i style="background: var(--nor)" />测试弹幕</button>
-              <button class="btn" :disabled="!o.chatEnabled" @click="chatPv?.test('guard')"><i style="background: var(--gov)" />大航海发言</button>
-            </template>
+            <button v-for="id in (['gov', 'adm', 'cap', 'mod', 'fan', 'nor'] as Identity[])" :key="id" class="btn" :disabled="!tierEffect(id)" :title="tierEffect(id) ? '' : '这个身份还没选特效'" @click="test(id)"><i :style="{ background: id === 'fan' ? '#C770A4' : `var(--${id})` }" />{{ { gov: '总督', adm: '提督', cap: '舰长', mod: '房管', fan: '粉丝牌', nor: '其他' }[id as 'gov'] }}</button>
             <span class="prev-bg"><span>背景</span><Seg :model-value="alphaBg ? 'alpha' : 'game'" label="预览背景" :options="[{ value: 'game', label: '游戏画面' }, { value: 'alpha', label: '透明' }]" @change="(v) => (alphaBg = v === 'alpha')" /></span>
           </div>
-          <p v-if="ptab === 'fx' && overlays.length" class="prev-note">特效页已连上 {{ clock(overlays[0]!.since) }} 起</p>
+          <p v-if="overlays.length" class="prev-note">特效页已连上 {{ clock(overlays[0]!.since) }} 起</p>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { refreshSettings, state } from '../lib/store.ts';
 import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { BackupItem, ImportPreview, Settings } from '../lib/types.ts';
 import Icon from './Icon.vue';
+import Tip from './Tip.vue';
 import ImportDialog from './ImportDialog.vue';
 import Switch from './Switch.vue';
 
@@ -77,39 +78,38 @@ onMounted(load);
   <div v-if="state.settings" class="card">
     <div class="card-h"><h2>数据</h2><span class="aside"><button class="btn" :disabled="running" title="马上备份一次数据库和配置（另外保留最近 5 份）" @click="runNow"><Icon name="i-check" />{{ running ? '正在备份…' : '立即备份' }}</button></span></div>
     <div class="field">
-      <div class="toggle-line">每天自动备份 <span class="hint">凌晨备份数据库和配置，保留最近 7 份；手动备份另外保留最近 5 份</span>
+      <div class="toggle-line">每天自动备份<Tip text="凌晨备份数据库和配置，保留最近 7 份；手动备份另外保留最近 5 份。" />
         <Switch v-model="state.settings.autoBackup" label="每天自动备份" @change="(v) => save({ autoBackup: v }, v ? '已开启每天自动备份' : '已关闭自动备份')" />
       </div>
       <div class="bk-t">
         <div v-for="b in showAll ? backups : backups.slice(0, 2)" :key="b.stamp" class="r">
-          <span class="num">{{ when(b.stamp) }}<span v-if="b.manual" class="tag nor" style="margin-left: 6px; font-size: 11px">手动</span></span>
+          <span class="num">{{ when(b.stamp) }}<span v-if="b.manual" class="tag nor" style="margin-left: 6px; font-size: var(--fs-badge)">手动</span></span>
           <span class="sz">{{ fileSize(b.dbSize + b.configSize) }}</span>
           <button v-if="b.config" type="button" class="linkish" @click="restore(b)">恢复到这份</button><span v-else />
           <a v-if="b.config" class="linkish" :href="`/api/backup/files/${b.config}`" download title="下载这份配置文件">下载</a><span v-else />
         </div>
-        <div v-if="!backups.length" class="r" style="grid-template-columns: 1fr"><span class="inline-hint">还没有备份。点右上角「立即备份」备份一份。</span></div>
+        <div v-if="!backups.length" class="r" style="grid-template-columns: 1fr"><span class="inline-hint">还没有备份</span></div>
         <button v-if="backups.length > 2" type="button" class="more" @click="showAll = !showAll">{{ showAll ? '收起' : `全部 ${backups.length} 份` }}</button>
       </div>
     </div>
     <div class="field" style="margin-top: 14px">
       <div class="slider-row">
-        <label for="keep">事件记录保留</label>
+        <label for="keep">事件记录保留<Tip text="原始消息只保留 7 天，用于排查问题。" /></label>
         <select id="keep" class="sel" :value="state.settings.retentionDays" @change="(e) => setRetention(Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'])">
           <option :value="30">30 天</option><option :value="90">90 天</option><option :value="180">180 天</option><option :value="0">永久</option>
         </select>
         <span />
       </div>
-      <span class="hint" style="font-size: 12px; color: var(--t3)">原始消息只保留 7 天，用于排查问题。</span>
+      
     </div>
     <div class="field" style="margin-top: 14px">
-      <span class="flabel">导出 / 导入配置</span>
+      <span class="flabel">导出 / 导入配置<Tip text="配置包括规则、素材设置、输出和播放设置，不含 B站登录信息和后台密码。桌面版和服务器版的文件可以互相导入；换电脑时建议导出含素材文件的 zip。导入或恢复前会自动备份一份现在的配置。" /></span>
       <div class="bk-actions">
         <a class="btn" href="/api/backup/export" download><Icon name="i-upload" />导出配置</a>
         <a class="btn" href="/api/backup/export?files=1" download>导出（含素材文件）</a>
         <button class="btn" :disabled="uploading !== null" @click="fileIn?.click()">{{ uploading !== null ? `正在上传 ${Math.round(uploading * 100)}%` : '导入配置' }}</button>
         <input ref="fileIn" type="file" accept=".json,.zip,application/json,application/zip" hidden @change="pick" />
       </div>
-      <span class="hint" style="font-size: 12px; color: var(--t3)">配置包括规则、素材设置、输出和播放设置，不含 B站登录信息和后台密码。导出的文件桌面版和服务器版都能导入；换电脑时建议用「含素材文件」的 zip。导入或恢复前会自动备份一份现在的配置，导错了可以在上面的备份列表里点「恢复到这份」。</span>
     </div>
     <ImportDialog v-if="preview" :preview="preview" @close="preview = null" @done="(preview = null), load()" />
   </div>

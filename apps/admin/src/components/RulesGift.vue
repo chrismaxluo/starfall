@@ -208,7 +208,7 @@ function previewBand(i: number): void {
       </div>
     </div>
     <div v-if="picking" class="rl-gpick">
-      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">来自你直播间的礼物面板，分页和顺序与面板一致；打字搜索时也会在 B 站全站礼物里找（盲盒里爆出的、活动礼物等）。点一下就加上，可以连着选几个</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
+      <div class="h"><input v-model.trim="giftQ" class="inp" placeholder="搜索礼物名" aria-label="搜索礼物" /><span class="hint">直播间礼物面板里的礼物；搜索时也会找 B站全站礼物，点一下就加上</span><button class="icon-btn" aria-label="收起" @click="picking = false"><Icon name="i-x" /></button></div>
       <div class="grid">
         <template v-for="grp in groups" :key="grp.title">
           <div class="sep">{{ grp.title }}</div>

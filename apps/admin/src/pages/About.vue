@@ -110,7 +110,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
 
 <template>
   <section class="page">
-    <div class="page-head"><div><h1>关于星临</h1><p>版本、更新记录和运行信息。</p></div></div>
+    <div class="page-head"><div><h1>关于星临</h1></div></div>
 
     <div class="about-grid">
       <div class="card about-hero">
@@ -148,7 +148,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
         <dl v-else class="about-kv">
           <template v-for="[k, v] in shown" :key="k"><dt>{{ k }}</dt><dd>{{ v }}</dd></template>
         </dl>
-        <p class="inline-hint" style="margin: 12px 0 0">反馈问题时，点「复制运行信息」一起发给作者，里面有更详细的系统信息，更容易查出原因。</p>
+        <p class="inline-hint" style="margin: 12px 0 0">反馈问题时，请把复制的运行信息一起发给作者。</p>
       </div>
     </div>
 

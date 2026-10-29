@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
+import Empty from '../components/Empty.vue';
 import Icon from '../components/Icon.vue';
 import { del, post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
@@ -211,7 +212,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
     <div class="page-head">
       <div>
         <h1>素材库</h1>
-        <p>上传的动画和图片就是进场特效，在触发规则里直接选用。音效单独管理，可以被多个素材共用。</p>
+        <p>上传的动画和图片可以在触发规则里选用；音效可以被多个素材共用。</p>
       </div>
       <div class="actions">
         <span class="usage"><span class="num">已用 {{ fileSize(totalSize) }}</span></span>
@@ -249,6 +250,8 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
     </div>
 
     <div v-if="tab === 'anim'">
+      <!-- 一个自己的素材都没有时，上面的大拖放框就是入口，这里不再放一张空的「上传素材」卡片 -->
+      <template v-if="!empty">
       <div class="a-sec" style="margin-top: 4px"><h2>我的素材</h2><span>{{ mine.length }} 个</span></div>
       <div class="ecards">
         <button class="ecard new" @click="fileIn?.click()"><div><Icon name="i-upload" />上传素材</div></button>
@@ -289,7 +292,8 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
           </div>
         </div>
       </div>
-      <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span></div>
+      </template>
+      <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span><a class="linkish a-demo" href="/overlay/?demo=1" target="_blank" rel="noopener" title="在新标签里轮流播放所有内置特效（示例）">轮流播放全部<Icon name="i-ext" /></a></div>
       <div class="ecards">
         <div v-for="e in builtin" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)">
           <div class="ethumb">
@@ -326,7 +330,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
           <ConfirmButton v-else label="删除" confirm-label="确认删除？" cls="danger" armed-cls="delb" @confirm="removeSound(s)"><Icon name="i-trash" />删除</ConfirmButton>
         </div>
       </div>
-      <div v-if="!sounds.length" class="soon-box" style="grid-column: 1 / -1"><b>还没有音效</b>把 MP3 / WAV / OGG 拖到上面就能添加，然后在素材设置的「音效」里选用</div>
+      <Empty v-if="!sounds.length" style="grid-column: 1 / -1" icon="i-music" title="还没有音效" desc="把 MP3、WAV、OGG 拖到这个页面就能添加，然后在素材设置的「音效」里选用" />
     </div>
   </section>
 </template>

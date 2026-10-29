@@ -18,6 +18,7 @@ import Music from './pages/Music.vue';
 import Rules from './pages/Rules.vue';
 import Assets from './pages/Assets.vue';
 import Events from './pages/Events.vue';
+import Chat from './pages/Chat.vue';
 import GiftList from './pages/GiftList.vue';
 import Output from './pages/Output.vue';
 import SettingsPage from './pages/Settings.vue';
@@ -35,16 +36,16 @@ import { loadMusic, neteaseIssues } from './lib/music.ts';
 import { toggleTheme } from './lib/theme.ts';
 import { attempt, runAction, toast, toasts } from './lib/toast.ts';
 
-const NAV: Array<{ page: Page; name: string; icon: string }> = [
-  { page: 'overview', name: '总览', icon: 'i-grid' },
-  { page: 'quickplay', name: '素材快捷播放', icon: 'i-bolt' },
-  { page: 'music', name: '弹幕点歌', icon: 'i-music' },
-  { page: 'rules', name: '触发规则', icon: 'i-wand' },
-  { page: 'assets', name: '素材库', icon: 'i-image' },
-  { page: 'logs', name: '事件记录', icon: 'i-list' },
-  { page: 'giftlist', name: '送礼名单', icon: 'i-gift' },
-  { page: 'obs', name: '直播软件输出', icon: 'i-screen' },
+/** 侧栏按用途分组：开播时看的、特效、直播画面上的东西 */
+const NAV_GROUPS: Array<{ label: string; items: Array<{ page: Page; name: string; icon: string }> }> = [
+  { label: '工作台', items: [{ page: 'overview', name: '总览', icon: 'i-grid' }, { page: 'logs', name: '事件记录', icon: 'i-list' }] },
+  { label: '特效', items: [{ page: 'rules', name: '触发规则', icon: 'i-wand' }, { page: 'assets', name: '素材库', icon: 'i-image' }, { page: 'quickplay', name: '素材快捷播放', icon: 'i-bolt' }] },
+  {
+    label: '直播画面',
+    items: [{ page: 'chat', name: '弹幕列表', icon: 'i-chat' }, { page: 'giftlist', name: '送礼名单', icon: 'i-gift' }, { page: 'music', name: '弹幕点歌', icon: 'i-music' }, { page: 'obs', name: '直播软件输出', icon: 'i-screen' }],
+  },
 ];
+const NAV = NAV_GROUPS.flatMap((g) => g.items);
 /** 手机底部导航的短名称 */
 const SHORT: Partial<Record<Page, string>> = { overview: '总览', rules: '规则', assets: '素材', logs: '记录' };
 /** 手机底部导航直接放的几页，其他的在「更多」里 */
@@ -188,7 +189,9 @@ const alerts = computed((): Alert[] => {
     const p = portMoved.value;
     out.push({ key: 'port', level: 'amber', title: `这次星临改用 ${p.port} 端口`, text: `${p.home} 被别的程序占用。特效页连不上的话，到「直播软件输出」复制新地址换上，以后新旧地址都能用。`, action: toObs });
   }
-  return out.filter((x) => x.level === 'red' || !dismissed.value.includes(x.key));
+  // 总览的状态卡片里已经写着特效页、B站登录的问题（带修复按钮），总览上不再重复显示横幅
+  const inCard = (k: string) => route.value.page === 'overview' && (k === 'fx' || k === 'login' || k.startsWith('expire'));
+  return out.filter((x) => !inCard(x.key) && (x.level === 'red' || !dismissed.value.includes(x.key)));
 });
 
 /** 导航「弹幕点歌」旁的小圆点：网易云快到期（橙）、出问题（红） */
@@ -275,16 +278,15 @@ function reloadPage(): void {
           <Logo :size="32" />
           <span><div class="brand-name">星临</div><div class="brand-sub">STARFALL</div></span>
         </div>
-        <div>
-          <div class="nav-label">工作台</div>
-          <nav class="nav" aria-label="主导航">
-            <a v-for="n in NAV" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ n.name }}<span v-if="n.page === 'music' && musicDot" class="ndot" :class="musicDot" :title="musicIssue" /></a>
+        <div v-for="g in NAV_GROUPS" :key="g.label">
+          <div class="nav-label">{{ g.label }}</div>
+          <nav class="nav" :aria-label="g.label">
+            <a v-for="n in g.items" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ n.name }}<span v-if="n.page === 'music' && musicDot" class="ndot" :class="musicDot" :title="musicIssue" /></a>
           </nav>
         </div>
         <div>
           <div class="nav-label">其他</div>
           <nav class="nav" aria-label="其他">
-            <a href="/overlay/?demo=1" target="_blank" rel="noopener" title="在新标签里轮流播放所有内置特效（示例）"><Icon name="i-demo" />内置特效演示<Icon name="i-ext" /></a>
             <a href="#about" :aria-current="route.page === 'about' ? 'page' : 'false'"><Icon name="i-info" />关于</a>
             <a href="#settings" :aria-current="route.page === 'settings' ? 'page' : 'false'"><Icon name="i-gear" />设置</a>
           </nav>
@@ -340,6 +342,7 @@ function reloadPage(): void {
         <Rules v-else-if="route.page === 'rules'" />
         <Assets v-else-if="route.page === 'assets'" />
         <Events v-else-if="route.page === 'logs'" />
+        <Chat v-else-if="route.page === 'chat'" />
         <GiftList v-else-if="route.page === 'giftlist'" />
         <Output v-else-if="route.page === 'obs'" />
         <SettingsPage v-else-if="route.page === 'settings'" />
@@ -349,11 +352,12 @@ function reloadPage(): void {
 
     <nav class="tabbar" aria-label="主导航（手机）">
       <a v-for="n in TABS" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ SHORT[n.page] }}</a>
-      <button :aria-current="['quickplay', 'music', 'giftlist', 'obs', 'about', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
+      <button :aria-current="['quickplay', 'music', 'chat', 'giftlist', 'obs', 'about', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
     </nav>
     <div v-if="moreOpen" style="position: fixed; inset: 0; z-index: 44" @click="moreOpen = false" />
     <div v-if="moreOpen" class="sheet" @click="moreOpen = false">
       <a href="#quickplay"><Icon name="i-bolt" />素材快捷播放</a>
+      <a href="#chat"><Icon name="i-chat" />弹幕列表</a>
       <a href="#music"><Icon name="i-music" />弹幕点歌</a>
       <a href="#giftlist"><Icon name="i-gift" />送礼名单</a>
       <a href="#obs" @click="go('obs')"><Icon name="i-screen" />直播软件输出</a>

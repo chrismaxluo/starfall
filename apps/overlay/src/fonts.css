@@ -1,0 +1,23 @@
+/* 英文字体：自己声明 Geist Sans，不用 fontsource 的样式（和管理后台 apps/admin/src/styles/fonts.css 一样）。
+   Geist 自带一批窄的中文标点（，。（）：；！？「」等），排在字体列表最前面时，观众弹幕和特效文字里的中文标点会被挤成英文样式。
+   这里跳过 U+3000–303F（中文标点）和 U+FF00–FFEF（全角符号），这些字交给后面的中文字体画。 */
+@font-face {
+  font-family: "Geist Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-2FFF, U+3040-FEFF, U+FFF0-FFFF;
+}
+@font-face {
+  font-family: "Geist Sans"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-500-normal.woff2") format("woff2");
+  unicode-range: U+0000-2FFF, U+3040-FEFF, U+FFF0-FFFF;
+}
+@font-face {
+  font-family: "Geist Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-2FFF, U+3040-FEFF, U+FFF0-FFFF;
+}
+@font-face {
+  font-family: "Geist Sans"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("@fontsource/geist-sans/files/geist-sans-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-2FFF, U+3040-FEFF, U+FFF0-FFFF;
+}

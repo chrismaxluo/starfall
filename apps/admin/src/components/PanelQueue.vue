@@ -3,6 +3,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Avatar from './Avatar.vue';
 import ConfirmButton from './ConfirmButton.vue';
+import Empty from './Empty.vue';
 import EvIcon from './EvIcon.vue';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
@@ -64,7 +65,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
       <button class="x" :aria-label="`把 ${q.viewerName} 移出队列`" title="移出队列（这次不播）" @click="removeItem(q.id, q.viewerName)"><Icon name="i-x" /></button>
     </div>
   </div>
-  <div v-if="!playing && !upcoming.length" class="ov-qempty"><b>现在没有排队</b>观众进场、送礼时会出现在这里，按顺序一个一个播放</div>
+  <Empty v-if="!playing && !upcoming.length" compact icon="i-queue" title="现在没有排队" desc="观众进场、送礼时会出现在这里，按顺序一个一个播放" />
   <div class="ov-qfoot">
     <span v-if="upcoming.length > Q_SHOW">后面还有 <b class="num">{{ upcoming.length - Q_SHOW }}</b> 条</span>
     <button class="linkish" :aria-expanded="showQueueSet" @click="showQueueSet = !showQueueSet">排队设置</button>

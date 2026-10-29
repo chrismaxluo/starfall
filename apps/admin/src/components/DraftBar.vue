@@ -13,11 +13,11 @@ defineEmits<{ save: []; discard: [] }>();
 </template>
 
 <style scoped>
-.draftbar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 10px 10px 10px 14px; border-radius: 12px;
+.draftbar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 10px 10px 10px 14px; border-radius: var(--r-md);
   background: var(--l3); border: 1px solid var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 24px -12px rgba(0, 0, 0, .35); }
-.draftbar-t { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; margin-right: auto; font-size: 13px; font-weight: 600; color: var(--t1); }
+.draftbar-t { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; margin-right: auto; font-size: var(--fs-sec); font-weight: 600; color: var(--t1); }
 .draftbar-t i { flex: none; align-self: center; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-.draftbar-t small { font-size: 12px; font-weight: 400; color: var(--t2); }
+.draftbar-t small { font-size: var(--fs-cap); font-weight: 400; color: var(--t2); }
 .draftbar .btn { flex: none; height: 32px; }
 /* 手机：避开底部导航 */
 @media (max-width: 820px) { .draftbar { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); } }

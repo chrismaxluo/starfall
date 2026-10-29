@@ -48,7 +48,7 @@ const issues = computed(() => (tab.value === 'play' ? [] : neteaseIssues()));
     <div class="page-head">
       <div>
         <h1>弹幕点歌</h1>
-        <p>观众发弹幕「{{ music.settings?.cmdRequest ?? '点歌' }} 歌名」，歌会排进列表，在直播画面上的点歌窗口里播放。</p>
+        <p>观众发弹幕「{{ music.settings?.cmdRequest ?? '点歌' }} 歌名」点歌，在直播画面的点歌窗口里播放。</p>
       </div>
       <div v-if="music.settings" class="mu-head-r">
         <button class="btn" :title="`在直播软件里加一个浏览器源，宽高填 ${MUSIC_WIDTH} × ${MUSIC_HEIGHT}`" @click="copyMusicUrl"><Icon name="i-copy" />复制点歌窗口地址</button>
@@ -90,15 +90,15 @@ const issues = computed(() => (tab.value === 'play' ? [] : neteaseIssues()));
 .mu-glowfade-enter-from, .mu-glowfade-leave-to { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .mu-glowfade-enter-active, .mu-glowfade-leave-active { transition: none; } }
 .mu-head-r { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-.mu-sw { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--t2); padding-left: 4px; }
-.mu-alert { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--t1); font-size: 13px; }
+.mu-sw { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sec); font-weight: 500; color: var(--t2); padding-left: 4px; }
+.mu-alert { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; border-radius: var(--r-md); background: var(--accent-soft); color: var(--t1); font-size: var(--fs-sec); }
 .mu-alert svg { width: 16px; height: 16px; flex: none; color: var(--accent); }
 .mu-alert.warn { background: var(--gov-soft); }
 .mu-alert.warn svg { color: var(--gov); }
 .mu-alert.bad { background: var(--bad-soft); }
 .mu-alert.bad svg { color: var(--bad); }
-.mu-alert .btn { margin-left: auto; height: 28px; font-size: 12.5px; }
+.mu-alert .btn { margin-left: auto; height: 28px; font-size: var(--fs-sec); }
 .mu-tabs { margin-bottom: 16px; }
 .mu-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; }
-.mu-cnt { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font: 600 11px/18px var(--font-mono); background: var(--accent-soft); color: var(--accent); text-align: center; }
+.mu-cnt { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-sm); font: 600 11px/18px var(--font-sans); font-variant-numeric: tabular-nums; background: var(--accent-soft); color: var(--accent); text-align: center; }
 </style>

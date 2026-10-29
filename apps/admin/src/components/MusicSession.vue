@@ -67,13 +67,13 @@ onBeforeUnmount(() => timer && clearInterval(timer));
 .ss { display: flex; flex-direction: column; }
 .ss-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
 .ss-n b { display: block; font-size: 28px; font-weight: 600; letter-spacing: -0.04em; line-height: 1.1; }
-.ss-n span { font-size: 12px; color: var(--t3); }
+.ss-n span { font-size: var(--fs-cap); color: var(--t3); }
 .ss-top { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
-.ss-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--t2); min-width: 0; }
+.ss-row { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sec); color: var(--t2); min-width: 0; }
 .ss-row .k { width: 4.5em; flex: none; color: var(--t3); }
 .ss-row b { font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-row em { font-style: normal; color: var(--t3); flex: none; }
-.ss-row img, .ss-blank { width: 20px; height: 20px; border-radius: 5px; object-fit: cover; flex: none; }
+.ss-row img, .ss-blank { width: 20px; height: 20px; border-radius: var(--r-xs); object-fit: cover; flex: none; }
 .ss-blank { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .ss-blank svg { width: 12px; height: 12px; }
 .ss-none { color: var(--t3); }

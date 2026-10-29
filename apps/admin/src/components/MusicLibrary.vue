@@ -2,6 +2,7 @@
 // 点歌 · 歌库：上传音乐（可以一次选多个，歌词用同名的 .lrc 一起传）、改歌名歌手、配歌词、删除；电脑版还能直接用一个文件夹里的歌
 import { computed, onMounted, ref, watch } from 'vue';
 import ConfirmButton from './ConfirmButton.vue';
+import Empty from './Empty.vue';
 import Icon from './Icon.vue';
 import { del, get, post, put, upload } from '../lib/api.ts';
 import { desktop } from '../lib/desktop.ts';
@@ -168,7 +169,7 @@ async function rescan(): Promise<void> {
         <span class="aside"><input v-model="q" class="inp mlb-q" placeholder="搜歌名、歌手" aria-label="在歌库里搜" /></span>
       </div>
       <div v-if="!loaded" class="inline-hint">读取中…</div>
-      <div v-else-if="!songs.length" class="inline-hint">歌库是空的。上传后，观众点歌时会先在这里找（规则里可以改成先找网易云）。</div>
+      <Empty v-else-if="!songs.length" compact icon="i-music" title="歌库是空的" desc="上传后，观众点歌时会先在这里找（规则里可以改成先找网易云）" />
       <div v-else-if="!shown.length" class="inline-hint">没有符合的歌。</div>
       <div v-else class="mlb-list">
         <div v-for="s in shown" :key="s.id" class="mlb-row">
@@ -195,12 +196,12 @@ async function rescan(): Promise<void> {
 .mlb { display: flex; flex-direction: column; gap: 16px; }
 .mlb-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: stretch; }
 @media (max-width: 1000px) { .mlb-top { grid-template-columns: 1fr; } }
-.mlb-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 150px; padding: 20px; border-radius: 16px; border: 1.5px dashed var(--line-strong); background: var(--l2); text-align: center; cursor: pointer; }
+.mlb-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 150px; padding: 20px; border-radius: var(--r-lg); border: 1.5px dashed var(--line-strong); background: var(--l2); text-align: center; cursor: pointer; }
 .mlb-drop:hover, .mlb-drop.over { border-color: var(--accent); background: var(--accent-soft); }
 .mlb-drop.busy { cursor: progress; }
 .mlb-drop svg { width: 26px; height: 26px; color: var(--accent); }
-.mlb-drop b { font-size: 14px; font-weight: 600; }
-.mlb-drop span { font-size: 12.5px; color: var(--t2); max-width: 520px; line-height: 1.6; }
+.mlb-drop b { font-size: var(--fs-body); font-weight: 600; }
+.mlb-drop span { font-size: var(--fs-sec); color: var(--t2); max-width: 520px; line-height: 1.6; }
 .mlb-bar { position: relative; width: 280px; height: 4px; border-radius: 2px; background: var(--hover); overflow: hidden; }
 .mlb-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
 .mlb-folder { width: 340px; margin: 0; }
@@ -208,23 +209,23 @@ async function rescan(): Promise<void> {
 .mlb-path { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font: 12.5px/1.4 var(--font-mono); color: var(--t1); word-break: break-all; }
 .mlb-path svg { width: 15px; height: 15px; flex: none; color: var(--accent); }
 .mlb-fa { display: flex; gap: 6px; flex-wrap: wrap; }
-.mlb-folder .btn.sm, .mlb-folder :deep(.btn.sm) { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.mlb-folder .btn.sm, .mlb-folder :deep(.btn.sm) { height: 28px; padding: 0 10px; font-size: var(--fs-sec); }
 .mlb-q { width: 200px; height: 30px; }
 .mlb-list { display: flex; flex-direction: column; margin: 0 -6px; }
-.mlb-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 140px 110px 32px; align-items: center; gap: 12px; padding: 6px; border-radius: 8px; font-size: 13px; }
+.mlb-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 140px 110px 32px; align-items: center; gap: 12px; padding: 6px; border-radius: var(--r-sm); font-size: var(--fs-sec); }
 .mlb-row + .mlb-row { border-top: 1px solid var(--line); }
 .mlb-row:hover { background: var(--hover); }
-.mlb-cover { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
+.mlb-cover { width: 40px; height: 40px; border-radius: var(--r-sm); object-fit: cover; }
 .mlb-cover.blank { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .mlb-cover.blank svg { width: 16px; height: 16px; }
 .mlb-ed { display: flex; flex-direction: column; min-width: 0; }
-.mlb-in { width: 100%; min-width: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--t1); font: inherit; padding: 1px 6px; margin-left: -6px; }
+.mlb-in { width: 100%; min-width: 0; border: 1px solid transparent; border-radius: var(--r-xs); background: transparent; color: var(--t1); font: inherit; padding: 1px 6px; margin-left: -6px; }
 .mlb-in:hover { border-color: var(--line); }
 .mlb-in:focus { outline: none; border-color: var(--accent); background: var(--l3); }
 .mlb-in.t { font-weight: 600; }
-.mlb-in.a { font-size: 12px; color: var(--t2); }
-.mlb-meta { font-size: 12px; color: var(--t3); }
+.mlb-in.a { font-size: var(--fs-cap); color: var(--t2); }
+.mlb-meta { font-size: var(--fs-cap); color: var(--t3); }
 .mlb-ly { display: flex; align-items: center; gap: 4px; }
-.mlb-ly .btn.sm { height: 26px; padding: 0 10px; font-size: 12px; cursor: pointer; }
-.mlb-has { font-size: 12px; color: var(--ok); }
+.mlb-ly .btn.sm { height: 26px; padding: 0 10px; font-size: var(--fs-cap); cursor: pointer; }
+.mlb-has { font-size: var(--fs-cap); color: var(--ok); }
 </style>

@@ -2,6 +2,7 @@
 // 总览右侧面板「大航海」：这段时间来了哪些舰长、提督、总督（进场几次、最后一次什么时候），舰队名单里还有谁没来
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from './Avatar.vue';
+import Empty from './Empty.vue';
 import PersonRow from './PersonRow.vue';
 import { get } from '../lib/api.ts';
 import { GUARD_TEXT, pageVisible } from '../lib/audience.ts';
@@ -65,7 +66,7 @@ const where = computed(() => (props.scope === 'live' ? '本场' : '今天'));
 </script>
 
 <template>
-  <div v-if="!state.status?.room" class="ov-qempty"><b>还没设置直播间</b>在设置里填好直播间号后显示</div>
+  <Empty v-if="!state.status?.room" compact icon="i-screen" title="还没设置直播间" desc="在设置里填好直播间号后显示" />
   <template v-else>
     <div class="fleet">
       <span class="ring" :style="{ '--p': pct }"><span class="num">{{ fleet ? `${pct}%` : '—' }}</span></span>
@@ -79,7 +80,7 @@ const where = computed(() => (props.scope === 'live' ? '本场' : '今天'));
     </div>
     <div class="plist" style="max-height: 220px">
       <PersonRow v-for="c in came" :key="c.uid" :viewer="c.viewer" :sub="`${GUARD_TEXT[c.viewer.guard] ?? '大航海'} · 最后一次 ${clock(c.lastTs).slice(0, 5)}`" :value="String(c.times)" unit="次进场" @pick="(v, px, py) => emit('pick', v, px, py)" />
-      <div v-if="data && !came.length" class="pempty">{{ where }}还没有大航海进场</div>
+      <Empty v-if="data && !came.length" compact icon="i-anchor" :title="`${where}还没有大航海进场`" />
     </div>
     <details v-if="missing.length" class="missing">
       <summary>还没来的 {{ fleet && fleet.members.length < fleet.total ? `${fleet.total - came.length} 人（名单只读了前 ${fleet.members.length} 人）` : `${missing.length} 人` }}（点开看）</summary>

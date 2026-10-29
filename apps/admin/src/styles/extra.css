@@ -93,7 +93,7 @@
 
 /* ================= 总览 ================= */
 /* 直播间信息 */
-.ov-room { display: grid; grid-template-columns: 224px minmax(0, 1fr) auto; gap: 20px; align-items: center; margin-bottom: 4px; }
+.ov-room { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 18px; align-items: center; padding: 14px; }
 .ov-cover { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-sm); overflow: hidden; background: var(--hover); }
 .ov-cover > img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ov-cover.off > img { filter: grayscale(.85) brightness(.8); }
@@ -104,12 +104,12 @@
 .ov-cover .badge.off { background: rgba(20, 20, 28, .72); color: #D8D8E0; }
 .ov-cover .badge i { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
 .ov-cover .dur { position: absolute; right: 8px; bottom: 8px; height: 22px; padding: 0 8px; border-radius: var(--r-xs); font-size: var(--fs-cap); color: #fff; background: rgba(10, 10, 16, .66); display: inline-flex; align-items: center; }
-.ov-meta { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.ov-anchor { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.ov-anchor .avatar { width: 30px; height: 30px; font-size: var(--fs-sec); }
-.ov-anchor > span { min-width: 0; display: flex; flex-direction: column; }
-.ov-anchor b { font-weight: 600; font-size: var(--fs-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ov-anchor .sub { font-size: var(--fs-cap); color: var(--t3); white-space: nowrap; }
+.ov-meta { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ov-anchor { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-sec); color: var(--t2); }
+.ov-anchor .avatar { width: 22px; height: 22px; font-size: var(--fs-badge); }
+.ov-anchor b { font-weight: 500; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-anchor .sub { color: var(--t3); white-space: nowrap; }
+.ov-anchor .sub::before { content: "·"; margin-right: 8px; }
 .ov-title { font-size: var(--fs-h2); font-weight: 600; letter-spacing: -.01em; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ov-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: var(--fs-cap); color: var(--t2); }
 .ov-tags .pill { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: var(--r-xs); background: var(--hover); border: 1px solid var(--line); color: var(--t2); text-decoration: none; }
@@ -260,12 +260,14 @@
 .playmini svg.i { width: 13px; height: 13px; fill: none; stroke: currentColor; }
 
 /* ---- 总览：一排数字 ---- */
-.kstrip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 0; margin-bottom: 16px; }
-.kstrip > div { padding: 16px 18px; min-width: 0; }
-.kstrip > div + div { border-left: 1px solid var(--line); }
+.kstrip { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 4fr); border-top: 1px solid var(--line); }
+.kstrip .kg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); position: relative; min-width: 0; }
+.kstrip .kg.bili { grid-template-columns: repeat(4, minmax(0, 1fr)); border-left: 1px solid var(--line); }
+.kstrip .kg > div { padding: 14px 18px 16px; min-width: 0; }
+.kstrip .kg > div + div { border-left: 1px solid var(--line); }
 .kstrip small { display: flex; align-items: center; gap: 6px; font-size: var(--fs-cap); color: var(--t3); white-space: nowrap; }
-.kstrip .src { font-size: var(--fs-badge); letter-spacing: .06em; padding: 0 5px; border-radius: var(--r-xs); color: #FB7299; background: rgba(251, 114, 153, .12); font-weight: 600; }
-.kstrip .v { display: block; font-size: 26px; font-weight: 600; letter-spacing: -.03em; line-height: 1.25; margin-top: 4px; }
+.kstrip .src { position: absolute; top: 14px; right: 16px; font-size: var(--fs-badge); letter-spacing: .06em; padding: 0 5px; border-radius: var(--r-xs); color: #FB7299; background: rgba(251, 114, 153, .12); font-weight: 600; }
+.kstrip .v { display: block; font-size: var(--fs-kpi); font-weight: 600; letter-spacing: -.02em; line-height: 1.2; margin-top: 4px; }
 .kstrip .d { font-size: var(--fs-cap); color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kstrip .d b { color: var(--t1); font-weight: 500; }
 
@@ -278,7 +280,7 @@
 
 /* ---- 总览：右侧切换面板 ---- */
 .ptabs { display: flex; gap: 2px; margin: -6px -8px 12px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
-.ptabs button { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; background: none; color: var(--t3); font-size: var(--fs-body); font-weight: 500; white-space: nowrap; }
+.ptabs button { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 9px; border: 0; background: none; color: var(--t3); font-size: var(--fs-sec); font-weight: 500; white-space: nowrap; }
 .ptabs button:hover { color: var(--t1); }
 .ptabs button svg.i { width: 15px; height: 15px; }
 .ptabs button[aria-selected="true"] { color: var(--t1); }
@@ -323,16 +325,15 @@
 .missing .chips span { align-self: center; }
 .sub-h { font-size: var(--fs-sec); color: var(--t2); font-weight: 500; margin: 18px 0 2px; }
 
-@media (max-width: 1280px) {
-  .kstrip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .kstrip > div:nth-child(4) { border-left: 0; }
-  .kstrip > div:nth-child(n+4) { border-top: 1px solid var(--line); }
+/* 窄窗口：星临、B站两组上下排；手机上每组两格一行 */
+@media (max-width: 1000px) {
+  .kstrip { grid-template-columns: minmax(0, 1fr); }
+  .kstrip .kg.bili { border-left: 0; border-top: 1px solid var(--line); }
 }
 @media (max-width: 720px) {
-  .kstrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kstrip > div:nth-child(n) { border-left: 0; border-top: 0; }
-  .kstrip > div:nth-child(even) { border-left: 1px solid var(--line); }
-  .kstrip > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .kstrip .kg.bili { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kstrip .kg.bili > div:nth-child(n+4) { border-top: 1px solid var(--line); }
+  .kstrip .kg.bili > div:nth-child(4) { border-left: 0; }
   .kstrip .v { font-size: 22px; }
   .fbar label { margin-left: 0; }
 }
@@ -806,3 +807,62 @@ body:has(.editor) .toasts { bottom: 92px; }
 .empty-st.compact { padding: 22px 12px; }
 .empty-st.compact .es-ic { width: 36px; height: 36px; margin-bottom: 6px; }
 .empty-st.compact .es-ic svg.i { width: 17px; height: 17px; }
+
+/* ============ 直播画面组件页（弹幕列表、送礼名单）：左边「显示什么」和「加到直播软件」，右边预览和外观 ============ */
+.wp-head-r { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+.wp-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.wp-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 1100px) { .wp-grid { grid-template-columns: 1fr; } }
+.wp-pv { display: grid; place-items: center; padding: 6px 0; }
+.wp-sub { display: flex; align-items: baseline; gap: 8px; margin: 22px 0 2px; padding-top: 16px; border-top: 1px solid var(--line); font-size: var(--fs-title); font-weight: 600; color: var(--t1); }
+.wp-link { display: inline-block; font-size: var(--fs-sec); }
+.srows.dimmed { opacity: .5; }
+.a-sec .a-demo { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sec); }
+.a-sec .a-demo svg.i { width: 13px; height: 13px; }
+
+/* ============ 总览（驾驶舱） ============ */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.btn.sm { height: 28px; padding: 0 10px; font-size: var(--fs-sec); }
+.ov-top { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; margin-bottom: 16px; }
+/* 状态：圆点 + 标题（一切正常 / 哪里有问题），下面逐项列出，有问题的排前面并带修复按钮 */
+.ov-health { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; }
+.ov-health .oh-h { display: flex; align-items: center; gap: 10px; }
+.ov-health .oh-h b { font-size: var(--fs-title); font-weight: 600; }
+.oh-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--t3); box-shadow: 0 0 0 4px var(--hover); }
+.ov-health.ok .oh-dot { background: var(--ok); box-shadow: 0 0 0 4px var(--ok-soft); }
+.ov-health.warn .oh-dot { background: var(--gov); box-shadow: 0 0 0 4px var(--gov-soft); }
+.ov-health.bad .oh-dot { background: var(--bad); box-shadow: 0 0 0 4px var(--bad-soft); }
+.ov-health.bad { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); background: linear-gradient(var(--bad-soft), var(--bad-soft)), var(--l3); }
+.oh-dot.pulse { animation: ohPulse 2.4s ease-in-out infinite; }
+@keyframes ohPulse { 0%, 100% { box-shadow: 0 0 0 4px var(--ok-soft); } 50% { box-shadow: 0 0 0 7px transparent; } }
+@media (prefers-reduced-motion: reduce) { .oh-dot.pulse { animation: none; } }
+.oh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.oh-list li { display: flex; align-items: center; gap: 10px; min-height: 28px; font-size: var(--fs-sec); }
+.oh-list .oh-n { flex: none; width: 5em; color: var(--t3); }
+.oh-list .oh-t { flex: 1; min-width: 0; color: var(--t2); }
+.oh-list li.bad .oh-t { color: var(--bad); font-weight: 500; }
+.oh-list li.warn .oh-t { color: var(--gov); }
+.oh-list li.off .oh-t { color: var(--t3); }
+.oh-list .btn.sm { flex: none; height: 26px; font-size: var(--fs-cap); }
+/* 数据卡片 */
+.ov-kpis { padding: 0; margin-bottom: 16px; overflow: hidden; }
+.ov-kpis .card-h { padding: 12px 18px 10px; margin: 0; }
+.ov-kpis .card-h .aside { gap: 10px; }
+/* 下面两栏：左边实时动态，右边快捷播放、点歌、面板、身份构成 */
+.ov-main { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ov-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ov-col > .ov-quick, .ov-col > .card.mm { margin-bottom: 0; }
+@media (max-width: 1180px) { .ov-top { grid-template-columns: minmax(0, 1fr) 300px; } }
+@media (max-width: 1000px) { .ov-top, .ov-main { grid-template-columns: 1fr; } }
+/* 分段选项的文字不折行：放不下时整颗按钮换到下一行（.seg.wrap） */
+.seg button { white-space: nowrap; }
+.seg.wrap { flex-wrap: wrap; }
+/* B站的四项数据底色稍微带一点 B站粉，和右上角的「B站」标签一起表示这一组都来自 B站 */
+.kstrip .kg.bili { background: rgba(251, 114, 153, .035); }
+/* 顶栏：状态和按钮不折行，窗口窄时先让搜索框变短 */
+.top .crumb, .top .live, .top .livestate, .top .pausebtn { white-space: nowrap; flex-shrink: 0; }
+.top .search { flex: 0 1 280px; min-width: 120px; overflow: hidden; white-space: nowrap; }
+.top .search .kbd { flex-shrink: 0; }
+@media (max-width: 1360px) { .top .search .kbd { display: none; } }
+/* 总览右栏窄时，面板标签去掉图标，四个标签放得下 */
+@media (max-width: 1360px) { .ov-panel .ptabs button svg.i { display: none; } }

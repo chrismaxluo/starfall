@@ -11,6 +11,7 @@ import DraftBar from '../components/DraftBar.vue';
 import GiftsFilterPick from '../components/GiftsFilterPick.vue';
 import GiftsPreview from '../components/GiftsPreview.vue';
 import Icon from '../components/Icon.vue';
+import SourceCard from '../components/SourceCard.vue';
 import Switch from '../components/Switch.vue';
 import { del, get, post, put } from '../lib/api.ts';
 import { useDraft } from '../lib/draft.ts';
@@ -38,6 +39,7 @@ const whOf = (x: OutputDto) => {
   return `${s.w} × ${s.h}`;
 };
 const wh = computed(() => (o.value ? whOf(o.value) : ''));
+const srcWh = computed(() => (o.value ? giftsSourceSize(o.value) : { w: 0, h: 0 }));
 /** 换输出：草稿是上一个输出的，先问再丢掉 */
 function pickOutput(e: Event): void {
   const el = e.target as HTMLSelectElement;
@@ -318,7 +320,7 @@ function onDrop(to: number): void {
   <section v-if="o && cfg" class="page">
     <div class="page-head">
       <div><h1>送礼名单</h1><p>把收到的礼物、上舰、醒目留言排成一列显示在直播画面上。</p></div>
-      <div class="gl-head-r">
+      <div class="wp-head-r">
         <select v-if="state.outputs.length > 1" class="sel" aria-label="输出" :value="o.id" @change="pickOutput"><option v-for="x in state.outputs" :key="x.id" :value="x.id">{{ x.name }}</option></select>
         <span class="live" :class="o.giftsEnabled && online ? '' : 'off'"><i />{{ !o.giftsEnabled ? '已关闭' : online ? '直播软件里已加上' : '直播软件里还没加' }}</span>
         <button class="btn" :title="`在直播软件里加一个浏览器源，宽高填 ${wh}`" @click="copyUrl"><Icon name="i-copy" />复制地址</button>
@@ -326,11 +328,11 @@ function onDrop(to: number): void {
       </div>
     </div>
 
-    <div class="gl-grid">
-      <div class="gl-col">
+    <div class="wp-grid">
+      <div class="wp-col">
         <!-- 名单放什么 -->
         <div class="card">
-          <div class="card-h"><h2>名单放什么</h2><span class="aside">改了马上生效</span></div>
+          <div class="card-h"><h2>名单放什么</h2></div>
           <div class="gl-modes" role="radiogroup" aria-label="名单放什么">
             <button type="button" class="gl-mode" role="radio" :aria-checked="!manual" @click="pickAuto">
               <b><Icon name="i-bolt" />自动：收到的礼物</b>
@@ -463,14 +465,15 @@ function onDrop(to: number): void {
           <p v-if="more" class="inline-hint" style="margin: 10px 0 0">只列出了最新的 {{ records.length }} 条，更早的请加上观众名或金额缩小范围。</p>
         </div>
         </template>
+        <SourceCard name="送礼名单" :path="o.giftsPath" :secret="o.key" :w="srcWh.w" :h="srcWh.h" />
       </div>
 
       <!-- 预览和外观 -->
       <div class="card">
         <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示</span></div>
-        <div class="gl-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
+        <div class="wp-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
         <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled" :title="manual ? '在名单最后加一条测试记录，看看新加一条时的样子' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
-        <h3 class="gl-sub">外观<small>改完点「保存」才到直播画面</small></h3>
+        <h3 class="wp-sub">外观</h3>
         <div class="srows">
           <div class="srow">
             <span class="lb">样式</span>
@@ -558,10 +561,6 @@ function onDrop(to: number): void {
 </template>
 
 <style scoped>
-.gl-head-r { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-.gl-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-.gl-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-@media (max-width: 1100px) { .gl-grid { grid-template-columns: 1fr; } }
 
 /* 名单放什么：两个大选项 */
 .gl-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
@@ -582,14 +581,10 @@ function onDrop(to: number): void {
 .gl-sum.bad { background: rgba(214, 69, 69, .1); }
 .gl-sum.bad svg { color: #D64545; }
 
-.gl-pv { display: grid; place-items: center; padding: 6px 0; }
-.gl-sub { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 2px; font-size: var(--fs-sec); font-weight: 600; color: var(--t2); }
-.gl-sub small { font-size: var(--fs-cap); font-weight: 400; color: var(--t3); }
 .gl-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .gl-tools .inp { width: 180px; height: 32px; }
 .gl-tools .sel { height: 32px; min-width: 240px; max-width: 100%; }
 .gl-tools .sel.amt { min-width: 0; width: 120px; }
-.seg.wrap { flex-wrap: wrap; }
 .alpha { width: min(240px, 100%); accent-color: var(--accent); }
 .alpha-v { min-width: 3em; font-variant-numeric: tabular-nums; font-size: var(--fs-sec); color: var(--t1); }
 .inp.dt { width: 200px; height: 32px; }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// 总览：正在监控的直播间（标题、分区、主播、开播时间）、本场 / 今天的数据、实时动态、右侧切换面板（播放队列、在线观众、礼物榜、大航海）
+// 总览（开播时看的驾驶舱）：上面是直播间和「状态」（一切正常还是哪里有问题，问题旁边直接给修复按钮），
+// 然后是本场 / 今天的数据；下面左边实时动态，右边快捷播放、点歌、切换面板（播放队列、在线观众、礼物榜、大航海）和身份构成
 import EvIcon from '../components/EvIcon.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
@@ -12,6 +13,7 @@ import MusicMini from '../components/MusicMini.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
 import ViewerMenu from '../components/ViewerMenu.vue';
+import { togglePause } from '../lib/actions.ts';
 import { get } from '../lib/api.ts';
 import { describe, statusText } from '../lib/events.ts';
 import { bigNum, clock, duration, hms, when } from '../lib/format.ts';
@@ -19,6 +21,7 @@ import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
 import { useQuickHotkeys } from '../lib/quick.ts';
+import { go } from '../lib/route.ts';
 import { effectById, state, ui } from '../lib/store.ts';
 import { music } from '../lib/music.ts';
 import type { EventDto, StatsDto, TriggerKind, Viewer } from '../lib/types.ts';
@@ -89,23 +92,54 @@ const timeLine = computed(() => {
   const l = stats.value?.lastSession;
   return l ? `上次直播 ${when(l.startedAt, now.value)} – ${clock(l.endedAt).slice(0, 5)}（${duration(l.endedAt - l.startedAt)}）` : '还没有直播记录';
 });
-const connText = computed(() => {
-  const l = s.value?.live;
-  if (!l) return '—';
-  if (l.connection === 'connected') return '已连接';
-  if (l.reason === 'offline') return '未开播，未连接';
-  if (l.reason === 'not_logged_in') return '未登录 B站';
-  if (l.reason === 'no_room') return '未设置直播间';
-  return l.connectionDetail ?? '连接中';
+
+// ---------- 状态：弹幕连接、特效页、B站登录、暂停；有问题的排前面，旁边直接给修复按钮 ----------
+type Level = 'ok' | 'warn' | 'bad' | 'off';
+/** head：只有这一个问题时，状态卡片的标题 */
+interface Check { key: string; name: string; text: string; level: Level; head?: string; action?: { label: string; run: () => void } }
+const rescan = { label: '重新扫码', run: () => (ui.qr = true) };
+const checks = computed((): Check[] => {
+  const st = s.value;
+  if (!st) return [];
+  const l = st.live;
+  const out: Check[] = [];
+  if (l.connection === 'connected') out.push({ key: 'conn', name: '弹幕连接', text: '已连接', level: 'ok' });
+  else if (l.reason === 'offline') out.push({ key: 'conn', name: '弹幕连接', text: '开播后自动连接', level: 'off' });
+  else if (l.reason === 'no_room') out.push({ key: 'conn', name: '弹幕连接', text: '还没设置直播间', level: 'bad', head: '还没设置直播间', action: { label: '去设置', run: () => go('settings') } });
+  else if (l.reason !== 'not_logged_in') out.push({ key: 'conn', name: '弹幕连接', text: l.connectionDetail ?? '正在连接', level: 'warn', head: '正在连接直播间' });
+  const n = st.overlays ?? 0;
+  if (n > 0) out.push({ key: 'fx', name: '特效页', text: `${n} 个在线`, level: 'ok' });
+  else out.push({ key: 'fx', name: '特效页', text: live.value ? '不在线，观众看不到特效' : '不在线', level: live.value ? 'bad' : 'off', head: '特效页不在线', action: { label: '去检查', run: () => go('obs') } });
+  const a = st.account;
+  if (!a.loggedIn) out.push({ key: 'login', name: 'B站登录', text: '还没登录，收不到直播间消息', level: 'bad', head: '还没登录 B站', action: { label: '扫码登录', run: () => (ui.qr = true) } });
+  else {
+    const days = a.expiresAt ? Math.floor((a.expiresAt - now.value) / 86400_000) : null;
+    if (l.loginInvalid) out.push({ key: 'login', name: 'B站登录', text: '已失效，收不到直播间消息', level: 'bad', head: 'B站登录已失效', action: rescan });
+    else if (days !== null && days < 0) out.push({ key: 'login', name: 'B站登录', text: '已过期，收不到直播间消息', level: 'bad', head: 'B站登录已过期', action: rescan });
+    else if (days !== null && days <= 3) out.push({ key: 'login', name: 'B站登录', text: `还剩 ${days} 天`, level: 'warn', head: `B站登录还剩 ${days} 天`, action: rescan });
+    else out.push({ key: 'login', name: 'B站登录', text: days === null ? '有效' : `有效，还剩 ${days} 天`, level: 'ok' });
+  }
+  if (st.paused) out.push({ key: 'pause', name: '特效播放', text: '已暂停', level: 'warn', head: '特效已暂停', action: { label: '恢复播放', run: () => void togglePause() } });
+  const rank: Record<Level, number> = { bad: 0, warn: 1, off: 2, ok: 3 };
+  return out.sort((x, y) => rank[x.level] - rank[y.level]);
+});
+const health = computed((): { level: Level; title: string } => {
+  const bad = checks.value.filter((c) => c.level === 'bad');
+  const warn = checks.value.filter((c) => c.level === 'warn');
+  const one = (c: Check) => c.head ?? `${c.name}${c.text}`;
+  if (bad.length) return { level: 'bad', title: bad.length === 1 ? one(bad[0]!) : `有 ${bad.length} 个问题` };
+  if (warn.length) return { level: 'warn', title: warn.length === 1 ? one(warn[0]!) : `有 ${warn.length} 项要注意` };
+  return live.value ? { level: 'ok', title: '一切正常' } : { level: 'off', title: '未开播' };
 });
 
 // ---------- 数据 ----------
+/** 数据卡片右上角写清楚算的是哪段时间（标题已经写了本场 / 上一场 / 今天） */
 const scopeText = computed(() => {
   const x = stats.value;
-  if (scope.value === 'today') return '今天（0 点至今）';
-  if (!x || x.from === null) return '本场直播（还没有直播记录）';
-  if (x.live) return `本场直播（${when(x.from, now.value)} 开播至今）`;
-  return `上一场直播（${when(x.from, now.value)} – ${clock(x.to ?? x.from).slice(0, 5)}）`;
+  if (scope.value === 'today') return '0 点至今';
+  if (!x || x.from === null) return '还没有直播记录';
+  if (x.live) return `${when(x.from, now.value)} 开播至今`;
+  return `${when(x.from, now.value)} – ${clock(x.to ?? x.from).slice(0, 5)}`;
 });
 const COMP: Array<[Identity, string]> = [['gov', 'var(--gov)'], ['adm', 'var(--adm)'], ['cap', 'var(--cap)'], ['mod', 'var(--mod)'], ['fan', '#C770A4'], ['nor', 'var(--line-strong)']];
 const compTotal = computed(() => Object.values(stats.value?.composition ?? {}).reduce((a, b) => a + b, 0));
@@ -142,14 +176,8 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
 </script>
 
 <template>
-  <section class="page">
-    <div class="page-head">
-      <div>
-        <h1>总览</h1>
-        <p>正在监控的直播间和实时动态</p>
-      </div>
-    </div>
-
+  <section class="page ov">
+    <h1 class="sr-only">总览</h1>
     <div v-if="needSetup" class="guide">
       <b>开始使用：</b>
       <ol>
@@ -157,58 +185,66 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
       </ol>
     </div>
 
-    <!-- 直播间 -->
-    <div v-if="roomId" class="card ov-room">
-      <div class="ov-cover" :class="{ off: !live }">
-        <img v-if="cover" :src="cover" alt="" referrerpolicy="no-referrer" @error="coverFailed = true" />
-        <div v-else class="ph"><Avatar :name="anchorName" :face="info?.anchor.face" /></div>
-        <span class="badge" :class="{ off: !live }"><i v-if="live" />{{ live ? '直播中' : '未开播' }}</span>
-        <span v-if="live && since" class="dur num">{{ hms(now - since) }}</span>
-      </div>
-      <div class="ov-meta">
-        <div class="ov-anchor">
-          <Avatar :name="anchorName" :face="info?.anchor.face" />
-          <span><b>{{ anchorName }}</b><span class="sub">UID {{ s?.room?.anchorUid }}<template v-if="info && info.followers !== null"> · 粉丝 {{ bigNum(info.followers) }}</template></span></span>
+    <div v-if="roomId" class="ov-top">
+      <!-- 直播间 -->
+      <div class="card ov-room">
+        <div class="ov-cover" :class="{ off: !live }">
+          <img v-if="cover" :src="cover" alt="" referrerpolicy="no-referrer" @error="coverFailed = true" />
+          <div v-else class="ph"><Avatar :name="anchorName" :face="info?.anchor.face" /></div>
+          <span class="badge" :class="{ off: !live }"><i v-if="live" />{{ live ? '直播中' : '未开播' }}</span>
+          <span v-if="live && since" class="dur num">{{ hms(now - since) }}</span>
         </div>
-        <div class="ov-title" :title="info?.title">{{ info?.title || '（正在获取直播间信息）' }}</div>
-        <div class="ov-tags">
-          <span v-if="area" class="pill">{{ area }}</span>
-          <a class="pill" :href="`https://live.bilibili.com/${roomId}`" target="_blank" rel="noopener">房间号 <b class="num">{{ s?.room?.shortId || roomId }}</b><Icon name="i-ext" /></a>
-          <span class="pill">{{ timeLine }}</span>
+        <div class="ov-meta">
+          <div class="ov-title" :title="info?.title">{{ info?.title || '（正在获取直播间信息）' }}</div>
+          <div class="ov-anchor">
+            <Avatar :name="anchorName" :face="info?.anchor.face" />
+            <b>{{ anchorName }}</b>
+            <span v-if="area" class="sub">{{ area }}</span>
+          </div>
+          <div class="ov-tags">
+            <span class="pill">{{ timeLine }}</span>
+            <a class="pill" :href="`https://live.bilibili.com/${roomId}`" target="_blank" rel="noopener">房间 <b class="num">{{ s?.room?.shortId || roomId }}</b><Icon name="i-ext" /></a>
+            <span v-if="live" class="pill">房管 <b class="num">{{ s?.live.adminCount }}</b> 人</span>
+          </div>
         </div>
       </div>
-      <div class="ov-side">
-        <div class="row"><span>弹幕服务器</span><span :class="{ ok: s?.live.connection === 'connected' }">{{ connText }}</span></div>
-        <div class="row"><span>特效页</span><span :class="(s?.overlays ?? 0) > 0 ? 'ok' : 'warn'">{{ (s?.overlays ?? 0) > 0 ? `${s!.overlays} 个在线` : '不在线' }}</span></div>
-        <div v-if="live" class="row"><span>房管总数</span><span class="num">{{ s?.live.adminCount }} 人</span></div>
-        <div class="row"><span>换直播间</span><a class="linkish" href="#settings">去设置 →</a></div>
+
+      <!-- 状态：一切正常，还是哪里有问题 -->
+      <div class="card ov-health" :class="health.level" role="status">
+        <div class="oh-h"><span class="oh-dot" :class="{ pulse: health.level === 'ok' }" /><b>{{ health.title }}</b></div>
+        <ul class="oh-list">
+          <li v-for="c in checks" :key="c.key" :class="c.level">
+            <span class="oh-n">{{ c.name }}</span>
+            <span class="oh-t">{{ c.text }}</span>
+            <button v-if="c.action && (c.level === 'bad' || c.level === 'warn')" class="btn sm" :class="{ primary: c.level === 'bad' }" type="button" @click="c.action.run">{{ c.action.label }}</button>
+          </li>
+        </ul>
       </div>
     </div>
 
-    <div v-if="roomId" class="ov-scope">
-      <span>下面的数据：<b>{{ scopeText }}</b> · 只算直播间 {{ roomId }}</span>
-      <Seg :model-value="scope" label="数据范围" :options="[{ value: 'live', label: live ? '本场' : '上一场' }, { value: 'today', label: '今天' }]" @change="(v) => (picked = v)" />
+    <!-- 数据：星临自己统计的两项 + B站直播间的四项（B站只标一次） -->
+    <div v-if="roomId" class="card ov-kpis">
+      <div class="card-h">
+        <h2>{{ scope === 'today' ? '今天' : stats?.live || live ? '本场直播' : '上一场直播' }}</h2>
+        <span class="aside">{{ scopeText }}<Seg :model-value="scope" label="数据范围" :options="[{ value: 'live', label: live ? '本场' : '上一场' }, { value: 'today', label: '今天' }]" @change="(v) => (picked = v)" /></span>
+      </div>
+      <div class="kstrip">
+        <div class="kg">
+          <div title="同一个人进场多次只算一次"><small>进场观众</small><span class="v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardUnique ?? 0 }}</b> 人</div></div>
+          <div><small>播放特效</small><span class="v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardPlayed ?? 0 }}</b> 次</div></div>
+        </div>
+        <div class="kg bili">
+          <span class="src">B站</span>
+          <div><small>看过</small><span class="v num">{{ live ? bigNum(info?.watched) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
+          <div><small>高能榜</small><span class="v num">{{ live ? bigNum(info?.rankCount) : '—' }}</span><div class="d">{{ live ? '在线并登录的观众' : '开播后显示' }}</div></div>
+          <div><small>点赞</small><span class="v num">{{ live ? bigNum(info?.likes) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
+          <div><small>粉丝</small><span class="v num">{{ bigNum(info?.followers) }}</span><div class="d"><template v-if="info?.fansClub">粉丝团 <b class="num">{{ bigNum(info.fansClub) }}</b> 人</template><template v-else>&nbsp;</template></div></div>
+        </div>
+      </div>
     </div>
 
-    <div class="card kstrip">
-      <div><small>进场观众 · 每人算一次</small><span class="v num">{{ stats ? stats.enterUnique.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardUnique ?? 0 }}</b> 人</div></div>
-      <div><small>播放了特效</small><span class="v num">{{ stats ? stats.played.toLocaleString('zh-CN') : '—' }}</span><div class="d">其中大航海 <b class="num">{{ stats?.guardPlayed ?? 0 }}</b> 次</div></div>
-      <div><small>看过<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.watched) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
-      <div><small>高能榜<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.rankCount) : '—' }}</span><div class="d">{{ live ? '现在在线、登录了的观众' : '开播后显示' }}</div></div>
-      <div><small>点赞<span class="src">B站</span></small><span class="v num">{{ live ? bigNum(info?.likes) : '—' }}</span><div class="d">{{ live ? '本场累计' : '开播后显示' }}</div></div>
-      <div><small>粉丝<span class="src">B站</span></small><span class="v num">{{ bigNum(info?.followers) }}</span><div class="d"><template v-if="info?.fansClub">粉丝团 <b class="num">{{ bigNum(info.fansClub) }}</b> 人</template><template v-else>&nbsp;</template></div></div>
-    </div>
-
-    <div class="card ov-quick">
-      <div class="card-h"><h2>素材快捷播放</h2><span class="aside"><template v-if="state.quick.some((b) => b.hotkey)">按钮上的键也能按</template><a class="linkish" href="#quickplay">{{ state.quick.length ? '管理 →' : '去添加 →' }}</a></span></div>
-      <QuickPad v-if="state.quick.length" />
-      <p v-else class="qp-tip">把常用的素材做成按钮，直播时点一下就能播，不用再发弹幕触发。</p>
-    </div>
-
-    <MusicMini v-if="music.settings?.enabled" />
-
-    <div class="bento">
-      <div class="card span7" style="grid-row: span 2">
+    <div class="ov-main">
+      <div class="card ov-feed">
         <div class="card-h"><h2>实时动态</h2><span class="aside"><span v-if="frozen" class="hold"><i />暂停滚动{{ newWhileFrozen ? ` · 新来 ${newWhileFrozen} 条` : '' }}</span><template v-else>点任意一行可设置专属特效</template><span v-if="s?.live.connection === 'connected'" class="live" style="height: 22px"><i />LIVE</span></span></div>
         <div class="fbar">
           <Seg v-model="kind" label="实时动态筛选" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物 / SC' }, { value: 'guard', label: '上舰' }]" />
@@ -232,11 +268,20 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
         </div>
       </div>
 
-      <div class="card span5 ov-panel">
-        <OvPanel :scope="scope" :guard-came="stats?.guardUnique" @pick="pick" />
-      </div>
+      <div class="ov-col">
+        <div class="card ov-quick">
+          <div class="card-h"><h2>素材快捷播放</h2><span class="aside"><template v-if="state.quick.some((b) => b.hotkey)">按钮上的键也能按</template><a class="linkish" href="#quickplay">{{ state.quick.length ? '管理 →' : '去添加 →' }}</a></span></div>
+          <QuickPad v-if="state.quick.length" no-warn />
+          <p v-else class="qp-tip">把常用的素材做成按钮，直播时点一下就能播。</p>
+        </div>
 
-      <div class="card span5">
+        <MusicMini v-if="music.settings?.enabled" />
+
+        <div class="card ov-panel">
+          <OvPanel :scope="scope" :guard-came="stats?.guardUnique" @pick="pick" />
+        </div>
+
+        <div class="card">
         <div class="card-h"><h2>身份构成</h2><span class="aside">{{ scope === 'live' ? (stats?.live ? '本场进场' : '上一场进场') : '今天进场' }}</span></div>
         <div class="stack">
           <template v-for="[k, c] in COMP" :key="k">
@@ -256,6 +301,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
         </div>
         <div class="legend">
           <div v-for="[k, name, c] in HONOR" :key="k"><i :style="{ background: c }" />{{ name }}<b class="num">{{ stats?.honor[k] ?? 0 }}</b></div>
+        </div>
         </div>
       </div>
     </div>

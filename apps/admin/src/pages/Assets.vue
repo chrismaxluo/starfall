@@ -292,7 +292,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
         </div>
       </div>
       </template>
-      <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span></div>
+      <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span><a class="linkish a-demo" href="/overlay/?demo=1" target="_blank" rel="noopener" title="在新标签里轮流播放所有内置特效（示例）">轮流播放全部<Icon name="i-ext" /></a></div>
       <div class="ecards">
         <div v-for="e in builtin" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)">
           <div class="ethumb">

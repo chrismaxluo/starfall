@@ -126,7 +126,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 
     <div class="ml-col">
       <div class="card">
-        <div class="card-h"><h2>外观</h2><span class="aside">改完点「保存」才到直播画面</span></div>
+        <div class="card-h"><h2>外观</h2></div>
         <template v-for="g in STYLE_GROUPS" :key="g.name">
           <h3 class="ml-grp">{{ g.name }}</h3>
           <div class="ml-styles" role="radiogroup" :aria-label="`${g.name}样子`">

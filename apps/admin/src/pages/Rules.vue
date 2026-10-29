@@ -377,7 +377,7 @@ onMounted(() => void refreshRules());
     <div class="page-head">
       <div>
         <h1>触发规则</h1>
-        <p>谁、做了什么时，播放哪个特效。改完马上生效</p>
+        <p>谁、做了什么时，播放哪个特效。改完马上生效。</p>
       </div>
       <div class="actions"><button class="btn" @click="simOpen = true"><Icon name="i-bolt" />模拟一下</button></div>
     </div>

@@ -167,7 +167,7 @@
 /* ================= 触发规则 ================= */
 .rl-val .hint, .rl-gpick .hint { font-size: var(--fs-cap); color: var(--t3); }
 /* 冷却时间选择 */
-.cdpick { height: 30px; padding: 0 8px 0 10px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; font-size: var(--fs-sec); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.cdpick { height: 30px; padding: 0 10px 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; font-size: var(--fs-sec); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .cdpick:hover { border-color: var(--line-strong); }
 .cdpick svg.i { width: 12px; height: 12px; color: var(--t3); }
 .cdpop { position: fixed; z-index: 60; width: 268px; padding: 12px; border-radius: var(--r-md); background: var(--l3); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); display: flex; flex-direction: column; gap: 10px; animation: pop .15s ease-out; }
@@ -421,6 +421,8 @@
 .srow .wh3 > span { color: var(--t3); }
 .srow .slider-row { grid-template-columns: 72px minmax(0, 1fr) 48px; }
 .srow .sel { height: 32px; width: 140px; font-size: var(--fs-body); }
+.srow .whopick { height: 32px; min-width: 140px; justify-content: space-between; padding: 0 11px 0 14px; border-color: var(--line-strong); font-size: var(--fs-body); }
+.srow .whopick svg.i { width: 14px; height: 14px; }
 .inline-ck { display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; color: var(--t2); cursor: pointer; white-space: nowrap; }
 .inline-ck input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
 
@@ -440,7 +442,7 @@
   .outbar .omore { margin-left: 0; width: 100%; padding: 6px 12px 8px; }
 }
 /* 数字加减 */
-.stepper { display: inline-flex; align-items: stretch; height: 32px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--l3); overflow: hidden; }
+.stepper { display: inline-flex; align-items: stretch; height: 32px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--l2); overflow: hidden; }
 .stepper button { width: 32px; border: 0; background: transparent; color: var(--t2); font-size: 16px; line-height: 1; }
 .stepper button:hover:not(:disabled) { background: var(--hover); color: var(--t1); }
 .stepper button:disabled { opacity: .35; cursor: default; }
@@ -654,7 +656,7 @@ body:has(.editor) .toasts { bottom: 92px; }
 .cd2 { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 4px 6px; align-items: center; font-size: var(--fs-cap); color: var(--t3); padding: 8px 0; }
 .cd2 .cdpick { height: 26px; font-size: var(--fs-sec); }
 .c-kw { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; padding: 10px 0; }
-.c-kw .sel.sm { height: 26px; font-size: var(--fs-cap); padding: 0 24px 0 8px; width: auto; background-position: calc(100% - 14px) 10px, calc(100% - 9px) 10px; }
+.c-kw .sel.sm { height: 26px; font-size: var(--fs-cap); padding: 0 24px 0 8px; width: auto; background-position: right 8px center; background-size: 12px 12px; }
 .c-kw .kwin { width: 92px; height: 26px; padding: 0 8px; border-radius: var(--r-xs); border: 1px dashed var(--line-strong); background: none; color: var(--t1); font: inherit; font-size: var(--fs-sec); }
 .c-kw .kwin::placeholder { color: var(--t3); }
 .c-kw .kwin:focus { outline: 0; border-style: solid; border-color: var(--accent); width: 160px; }

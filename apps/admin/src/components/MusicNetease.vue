@@ -81,8 +81,7 @@ async function retry(): Promise<void> {
 <template>
   <div class="card nc">
     <div class="card-h">
-      <span class="nc-mark"><Icon name="i-music" /></span>
-      <h2>网易云音乐</h2>
+      <h2><span class="hicon nc-mark"><Icon name="i-music" /></span>网易云音乐</h2>
       <span v-if="on && a?.loggedIn" class="aside">
         <span>{{ checking ? '正在确认…' : a.checkedAt ? `${ago(a.checkedAt, now)}确认过` : '' }}</span>
         <button class="icon-btn sm" :class="{ spin: checking }" type="button" title="现在确认一次：登录还有效吗、会员到哪天" aria-label="现在确认一次登录和会员" @click="check()"><Icon name="i-replay" /></button>
@@ -154,8 +153,7 @@ async function retry(): Promise<void> {
 
 <style scoped>
 .nc { display: flex; flex-direction: column; }
-.nc-mark { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: #E5484D; color: #fff; flex: none; }
-.nc-mark svg { width: 11px; height: 11px; }
+.card-h h2 .nc-mark { background: rgba(229, 72, 77, .12); color: #E5484D; }
 .card-h .aside .icon-btn.sm { width: 28px; height: 28px; }
 .card-h .aside .icon-btn.sm svg { width: 14px; height: 14px; }
 .icon-btn.spin svg { animation: nc-spin .8s linear infinite; }
@@ -187,7 +185,7 @@ async function retry(): Promise<void> {
 .nc-left i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--gov); }
 .nc-tip { margin-top: 12px; padding: 9px 12px; border-radius: var(--r-sm); font-size: var(--fs-sec); line-height: 1.6; color: var(--t1); background: var(--gov-soft); }
 .nc-tip.bad { background: var(--bad-soft); }
-.nc-sep { height: 1px; background: var(--line); margin: 16px -20px 0; }
+.nc-sep { height: 1px; background: var(--line); margin: 16px 0 0; }
 .nc-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: auto; padding-top: 14px; }
 .nc-foot .acts { display: flex; gap: 6px; margin-left: auto; }
 .nc-foot .btn, .nc-foot :deep(.btn), .nc-foot :deep(.delb) { height: 30px; padding: 0 12px; font-size: var(--fs-sec); }

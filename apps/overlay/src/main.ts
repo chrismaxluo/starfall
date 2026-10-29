@@ -4,10 +4,7 @@
 // - 送礼名单：/overlay/?output=1&key=...&gifts=1
 // - 点歌窗口：/overlay/?output=1&key=...&music=1
 // 几种页面共用一个入口脚本（名字带构建哈希），都能按它自动更新
-import '@fontsource/geist-sans/400.css';
-import '@fontsource/geist-sans/500.css';
-import '@fontsource/geist-sans/600.css';
-import '@fontsource/geist-sans/700.css';
+import './fonts.css';
 import '@fontsource/geist-mono/500.css';
 import '@fontsource/geist-mono/600.css';
 import '@fontsource/noto-sans-sc/400.css';

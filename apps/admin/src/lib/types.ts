@@ -201,8 +201,8 @@ export interface EventDto {
   uid: number;
   uname: string;
   viewer: Viewer;
-  /** price：上舰是金瓜子，醒目留言是元 */
-  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; level?: number; months?: number; op?: string; price?: number } | null;
+  /** price：上舰是金瓜子，醒目留言是元；paid：付费礼物 */
+  payload: { source?: string; text?: string; giftName?: string; icon?: string; count?: number; unitPrice?: number; paid?: boolean; level?: number; months?: number; op?: string; price?: number } | null;
   rule: string | null;
   effectId: number | null;
   status: PlayStatus;

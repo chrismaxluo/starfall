@@ -332,7 +332,7 @@ function onDrop(to: number): void {
       <div class="wp-col">
         <!-- 名单放什么 -->
         <div class="card">
-          <div class="card-h"><h2>名单放什么</h2></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-todo" /></span>名单放什么</h2></div>
           <div class="gl-modes" role="radiogroup" aria-label="名单放什么">
             <button type="button" class="gl-mode" role="radio" :aria-checked="!manual" @click="pickAuto">
               <b><Icon name="i-bolt" />自动：收到的礼物</b>
@@ -415,7 +415,7 @@ function onDrop(to: number): void {
         </div>
         <template v-if="showRecords">
         <div class="card">
-          <div class="card-h"><h2>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-pin" /></span>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
           <Empty v-if="!pins.length" compact icon="i-pin" title="还没有挑选的记录" desc="在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」" />
           <div v-else class="gl-recs">
             <div
@@ -442,7 +442,7 @@ function onDrop(to: number): void {
         </div>
 
         <div class="card">
-          <div class="card-h"><h2>送礼记录</h2><span class="aside">{{ manual ? '点「加入名单」' : '点「加入名单」就会置顶' }}</span></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-gift" /></span>送礼记录</h2><span class="aside">{{ manual ? '点「加入名单」' : '点「加入名单」就会置顶' }}</span></div>
           <div class="gl-tools">
             <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
             <input v-model.trim="q" class="inp" placeholder="观众名、UID、礼物名" aria-label="搜观众名、UID、礼物名" />
@@ -470,7 +470,7 @@ function onDrop(to: number): void {
 
       <!-- 预览和外观 -->
       <div class="card">
-        <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-eye" /></span>预览</h2><span class="aside">只在这里显示</span></div>
         <div class="wp-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
         <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled" :title="manual ? '在名单最后加一条测试记录，看看新加一条时的样子' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
         <h3 class="wp-sub">外观</h3>

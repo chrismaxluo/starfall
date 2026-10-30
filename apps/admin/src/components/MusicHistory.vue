@@ -57,7 +57,7 @@ async function again(song: MusicSong): Promise<void> {
 <template>
   <div class="mh-grid">
     <div class="card">
-      <div class="card-h"><h2>放过的歌</h2><span class="aside">保留天数和事件记录一样</span></div>
+      <div class="card-h"><h2><span class="hicon"><Icon name="i-replay" /></span>放过的歌</h2><span class="aside">保留天数和事件记录一样</span></div>
       <Empty v-if="!rows.length" compact icon="i-music" title="还没有放过歌" />
       <div v-else class="mh-list">
         <div v-for="r in rows" :key="r.id" class="mh-row">
@@ -77,7 +77,7 @@ async function again(song: MusicSong): Promise<void> {
 
     <div class="mh-col">
       <div class="card">
-        <div class="card-h"><h2>最近 30 天点得最多的歌</h2><span class="aside">一共点了 {{ stats?.total ?? 0 }} 次</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-trophy" /></span>最近 30 天点得最多的歌</h2><span class="aside">一共点了 {{ stats?.total ?? 0 }} 次</span></div>
         <Empty v-if="!stats?.songs.length" compact icon="i-trophy" title="最近 30 天还没有人点歌" />
         <ol v-else class="mh-top">
           <li v-for="(x, i) in stats.songs" :key="`${x.song.source}${x.song.id}`">
@@ -88,7 +88,7 @@ async function again(song: MusicSong): Promise<void> {
         </ol>
       </div>
       <div class="card">
-        <div class="card-h"><h2>最近 30 天点歌最多的观众</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-users" /></span>最近 30 天点歌最多的观众</h2></div>
         <Empty v-if="!stats?.people.length" compact icon="i-users" title="最近 30 天还没有人点歌" />
         <ol v-else class="mh-top">
           <li v-for="(p, i) in stats.people" :key="p.uid">

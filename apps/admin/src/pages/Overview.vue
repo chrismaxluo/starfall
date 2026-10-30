@@ -17,6 +17,7 @@ import { togglePause } from '../lib/actions.ts';
 import { get } from '../lib/api.ts';
 import { describe, statusText } from '../lib/events.ts';
 import { bigNum, clock, duration, hms, when } from '../lib/format.ts';
+import { battery } from '../lib/preview.ts';
 import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
@@ -163,15 +164,30 @@ const newWhileFrozen = computed(() => {
   return filtered.value.filter((e) => e.id > top).length;
 });
 watch([kind, onlyGuard], () => frozen.value && (frozen.value = filtered.value.slice(0, FEED_SHOW)));
+/** 播放情况：已播放某特效、排队中、命中规则但没播、黑名单、没触发 */
+function playText(e: EventDto): string {
+  if (e.status === 'played' || e.status === 'queued') return `${e.status === 'played' ? '已播放' : '排队中'} ${effectById(e.effectId)?.name ?? ''}`;
+  if (e.rule) return `${statusText(e.status)}，未播放`;
+  return e.status === 'blacklist' ? '黑名单，未播放' : '未触发特效';
+}
 function rowText(e: EventDto): string {
   // 醒目留言只记录，不触发特效
   if (e.kind === 'sc') return describe(e);
-  const parts = e.kind === 'enter' ? [] : [describe(e)];
-  if (e.status === 'played' || e.status === 'queued') parts.push(`${e.status === 'played' ? '已播放' : '排队中'} ${effectById(e.effectId)?.name ?? ''}`);
-  else if (e.rule) parts.push(`${statusText(e.status)}，未播放`);
-  else parts.push(e.status === 'blacklist' ? '黑名单，未播放' : '未触发特效');
-  return parts.join(' · ');
+  return [...(e.kind === 'enter' ? [] : [describe(e)]), playText(e)].join(' · ');
 }
+/** 这一行值多少（金瓜子）：付费礼物、醒目留言、上舰。用来显示价值标签、挑出大礼物 */
+function worth(e: EventDto): number {
+  const p = e.payload;
+  if (!p) return 0;
+  if (e.kind === 'gift') return p.paid ? (p.unitPrice ?? 0) * (p.count ?? 1) : 0;
+  if (e.kind === 'sc') return (p.price ?? 0) * 1000;
+  if (e.kind === 'guard') return p.price ?? 0;
+  return 0;
+}
+/** 100 元以上算大礼物，那一行的粉色更亮 */
+const BIG_GOLD = 100_000;
+/** 大航海那一行带身份颜色（g1 总督、g2 提督、g3 舰长），送礼和醒目留言是粉色 */
+const rowCls = (e: EventDto) => [e.viewer.guard ? `g${e.viewer.guard}` : '', e.kind === 'gift' || e.kind === 'sc' ? 'gift' : '', worth(e) >= BIG_GOLD ? 'big' : ''];
 const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x, y });
 </script>
 
@@ -188,6 +204,8 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
     <div v-if="roomId" class="ov-top">
       <!-- 直播间 -->
       <div class="card ov-room">
+        <!-- 开播时卡片里透出封面的颜色 -->
+        <img v-if="live && cover" class="ov-amb" :src="cover" alt="" aria-hidden="true" referrerpolicy="no-referrer" />
         <div class="ov-cover" :class="{ off: !live }">
           <img v-if="cover" :src="cover" alt="" referrerpolicy="no-referrer" @error="coverFailed = true" />
           <div v-else class="ph"><Avatar :name="anchorName" :face="info?.anchor.face" /></div>
@@ -225,7 +243,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
     <!-- 数据：星临自己统计的两项 + B站直播间的四项（B站只标一次） -->
     <div v-if="roomId" class="card ov-kpis">
       <div class="card-h">
-        <h2>{{ scope === 'today' ? '今天' : stats?.live || live ? '本场直播' : '上一场直播' }}</h2>
+        <h2><span class="hicon"><Icon name="i-chart" /></span>{{ scope === 'today' ? '今天' : stats?.live || live ? '本场直播' : '上一场直播' }}</h2>
         <span class="aside">{{ scopeText }}<Seg :model-value="scope" label="数据范围" :options="[{ value: 'live', label: live ? '本场' : '上一场' }, { value: 'today', label: '今天' }]" @change="(v) => (picked = v)" /></span>
       </div>
       <div class="kstrip">
@@ -245,19 +263,22 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
 
     <div class="ov-main">
       <div class="card ov-feed">
-        <div class="card-h"><h2>实时动态</h2><span class="aside"><span v-if="frozen" class="hold"><i />暂停滚动{{ newWhileFrozen ? ` · 新来 ${newWhileFrozen} 条` : '' }}</span><template v-else>点任意一行可设置专属特效</template><span v-if="s?.live.connection === 'connected'" class="live" style="height: 22px"><i />LIVE</span></span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-list" /></span>实时动态</h2><span class="aside"><span v-if="frozen" class="hold"><i />暂停滚动{{ newWhileFrozen ? ` · 新来 ${newWhileFrozen} 条` : '' }}</span><template v-else>点任意一行可设置专属特效</template><span v-if="s?.live.connection === 'connected'" class="live" style="height: 22px"><i />LIVE</span></span></div>
         <div class="fbar">
           <Seg v-model="kind" label="实时动态筛选" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物 / SC' }, { value: 'guard', label: '上舰' }]" />
           <label>只看大航海<Switch v-model="onlyGuard" label="只看大航海" /></label>
         </div>
         <div class="feed" @mouseenter="frozen = feed.slice()" @mouseleave="frozen = null">
-          <div v-for="e in feed" :key="e.id" class="feed-row" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
+          <div v-for="e in feed" :key="e.id" class="feed-row" :class="rowCls(e)" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
             <Avatar :name="e.uname" :face="e.viewer.face" :guard="e.viewer.guard" />
             <span class="who">
               <b>{{ e.uname }}</b>
-              <span><EvIcon v-if="e.kind !== 'enter'" :kind="e.kind" :img="e.payload?.icon" />{{ rowText(e) }}</span>
+              <!-- 弹幕显示成聊天气泡，后面的小灰字是播放情况 -->
+              <span v-if="e.kind === 'danmu'" class="said"><span class="bubble">{{ e.payload?.text ?? '' }}</span><span>{{ playText(e) }}</span></span>
+              <span v-else-if="e.kind === 'gift'"><EvIcon kind="gift" :img="e.payload?.icon" />送出 <em>{{ e.payload?.giftName ?? '礼物' }}</em> ×{{ e.payload?.count ?? 1 }} · {{ playText(e) }}</span>
+              <span v-else><EvIcon v-if="e.kind !== 'enter'" :kind="e.kind" :img="e.payload?.icon" />{{ rowText(e) }}</span>
             </span>
-            <span class="ids"><HonorMedal :level="e.viewer.honor" /><IdTag :viewer="e.viewer" /></span>
+            <span class="ids"><span v-if="worth(e)" class="gv">{{ battery(worth(e)) }}</span><HonorMedal :level="e.viewer.honor" /><IdTag :viewer="e.viewer" /></span>
             <time class="num">{{ clock(e.ts) }}</time>
             <span class="rowact" aria-hidden="true"><Icon name="i-more" /></span>
           </div>
@@ -270,7 +291,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
 
       <div class="ov-col">
         <div class="card ov-quick">
-          <div class="card-h"><h2>素材快捷播放</h2><span class="aside"><template v-if="state.quick.some((b) => b.hotkey)">按钮上的键也能按</template><a class="linkish" href="#quickplay">{{ state.quick.length ? '管理 →' : '去添加 →' }}</a></span></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-bolt" /></span>素材快捷播放</h2><span class="aside"><template v-if="state.quick.some((b) => b.hotkey)">按钮上的键也能按</template><a class="linkish" href="#quickplay">{{ state.quick.length ? '管理 →' : '去添加 →' }}</a></span></div>
           <QuickPad v-if="state.quick.length" no-warn />
           <p v-else class="qp-tip">把常用的素材做成按钮，直播时点一下就能播。</p>
         </div>
@@ -282,7 +303,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
         </div>
 
         <div class="card">
-        <div class="card-h"><h2>身份构成</h2><span class="aside">{{ scope === 'live' ? (stats?.live ? '本场进场' : '上一场进场') : '今天进场' }}</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-users" /></span>身份构成</h2><span class="aside">{{ scope === 'live' ? (stats?.live ? '本场进场' : '上一场进场') : '今天进场' }}</span></div>
         <div class="stack">
           <template v-for="[k, c] in COMP" :key="k">
             <i v-if="stats && stats.composition[k]" :style="{ width: `${Math.max((stats.composition[k] / compTotal) * 100, 1.2)}%`, background: c }" />

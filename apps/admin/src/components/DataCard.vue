@@ -76,7 +76,7 @@ onMounted(load);
 
 <template>
   <div v-if="state.settings" class="card">
-    <div class="card-h"><h2>数据</h2><span class="aside"><button class="btn" :disabled="running" title="马上备份一次数据库和配置（另外保留最近 5 份）" @click="runNow"><Icon name="i-check" />{{ running ? '正在备份…' : '立即备份' }}</button></span></div>
+    <div class="card-h"><h2><span class="hicon"><Icon name="i-upload" /></span>数据</h2><span class="aside"><button class="btn" :disabled="running" title="马上备份一次数据库和配置（另外保留最近 5 份）" @click="runNow"><Icon name="i-check" />{{ running ? '正在备份…' : '立即备份' }}</button></span></div>
     <div class="field">
       <div class="toggle-line">每天自动备份<Tip text="凌晨备份数据库和配置，保留最近 7 份；手动备份另外保留最近 5 份。" />
         <Switch v-model="state.settings.autoBackup" label="每天自动备份" @change="(v) => save({ autoBackup: v }, v ? '已开启每天自动备份' : '已关闭自动备份')" />

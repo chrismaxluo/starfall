@@ -22,7 +22,7 @@ defineExpose({ copy });
 
 <template>
   <div class="card">
-    <div class="card-h"><h2>加到直播软件</h2><span class="aside">地址里带访问密钥，不要公开</span></div>
+    <div class="card-h"><h2><span class="hicon"><Icon name="i-screen" /></span>加到直播软件</h2><span class="aside">地址里带访问密钥，不要公开</span></div>
     <p class="src-how">在直播软件里添加一个<b>浏览器</b>来源，粘贴下面的地址，宽高填 <code>{{ w }} × {{ h }}</code></p>
     <div class="src-url">
       <input class="inp" :value="shown" readonly :aria-label="`${name}地址`" @focus="(e) => show && (e.target as HTMLInputElement).select()" />

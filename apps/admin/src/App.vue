@@ -139,6 +139,11 @@ const conn = computed((): { cls: string; text: string; title?: string } => {
 /** 特效页（直播软件里的浏览器源）在不在线 */
 const fxOnline = computed(() => (state.status?.overlays ?? 0) > 0);
 const isLive = computed(() => Boolean(state.status?.live.live));
+// 直播氛围：开播时在总览把直播间封面模糊后铺在窗口顶部当光源，侧栏、顶栏、卡片半透明能透出光。
+// 只在总览：那里看得到封面；其他页面是改设置的地方，保持安静，也少占显卡。封面加载失败就不显示
+const ambFailed = ref(false);
+const liveCover = computed(() => (isLive.value && route.value.page === 'overview' && !ambFailed.value ? (state.roomInfo?.cover ?? '') : ''));
+watch(() => state.roomInfo?.cover, () => (ambFailed.value = false));
 // 直播中特效页一直不在线才提醒（特效页自动更新、刷新会断开一两秒，不算）
 const fxDownLong = ref(false);
 let fxTimer: ReturnType<typeof setTimeout> | null = null;
@@ -272,7 +277,8 @@ function reloadPage(): void {
   <div v-if="state.authed === null" class="login"><span class="spin" /></div>
   <Login v-else-if="!state.authed" @done="boot" />
   <template v-else>
-    <div class="app" :class="{ stale: wsDownLong }">
+    <div class="app" :class="{ stale: wsDownLong, lit: Boolean(liveCover) }">
+      <img v-if="liveCover" class="amb" :src="liveCover" alt="" aria-hidden="true" referrerpolicy="no-referrer" @error="ambFailed = true" />
       <aside class="side">
         <div class="brand">
           <Logo :size="32" />
@@ -307,13 +313,12 @@ function reloadPage(): void {
 
       <div class="main">
         <header class="top">
-          <div class="crumb">
-            <template v-if="state.status?.room">直播间 <b class="num">{{ state.status.room.shortId || state.status.room.roomId }}</b></template>
-            <template v-else><a class="linkish" href="#settings">设置直播间</a></template>
-          </div>
-          <span class="live" :class="conn.cls" :title="conn.title"><i />{{ conn.text }}</span>
-          <span class="livestate" :class="{ on: state.status?.live.live }"><i />{{ liveText }}</span>
-          <a v-if="state.status" class="live fxlamp" :class="fxOnline ? '' : isLive ? 'warn' : 'off'" href="#obs" :title="fxOnline ? '直播软件里的特效页在线' : '直播软件里的特效页不在线，点这里查看怎么添加'"><i />特效页{{ fxOnline ? '在线' : '不在线' }}</a>
+          <div v-if="state.status && !state.status.room" class="crumb"><a class="linkish" href="#settings">设置直播间</a></div>
+          <span class="status-group">
+            <span class="live" :class="conn.cls" :title="conn.title"><i />{{ conn.text }}</span>
+            <span class="livestate" :class="{ on: state.status?.live.live }"><i />{{ liveText }}</span>
+            <a v-if="state.status" class="live fxlamp" :class="fxOnline ? '' : isLive ? 'warn' : 'off'" href="#obs" :title="fxOnline ? '直播软件里的特效页在线' : '直播软件里的特效页不在线，点这里查看怎么添加'"><i />特效页{{ fxOnline ? '在线' : '不在线' }}</a>
+          </span>
           <button class="search" aria-label="打开命令面板" @click="ui.palette = true"><Icon name="i-search" />搜索或执行命令<span class="kbd">Ctrl K</span></button>
           <button class="pausebtn" :aria-pressed="paused" title="快捷键 Ctrl + Shift + P（快捷键只暂停，恢复请点按钮）" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
           <button class="icon-btn" aria-label="切换亮色 / 暗色" @click="(e) => toggleTheme((e.currentTarget as HTMLElement).getBoundingClientRect().left + 17, (e.currentTarget as HTMLElement).getBoundingClientRect().top + 17)">

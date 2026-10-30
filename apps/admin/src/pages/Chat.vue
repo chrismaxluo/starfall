@@ -108,7 +108,7 @@ const online = computed(() => state.overlays.filter((x) => x.outputId === o.valu
     <div class="wp-grid">
       <div class="wp-col">
         <div class="card" :class="{ dimmed: !o.chatEnabled }">
-          <div class="card-h"><h2>显示什么</h2></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-todo" /></span>显示什么</h2></div>
           <div class="srows">
             <div class="srow">
               <span class="lb">粉丝牌</span>
@@ -143,7 +143,7 @@ const online = computed(() => state.overlays.filter((x) => x.outputId === o.valu
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-eye" /></span>预览</h2><span class="aside">只在这里显示</span></div>
         <div class="wp-pv"><ChatPreview ref="pv" :key="`c${o.id}`" :config="cfg" :alpha="alphaBg" /></div>
         <div class="prev-tools">
           <button class="btn" :disabled="!o.chatEnabled" @click="pv?.test('normal')"><i style="background: var(--nor)" />测试弹幕</button>

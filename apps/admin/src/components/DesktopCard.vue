@@ -36,7 +36,7 @@ async function toggleAuto(on: boolean): Promise<void> {
 
 <template>
   <div class="card">
-    <div class="card-h"><h2>桌面版</h2><span v-if="info" class="aside num">版本 {{ info.version }}</span></div>
+    <div class="card-h"><h2><span class="hicon"><Icon name="i-screen" /></span>桌面版</h2><span v-if="info" class="aside num">版本 {{ info.version }}</span></div>
     <template v-if="bridge && info">
       <div class="toggle-line">开机自动启动 <span class="hint">开机后在右下角托盘里运行，不弹出窗口</span><Switch v-model="autoStart" label="开机自动启动" @change="toggleAuto" /></div>
       <div class="acct-actions">

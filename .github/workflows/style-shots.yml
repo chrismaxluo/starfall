@@ -31,10 +31,25 @@ jobs:
           for i in $(seq 1 60); do grep -q 后台密码 "$RUNNER_TEMP/demo.log" && break; sleep 1; done
           grep -q 后台密码 "$RUNNER_TEMP/demo.log"
       - name: 存快照
+        env:
+          # 体验演示要用的弹窗、菜单、提示条等状态（页面@状态）
+          SNAP_STATES: >-
+            {"palette":[{"key":"Control+k","wait":900}],
+             "viewer":[{"click":".feed-row","wait":800}],
+             "rowmenu":[{"click":"button[aria-label$='更多操作']","wait":800}],
+             "sim":[{"click":"button:has-text('模拟一下')","wait":1000}],
+             "preview":[{"click":"button.icon-btn.play","wait":1500}],
+             "wizard":[{"click":"button:has-text('重新打开新手引导')","wait":1000}],
+             "dirty":[{"click":"button:has-text('靠右')","wait":900}],
+             "toast":[{"click":"button.switch","wait":500}],
+             "paused":[{"click":"button.pausebtn","wait":1500}]}
         run: |
           mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y > /dev/null && npm i playwright-core@1.63.0 > /dev/null
           cd "$GITHUB_WORKSPACE"
-          PW_DIR="$RUNNER_TEMP/pw" node design/tools/style-capture.mjs "$RUNNER_TEMP/demo.log" "$RUNNER_TEMP/snap" music music/rules rules chat settings
+          PW_DIR="$RUNNER_TEMP/pw" node design/tools/style-capture.mjs "$RUNNER_TEMP/demo.log" "$RUNNER_TEMP/snap" \
+            overview rules logs assets settings music quickplay chat giftlist obs about \
+            overview@palette overview@viewer rules@rowmenu rules@sim rules@preview settings@wizard chat@dirty settings@toast \
+            overview@loading logs@loading assets@loading music@loading overview@paused
           cp -r apps/admin/dist "$RUNNER_TEMP/snap/dist"
       - uses: actions/upload-artifact@v7
         with:

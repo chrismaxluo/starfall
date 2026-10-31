@@ -35,7 +35,7 @@ for (const spec of routes.length ? routes : ['overview', 'settings']) {
   const [rt, st] = spec.split('@');
   if (st?.startsWith('loading')) {
     // 「正在读取」那一刻：接口故意慢 6 秒，整页重新打开，1.2 秒时拍
-    await page.route('**/api/**', (r) => setTimeout(() => r.continue().catch(() => {}), 6000));
+    await page.route((u) => u.pathname.startsWith('/api/') && !u.pathname.startsWith('/api/auth/'), (r) => setTimeout(() => r.continue().catch(() => {}), 6000));
     await page.goto(`${B}/?t=${Date.now()}#${rt}`);
     await page.waitForTimeout(1200);
   } else if (st) {
@@ -60,6 +60,6 @@ for (const spec of routes.length ? routes : ['overview', 'settings']) {
   if (st?.startsWith('loading')) await page.unrouteAll({ behavior: 'ignoreErrors' });
   const file = path.join(out, `snap-${spec.replace(/[/@]/g, '-')}.html`);
   fs.writeFileSync(file, html);
-  console.log(rt, Math.round(html.length / 1024) + 'KB');
+  console.log(spec, Math.round(html.length / 1024) + 'KB');
 }
 await browser.close();

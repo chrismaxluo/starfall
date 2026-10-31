@@ -47,9 +47,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y > /dev/null && npm i playwright-core@1.63.0 > /dev/null
           cd "$GITHUB_WORKSPACE"
           PW_DIR="$RUNNER_TEMP/pw" node design/tools/style-capture.mjs "$RUNNER_TEMP/demo.log" "$RUNNER_TEMP/snap" \
-            overview rules logs assets settings music quickplay chat giftlist obs about \
-            overview@palette overview@viewer rules@rowmenu rules@sim rules@preview settings@wizard chat@dirty settings@toast \
-            overview@loading logs@loading assets@loading music@loading overview@paused
+            overview@loading logs@loading assets@loading music@loading quickplay@loading
           cp -r apps/admin/dist "$RUNNER_TEMP/snap/dist"
       - uses: actions/upload-artifact@v7
         with:

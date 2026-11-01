@@ -43,8 +43,9 @@ export function placeWindow(saved: SavedWindow | undefined, areas: Rect[], prima
     const y = clamp(saved.y, area.y, area.y + area.height - height);
     return { bounds: { x, y, width, height }, maximized: saved.maximized, ...mins(area) };
   }
-  const width = Math.min(DEF_W, Math.round(primary.width * 0.92));
-  const height = Math.min(DEF_H, Math.round(primary.height * 0.92));
+  // 占屏幕的九成多，但不小于最小大小（屏幕本身比最小大小还小时就是整个屏幕）
+  const width = Math.min(DEF_W, Math.max(Math.round(primary.width * 0.92), Math.min(MIN_W, primary.width)));
+  const height = Math.min(DEF_H, Math.max(Math.round(primary.height * 0.92), Math.min(MIN_H, primary.height)));
   return { bounds: { x: primary.x + Math.round((primary.width - width) / 2), y: primary.y + Math.round((primary.height - height) / 2), width, height }, maximized: false, ...mins(primary) };
 }
 

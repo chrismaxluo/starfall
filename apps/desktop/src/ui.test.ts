@@ -11,8 +11,9 @@ describe('窗口放在哪', () => {
     const small = placeWindow(undefined, [LAPTOP], LAPTOP);
     expect(small.bounds.width).toBeLessThanOrEqual(1366);
     expect(small.bounds.height).toBeLessThanOrEqual(728);
+    // 1024 宽的屏幕：九成不到最小宽度，用最小宽度（不会比最小大小还小）
     const tiny = { x: 0, y: 0, width: 1024, height: 536 };
-    expect(placeWindow(undefined, [tiny], tiny)).toMatchObject({ minWidth: 960, minHeight: 536 });
+    expect(placeWindow(undefined, [tiny], tiny)).toEqual({ bounds: { x: 32, y: 0, width: 960, height: 536 }, maximized: false, minWidth: 960, minHeight: 536 });
   });
   it('回到上次的位置、大小、最大化，副屏上的也是', () => {
     const saved = { x: 2100, y: 60, width: 1200, height: 800, maximized: true };

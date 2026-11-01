@@ -1,0 +1,60 @@
+# 电脑版产品体验第二轮的检查：在 GitHub 的 Windows 电脑上打包（不做安装包，只要 win-unpacked），打开星临走一遍并截图。
+# 只在 design/ux-check 分支上运行，这个分支不合并进 dev。
+name: 电脑版体验检查
+
+on:
+  push:
+    branches: ['design/ux-check']
+    paths: ['apps/desktop/**', 'apps/admin/**', 'design/tools/desk-check.mjs', '.github/workflows/ux-desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 电脑版截图
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: 安装打包工具
+        working-directory: apps/desktop
+        run: npm ci --no-audit --no-fund
+      - name: 检查桌面版代码
+        working-directory: apps/desktop
+        run: npm run typecheck
+      - name: 准备打包文件
+        working-directory: apps/desktop
+        run: npm run build
+      - name: 安装运行时依赖
+        working-directory: apps/desktop/stage
+        run: npm install --omit=dev --no-audit --no-fund
+      - name: 打包（不做安装包）
+        working-directory: apps/desktop
+        run: npx electron-builder --win --x64 --dir --publish never
+      - name: 走一遍并截图
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y > /dev/null && npm i playwright-core@1.63.0 > /dev/null
+          cd "$GITHUB_WORKSPACE"
+          PW_DIR="$RUNNER_TEMP/pw" node design/tools/desk-check.mjs "$GITHUB_WORKSPACE/apps/desktop/release/win-unpacked/Starfall.exe" "$RUNNER_TEMP/shots"
+      - name: 带上日志
+        if: always()
+        run: cp -r "$APPDATA/Starfall/logs" "$RUNNER_TEMP/shots/" 2>/dev/null; cp "$APPDATA/Starfall/desktop.json" "$RUNNER_TEMP/shots/" 2>/dev/null; true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: desk-shots
+          path: ${{ runner.temp }}/shots
+          retention-days: 7

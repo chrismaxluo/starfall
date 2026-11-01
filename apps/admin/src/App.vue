@@ -96,6 +96,8 @@ async function boot(): Promise<void> {
     state.authed = false;
     return;
   }
+  // 重新登录时也先显示占位条，数据读到了再换上（不显示上一次登录时留下的旧数据）
+  state.ready = false;
   state.authed = true;
   await attempt(loadAll);
   state.ready = true;

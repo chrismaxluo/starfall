@@ -9,7 +9,8 @@ import Icon from './Icon.vue';
 import Switch from './Switch.vue';
 import { del, post, put } from '../lib/api.ts';
 import { refreshSettings, skipPlaying, state } from '../lib/store.ts';
-import { attempt } from '../lib/toast.ts';
+import { attempt, undoable } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 
 const PLAY_GAP_MS = 300;
 const Q_SHOW = 5;
@@ -31,13 +32,17 @@ const upcoming = computed(() => {
     return { ...q, eta };
   });
 });
+// 移出的那一行收起来，下面的滑上去；撤销时展开
+const listMotion = useListMotion();
 const eta = (ms: number) => (ms < 1000 ? '马上' : `约 ${Math.round(ms / 1000)} 秒后`);
 const skip = skipPlaying;
 async function clearQueue(): Promise<void> {
   await attempt(() => post<{ cleared: number }>('/api/playback/clear'), '已清空排队');
 }
+/** 移出排队的一项：8 秒内可以撤销（放回原来的位置） */
 async function removeItem(id: string, name: string): Promise<void> {
-  await attempt(() => del(`/api/playback/queue/${encodeURIComponent(id)}`), `已移出队列：${name}，这次不播放`);
+  const url = `/api/playback/queue/${encodeURIComponent(id)}`;
+  if (await attempt(() => del(url))) undoable(`已移出队列：${name}，这次不播放`, () => post(`${url}/restore`));
 }
 async function saveSetting(patch: object, msg: string): Promise<void> {
   // 成功失败都重新读取：失败时开关要回到原来的状态
@@ -56,7 +61,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
     <span class="left num">还剩 {{ (left / 1000).toFixed(1) }} 秒</span>
     <div class="bar"><i :style="{ width: `${progress}%` }" /></div>
   </div>
-  <div v-if="upcoming.length" class="ov-q">
+  <TransitionGroup v-if="upcoming.length" tag="div" class="ov-q lst-box" :name="listMotion()" @before-leave="pinLeaving">
     <div v-for="(q, i) in upcoming.slice(0, Q_SHOW)" :key="q.id" class="qrow">
       <span class="n num">{{ i + 1 }}</span>
       <Avatar :name="q.viewerName" :face="q.viewerFace" :guard="q.viewerGuard" />
@@ -64,7 +69,7 @@ async function saveSetting(patch: object, msg: string): Promise<void> {
       <span class="eta num">{{ eta(q.eta) }}</span>
       <button class="x" :aria-label="`把 ${q.viewerName} 移出队列`" title="移出队列（这次不播）" @click="removeItem(q.id, q.viewerName)"><Icon name="i-x" /></button>
     </div>
-  </div>
+  </TransitionGroup>
   <Empty v-if="!playing && !upcoming.length" compact icon="i-queue" title="现在没有排队" desc="观众进场、送礼时会出现在这里，按顺序一个一个播放" />
   <div class="ov-qfoot">
     <span v-if="upcoming.length > Q_SHOW">后面还有 <b class="num">{{ upcoming.length - Q_SHOW }}</b> 条</span>

@@ -3,6 +3,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import ConfirmButton from './ConfirmButton.vue';
 import Empty from './Empty.vue';
+import SkelRows from './SkelRows.vue';
 import Icon from './Icon.vue';
 import { del, get, post, put, upload } from '../lib/api.ts';
 import { desktop } from '../lib/desktop.ts';
@@ -10,17 +11,20 @@ import { fileSize } from '../lib/format.ts';
 import { mmss, music } from '../lib/music.ts';
 import type { LocalSong } from '../lib/music.ts';
 import { state } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, deleteLater, toast } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 
 const songs = ref<LocalSong[]>([]);
 const folder = ref<string | null>(null);
 const loaded = ref(false);
+/** 删了、还在「撤销」时间里的歌（还没真正删掉）：重新读取时也不显示 */
+const deleting = new Set<number>();
 async function load(): Promise<void> {
   const r = await attempt(() => get<{ songs: LocalSong[]; folder: string | null }>('/api/music/local'));
   if (!r) return;
-  songs.value = r.songs;
+  songs.value = r.songs.filter((x) => !deleting.has(x.id));
   folder.value = r.folder;
-  music.libraryCount = r.songs.length;
+  music.libraryCount = songs.value.length;
   loaded.value = true;
 }
 onMounted(load);
@@ -28,6 +32,8 @@ onMounted(load);
 watch(() => music.libraryRev, () => void load());
 
 const q = ref('');
+// 删掉的那一行收起来，撤销时展开
+const listMotion = useListMotion();
 const shown = computed(() => {
   const s = q.value.trim().toLowerCase();
   return s ? songs.value.filter((x) => `${x.title} ${x.artist} ${x.album} ${x.filename}`.toLowerCase().includes(s)) : songs.value;
@@ -100,8 +106,28 @@ async function dropLyric(s: LocalSong): Promise<void> {
   const r = await attempt(() => put<{ song: LocalSong }>(`/api/music/local/${s.id}`, { lyric: null }), '歌词去掉了');
   if (r) Object.assign(s, r.song);
 }
-async function remove(s: LocalSong): Promise<void> {
-  if (await attempt(() => del(`/api/music/local/${s.id}`), `已删掉《${s.title}》`)) await load();
+/** 删歌：马上从列表里拿掉，右下角 8 秒内可以撤销，过了才真正删除 */
+function remove(s: LocalSong): void {
+  deleteLater(`已删掉《${s.title}》`, {
+    hide: () => {
+      deleting.add(s.id);
+      songs.value = songs.value.filter((x) => x.id !== s.id);
+      music.libraryCount = songs.value.length;
+    },
+    restore: () => {
+      deleting.delete(s.id);
+      void load();
+    },
+    commit: async () => {
+      try {
+        await del(`/api/music/local/${s.id}`);
+      } finally {
+        deleting.delete(s.id);
+      }
+      await load();
+    },
+    url: `/api/music/local/${s.id}`,
+  });
 }
 
 // ---------- 电脑版：文件夹 ----------
@@ -168,10 +194,10 @@ async function rescan(): Promise<void> {
         <h2><span class="hicon"><Icon name="i-list" /></span>歌库 {{ songs.length }} 首</h2>
         <span class="aside"><input v-model="q" class="inp mlb-q" placeholder="搜歌名、歌手" aria-label="在歌库里搜" /></span>
       </div>
-      <div v-if="!loaded" class="inline-hint">读取中…</div>
+      <SkelRows v-if="!loaded" :n="4" />
       <Empty v-else-if="!songs.length" compact icon="i-music" title="歌库是空的" desc="上传后，观众点歌时会先在这里找（规则里可以改成先找网易云）" />
       <div v-else-if="!shown.length" class="inline-hint">没有符合的歌。</div>
-      <div v-else class="mlb-list">
+      <TransitionGroup v-else tag="div" class="mlb-list lst-box" :name="listMotion()" @before-leave="pinLeaving">
         <div v-for="s in shown" :key="s.id" class="mlb-row">
           <img v-if="s.cover" class="mlb-cover" :src="s.cover" alt="" />
           <span v-else class="mlb-cover blank"><Icon name="i-music" /></span>
@@ -184,10 +210,10 @@ async function rescan(): Promise<void> {
             <template v-if="s.hasLyric"><span class="mlb-has">有歌词</span><button class="icon-btn" type="button" :aria-label="`去掉《${s.title}》的歌词`" title="去掉歌词" @click="dropLyric(s)"><Icon name="i-x" /></button></template>
             <label v-else class="btn sm" :title="'选一个 .lrc 歌词文件'"><input type="file" accept=".lrc,text/plain" hidden @change="(e) => pickLyric(s, e)" />配歌词</label>
           </span>
-          <ConfirmButton v-if="!s.folder" label="" confirm-label="删除" cls="icon-btn" :aria-label="`删除《${s.title}》`" @confirm="remove(s)"><Icon name="i-trash" /></ConfirmButton>
+          <button v-if="!s.folder" class="icon-btn" type="button" :aria-label="`删除《${s.title}》`" title="删除" @click="remove(s)"><Icon name="i-trash" /></button>
           <span v-else />
         </div>
-      </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>

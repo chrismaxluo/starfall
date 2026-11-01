@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { Component } from 'vue';
 import Sprite from './components/Sprite.vue';
 import Icon from './components/Icon.vue';
 import Avatar from './components/Avatar.vue';
@@ -11,6 +12,7 @@ import Palette from './components/Palette.vue';
 import PreviewModal from './components/PreviewModal.vue';
 import QrLogin from './components/QrLogin.vue';
 import Wizard from './components/Wizard.vue';
+import PageSkel from './components/PageSkel.vue';
 import Login from './pages/Login.vue';
 import Overview from './pages/Overview.vue';
 import QuickPlay from './pages/QuickPlay.vue';
@@ -23,7 +25,7 @@ import GiftList from './pages/GiftList.vue';
 import Output from './pages/Output.vue';
 import SettingsPage from './pages/Settings.vue';
 import About from './pages/About.vue';
-import { pauseOnly, togglePause } from './lib/actions.ts';
+import { pauseBusy, pauseOnly, togglePause } from './lib/actions.ts';
 import { get, post, setUnauthorizedHandler } from './lib/api.ts';
 import { desktop } from './lib/desktop.ts';
 import type { FxHint } from './lib/desktop.ts';
@@ -34,6 +36,8 @@ import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
 import { loadMusic, neteaseIssues } from './lib/music.ts';
 import { toggleTheme } from './lib/theme.ts';
+import { canAnimate } from './lib/motion.ts';
+import { checkWhatsNew, seenWhatsNew, whatsNew } from './lib/whatsnew.ts';
 import { attempt, runAction, toast, toasts } from './lib/toast.ts';
 
 /** 侧栏按用途分组：开播时看的、特效、直播画面上的东西 */
@@ -51,8 +55,36 @@ const SHORT: Partial<Record<Page, string>> = { overview: '总览', rules: '规�
 /** 手机底部导航直接放的几页，其他的在「更多」里 */
 const TABS = NAV.filter((n) => n.page in SHORT);
 const moreOpen = ref(false);
+// 自己打开了「关于」：更新提示算看过了
+watch(() => route.value.page, (p) => p === 'about' && whatsNew.value && seenWhatsNew());
 // 换了页面（包括点底栏其他标签）就收起
 watch(() => route.value.page, () => (moreOpen.value = false));
+// ---------- 页面：换页有过渡；回来时还在原来的位置 ----------
+const PAGE_OF: Record<Page, Component> = { overview: Overview, quickplay: QuickPlay, music: Music, rules: Rules, assets: Assets, logs: Events, chat: Chat, giftlist: GiftList, obs: Output, settings: SettingsPage, about: About };
+/** 换走以后留着的页面（回来时筛选、读过的记录都还在，不重新读）。有预览窗口、草稿的页面不留，省电脑资源 */
+const KEEP = ['Overview', 'Events', 'Rules', 'Assets'];
+const pageComp = computed(() => (state.ready ? PAGE_OF[route.value.page] : PageSkel));
+/** 每一页离开时滚到哪里 */
+const scrollPos = new Map<Page, number>();
+watch(
+  () => route.value.page,
+  (_, old) => {
+    const el = document.querySelector<HTMLElement>('.main > .page');
+    if (old && el) scrollPos.set(old, el.scrollTop);
+  },
+  { flush: 'pre' },
+);
+function onPageEnter(el: Element): void {
+  const p = el as HTMLElement;
+  // 地址里带了要看的那一块（例如 #about/changelog）：滚到那里；否则回到上次的位置
+  const sub = route.value.sub;
+  const target = sub && /^[a-z-]+$/.test(sub) ? p.querySelector<HTMLElement>(`#${sub}`) : null;
+  if (target) void nextTick(() => target.scrollIntoView({ block: 'start' }));
+  else p.scrollTop = scrollPos.get(route.value.page) ?? 0;
+}
+/** 换页过渡：窗口藏着、设置了减少动画时不播 */
+const pageTrans = () => (canAnimate() ? 'pg' : 'pg-off');
+
 const now = ref(Date.now());
 let clock: ReturnType<typeof setInterval> | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
@@ -64,8 +96,12 @@ async function boot(): Promise<void> {
     state.authed = false;
     return;
   }
+  // 重新登录时也先显示占位条，数据读到了再换上（不显示上一次登录时留下的旧数据）
+  state.ready = false;
   state.authed = true;
   await attempt(loadAll);
+  state.ready = true;
+  checkWhatsNew(Boolean(state.settings?.onboarded));
   // 点歌：总览的小卡片、顶部的网易云登录提醒要用（读不到不影响别的）
   void loadMusic().catch(() => undefined);
   startLive();
@@ -298,7 +334,8 @@ function reloadPage(): void {
           </nav>
         </div>
         <div class="side-foot">
-          <a class="acct" href="#settings" @click="onAcct">
+          <span v-if="!state.status" class="acct skel-acct" aria-hidden="true"><span class="skel round" style="width: 32px; height: 32px; flex: none" /><span class="acct-meta" style="gap: 6px; flex: 1"><span class="skel line" style="width: 60%" /><span class="skel line" style="width: 85%; height: 10px" /></span></span>
+          <a v-else class="acct" href="#settings" @click="onAcct">
             <template v-if="acct?.loggedIn">
               <Avatar :name="acct.name" :face="acct.face" />
               <span class="acct-meta"><b>{{ acct.name }}</b><span>{{ acctDays || `UID ${acct.uid}` }}</span></span>
@@ -314,13 +351,14 @@ function reloadPage(): void {
       <div class="main">
         <header class="top">
           <div v-if="state.status && !state.status.room" class="crumb"><a class="linkish" href="#settings">设置直播间</a></div>
-          <span class="status-group">
+          <span v-if="!state.status" class="skel pill" style="width: 260px; height: 30px" aria-hidden="true" />
+          <span v-else class="status-group">
             <span class="live" :class="conn.cls" :title="conn.title"><i />{{ conn.text }}</span>
             <span class="livestate" :class="{ on: state.status?.live.live }"><i />{{ liveText }}</span>
             <a v-if="state.status" class="live fxlamp" :class="fxOnline ? '' : isLive ? 'warn' : 'off'" href="#obs" :title="fxOnline ? '直播软件里的特效页在线' : '直播软件里的特效页不在线，点这里查看怎么添加'"><i />特效页{{ fxOnline ? '在线' : '不在线' }}</a>
           </span>
           <button class="search" aria-label="打开命令面板" @click="ui.palette = true"><Icon name="i-search" />搜索或执行命令<span class="kbd">Ctrl K</span></button>
-          <button class="pausebtn" :aria-pressed="paused" title="快捷键 Ctrl + Shift + P（快捷键只暂停，恢复请点按钮）" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
+          <button class="pausebtn" :class="{ busy: pauseBusy }" :aria-pressed="paused" :aria-busy="pauseBusy" title="快捷键 Ctrl + Shift + P（快捷键只暂停，恢复请点按钮）" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
           <button class="icon-btn" aria-label="切换亮色 / 暗色" @click="(e) => toggleTheme((e.currentTarget as HTMLElement).getBoundingClientRect().left + 17, (e.currentTarget as HTMLElement).getBoundingClientRect().top + 17)">
             <Icon name="i-moon" class="theme-light-only" /><Icon name="i-sun" class="theme-dark-only" />
           </button>
@@ -328,30 +366,39 @@ function reloadPage(): void {
         </header>
         <!-- 「关于」页里有同样的一份，在那一页时顶部不重复显示 -->
         <DesktopUpdateBar v-if="state.desktop && route.page !== 'about'" />
-        <div v-if="ui.newVersion && ui.newVersion !== ui.dismissedVersion" class="verbar" role="status">
-          <Icon name="i-update" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>
-          <button class="btn" @click="ui.dismissedVersion = ui.newVersion">稍后</button><button class="btn primary" @click="reloadPage">刷新</button>
-        </div>
-        <div v-for="a in alerts" :key="a.key" class="alertbar" :class="a.level" role="alert">
-          <Icon :name="a.level === 'red' ? 'i-ban' : 'i-info'" /><b>{{ a.title }}</b><span>{{ a.text }}</span>
-          <button v-if="a.level === 'amber' && a.key !== 'ws'" class="btn" @click="dismissed.push(a.key)">知道了</button>
-          <button v-if="a.action" class="btn primary" @click="a.action.run">{{ a.action.label }}</button>
-        </div>
-        <div v-if="paused" class="pausebar">
-          <Icon name="i-pause" /><b>所有特效已暂停</b><span>正在播放的特效已经停下，排队的也清空了；观众暂时看不到任何特效，事件照常记录。</span>
-          <button class="btn primary" @click="togglePause">恢复播放</button>
-        </div>
-        <Overview v-if="route.page === 'overview'" />
-        <QuickPlay v-else-if="route.page === 'quickplay'" />
-        <Music v-else-if="route.page === 'music'" />
-        <Rules v-else-if="route.page === 'rules'" />
-        <Assets v-else-if="route.page === 'assets'" />
-        <Events v-else-if="route.page === 'logs'" />
-        <Chat v-else-if="route.page === 'chat'" />
-        <GiftList v-else-if="route.page === 'giftlist'" />
-        <Output v-else-if="route.page === 'obs'" />
-        <SettingsPage v-else-if="route.page === 'settings'" />
-        <About v-else-if="route.page === 'about'" />
+        <!-- 顶部提示条：滑下来，页面跟着让开；收起时滑回去 -->
+        <TransitionGroup :name="canAnimate() ? 'bar' : 'bar-off'">
+          <div v-if="whatsNew" key="whatsnew" class="bar-wrap">
+            <div class="verbar" role="status">
+              <Icon name="i-update" /><b>星临已更新到 v{{ whatsNew }}</b><span>这次新增和改进的内容可以在「关于」的更新记录里查看。</span>
+              <button class="btn" @click="seenWhatsNew">知道了</button><button class="btn primary" @click="(seenWhatsNew(), go('about', 'changelog'))">看看改了什么</button>
+            </div>
+          </div>
+          <div v-if="ui.newVersion && ui.newVersion !== ui.dismissedVersion" key="newver" class="bar-wrap">
+            <div class="verbar" role="status">
+              <Icon name="i-update" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>
+              <button class="btn" @click="ui.dismissedVersion = ui.newVersion">稍后</button><button class="btn primary" @click="reloadPage">刷新</button>
+            </div>
+          </div>
+          <div v-for="a in alerts" :key="`alert-${a.key}`" class="bar-wrap">
+            <div class="alertbar" :class="a.level" role="alert">
+              <Icon :name="a.level === 'red' ? 'i-ban' : 'i-info'" /><b>{{ a.title }}</b><span>{{ a.text }}</span>
+              <button v-if="a.level === 'amber' && a.key !== 'ws'" class="btn" @click="dismissed.push(a.key)">知道了</button>
+              <button v-if="a.action" class="btn primary" @click="a.action.run">{{ a.action.label }}</button>
+            </div>
+          </div>
+          <div v-if="paused" key="paused" class="bar-wrap">
+            <div class="pausebar">
+              <Icon name="i-pause" /><b>所有特效已暂停</b><span>正在播放的特效已经停下，排队的也清空了；观众暂时看不到任何特效，事件照常记录。</span>
+              <button class="btn primary" :disabled="pauseBusy" @click="togglePause">恢复播放</button>
+            </div>
+          </div>
+        </TransitionGroup>
+        <Transition :name="pageTrans()" mode="out-in" @enter="onPageEnter">
+          <KeepAlive :include="KEEP">
+            <component :is="pageComp" />
+          </KeepAlive>
+        </Transition>
       </div>
     </div>
 
@@ -378,9 +425,9 @@ function reloadPage(): void {
     <QrLogin v-if="ui.qr" @close="ui.qr = false" />
   </template>
 
-  <div class="toasts" aria-live="polite">
+  <TransitionGroup tag="div" class="toasts" name="toast" aria-live="polite">
     <div v-for="t in toasts" :key="t.id" class="toast" :class="{ out: t.out }">
       <Icon :name="t.kind === 'err' ? 'i-ban' : t.kind === 'info' ? 'i-info' : 'i-check'" :style="t.kind === 'err' ? 'color:#D64545' : t.kind === 'info' ? 'color:var(--accent)' : ''" />{{ t.text }}<button v-if="t.action" type="button" class="toast-act" @click="runAction(t)">{{ t.action.label }}</button>
     </div>
-  </div>
+  </TransitionGroup>
 </template>

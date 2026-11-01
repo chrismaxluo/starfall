@@ -2,7 +2,8 @@
 // 事件记录：每个事件一行（时间、观众、身份、事件、结果），不常用的操作收进「⋯」；没命中规则的可以一键隐藏
 import Empty from '../components/Empty.vue';
 import EvIcon from '../components/EvIcon.vue';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import SkelRows from '../components/SkelRows.vue';
 import Avatar from '../components/Avatar.vue';
 import Icon from '../components/Icon.vue';
 import HonorMedal from '../components/HonorMedal.vue';
@@ -143,6 +144,12 @@ const off2 = onLiveEventStatus((id, s) => {
 const off3 = onResync(() => void load());
 onMounted(() => void load());
 onBeforeUnmount(() => (off1(), off2(), off3()));
+// 换走后这一页留着（回来时筛选、列表都还在）；从观众菜单「查看 TA 的记录」跳过来时换成搜这个人
+onActivated(() => {
+  if (ui.logQuery === null) return;
+  q.value = ui.logQuery;
+  ui.logQuery = null;
+});
 
 const isExcl = (uid: number) => state.exclusives.some((x) => x.uid === uid && x.enabled);
 /** 每种没播的原因，一键去处理 */
@@ -264,7 +271,7 @@ const COLS = '78px minmax(140px, 1fr) minmax(120px, 1fr) minmax(160px, 1.3fr) mi
         </div>
         <div class="c-act"><RowMenu :items="rowMenu(e)" :label="`${e.uname}：更多操作`" /></div>
       </div>
-      <div v-if="loading && !rows.length" class="rt-empty">正在读取…</div>
+      <SkelRows v-if="loading && !rows.length" :n="8" style="padding: 16px" />
       <Empty v-else-if="failed && !rows.length" icon="i-ban" title="没读到事件记录" desc="可能是和星临的连接断了"><button class="btn" type="button" @click="load()">重试</button></Empty>
       <Empty v-else-if="!rows.length && (hasFilter() || hitOnly)" icon="i-search" title="没有符合条件的记录">
         <button v-if="hasFilter()" class="btn" type="button" @click="clearFilters">清除筛选</button><button v-else class="btn" type="button" @click="hitOnly = false">显示没命中规则的</button>

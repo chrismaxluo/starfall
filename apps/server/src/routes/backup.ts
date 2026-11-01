@@ -85,7 +85,10 @@ export function backupRoutes(app: FastifyInstance, ctx: AppContext): void {
   };
 
   // ---------- 导出 ----------
-  app.get<{ Querystring: { files?: string } }>('/api/backup/export', async (req, reply) => {
+  app.get<{ Querystring: { files?: string; t?: string } }>('/api/backup/export', async (req, reply) => {
+    // 带了 t：开始下载时用 cookie 告诉后台（打包要一会儿，后台先显示「正在打包…」，开始下载了再说一声）
+    const t = req.query.t;
+    if (t && /^[a-z0-9]{1,24}$/.test(t)) reply.header('Set-Cookie', `starfall_export=${t}; Path=/; Max-Age=120; SameSite=Strict`);
     const file = ctx.io.export();
     const stamp = ctx.backups.stamp();
     const json = Buffer.from(JSON.stringify(file, null, 2));

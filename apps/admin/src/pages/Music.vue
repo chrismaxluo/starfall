@@ -16,6 +16,7 @@ import { HOLD_TEXT, copyMusicUrl, loadMusic, music, neteaseIssues, saveMusic } f
 import { go, route } from '../lib/route.ts';
 import { state } from '../lib/store.ts';
 import { attempt } from '../lib/toast.ts';
+import SkelRows from '../components/SkelRows.vue';
 
 const TABS = [
   { key: 'play', label: '主页' },
@@ -56,7 +57,7 @@ const issues = computed(() => (tab.value === 'play' ? [] : neteaseIssues()));
       </div>
     </div>
 
-    <div v-if="!music.loaded" class="inline-hint">读取中…</div>
+    <div v-if="!music.loaded" class="card"><SkelRows :n="5" /></div>
     <template v-else>
       <div v-if="hold && hold !== 'manual'" class="mu-alert" :class="{ warn: hold !== 'offline' }">
         <Icon name="i-info" /><span>{{ HOLD_TEXT[hold] }}</span>

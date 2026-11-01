@@ -152,7 +152,7 @@ const titleOf = (t: string) => (t === '未发布' ? '开发中（还没发布）
       </div>
     </div>
 
-    <div class="card cl">
+    <div id="changelog" class="card cl">
       <div class="card-h"><h2><span class="hicon"><Icon name="i-update" /></span>更新记录</h2><span class="aside">最近两个版本改了什么</span></div>
       <div v-for="(s, i) in sections" :key="s.title" class="cl-sec" :class="{ open: open.has(i) }">
         <button type="button" class="cl-h" :aria-expanded="open.has(i)" @click="toggle(i)"><Icon name="i-chev" />{{ titleOf(s.title) }}</button>

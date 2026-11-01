@@ -4,14 +4,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
 import { FADE_MAX_MS, FADE_MIN_MS, FEATHER_MAX, OFFSET_MAX, SIZE_MAX, SIZE_MIN } from '@starfall/shared';
 import type { EffectTexts, FeatherMode, Position, SvgaRole } from '@starfall/shared';
-import { del, post, put, upload } from '../lib/api.ts';
+import { post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { placeWarnings } from '../lib/place.ts';
 import { SAMPLES, STYLES } from '../lib/identity.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
 import { builtinThumb, svgaLayerImages } from '../lib/thumbs.ts';
-import { effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
+import { deleteEffect, effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { unloadGuards } from '../lib/route.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import { checkFile } from '../lib/upload-check.ts';
@@ -318,12 +318,11 @@ async function copy(force = false): Promise<void> {
   ui.editorId = r.id;
 }
 
-async function remove(): Promise<void> {
+/** 删除：马上关掉、从素材库拿掉，右下角 8 秒内可以撤销 */
+function remove(): void {
   if (!eff.value) return;
   if (eff.value.usedBy.length) return toast(`「${eff.value.name}」正在用于 ${eff.value.usedBy.map((u) => u.label).join('、')}，请先在触发规则里换成其他素材`, 'err');
-  if (!(await attempt(() => del(`/api/effects/${eff.value!.id}`), `已删除素材：${eff.value.name}`))) return;
-  await refreshEffects();
-  emit('close');
+  deleteEffect(eff.value, () => emit('close'));
 }
 
 async function replaceFile(): Promise<void> {
@@ -615,7 +614,7 @@ onBeforeUnmount(() => {
           <template v-else>还没有规则使用这个素材</template>
         </span>
         <template v-if="!ro">
-          <ConfirmButton label="删除" cls="btn" style="color: #d64545" @confirm="remove" />
+          <button class="btn" type="button" style="color: #d64545" @click="remove"><Icon name="i-trash" />删除</button>
           <button class="btn" @click="copy()"><Icon name="i-dup" />复制</button>
           <button class="btn" @click="close()">{{ dirty ? '取消' : '关闭' }}</button>
           <button class="btn primary" :disabled="busy || !dirty" :title="dirty ? '保存后留在这里，可以接着调（Ctrl + S）' : '没有要保存的修改'" @click="save()">{{ dirty ? '保存' : '已保存' }}</button>

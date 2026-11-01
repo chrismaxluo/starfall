@@ -19,7 +19,8 @@ import { clock, dateTime, inputDateTime, parseInputDateTime } from '../lib/forma
 import { battery } from '../lib/preview.ts';
 import { confirmLeave } from '../lib/route.ts';
 import { overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 import type { OutputDto } from '../lib/types.ts';
 
 // ---------- 输出（只有一个输出时不显示切换） ----------
@@ -260,6 +261,8 @@ interface Pin {
   item: GiftListItem;
 }
 const pins = ref<Pin[]>([]);
+// 移出的那一行收起来，撤销时展开
+const listMotion = useListMotion();
 const pinMax = ref(50);
 const inList = computed(() => new Map(pins.value.map((p) => [p.eventId, p.id])));
 async function loadPins(): Promise<void> {
@@ -284,9 +287,24 @@ async function add(r: Rec): Promise<void> {
   const res = await attempt(() => post<{ pins: Pin[] }>('/api/gift-list/pins', { eventId: r.eventId }), `已加入名单：${r.viewer.name} ${what(r)}`);
   if (res) pins.value = res.pins;
 }
+/** 移出名单：8 秒内可以撤销（放回原来的位置） */
 async function remove(id: number, name: string): Promise<void> {
-  const res = await attempt(() => del<{ pins: Pin[] }>(`/api/gift-list/pins/${id}`), `已移出名单：${name}`);
-  if (res) pins.value = res.pins;
+  const at = pins.value.findIndex((x) => x.id === id);
+  const old = pins.value[at];
+  const res = await attempt(() => del<{ pins: Pin[] }>(`/api/gift-list/pins/${id}`));
+  if (!res) return;
+  pins.value = res.pins;
+  if (!old) return;
+  undoable(`已移出名单：${name}`, async () => {
+    const r = await post<{ pins: Pin[] }>('/api/gift-list/pins', { eventId: old.eventId });
+    const ids = r.pins.map((x) => x.id);
+    const back = r.pins.find((x) => x.eventId === old.eventId)?.id;
+    if (back !== undefined && ids.indexOf(back) !== at) {
+      ids.splice(ids.indexOf(back), 1);
+      ids.splice(Math.min(at, ids.length), 0, back);
+      pins.value = (await put<{ pins: Pin[] }>('/api/gift-list/pins/order', { ids })).pins;
+    } else pins.value = r.pins;
+  });
 }
 /** 把第 from 条挪到第 to 个位置：页面上先挪好再保存，保存失败时取回原来的顺序 */
 async function reorder(from: number, to: number): Promise<void> {
@@ -417,7 +435,7 @@ function onDrop(to: number): void {
         <div class="card">
           <div class="card-h"><h2><span class="hicon"><Icon name="i-pin" /></span>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
           <Empty v-if="!pins.length" compact icon="i-pin" title="还没有挑选的记录" desc="在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」" />
-          <div v-else class="gl-recs">
+          <TransitionGroup v-else tag="div" class="gl-recs lst-box" :name="listMotion()" @before-leave="pinLeaving">
             <div
               v-for="(p, i) in pins"
               :key="p.id"
@@ -438,7 +456,7 @@ function onDrop(to: number): void {
               </span>
               <button class="btn sm" type="button" @click="remove(p.id, p.item.viewer.name)"><Icon name="i-x" />移出</button>
             </div>
-          </div>
+          </TransitionGroup>
         </div>
 
         <div class="card">

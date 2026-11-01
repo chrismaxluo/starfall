@@ -71,23 +71,23 @@ useEsc(() => emit('close'));
 <style scoped>
 .dlg.msw { width: min(600px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
 .msw .qh { flex-wrap: wrap; row-gap: 2px; }
-.msw-of { font-size: 12.5px; color: var(--t2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msw-of { font-size: var(--fs-sec); color: var(--t2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msw-b { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .msw-s { display: flex; gap: 8px; }
 .msw-s .inp { flex: 1; min-width: 0; }
 .msw-list { overflow: auto; margin: 0 -6px; max-height: 56vh; }
-.msw-sub { font-size: 12px; font-weight: 600; color: var(--t3); margin: 10px 6px 4px; }
-.msw-hit { display: grid; grid-template-columns: 36px minmax(0, 1fr) 40px 72px; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; font-size: 13px; }
+.msw-sub { font-size: var(--fs-cap); font-weight: 600; color: var(--t3); margin: 10px 6px 4px; }
+.msw-hit { display: grid; grid-template-columns: 36px minmax(0, 1fr) 40px 72px; align-items: center; gap: 10px; padding: 7px 6px; border-radius: var(--r-sm); font-size: var(--fs-sec); }
 .msw-hit + .msw-hit { border-top: 1px solid var(--line); }
 .msw-hit:hover { background: var(--hover); }
 .msw-hit.dim { opacity: .5; }
-.msw-th { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.msw-th { width: 36px; height: 36px; border-radius: var(--r-sm); object-fit: cover; }
 .msw-th.blank { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .msw-th.blank svg { width: 16px; height: 16px; }
 .msw-t { display: flex; flex-direction: column; min-width: 0; }
 .msw-t b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.msw-t span { font-size: 12px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.msw-d { font-size: 12px; color: var(--t3); text-align: right; }
-.msw-cur { font-size: 12px; color: var(--accent); text-align: center; }
-.msw-hit .btn.sm { height: 28px; padding: 0 8px; font-size: 12px; justify-content: center; }
+.msw-t span { font-size: var(--fs-cap); color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msw-d { font-size: var(--fs-cap); color: var(--t3); text-align: right; }
+.msw-cur { font-size: var(--fs-cap); color: var(--accent); text-align: center; }
+.msw-hit .btn.sm { height: 28px; padding: 0 8px; font-size: var(--fs-cap); justify-content: center; }
 </style>

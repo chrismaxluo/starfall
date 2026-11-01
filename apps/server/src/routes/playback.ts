@@ -49,6 +49,15 @@ export function playbackRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { removed: true };
   });
 
+  // 撤销移出：放回队列
+  app.post('/api/playback/queue/:id/restore', async (req) => {
+    const { id } = parseBody(z.object({ id: z.string().min(1).max(64) }), req.params);
+    const r = ctx.pipeline.restore(id);
+    if (r === 'paused') throw new HttpError(409, 'paused', '特效已暂停，放不回队列了');
+    if (r === 'expired') throw new HttpError(404, 'not_found', '已经过了能撤销的时间');
+    return { restored: true };
+  });
+
   /** 预览、发到直播测试共用：特效编号 + 还没保存的修改 + 示例观众 + 欢迎语变量 */
   const PreviewBody = z.object({
     effectId: z.number().int().positive(),

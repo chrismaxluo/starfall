@@ -3,6 +3,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import type { MusicSong } from '@starfall/shared/overlay';
 import Avatar from './Avatar.vue';
+import Empty from './Empty.vue';
 import Icon from './Icon.vue';
 import RowMenu from './RowMenu.vue';
 import { get, post } from '../lib/api.ts';
@@ -56,8 +57,8 @@ async function again(song: MusicSong): Promise<void> {
 <template>
   <div class="mh-grid">
     <div class="card">
-      <div class="card-h"><h2>放过的歌</h2><span class="aside">保留天数和事件记录一样</span></div>
-      <div v-if="!rows.length" class="inline-hint">还没有。</div>
+      <div class="card-h"><h2><span class="hicon"><Icon name="i-replay" /></span>放过的歌</h2><span class="aside">保留天数和事件记录一样</span></div>
+      <Empty v-if="!rows.length" compact icon="i-music" title="还没有放过歌" />
       <div v-else class="mh-list">
         <div v-for="r in rows" :key="r.id" class="mh-row">
           <span class="t num">{{ dateTime(r.item.at) }}</span>
@@ -76,8 +77,8 @@ async function again(song: MusicSong): Promise<void> {
 
     <div class="mh-col">
       <div class="card">
-        <div class="card-h"><h2>最近 30 天点得最多的歌</h2><span class="aside">一共点了 {{ stats?.total ?? 0 }} 次</span></div>
-        <div v-if="!stats?.songs.length" class="inline-hint">还没有。</div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-trophy" /></span>最近 30 天点得最多的歌</h2><span class="aside">一共点了 {{ stats?.total ?? 0 }} 次</span></div>
+        <Empty v-if="!stats?.songs.length" compact icon="i-trophy" title="最近 30 天还没有人点歌" />
         <ol v-else class="mh-top">
           <li v-for="(x, i) in stats.songs" :key="`${x.song.source}${x.song.id}`">
             <span class="no num">{{ i + 1 }}</span>
@@ -87,8 +88,8 @@ async function again(song: MusicSong): Promise<void> {
         </ol>
       </div>
       <div class="card">
-        <div class="card-h"><h2>最近 30 天点歌最多的观众</h2></div>
-        <div v-if="!stats?.people.length" class="inline-hint">还没有。</div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-users" /></span>最近 30 天点歌最多的观众</h2></div>
+        <Empty v-if="!stats?.people.length" compact icon="i-users" title="最近 30 天还没有人点歌" />
         <ol v-else class="mh-top">
           <li v-for="(p, i) in stats.people" :key="p.uid">
             <span class="no num">{{ i + 1 }}</span>
@@ -106,28 +107,28 @@ async function again(song: MusicSong): Promise<void> {
 .mh-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @media (max-width: 1100px) { .mh-grid { grid-template-columns: 1fr; } }
 .mh-list { display: flex; flex-direction: column; margin: 0 -6px; }
-.mh-row { display: grid; grid-template-columns: 112px 34px minmax(0, 1fr) minmax(0, 8em) minmax(0, 11em) 80px 30px; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 8px; font-size: 13px; }
+.mh-row { display: grid; grid-template-columns: 112px 34px minmax(0, 1fr) minmax(0, 8em) minmax(0, 11em) 80px 30px; align-items: center; gap: 10px; padding: 7px 6px; border-radius: var(--r-sm); font-size: var(--fs-sec); }
 .mh-row + .mh-row { border-top: 1px solid var(--line); }
 .mh-row:hover { background: var(--hover); }
-.mh-row .t { font-size: 12px; color: var(--t3); }
-.mh-thumb { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; }
+.mh-row .t { font-size: var(--fs-cap); color: var(--t3); }
+.mh-thumb { width: 34px; height: 34px; border-radius: var(--r-sm); object-fit: cover; }
 .mh-thumb.blank { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .mh-thumb.blank svg { width: 15px; height: 15px; }
 .mh-t { display: flex; flex-direction: column; min-width: 0; }
 .mh-t b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mh-t span { font-size: 12px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mh-who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--t2); }
+.mh-t span { font-size: var(--fs-cap); color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mh-who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sec); color: var(--t2); }
 .mh-who span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mh-st { font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mh-st { font-size: var(--fs-cap); color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mh-st.ok { color: var(--ok); }
 .mh-st.bad { color: #D64545; }
-.mh-in { font-size: 12px; color: var(--t3); text-align: center; }
-.mh-row .btn.sm { height: 28px; padding: 0 8px; font-size: 12px; justify-content: center; }
+.mh-in { font-size: var(--fs-cap); color: var(--t3); text-align: center; }
+.mh-row .btn.sm { height: 28px; padding: 0 8px; font-size: var(--fs-cap); justify-content: center; }
 .mh-more { margin-top: 12px; }
 .mh-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.mh-top li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; }
+.mh-top li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 0; font-size: var(--fs-sec); }
 .mh-top li + li { border-top: 1px solid var(--line); }
-.mh-top .no { color: var(--t3); font-size: 12px; text-align: center; }
+.mh-top .no { color: var(--t3); font-size: var(--fs-cap); text-align: center; }
 .mh-top li:nth-child(-n + 3) .no { color: var(--accent); font-weight: 600; }
-.mh-top .n { font-size: 12px; color: var(--t2); }
+.mh-top .n { font-size: var(--fs-cap); color: var(--t2); }
 </style>

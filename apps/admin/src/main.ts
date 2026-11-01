@@ -1,6 +1,4 @@
-import '@fontsource/geist-sans/400.css';
-import '@fontsource/geist-sans/500.css';
-import '@fontsource/geist-sans/600.css';
+import './styles/fonts.css';
 import '@fontsource/geist-mono/500.css';
 import '@fontsource/geist-mono/600.css';
 import '@fontsource/noto-sans-sc/400.css';
@@ -9,7 +7,10 @@ import '@fontsource/noto-sans-sc/600.css';
 import './styles/app.css';
 import './styles/extra.css';
 import './styles/login.css';
+import './styles/motion.css';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { installMotion } from './lib/motion.ts';
 
 createApp(App).mount('#app');
+installMotion();

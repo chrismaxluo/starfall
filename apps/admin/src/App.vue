@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { Component } from 'vue';
 import Sprite from './components/Sprite.vue';
 import Icon from './components/Icon.vue';
 import Avatar from './components/Avatar.vue';
@@ -11,6 +12,7 @@ import Palette from './components/Palette.vue';
 import PreviewModal from './components/PreviewModal.vue';
 import QrLogin from './components/QrLogin.vue';
 import Wizard from './components/Wizard.vue';
+import PageSkel from './components/PageSkel.vue';
 import Login from './pages/Login.vue';
 import Overview from './pages/Overview.vue';
 import QuickPlay from './pages/QuickPlay.vue';
@@ -18,11 +20,12 @@ import Music from './pages/Music.vue';
 import Rules from './pages/Rules.vue';
 import Assets from './pages/Assets.vue';
 import Events from './pages/Events.vue';
+import Chat from './pages/Chat.vue';
 import GiftList from './pages/GiftList.vue';
 import Output from './pages/Output.vue';
 import SettingsPage from './pages/Settings.vue';
 import About from './pages/About.vue';
-import { pauseOnly, togglePause } from './lib/actions.ts';
+import { pauseBusy, pauseOnly, togglePause } from './lib/actions.ts';
 import { get, post, setUnauthorizedHandler } from './lib/api.ts';
 import { desktop } from './lib/desktop.ts';
 import type { FxHint } from './lib/desktop.ts';
@@ -32,26 +35,56 @@ import { confirmLeave, go, route } from './lib/route.ts';
 import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
 import { loadMusic, neteaseIssues } from './lib/music.ts';
-import { toggleTheme } from './lib/theme.ts';
+import { syncDesktopTheme, toggleTheme } from './lib/theme.ts';
+import { canAnimate } from './lib/motion.ts';
+import { checkWhatsNew, seenWhatsNew, whatsNew } from './lib/whatsnew.ts';
 import { attempt, runAction, toast, toasts } from './lib/toast.ts';
 
-const NAV: Array<{ page: Page; name: string; icon: string }> = [
-  { page: 'overview', name: '总览', icon: 'i-grid' },
-  { page: 'quickplay', name: '素材快捷播放', icon: 'i-bolt' },
-  { page: 'music', name: '弹幕点歌', icon: 'i-music' },
-  { page: 'rules', name: '触发规则', icon: 'i-wand' },
-  { page: 'assets', name: '素材库', icon: 'i-image' },
-  { page: 'logs', name: '事件记录', icon: 'i-list' },
-  { page: 'giftlist', name: '送礼名单', icon: 'i-gift' },
-  { page: 'obs', name: '直播软件输出', icon: 'i-screen' },
+/** 侧栏按用途分组：开播时看的、特效、直播画面上的东西 */
+const NAV_GROUPS: Array<{ label: string; items: Array<{ page: Page; name: string; icon: string }> }> = [
+  { label: '工作台', items: [{ page: 'overview', name: '总览', icon: 'i-grid' }, { page: 'logs', name: '事件记录', icon: 'i-list' }] },
+  { label: '特效', items: [{ page: 'rules', name: '触发规则', icon: 'i-wand' }, { page: 'assets', name: '素材库', icon: 'i-image' }, { page: 'quickplay', name: '素材快捷播放', icon: 'i-bolt' }] },
+  {
+    label: '直播画面',
+    items: [{ page: 'chat', name: '弹幕列表', icon: 'i-chat' }, { page: 'giftlist', name: '送礼名单', icon: 'i-gift' }, { page: 'music', name: '弹幕点歌', icon: 'i-music' }, { page: 'obs', name: '直播软件输出', icon: 'i-screen' }],
+  },
 ];
+const NAV = NAV_GROUPS.flatMap((g) => g.items);
 /** 手机底部导航的短名称 */
 const SHORT: Partial<Record<Page, string>> = { overview: '总览', rules: '规则', assets: '素材', logs: '记录' };
 /** 手机底部导航直接放的几页，其他的在「更多」里 */
 const TABS = NAV.filter((n) => n.page in SHORT);
 const moreOpen = ref(false);
+// 自己打开了「关于」：更新提示算看过了
+watch(() => route.value.page, (p) => p === 'about' && whatsNew.value && seenWhatsNew());
 // 换了页面（包括点底栏其他标签）就收起
 watch(() => route.value.page, () => (moreOpen.value = false));
+// ---------- 页面：换页有过渡；回来时还在原来的位置 ----------
+const PAGE_OF: Record<Page, Component> = { overview: Overview, quickplay: QuickPlay, music: Music, rules: Rules, assets: Assets, logs: Events, chat: Chat, giftlist: GiftList, obs: Output, settings: SettingsPage, about: About };
+/** 换走以后留着的页面（回来时筛选、读过的记录都还在，不重新读）。有预览窗口、草稿的页面不留，省电脑资源 */
+const KEEP = ['Overview', 'Events', 'Rules', 'Assets'];
+const pageComp = computed(() => (state.ready ? PAGE_OF[route.value.page] : PageSkel));
+/** 每一页离开时滚到哪里 */
+const scrollPos = new Map<Page, number>();
+watch(
+  () => route.value.page,
+  (_, old) => {
+    const el = document.querySelector<HTMLElement>('.main > .page');
+    if (old && el) scrollPos.set(old, el.scrollTop);
+  },
+  { flush: 'pre' },
+);
+function onPageEnter(el: Element): void {
+  const p = el as HTMLElement;
+  // 地址里带了要看的那一块（例如 #about/changelog）：滚到那里；否则回到上次的位置
+  const sub = route.value.sub;
+  const target = sub && /^[a-z-]+$/.test(sub) ? p.querySelector<HTMLElement>(`#${sub}`) : null;
+  if (target) void nextTick(() => target.scrollIntoView({ block: 'start' }));
+  else p.scrollTop = scrollPos.get(route.value.page) ?? 0;
+}
+/** 换页过渡：窗口藏着、设置了减少动画时不播 */
+const pageTrans = () => (canAnimate() ? 'pg' : 'pg-off');
+
 const now = ref(Date.now());
 let clock: ReturnType<typeof setInterval> | null = null;
 let poll: ReturnType<typeof setInterval> | null = null;
@@ -63,8 +96,12 @@ async function boot(): Promise<void> {
     state.authed = false;
     return;
   }
+  // 重新登录时也先显示占位条，数据读到了再换上（不显示上一次登录时留下的旧数据）
+  state.ready = false;
   state.authed = true;
   await attempt(loadAll);
+  state.ready = true;
+  checkWhatsNew(Boolean(state.settings?.onboarded));
   // 点歌：总览的小卡片、顶部的网易云登录提醒要用（读不到不影响别的）
   void loadMusic().catch(() => undefined);
   startLive();
@@ -138,6 +175,11 @@ const conn = computed((): { cls: string; text: string; title?: string } => {
 /** 特效页（直播软件里的浏览器源）在不在线 */
 const fxOnline = computed(() => (state.status?.overlays ?? 0) > 0);
 const isLive = computed(() => Boolean(state.status?.live.live));
+// 直播氛围：开播时在总览把直播间封面模糊后铺在窗口顶部当光源，侧栏、顶栏、卡片半透明能透出光。
+// 只在总览：那里看得到封面；其他页面是改设置的地方，保持安静，也少占显卡。封面加载失败就不显示
+const ambFailed = ref(false);
+const liveCover = computed(() => (isLive.value && route.value.page === 'overview' && !ambFailed.value ? (state.roomInfo?.cover ?? '') : ''));
+watch(() => state.roomInfo?.cover, () => (ambFailed.value = false));
 // 直播中特效页一直不在线才提醒（特效页自动更新、刷新会断开一两秒，不算）
 const fxDownLong = ref(false);
 let fxTimer: ReturnType<typeof setTimeout> | null = null;
@@ -152,6 +194,18 @@ watch(
   { immediate: true },
 );
 
+// 电脑版：窗口标题栏跟着后台的亮色 / 暗色
+syncDesktopTheme();
+// 电脑版：本机服务出问题自动重启时，顶部说一声；连上后页面自己补回数据，不整页刷新
+const serverState = ref<'restarting' | 'ok' | 'stopped'>('ok');
+const offServer = desktop?.onServer?.((s) => (serverState.value = s));
+onBeforeUnmount(() => offServer?.());
+// 电脑版：后台页面出问题被自动重新打开（地址带 ?recovered=1）：说一句，再把地址改回去
+if (new URLSearchParams(location.search).has('recovered')) {
+  history.replaceState(null, '', location.pathname + location.hash);
+  setTimeout(() => toast('刚才后台页面出了点问题，已经自动恢复。直播画面上的特效不受影响。', 'info', 6000), 800);
+}
+
 // 桌面版：直播软件开着但特效页一直没连上、这次端口变了时，桌面版告诉后台怎么办（apps/desktop/src/main.ts watchFx）
 const fxHint = ref<FxHint | null>(null);
 void desktop?.fxHint?.().then((h) => (fxHint.value = h), () => undefined);
@@ -165,6 +219,14 @@ const dismissed = ref<string[]>([]);
 const alerts = computed((): Alert[] => {
   const out: Alert[] = [];
   const s = state.status;
+  if (serverState.value === 'restarting') {
+    out.push({ key: 'ws', level: 'amber', title: '星临服务出了点问题，正在自动重启', text: '马上就好，页面不用刷新，正在填的内容也不会丢。' });
+    return out;
+  }
+  if (serverState.value === 'stopped') {
+    out.push({ key: 'ws', level: 'red', title: '星临服务已停止', text: '多次意外退出，已停止自动重启。直播画面上的特效暂时不会播放，请退出星临再打开。', action: { label: '打开日志文件夹', run: () => void desktop?.openLogs() } });
+    return out;
+  }
   if (wsDownLong.value) {
     out.push({ key: 'ws', level: 'amber', title: '和星临的连接断了', text: '正在自动重连，页面上的状态可能不是最新的。' });
     return out;
@@ -188,7 +250,9 @@ const alerts = computed((): Alert[] => {
     const p = portMoved.value;
     out.push({ key: 'port', level: 'amber', title: `这次星临改用 ${p.port} 端口`, text: `${p.home} 被别的程序占用。特效页连不上的话，到「直播软件输出」复制新地址换上，以后新旧地址都能用。`, action: toObs });
   }
-  return out.filter((x) => x.level === 'red' || !dismissed.value.includes(x.key));
+  // 总览的状态卡片里已经写着特效页、B站登录的问题（带修复按钮），总览上不再重复显示横幅
+  const inCard = (k: string) => route.value.page === 'overview' && (k === 'fx' || k === 'login' || k.startsWith('expire'));
+  return out.filter((x) => !inCard(x.key) && (x.level === 'red' || !dismissed.value.includes(x.key)));
 });
 
 /** 导航「弹幕点歌」旁的小圆点：网易云快到期（橙）、出问题（红） */
@@ -269,28 +333,29 @@ function reloadPage(): void {
   <div v-if="state.authed === null" class="login"><span class="spin" /></div>
   <Login v-else-if="!state.authed" @done="boot" />
   <template v-else>
-    <div class="app" :class="{ stale: wsDownLong }">
+    <div class="app" :class="{ stale: wsDownLong, lit: Boolean(liveCover) }">
+      <img v-if="liveCover" class="amb" :src="liveCover" alt="" aria-hidden="true" referrerpolicy="no-referrer" @error="ambFailed = true" />
       <aside class="side">
         <div class="brand">
           <Logo :size="32" />
           <span><div class="brand-name">星临</div><div class="brand-sub">STARFALL</div></span>
         </div>
-        <div>
-          <div class="nav-label">工作台</div>
-          <nav class="nav" aria-label="主导航">
-            <a v-for="n in NAV" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ n.name }}<span v-if="n.page === 'music' && musicDot" class="ndot" :class="musicDot" :title="musicIssue" /></a>
+        <div v-for="g in NAV_GROUPS" :key="g.label">
+          <div class="nav-label">{{ g.label }}</div>
+          <nav class="nav" :aria-label="g.label">
+            <a v-for="n in g.items" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ n.name }}<span v-if="n.page === 'music' && musicDot" class="ndot" :class="musicDot" :title="musicIssue" /></a>
           </nav>
         </div>
         <div>
           <div class="nav-label">其他</div>
           <nav class="nav" aria-label="其他">
-            <a href="/overlay/?demo=1" target="_blank" rel="noopener" title="在新标签里轮流播放所有内置特效（示例）"><Icon name="i-demo" />内置特效演示<Icon name="i-ext" /></a>
             <a href="#about" :aria-current="route.page === 'about' ? 'page' : 'false'"><Icon name="i-info" />关于</a>
             <a href="#settings" :aria-current="route.page === 'settings' ? 'page' : 'false'"><Icon name="i-gear" />设置</a>
           </nav>
         </div>
         <div class="side-foot">
-          <a class="acct" href="#settings" @click="onAcct">
+          <span v-if="!state.status" class="acct skel-acct" aria-hidden="true"><span class="skel round" style="width: 32px; height: 32px; flex: none" /><span class="acct-meta" style="gap: 6px; flex: 1"><span class="skel line" style="width: 60%" /><span class="skel line" style="width: 85%; height: 10px" /></span></span>
+          <a v-else class="acct" href="#settings" @click="onAcct">
             <template v-if="acct?.loggedIn">
               <Avatar :name="acct.name" :face="acct.face" />
               <span class="acct-meta"><b>{{ acct.name }}</b><span>{{ acctDays || `UID ${acct.uid}` }}</span></span>
@@ -305,15 +370,15 @@ function reloadPage(): void {
 
       <div class="main">
         <header class="top">
-          <div class="crumb">
-            <template v-if="state.status?.room">直播间 <b class="num">{{ state.status.room.shortId || state.status.room.roomId }}</b></template>
-            <template v-else><a class="linkish" href="#settings">设置直播间</a></template>
-          </div>
-          <span class="live" :class="conn.cls" :title="conn.title"><i />{{ conn.text }}</span>
-          <span class="livestate" :class="{ on: state.status?.live.live }"><i />{{ liveText }}</span>
-          <a v-if="state.status" class="live fxlamp" :class="fxOnline ? '' : isLive ? 'warn' : 'off'" href="#obs" :title="fxOnline ? '直播软件里的特效页在线' : '直播软件里的特效页不在线，点这里查看怎么添加'"><i />特效页{{ fxOnline ? '在线' : '不在线' }}</a>
+          <div v-if="state.status && !state.status.room" class="crumb"><a class="linkish" href="#settings">设置直播间</a></div>
+          <span v-if="!state.status" class="skel pill" style="width: 260px; height: 30px" aria-hidden="true" />
+          <span v-else class="status-group">
+            <span class="live" :class="conn.cls" :title="conn.title"><i />{{ conn.text }}</span>
+            <span class="livestate" :class="{ on: state.status?.live.live }"><i />{{ liveText }}</span>
+            <a v-if="state.status" class="live fxlamp" :class="fxOnline ? '' : isLive ? 'warn' : 'off'" href="#obs" :title="fxOnline ? '直播软件里的特效页在线' : '直播软件里的特效页不在线，点这里查看怎么添加'"><i />特效页{{ fxOnline ? '在线' : '不在线' }}</a>
+          </span>
           <button class="search" aria-label="打开命令面板" @click="ui.palette = true"><Icon name="i-search" />搜索或执行命令<span class="kbd">Ctrl K</span></button>
-          <button class="pausebtn" :aria-pressed="paused" title="快捷键 Ctrl + Shift + P（快捷键只暂停，恢复请点按钮）" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
+          <button class="pausebtn" :class="{ busy: pauseBusy }" :aria-pressed="paused" :aria-busy="pauseBusy" title="快捷键 Ctrl + Shift + P（快捷键只暂停，恢复请点按钮）" @click="togglePause"><Icon name="i-pause" /><span>{{ paused ? '已暂停' : '暂停所有特效' }}</span></button>
           <button class="icon-btn" aria-label="切换亮色 / 暗色" @click="(e) => toggleTheme((e.currentTarget as HTMLElement).getBoundingClientRect().left + 17, (e.currentTarget as HTMLElement).getBoundingClientRect().top + 17)">
             <Icon name="i-moon" class="theme-light-only" /><Icon name="i-sun" class="theme-dark-only" />
           </button>
@@ -321,39 +386,50 @@ function reloadPage(): void {
         </header>
         <!-- 「关于」页里有同样的一份，在那一页时顶部不重复显示 -->
         <DesktopUpdateBar v-if="state.desktop && route.page !== 'about'" />
-        <div v-if="ui.newVersion && ui.newVersion !== ui.dismissedVersion" class="verbar" role="status">
-          <Icon name="i-update" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>
-          <button class="btn" @click="ui.dismissedVersion = ui.newVersion">稍后</button><button class="btn primary" @click="reloadPage">刷新</button>
-        </div>
-        <div v-for="a in alerts" :key="a.key" class="alertbar" :class="a.level" role="alert">
-          <Icon :name="a.level === 'red' ? 'i-ban' : 'i-info'" /><b>{{ a.title }}</b><span>{{ a.text }}</span>
-          <button v-if="a.level === 'amber' && a.key !== 'ws'" class="btn" @click="dismissed.push(a.key)">知道了</button>
-          <button v-if="a.action" class="btn primary" @click="a.action.run">{{ a.action.label }}</button>
-        </div>
-        <div v-if="paused" class="pausebar">
-          <Icon name="i-pause" /><b>所有特效已暂停</b><span>正在播放的特效已经停下，排队的也清空了；观众暂时看不到任何特效，事件照常记录。</span>
-          <button class="btn primary" @click="togglePause">恢复播放</button>
-        </div>
-        <Overview v-if="route.page === 'overview'" />
-        <QuickPlay v-else-if="route.page === 'quickplay'" />
-        <Music v-else-if="route.page === 'music'" />
-        <Rules v-else-if="route.page === 'rules'" />
-        <Assets v-else-if="route.page === 'assets'" />
-        <Events v-else-if="route.page === 'logs'" />
-        <GiftList v-else-if="route.page === 'giftlist'" />
-        <Output v-else-if="route.page === 'obs'" />
-        <SettingsPage v-else-if="route.page === 'settings'" />
-        <About v-else-if="route.page === 'about'" />
+        <!-- 顶部提示条：滑下来，页面跟着让开；收起时滑回去 -->
+        <TransitionGroup :name="canAnimate() ? 'bar' : 'bar-off'">
+          <div v-if="whatsNew" key="whatsnew" class="bar-wrap">
+            <div class="verbar" role="status">
+              <Icon name="i-update" /><b>星临已更新到 v{{ whatsNew }}</b><span>这次新增和改进的内容可以在「关于」的更新记录里查看。</span>
+              <button class="btn" @click="seenWhatsNew">知道了</button><button class="btn primary" @click="(seenWhatsNew(), go('about', 'changelog'))">看看改了什么</button>
+            </div>
+          </div>
+          <div v-if="ui.newVersion && ui.newVersion !== ui.dismissedVersion" key="newver" class="bar-wrap">
+            <div class="verbar" role="status">
+              <Icon name="i-update" /><b>后台有新版本</b><span>刷新后就能用上新功能。正在编辑的内容请先保存。</span>
+              <button class="btn" @click="ui.dismissedVersion = ui.newVersion">稍后</button><button class="btn primary" @click="reloadPage">刷新</button>
+            </div>
+          </div>
+          <div v-for="a in alerts" :key="`alert-${a.key}`" class="bar-wrap">
+            <div class="alertbar" :class="a.level" role="alert">
+              <Icon :name="a.level === 'red' ? 'i-ban' : 'i-info'" /><b>{{ a.title }}</b><span>{{ a.text }}</span>
+              <button v-if="a.level === 'amber' && a.key !== 'ws'" class="btn" @click="dismissed.push(a.key)">知道了</button>
+              <button v-if="a.action" class="btn primary" @click="a.action.run">{{ a.action.label }}</button>
+            </div>
+          </div>
+          <div v-if="paused" key="paused" class="bar-wrap">
+            <div class="pausebar">
+              <Icon name="i-pause" /><b>所有特效已暂停</b><span>正在播放的特效已经停下，排队的也清空了；观众暂时看不到任何特效，事件照常记录。</span>
+              <button class="btn primary" :disabled="pauseBusy" @click="togglePause">恢复播放</button>
+            </div>
+          </div>
+        </TransitionGroup>
+        <Transition :name="pageTrans()" mode="out-in" @enter="onPageEnter">
+          <KeepAlive :include="KEEP">
+            <component :is="pageComp" />
+          </KeepAlive>
+        </Transition>
       </div>
     </div>
 
     <nav class="tabbar" aria-label="主导航（手机）">
       <a v-for="n in TABS" :key="n.page" :href="`#${n.page}`" :aria-current="route.page === n.page ? 'page' : 'false'"><Icon :name="n.icon" />{{ SHORT[n.page] }}</a>
-      <button :aria-current="['quickplay', 'music', 'giftlist', 'obs', 'about', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
+      <button :aria-current="['quickplay', 'music', 'chat', 'giftlist', 'obs', 'about', 'settings'].includes(route.page) ? 'page' : 'false'" @click="moreOpen = !moreOpen"><Icon name="i-more" />更多</button>
     </nav>
     <div v-if="moreOpen" style="position: fixed; inset: 0; z-index: 44" @click="moreOpen = false" />
     <div v-if="moreOpen" class="sheet" @click="moreOpen = false">
       <a href="#quickplay"><Icon name="i-bolt" />素材快捷播放</a>
+      <a href="#chat"><Icon name="i-chat" />弹幕列表</a>
       <a href="#music"><Icon name="i-music" />弹幕点歌</a>
       <a href="#giftlist"><Icon name="i-gift" />送礼名单</a>
       <a href="#obs" @click="go('obs')"><Icon name="i-screen" />直播软件输出</a>
@@ -369,9 +445,9 @@ function reloadPage(): void {
     <QrLogin v-if="ui.qr" @close="ui.qr = false" />
   </template>
 
-  <div class="toasts" aria-live="polite">
+  <TransitionGroup tag="div" class="toasts" name="toast" aria-live="polite">
     <div v-for="t in toasts" :key="t.id" class="toast" :class="{ out: t.out }">
       <Icon :name="t.kind === 'err' ? 'i-ban' : t.kind === 'info' ? 'i-info' : 'i-check'" :style="t.kind === 'err' ? 'color:#D64545' : t.kind === 'info' ? 'color:var(--accent)' : ''" />{{ t.text }}<button v-if="t.action" type="button" class="toast-act" @click="runAction(t)">{{ t.action.label }}</button>
     </div>
-  </div>
+  </TransitionGroup>
 </template>

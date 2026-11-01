@@ -6,10 +6,12 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { GIFTS_ALPHA_MAX, GIFTS_ALPHA_MIN, GIFTS_KEEP, GIFTS_MAX_LIMIT, GIFTS_MIN_OPTIONS, GIFTS_PAGE_HOLD, GIFTS_STEP_HOLD, GIFTS_TITLE_MAX, giftsRange, giftsSourceSize, giftsView } from '@starfall/shared/overlay';
 import type { GiftListItem, GiftsFilter, GiftsLook, GiftsMotion, GiftsRange, GiftsSpeed } from '@starfall/shared/overlay';
 import Avatar from '../components/Avatar.vue';
+import Empty from '../components/Empty.vue';
 import DraftBar from '../components/DraftBar.vue';
 import GiftsFilterPick from '../components/GiftsFilterPick.vue';
 import GiftsPreview from '../components/GiftsPreview.vue';
 import Icon from '../components/Icon.vue';
+import SourceCard from '../components/SourceCard.vue';
 import Switch from '../components/Switch.vue';
 import { del, get, post, put } from '../lib/api.ts';
 import { useDraft } from '../lib/draft.ts';
@@ -17,7 +19,8 @@ import { clock, dateTime, inputDateTime, parseInputDateTime } from '../lib/forma
 import { battery } from '../lib/preview.ts';
 import { confirmLeave } from '../lib/route.ts';
 import { overlayConfigOf, refreshOutputs, state } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 import type { OutputDto } from '../lib/types.ts';
 
 // ---------- 输出（只有一个输出时不显示切换） ----------
@@ -37,6 +40,7 @@ const whOf = (x: OutputDto) => {
   return `${s.w} × ${s.h}`;
 };
 const wh = computed(() => (o.value ? whOf(o.value) : ''));
+const srcWh = computed(() => (o.value ? giftsSourceSize(o.value) : { w: 0, h: 0 }));
 /** 换输出：草稿是上一个输出的，先问再丢掉 */
 function pickOutput(e: Event): void {
   const el = e.target as HTMLSelectElement;
@@ -95,10 +99,10 @@ function pickAuto(): void {
 const range = computed(() => giftsRange(f.value));
 const RANGES: Array<{ value: GiftsRange; label: string; hint: string }> = [
   { value: 'live', label: '本场直播', hint: '下次开播时清空；没开播时显示上一场的' },
-  { value: 'today', label: '今天', hint: '每天 0 点清空，一天播几场都算在一起；跨夜直播过了 0 点也会清空' },
+  { value: 'today', label: '今天', hint: '每天 0 点清空，一天播几场都算在一起' },
   { value: 'week', label: '本周', hint: '每周一 0 点清空' },
   { value: 'month', label: '本月', hint: '每月 1 号 0 点清空' },
-  { value: 'since', label: '从某个时间起', hint: '从你定的时间开始一直累积，适合生日会、周年、活动，直到你换掉' },
+  { value: 'since', label: '从某个时间起', hint: '从指定的时间开始一直累积，适合生日会、周年、活动' },
 ];
 const rangeName = (r: GiftsRange) => RANGES.find((x) => x.value === r)!.label;
 function setRange(r: GiftsRange): void {
@@ -257,6 +261,8 @@ interface Pin {
   item: GiftListItem;
 }
 const pins = ref<Pin[]>([]);
+// 移出的那一行收起来，撤销时展开
+const listMotion = useListMotion();
 const pinMax = ref(50);
 const inList = computed(() => new Map(pins.value.map((p) => [p.eventId, p.id])));
 async function loadPins(): Promise<void> {
@@ -281,9 +287,24 @@ async function add(r: Rec): Promise<void> {
   const res = await attempt(() => post<{ pins: Pin[] }>('/api/gift-list/pins', { eventId: r.eventId }), `已加入名单：${r.viewer.name} ${what(r)}`);
   if (res) pins.value = res.pins;
 }
+/** 移出名单：8 秒内可以撤销（放回原来的位置） */
 async function remove(id: number, name: string): Promise<void> {
-  const res = await attempt(() => del<{ pins: Pin[] }>(`/api/gift-list/pins/${id}`), `已移出名单：${name}`);
-  if (res) pins.value = res.pins;
+  const at = pins.value.findIndex((x) => x.id === id);
+  const old = pins.value[at];
+  const res = await attempt(() => del<{ pins: Pin[] }>(`/api/gift-list/pins/${id}`));
+  if (!res) return;
+  pins.value = res.pins;
+  if (!old) return;
+  undoable(`已移出名单：${name}`, async () => {
+    const r = await post<{ pins: Pin[] }>('/api/gift-list/pins', { eventId: old.eventId });
+    const ids = r.pins.map((x) => x.id);
+    const back = r.pins.find((x) => x.eventId === old.eventId)?.id;
+    if (back !== undefined && ids.indexOf(back) !== at) {
+      ids.splice(ids.indexOf(back), 1);
+      ids.splice(Math.min(at, ids.length), 0, back);
+      pins.value = (await put<{ pins: Pin[] }>('/api/gift-list/pins/order', { ids })).pins;
+    } else pins.value = r.pins;
+  });
 }
 /** 把第 from 条挪到第 to 个位置：页面上先挪好再保存，保存失败时取回原来的顺序 */
 async function reorder(from: number, to: number): Promise<void> {
@@ -316,8 +337,8 @@ function onDrop(to: number): void {
 <template>
   <section v-if="o && cfg" class="page">
     <div class="page-head">
-      <div><h1>送礼名单</h1><p>把收到的礼物、上舰、醒目留言排成一列显示在直播画面上。</p></div>
-      <div class="gl-head-r">
+      <div><h1>送礼名单</h1><p>收到的礼物、上舰和醒目留言排成一列，显示在直播画面上。</p></div>
+      <div class="wp-head-r">
         <select v-if="state.outputs.length > 1" class="sel" aria-label="输出" :value="o.id" @change="pickOutput"><option v-for="x in state.outputs" :key="x.id" :value="x.id">{{ x.name }}</option></select>
         <span class="live" :class="o.giftsEnabled && online ? '' : 'off'"><i />{{ !o.giftsEnabled ? '已关闭' : online ? '直播软件里已加上' : '直播软件里还没加' }}</span>
         <button class="btn" :title="`在直播软件里加一个浏览器源，宽高填 ${wh}`" @click="copyUrl"><Icon name="i-copy" />复制地址</button>
@@ -325,11 +346,11 @@ function onDrop(to: number): void {
       </div>
     </div>
 
-    <div class="gl-grid">
-      <div class="gl-col">
+    <div class="wp-grid">
+      <div class="wp-col">
         <!-- 名单放什么 -->
         <div class="card">
-          <div class="card-h"><h2>名单放什么</h2><span class="aside">改了马上生效</span></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-todo" /></span>名单放什么</h2></div>
           <div class="gl-modes" role="radiogroup" aria-label="名单放什么">
             <button type="button" class="gl-mode" role="radio" :aria-checked="!manual" @click="pickAuto">
               <b><Icon name="i-bolt" />自动：收到的礼物</b>
@@ -353,7 +374,7 @@ function onDrop(to: number): void {
                   <button class="btn sm" type="button" @click="sinceNow">从现在开始算</button>
                 </div>
                 <span class="hint">{{ RANGES.find((r) => r.value === range)?.hint }}</span>
-                <span v-if="tooOld" class="hint warn">事件记录只保留 {{ tooOld }} 天，更早的礼物已经删掉了，算不进来（可以在「设置」里改保留天数）</span>
+                <span v-if="tooOld" class="hint warn">事件记录只保留 {{ tooOld }} 天，更早的礼物算不进来</span>
               </div>
             </div>
             <div class="srow">
@@ -374,7 +395,7 @@ function onDrop(to: number): void {
                 <div v-else class="line">
                   <Switch :model-value="f.amount !== false" label="显示总金额" @change="(v) => setFilter({ amount: v }, v ? '名单显示每人的总金额（电池）' : '名单不显示金额，只排名次')" /><span>显示总金额（电池）</span>
                 </div>
-                <span class="hint">{{ view === 'viewer' ? '每人一条，按这段时间送的总价值从多到少排，前三名有金银铜标记；有人再送，数字往上涨、名次跟着变' : f.sort === 'value' ? '大礼物排在上面；一屏放不下又不滚动时，留下最大的几条' : '旧的在上、新的在下' }}{{ view === 'item' && f.merge ? '；同一个人分几次送的同一种礼物合成一条，数量加起来' : '' }}</span>
+                <span class="hint">{{ view === 'viewer' ? '每人一条，按送出的总价值排名，前三名有金银铜标记' : f.sort === 'value' ? '大礼物排在上面' : '旧的在上、新的在下' }}{{ view === 'item' && f.merge ? '；同一个人送的同一种礼物合成一条' : '' }}</span>
               </div>
             </div>
             <div class="srow">
@@ -386,7 +407,7 @@ function onDrop(to: number): void {
                     <button :aria-pressed="f.mode === 'only'" @click="setFilter({ mode: 'only' }, '名单只显示选中的几种礼物')">只要这几种</button>
                   </span>
                   <select v-if="f.mode === 'all'" class="sel" aria-label="最低金额" :value="listMin" @change="setMin(Number(($event.target as HTMLSelectElement).value))"><option v-for="g in GIFTS_MIN_OPTIONS" :key="g" :value="g">{{ g ? `${yuanOf(g)}以上` : '金额不限' }}</option></select>
-                  <span class="hint">{{ f.mode === 'all' ? (listMin ? `一次送出（连击合起来算）满 ${yuanOf(listMin)}才显示，小礼物不进名单` : '所有付费礼物都显示（免费礼物不显示）') : '只显示下面选中的礼物，谁送的都算' }}</span>
+                  <span class="hint">{{ f.mode === 'all' ? (listMin ? `一次送出满 ${yuanOf(listMin)}才显示（连击合起来算）` : '所有付费礼物都显示') : '只显示下面选中的礼物，谁送的都算' }}</span>
                 </div>
                 <GiftsFilterPick v-if="f.mode === 'only'" :model-value="f.gifts" @change="(gifts, msg) => setFilter({ gifts }, msg)" />
               </div>
@@ -403,7 +424,7 @@ function onDrop(to: number): void {
               <span class="lb">置顶</span>
               <div class="ctl">
                 <div class="line"><Switch :model-value="Boolean(f.pinTop)" label="置顶我挑的记录" @change="(v) => setFilter({ pinTop: v }, v ? '挑好的记录固定在名单最上面' : '不再置顶')" /><span>把我挑的记录固定在最上面</span></div>
-                <span class="hint">在下面的送礼记录里挑，固定在名单最上面不滚动，下面接着放自动名单；最多占一屏少一条</span>
+                <span class="hint">从下面的送礼记录里挑，固定在名单最上面</span>
               </div>
             </div>
           </div>
@@ -412,9 +433,9 @@ function onDrop(to: number): void {
         </div>
         <template v-if="showRecords">
         <div class="card">
-          <div class="card-h"><h2>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
-          <div v-if="!pins.length" class="inline-hint">还没有。在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」。</div>
-          <div v-else class="gl-recs">
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-pin" /></span>{{ pinsTitle }} {{ pins.length }} 条</h2><span class="aside">{{ manual ? `拖动排顺序 · 最多 ${pinMax} 条` : `拖动排顺序 · 一屏最多置顶 ${Math.max(0, v.giftsMax - 1)} 条` }} · 一直保留到移出</span></div>
+          <Empty v-if="!pins.length" compact icon="i-pin" title="还没有挑选的记录" desc="在下面的送礼记录里点「加入名单」，或者在「事件记录」里点一条礼物的「⋯」→「加入送礼名单」" />
+          <TransitionGroup v-else tag="div" class="gl-recs lst-box" :name="listMotion()" @before-leave="pinLeaving">
             <div
               v-for="(p, i) in pins"
               :key="p.id"
@@ -435,17 +456,17 @@ function onDrop(to: number): void {
               </span>
               <button class="btn sm" type="button" @click="remove(p.id, p.item.viewer.name)"><Icon name="i-x" />移出</button>
             </div>
-          </div>
+          </TransitionGroup>
         </div>
 
         <div class="card">
-          <div class="card-h"><h2>送礼记录</h2><span class="aside">{{ manual ? '点「加入名单」' : '点「加入名单」就会置顶' }}</span></div>
+          <div class="card-h"><h2><span class="hicon"><Icon name="i-gift" /></span>送礼记录</h2><span class="aside">{{ manual ? '点「加入名单」' : '点「加入名单」就会置顶' }}</span></div>
           <div class="gl-tools">
             <select v-model="sessId" class="sel" aria-label="场次"><option value="all">全部场次</option><option v-for="s in sessions" :key="s.id" :value="s.id">{{ sessLabel(s) }}</option></select>
             <input v-model.trim="q" class="inp" placeholder="观众名、UID、礼物名" aria-label="搜观众名、UID、礼物名" />
             <select v-model.number="minGold" class="sel amt" aria-label="金额"><option v-for="g in MIN_OPTIONS" :key="g" :value="g">{{ g ? `${g / 1000} 元以上` : '金额不限' }}</option></select>
           </div>
-          <div v-if="!sessions.length" class="inline-hint">还没有直播记录。开播后收到的礼物会出现在这里。</div>
+          <div v-if="!sessions.length" class="inline-hint">还没有直播记录</div>
           <div v-else-if="loading && !records.length" class="inline-hint">读取中…</div>
           <div v-else-if="!records.length" class="inline-hint">{{ q || minGold ? '没有符合的记录' : sessId === 'all' ? '还没有收到付费礼物、上舰或醒目留言' : '这一场没有收到付费礼物、上舰或醒目留言' }}</div>
           <div v-else class="gl-recs" :class="{ all: sessId === 'all' }">
@@ -462,14 +483,15 @@ function onDrop(to: number): void {
           <p v-if="more" class="inline-hint" style="margin: 10px 0 0">只列出了最新的 {{ records.length }} 条，更早的请加上观众名或金额缩小范围。</p>
         </div>
         </template>
+        <SourceCard name="送礼名单" :path="o.giftsPath" :secret="o.key" :w="srcWh.w" :h="srcWh.h" />
       </div>
 
       <!-- 预览和外观 -->
       <div class="card">
-        <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示</span></div>
-        <div class="gl-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-eye" /></span>预览</h2><span class="aside">只在这里显示</span></div>
+        <div class="wp-pv"><GiftsPreview ref="pv" :key="`g${o.id}`" :config="cfg" /></div>
         <div class="prev-tools"><button class="btn" :disabled="!o.giftsEnabled" :title="manual ? '在名单最后加一条测试记录，看看新加一条时的样子' : ''" @click="pv?.test()"><i style="background: #FF9D00" />测试一条（只在这里显示）</button></div>
-        <h3 class="gl-sub">外观<small>改完点「保存」才到直播画面</small></h3>
+        <h3 class="wp-sub">外观</h3>
         <div class="srows">
           <div class="srow">
             <span class="lb">样式</span>
@@ -487,7 +509,7 @@ function onDrop(to: number): void {
                 <input id="gl-alpha" class="alpha" type="range" :min="GIFTS_ALPHA_MIN" :max="GIFTS_ALPHA_MAX" step="5" :value="v.giftsAlpha" aria-label="弥散卡片的透明度" @input="look.set({ giftsAlpha: Number(($event.target as HTMLInputElement).value) })" />
                 <output for="gl-alpha" class="alpha-v">{{ v.giftsAlpha }}%</output>
               </div>
-              <span class="hint">越透越能看到后面的直播画面；画面很亮或很花时调低一点，字更清楚</span>
+              <span class="hint">画面很亮或很花时调低一点，字更清楚</span>
             </div>
           </div>
           <div class="srow">
@@ -507,7 +529,6 @@ function onDrop(to: number): void {
                 <input :key="`t${o.id}`" class="inp title" :value="v.giftsTitle" :maxlength="GIFTS_TITLE_MAX" placeholder="不加标题就留空" aria-label="名单标题" @input="look.set({ giftsTitle: ($event.target as HTMLInputElement).value })" />
                 <button v-for="t in titleIdeas.filter((x) => x !== v.giftsTitle)" :key="t" class="btn sm" type="button" @click="look.set({ giftsTitle: t })">用「{{ t }}」</button>
               </div>
-              <span class="hint">显示在名单最上面</span>
             </div>
           </div>
           <div class="srow">
@@ -526,7 +547,6 @@ function onDrop(to: number): void {
                 <button :aria-pressed="v.giftsSide === 'left'" @click="look.set({ giftsSide: 'left' })">靠左</button>
                 <button :aria-pressed="v.giftsSide === 'right'" @click="look.set({ giftsSide: 'right' })">靠右</button>
               </span>
-              <span class="hint">放在画面哪边就选哪边</span>
             </div></div>
           </div>
           <div class="srow">
@@ -557,58 +577,50 @@ function onDrop(to: number): void {
 </template>
 
 <style scoped>
-.gl-head-r { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-.gl-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-.gl-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-@media (max-width: 1100px) { .gl-grid { grid-template-columns: 1fr; } }
 
 /* 名单放什么：两个大选项 */
 .gl-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
 @media (max-width: 640px) { .gl-modes { grid-template-columns: 1fr; } }
-.gl-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
+.gl-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border-radius: var(--r-md); border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
 .gl-mode:hover { border-color: var(--line-strong); }
 .gl-mode[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-ring); }
-.gl-mode b { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.gl-mode b { display: flex; align-items: center; gap: 8px; font-size: var(--fs-body); font-weight: 600; }
 .gl-mode b svg { width: 16px; height: 16px; color: var(--accent); }
-.gl-mode span { font-size: 12.5px; color: var(--t2); line-height: 1.6; }
+.gl-mode span { font-size: var(--fs-sec); color: var(--t2); line-height: 1.6; }
 .srow .line .gap { width: 12px; }
-.srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: 13px; color: var(--t2); }
+.srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: var(--fs-sec); color: var(--t2); }
 
 /* 现在画面上显示 */
-.gl-sum { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--ok-soft, rgba(52, 199, 123, .1)); color: var(--t1); font-size: 13px; line-height: 1.6; }
+.gl-sum { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--ok-soft, rgba(52, 199, 123, .1)); color: var(--t1); font-size: var(--fs-sec); line-height: 1.6; }
 .gl-sum svg { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--ok, #34C77B); }
 .gl-sum b { font-weight: 600; }
 .gl-sum.bad { background: rgba(214, 69, 69, .1); }
 .gl-sum.bad svg { color: #D64545; }
 
-.gl-pv { display: grid; place-items: center; padding: 6px 0; }
-.gl-sub { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--t2); }
-.gl-sub small { font-size: 12px; font-weight: 400; color: var(--t3); }
 .gl-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .gl-tools .inp { width: 180px; height: 32px; }
 .gl-tools .sel { height: 32px; min-width: 240px; max-width: 100%; }
 .gl-tools .sel.amt { min-width: 0; width: 120px; }
-.seg.wrap { flex-wrap: wrap; }
 .alpha { width: min(240px, 100%); accent-color: var(--accent); }
-.alpha-v { min-width: 3em; font-family: var(--font-mono); font-size: 12.5px; color: var(--t1); }
+.alpha-v { min-width: 3em; font-variant-numeric: tabular-nums; font-size: var(--fs-sec); color: var(--t1); }
 .inp.dt { width: 200px; height: 32px; }
 /* 手动时有两个标题建议：输入框先缩一点，一行放得下 */
 .inp.title { flex: 1 1 120px; max-width: 200px; height: 32px; }
 .hint.warn { color: var(--gov); }
 .gl-recs.all .gl-rec { grid-template-columns: 112px 30px minmax(0, 1fr) 34px 96px 100px; }
 .gl-recs { display: flex; flex-direction: column; max-height: 560px; overflow: auto; margin: 0 -6px; }
-.gl-rec { display: grid; grid-template-columns: 62px 30px minmax(0, 1fr) 34px 96px 100px; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; font-size: 13px; }
+.gl-rec { display: grid; grid-template-columns: 62px 30px minmax(0, 1fr) 34px 96px 100px; align-items: center; gap: 10px; padding: 8px 6px; border-radius: var(--r-sm); font-size: var(--fs-sec); }
 .gl-rec + .gl-rec { border-top: 1px solid var(--line); }
 .gl-rec:hover { background: var(--hover); }
 .gl-rec.on { background: var(--accent-soft); }
-.gl-rec .t { color: var(--t3); font-size: 12px; }
+.gl-rec .t { color: var(--t3); font-size: var(--fs-cap); }
 .gl-rec .who { display: flex; flex-direction: column; min-width: 0; }
 .gl-rec .who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gl-rec .who span { color: var(--t2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gl-rec .who span { color: var(--t2); font-size: var(--fs-cap); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gl-rec .gimg { width: 32px; height: 32px; object-fit: contain; }
-.gl-rec .v { color: var(--t2); font-size: 12px; text-align: right; white-space: nowrap; }
+.gl-rec .v { color: var(--t2); font-size: var(--fs-cap); text-align: right; white-space: nowrap; }
 .gl-rec .ord { display: flex; gap: 2px; }
-.gl-rec .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; justify-content: center; }
+.gl-rec .btn.sm { height: 28px; padding: 0 10px; font-size: var(--fs-sec); justify-content: center; }
 .gl-rec .btn.on { color: var(--accent); }
 .gl-recs .gl-rec.pin { grid-template-columns: 44px 112px 30px minmax(0, 1fr) 34px 64px 72px; }
 .gl-rec.pin.dragging { opacity: .45; }

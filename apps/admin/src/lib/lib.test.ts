@@ -3,6 +3,7 @@ import { describe as describeEvent, statusCls } from './events.ts';
 import { bigNum, clock, dateTime, fileSize, gcd, hms, seconds, setTimeZone, today, when } from './format.ts';
 import { identityOf, isAnchor, medalColors } from './identity.ts';
 import { placeWarnings, scaleRect } from './place.ts';
+import { CURRENT, compareVersions } from './whatsnew.ts';
 import { sampleFor, whoText } from './danmu-who.ts';
 import { DANMU_WHO_ALL, danmuWhoFromOld } from '@starfall/shared';
 import type { EventDto, Viewer } from './types.ts';
@@ -151,5 +152,18 @@ describe('更新记录', () => {
     expect(s[1]!.html).toBe('<p>本版本说明。</p>');
     // 打包进来的真实更新记录
     expect(CHANGELOG.some((x) => x.title.startsWith('v1.4.0'))).toBe(true);
+  });
+});
+
+describe('更新后的提示', () => {
+  it('版本号比大小：按数字比；正式版比同号的测试版新', () => {
+    expect(compareVersions('1.10.0', '1.9.0')).toBe(1);
+    expect(compareVersions('2.0.0', '2.0.0')).toBe(0);
+    expect(compareVersions('2.0.0-beta.2', '2.0.0')).toBe(-1);
+    expect(compareVersions('2.0.0-beta.10', '2.0.0-beta.2')).toBe(1);
+    expect(compareVersions('1.9.0', '2.0.0-beta.1')).toBe(-1);
+  });
+  it('这个后台的版本取更新记录最上面的正式版本', () => {
+    expect(CURRENT).toMatch(/^\d+\.\d+\.\d+/);
   });
 });

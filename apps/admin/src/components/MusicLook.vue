@@ -7,6 +7,7 @@ import type { MusicState } from '@starfall/shared/overlay';
 import DraftBar from './DraftBar.vue';
 import Icon from './Icon.vue';
 import Switch from './Switch.vue';
+import Tip from './Tip.vue';
 import { useDraft } from '../lib/draft.ts';
 import { MUSIC_STYLE_NAMES, music, saveMusic } from '../lib/music.ts';
 import { state } from '../lib/store.ts';
@@ -113,7 +114,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 <template>
   <div v-if="music.settings" class="ml-grid">
     <div class="card">
-      <div class="card-h"><h2>预览</h2><span class="aside">只在这里显示，不出声</span></div>
+      <div class="card-h"><h2><span class="hicon"><Icon name="i-eye" /></span>预览</h2><span class="aside">只在这里显示，不出声</span></div>
       <div class="ml-pv" :style="{ width: `${MUSIC_WIDTH * K}px`, height: `${MUSIC_HEIGHT * K}px` }">
         <iframe ref="frame" src="/overlay/?music=1&preview=1" title="点歌窗口预览" :style="{ width: `${MUSIC_WIDTH}px`, height: `${MUSIC_HEIGHT}px`, transform: `scale(${K})` }" />
       </div>
@@ -126,7 +127,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 
     <div class="ml-col">
       <div class="card">
-        <div class="card-h"><h2>外观</h2><span class="aside">改完点「保存」才到直播画面</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-spark" /></span>外观</h2></div>
         <template v-for="g in STYLE_GROUPS" :key="g.name">
           <h3 class="ml-grp">{{ g.name }}</h3>
           <div class="ml-styles" role="radiogroup" :aria-label="`${g.name}样子`">
@@ -144,7 +145,6 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
                 <button :aria-pressed="v.side === 'left'" @click="look.set({ side: 'left' })">靠左</button>
                 <button :aria-pressed="v.side === 'right'" @click="look.set({ side: 'right' })">靠右</button>
               </span>
-              <span class="hint">放在画面哪边就选哪边</span>
             </div></div>
           </div>
           <div class="srow">
@@ -188,7 +188,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>声音</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-music" /></span>声音</h2></div>
         <div class="srows">
           <div class="srow">
             <span class="lb">音量</span>
@@ -201,7 +201,7 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
             <span class="lb">音量均衡</span>
             <div class="ctl"><div class="line">
               <Switch :model-value="s.normalize" label="音量均衡" @change="(v) => set({ normalize: v }, v ? '音量均衡已打开：从下一首开始生效' : '音量均衡已关闭')" />
-              <span class="hint">有的歌录得特别响，打开后自动调小到差不多的音量，换歌时不会突然很大声（偏轻的歌保持原样，不会因为调大而破音）</span>
+              <span class="hint">把录得特别响的歌调小，换歌时音量更一致</span>
             </div></div>
           </div>
           <div class="srow">
@@ -220,20 +220,20 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
                 <button :aria-pressed="s.liteMode === 'on'" @click="set({ liteMode: 'on' }, '精简模式已打开')">一直开</button>
                 <button :aria-pressed="s.liteMode === 'off'" @click="set({ liteMode: 'off' }, '精简模式已关闭')">关</button>
               </span>
-              <span class="hint">直播软件里的浏览器忙不过来时，音乐会像慢放、歌词变慢。精简模式去掉模糊和动画，也不做音量均衡，直接原生播放。「自动」发现卡顿就切过去</span>
+              <span class="hint">去掉模糊和动画，直接原生播放<Tip text="直播软件里的浏览器忙不过来时，音乐会像慢放、歌词变慢。精简模式去掉模糊和动画，也不做音量均衡；选「自动」时，发现卡顿就自动切换。" /></span>
             </div></div>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>点歌窗口地址</h2><span class="aside">宽高填 {{ MUSIC_WIDTH }} × {{ MUSIC_HEIGHT }}</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-copy" /></span>点歌窗口地址</h2><span class="aside">宽高填 {{ MUSIC_WIDTH }} × {{ MUSIC_HEIGHT }}</span></div>
         <div v-for="o in state.outputs" :key="o.id" class="ml-url">
           <span class="ml-on" :class="{ on: online(o.id) }"><i />{{ o.name }} · {{ online(o.id) ? '已加上' : '还没加' }}</span>
           <button class="btn sm primary" @click="copy(o.musicPath)"><Icon name="i-copy" />复制地址</button>
           <a class="linkish" :href="`${o.musicPath}&view=1`" target="_blank" rel="noopener" title="深色背景，只用来查看，不出声；直播软件里请用复制的地址">在浏览器里查看</a>
         </div>
-        <p class="inline-hint">在直播姬或 OBS 里加一个浏览器源，粘贴地址，拖到画面一侧。加了好几个也只有一个出声音。</p>
+        <p class="inline-hint">在直播软件里加一个浏览器源，粘贴地址，拖到画面一侧；加了好几个时只有一个出声音。</p>
       </div>
     </div>
   </div>
@@ -243,22 +243,22 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; }
 .ml-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 @media (max-width: 1100px) { .ml-grid { grid-template-columns: 1fr; } }
-.ml-pv { position: relative; overflow: hidden; border-radius: 12px; background: radial-gradient(60% 40% at 30% 30%, rgba(255, 170, 90, .4), transparent 70%), radial-gradient(60% 40% at 80% 80%, rgba(90, 160, 255, .38), transparent 70%), linear-gradient(170deg, #1a1b2e, #0c0d16); }
+.ml-pv { position: relative; overflow: hidden; border-radius: var(--r-md); background: radial-gradient(60% 40% at 30% 30%, rgba(255, 170, 90, .4), transparent 70%), radial-gradient(60% 40% at 80% 80%, rgba(90, 160, 255, .38), transparent 70%), linear-gradient(170deg, #1a1b2e, #0c0d16); }
 .ml-pv iframe { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; background: transparent; }
 .ml-pvt { display: flex; align-items: center; gap: 12px; margin: 12px 0 6px; }
-.ml-ck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--t2); }
-.ml-grp { margin: 2px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--t3); }
+.ml-ck { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sec); color: var(--t2); }
+.ml-grp { margin: 2px 0 8px; font-size: var(--fs-cap); font-weight: 600; letter-spacing: .08em; color: var(--t3); }
 .ml-styles + .ml-grp { margin-top: 14px; }
 .ml-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
 @media (max-width: 1300px) { .ml-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ml-style { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
+.ml-style { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: var(--r-md); border: 1.5px solid var(--line); background: var(--l2); color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
 .ml-style:hover { border-color: var(--line-strong); }
 .ml-style[aria-checked='true'] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-ring); }
-.ml-style > b { font-size: 13.5px; font-weight: 600; }
-.ml-style > span:last-child { font-size: 12px; color: var(--t2); line-height: 1.5; }
+.ml-style > b { font-size: var(--fs-body); font-weight: 600; }
+.ml-style > span:last-child { font-size: var(--fs-cap); color: var(--t2); line-height: 1.5; }
 /* 样子的小示意图 */
-.ml-ill { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; height: 44px; margin-bottom: 4px; padding: 0 8px; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #2a2b45, #16172a); }
-.ml-ill i { flex: none; width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #8d8bff, #e07ab5); }
+.ml-ill { position: relative; display: flex; align-items: center; gap: 6px; width: 100%; height: 44px; margin-bottom: 4px; padding: 0 8px; border-radius: var(--r-sm); overflow: hidden; background: linear-gradient(135deg, #2a2b45, #16172a); }
+.ml-ill i { flex: none; width: 28px; height: 28px; border-radius: var(--r-xs); background: linear-gradient(135deg, #8d8bff, #e07ab5); }
 .ml-ill b { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .75); width: 38%; }
 .ml-ill b + b { width: 20%; background: rgba(255, 255, 255, .35); }
 .ml-ill em { display: none; }
@@ -278,11 +278,11 @@ const online = (id: number) => state.overlays.filter((x) => x.outputId === id &&
 .ml-ill.minimal { background: linear-gradient(135deg, #6f86c8, #c98bb5 60%, #e9b48c); }
 .ml-ill.minimal::before { content: ""; position: absolute; left: 18%; right: 18%; top: 12px; bottom: 12px; border-radius: 999px; background: linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, .12)), rgba(20, 20, 30, .25); box-shadow: inset 0 1px 1px rgba(255, 255, 255, .7), inset 0 0 0 1px rgba(255, 255, 255, .35); }
 .srow .line .gap { width: 12px; }
-.srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: 13px; color: var(--t2); }
+.srow .line > span:not(.seg):not(.hint):not(.gap) { font-size: var(--fs-sec); color: var(--t2); }
 .ml-range { width: 180px; accent-color: var(--accent); }
-.ml-url { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; }
+.ml-url { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: var(--fs-sec); }
 .ml-url + .ml-url { border-top: 1px solid var(--line); }
-.ml-url .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; margin-left: auto; }
+.ml-url .btn.sm { height: 28px; padding: 0 10px; font-size: var(--fs-sec); margin-left: auto; }
 .ml-on { display: inline-flex; align-items: center; gap: 8px; color: var(--t2); }
 .ml-on i { width: 7px; height: 7px; border-radius: 50%; background: var(--t3); }
 .ml-on.on i { background: var(--ok); }

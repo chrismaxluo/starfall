@@ -9,7 +9,8 @@ export interface DesktopInfo {
 }
 /** 下载新版本的进度（apps/desktop/src/main.ts 的 UpdateState） */
 export interface UpdateState {
-  phase: 'idle' | 'downloading' | 'downloaded' | 'error';
+  /** available：有新版本、还没下载（顶部问要不要下载） */
+  phase: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
   version: string | null;
   percent: number;
   transferred: number;
@@ -43,6 +44,13 @@ export interface DesktopBridge {
   onUpdateState(cb: (s: UpdateState) => void): () => void;
   /** 新版本下载好后：现在重启并安装 */
   installUpdate(): Promise<void>;
+  /** 有新版本时：下载 / 以后再说（旧版桌面版没有） */
+  downloadUpdate?(): Promise<void>;
+  dismissUpdate?(): Promise<void>;
+  /** 后台换了亮色 / 暗色（跟随系统为 system）：标题栏跟着变（旧版桌面版没有） */
+  setTheme?(t: 'light' | 'dark' | 'system'): Promise<void>;
+  /** 本机服务出问题自动重启：restarting → ok；多次失败为 stopped（旧版桌面版没有） */
+  onServer?(cb: (s: 'restarting' | 'ok' | 'stopped') => void): () => void;
   /** 特效页没连上时的提醒：先取一次现在的，之后有变化时回调（返回取消监听的函数）；旧版桌面版没有 */
   fxHint?(): Promise<FxHint>;
   onFxHint?(cb: (h: FxHint) => void): () => void;

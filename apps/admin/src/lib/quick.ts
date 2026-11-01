@@ -1,6 +1,6 @@
 // 素材快捷播放：点按钮或按快捷键，马上在直播画面上播放。
 // 网页里的快捷键只在「总览」「素材快捷播放」页面是当前窗口时有用；在游戏、直播软件里按要用桌面版的全局快捷键。
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue';
 import { errMsg, post } from './api.ts';
 import { effectById, state } from './store.ts';
 import { toast } from './toast.ts';
@@ -48,6 +48,11 @@ export function useQuickHotkeys(active: () => boolean = () => true): void {
     e.preventDefault();
     void playQuick(b);
   };
-  onMounted(() => addEventListener('keydown', onKey));
-  onBeforeUnmount(() => removeEventListener('keydown', onKey));
+  const on = () => addEventListener('keydown', onKey);
+  const off = () => removeEventListener('keydown', onKey);
+  onMounted(on);
+  onBeforeUnmount(off);
+  // 页面换走后留着（总览）：换走时停用，换回来再用
+  onActivated(on);
+  onDeactivated(off);
 }

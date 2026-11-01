@@ -69,6 +69,9 @@ describe('导出配置', () => {
     expect(res.rawPayload.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
     const names = [...res.rawPayload.toString('latin1').matchAll(/files\/[0-9a-f]{64}\.(webm|wav)/g)].map((m) => m[0]);
     expect(new Set(names).size).toBe(2);
+    // 带了 t：开始下载时用 cookie 告诉后台；不像样的 t 不理
+    expect((await t.req({ method: 'GET', url: '/api/backup/export?files=1&t=ab12' })).headers['set-cookie']).toMatch(/^starfall_export=ab12;/);
+    expect((await t.req({ method: 'GET', url: '/api/backup/export?files=1&t=a%3Bb' })).headers['set-cookie']).toBeUndefined();
   });
 });
 

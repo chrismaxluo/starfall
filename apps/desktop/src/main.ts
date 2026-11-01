@@ -1,8 +1,8 @@
 // 星临桌面版：主进程。
 // 在独立进程里启动本机服务（和服务器版同一套代码），打开管理后台窗口；
 // 关闭窗口缩到托盘（特效照常播放），可选开机自动启动，有新版本时提示更新。
-import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeTheme, shell, Tray, utilityProcess } from 'electron';
-import type { MenuItemConstructorOptions, UtilityProcess } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Menu, nativeTheme, screen, shell, Tray, utilityProcess } from 'electron';
+import type { MenuItemConstructorOptions, MessageBoxOptions, MessageBoxReturnValue, Rectangle, UtilityProcess } from 'electron';
 import { autoUpdater, CancellationToken } from 'electron-updater';
 import type { ProgressInfo } from 'electron-updater';
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider.js';
@@ -13,6 +13,8 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fixText, HOME_PORT, planPorts } from './ports.ts';
+import { placeWindow, trayStatus, zoomStep } from './ui.ts';
+import type { SavedWindow, StatusLite } from './ui.ts';
 import { downloadSources, normalizeMirror, r2ChannelUrl, sourceName, SpeedWatch, viaMirror } from './sources.ts';
 import { findStreamApp } from './stream-apps.ts';
 
@@ -72,6 +74,21 @@ interface DesktopState {
   trayTipShown?: boolean;
   /** 下载新版本时，GitHub 直连不行先试这个地址（加速站），再试内置的 */
   updateMirror?: string | null;
+  /** 后台选的亮色 / 暗色（标题栏、启动画面、窗口底色跟着它）；没选过为跟随系统 */
+  theme?: ThemeChoice;
+  /** 上次窗口的位置、大小、是否最大化 */
+  win?: SavedWindow;
+  /** 后台页面的缩放（Ctrl 加号、减号、滚轮），0 为原样 */
+  zoom?: number;
+}
+
+type ThemeChoice = 'light' | 'dark' | 'system';
+/** 和后台的底色一样（apps/admin/src/styles/app.css 的 --l1），打开时不闪别的颜色 */
+const BG = { light: '#F4F1EC', dark: '#13110E' } as const;
+const bgColor = () => (nativeTheme.shouldUseDarkColors ? BG.dark : BG.light);
+function themeChoice(): ThemeChoice {
+  const t = readState().theme;
+  return t === 'light' || t === 'dark' ? t : 'system';
 }
 function readState(): DesktopState {
   try {
@@ -115,6 +132,10 @@ async function start(): Promise<void> {
   createTray();
   // 第一次运行（新安装）：还没有小设置文件
   const fresh = !fs.existsSync(STATE_FILE);
+  // 标题栏、窗口底色先按后台上次选的亮色 / 暗色
+  nativeTheme.themeSource = themeChoice();
+  // 一双击就有窗口：服务启动的这几秒先显示启动画面，好了自动换成后台（开机自动启动时只在托盘里）
+  createWindow(!process.argv.includes(HIDDEN_ARG));
   try {
     const state = readState();
     const plan = await planPorts(state.usedPorts ?? (state.port ? [state.port] : []), canListen);
@@ -127,20 +148,21 @@ async function start(): Promise<void> {
     writeState({ port, usedPorts: plan.used });
   } catch (e) {
     log('服务启动失败', e);
-    await dialog.showMessageBox({ type: 'error', title: NAME, message: '星临服务启动失败', detail: `${(e as Error).message}\n\n日志在：${LOG_DIR}` });
+    await ask({ type: 'error', title: NAME, message: '星临服务启动失败', detail: `${(e as Error).message}\n\n日志在：${LOG_DIR}` });
     quitting = true;
     app.quit();
     return;
   }
   // 新安装默认开机自动启动：开机后星临先在托盘里运行，直播软件里的特效页一打开就能连上
   if (fresh && app.isPackaged) setAutoStart(true);
-  createWindow(!process.argv.includes(HIDDEN_ARG));
+  openAdmin();
   // 开机时有快捷键被别的软件占着：托盘提示一下（以前只写日志，主播不知道）
   void registerHotkeys(true).then(({ failed }) => {
-    if (failed.length) tray?.displayBalloon({ iconType: 'warning', title: NAME, content: `全局快捷键 ${failed.join('、')} 被别的软件占用了，暂时按了没反应；对方关掉后会自动恢复。` });
+    if (failed.length) notify({ iconType: 'warning', title: NAME, content: `全局快捷键 ${failed.join('、')} 被别的软件占用了，暂时按了没反应；对方关掉后会自动恢复。` });
   });
   setInterval(() => void registerHotkeys(), 30_000);
   startedAt = Date.now();
+  void watchFx();
   setInterval(() => void watchFx(), WATCH_MS);
   if (app.isPackaged) setupUpdates();
 }
@@ -192,6 +214,8 @@ function startServer(): Promise<void> {
       if (!ready) return reject(new Error(`服务进程退出（${code}）`));
       if (quitting) return;
       log(`服务意外退出（${code}）`);
+      // 后台页面顶部说「正在重新启动」；连上后页面自己补回数据，不整页刷新（正在填的东西不会丢）
+      win?.webContents.send('sf:server', 'restarting');
       const now = Date.now();
       crashes = [...crashes.filter((t) => now - t < 60_000), now];
       if (crashes.length >= 3) return crashDialog();
@@ -204,7 +228,7 @@ function startServer(): Promise<void> {
 function restartLater(ms: number): void {
   setTimeout(() => {
     startServer().then(
-      () => win?.webContents.reload(),
+      () => win?.webContents.send('sf:server', 'ok'),
       (e: Error) => {
         log('重启服务失败', e);
         if (quitting) return;
@@ -219,8 +243,8 @@ function restartLater(ms: number): void {
 
 function crashDialog(): void {
   tray?.setToolTip(`${NAME} · 服务已停止`);
-  void dialog
-    .showMessageBox({ type: 'error', title: NAME, message: '星临服务多次意外退出，已停止自动重启', detail: `直播画面上的特效和弹幕列表现在不会更新。可以退出星临再打开；还不行的话请把日志发给开发者：${LOG_DIR}`, buttons: ['打开日志文件夹', '关闭'] })
+  win?.webContents.send('sf:server', 'stopped');
+  void ask({ type: 'error', title: NAME, message: '星临服务多次意外退出，已停止自动重启', detail: `直播画面上的特效和弹幕列表现在不会更新。可以退出星临再打开；还不行的话请把日志发给开发者：${LOG_DIR}`, buttons: ['打开日志文件夹', '关闭'] })
     .then((r) => {
       if (r.response === 0) void shell.openPath(LOG_DIR);
     });
@@ -397,7 +421,8 @@ async function watchFx(): Promise<void> {
   if (watching || !server) return;
   watching = true;
   try {
-    const status = await api<{ overlays?: number }>('/api/status').catch(() => null);
+    const status = await api<StatusLite>('/api/status').catch(() => null);
+    showStatus(status);
     if (!status) return;
     const name = (status.overlays ?? 0) > 0 ? null : await runningStreamApp();
     if (!name) {
@@ -414,7 +439,7 @@ async function watchFx(): Promise<void> {
     setHint(hintFor(name));
     if (notified) return;
     notified = true;
-    tray?.displayBalloon({ iconType: 'warning', title: `${name}已经打开，但特效页没连上`, content: fxHint.fix });
+    notify({ iconType: 'warning', title: `${name}已经打开，但特效页没连上`, content: fxHint.fix });
   } finally {
     watching = false;
   }
@@ -422,31 +447,42 @@ async function watchFx(): Promise<void> {
 
 // ---------- 窗口 ----------
 
+/** 这次打开窗口时要不要最大化（开机自动启动时窗口先藏着，第一次叫出来时再最大化） */
+let maxOnShow = false;
+/** 第一次显示过窗口了 */
+let shownOnce = false;
+/** 后台页面最近崩溃的时间：一分钟里 3 次就不再自动重新打开 */
+let pageCrashes: number[] = [];
+
 function createWindow(show: boolean): void {
+  // 记住上次的大小、位置、在哪块屏幕；副屏拔掉了回到主屏；第一次按屏幕大小来定（笔记本小屏幕也放得下）
+  const place = placeWindow(readState().win, screen.getAllDisplays().map((d) => d.workArea), screen.getPrimaryDisplay().workArea);
+  maxOnShow = place.maximized;
   win = new BrowserWindow({
-    width: 1360,
-    height: 880,
-    minWidth: 960,
-    minHeight: 640,
+    ...place.bounds,
+    minWidth: place.minWidth,
+    minHeight: place.minHeight,
     title: NAME,
     icon: ICON,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0b0c10' : '#f6f7f9',
+    backgroundColor: bgColor(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
   });
   win.removeMenu();
-  if (show) win.once('ready-to-show', () => win?.show());
+  if (show) win.once('ready-to-show', showWindow);
   // 关闭 = 缩到托盘，特效照常播放；真正退出用托盘菜单
   win.on('close', (e) => {
     if (quitting) return;
     e.preventDefault();
+    saveWindow();
     win?.hide();
     if (!readState().trayTipShown) {
-      tray?.displayBalloon({ iconType: 'info', title: NAME, content: '星临还在后台运行，直播特效照常播放。要退出请右键托盘图标 →「退出星临」。' });
+      tray?.displayBalloon({ iconType: 'info', title: NAME, content: '星临还在后台运行，直播特效照常播放。要退出请右键任务栏右下角的星临图标（可能收在「^」里）→「退出星临」。' });
       writeState({ trayTipShown: true });
     }
   });
+  for (const ev of ['resize', 'move', 'maximize', 'unmaximize'] as const) win.on(ev as 'resize', saveWindowSoon);
   // 页面有没保存的修改时（刷新、退出）：Electron 默认悄悄取消，不弹提示。退出前已经确认过的直接放行，其余情况问一下
   win.webContents.on('will-prevent-unload', (e) => {
     if (allowUnload) return e.preventDefault();
@@ -463,31 +499,150 @@ function createWindow(show: boolean): void {
     e.preventDefault();
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
   });
-  // F5 刷新、F12 开发者工具（排查问题用）
+  // F5 刷新、F12 开发者工具（排查问题用）；Ctrl 加号、减号、0 放大缩小（和浏览器一样）
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return;
+    const z = input.control && !input.alt && !input.meta ? zoomStep(input.key) : null;
     if (input.key === 'F5') win?.webContents.reload();
     else if (input.key === 'F12') win?.webContents.toggleDevTools();
+    else if (z !== null) setZoom(z === 0 ? 0 : (win?.webContents.getZoomLevel() ?? 0) + z);
     else return;
     e.preventDefault();
   });
-  win.webContents.on('render-process-gone', (_e, d) => log('后台页面崩溃', d.reason));
-  void win.loadURL(`${base()}/`);
+  // 按住 Ctrl 转滚轮
+  win.webContents.on('zoom-changed', (_e, dir) => setZoom((win?.webContents.getZoomLevel() ?? 0) + (dir === 'in' ? 0.5 : -0.5)));
+  win.webContents.on('did-finish-load', () => {
+    if (isAdminUrl(win?.webContents.getURL() ?? '')) win?.webContents.setZoomLevel(readState().zoom ?? 0);
+  });
+  // 右键：输入框里剪切、复制、粘贴、全选；选中的文字可以复制
+  win.webContents.on('context-menu', (_e, p) => {
+    const f = p.editFlags;
+    const items: MenuItemConstructorOptions[] = p.isEditable
+      ? [{ label: '剪切', role: 'cut', enabled: f.canCut }, { label: '复制', role: 'copy', enabled: f.canCopy }, { label: '粘贴', role: 'paste', enabled: f.canPaste }, { type: 'separator' }, { label: '全选', role: 'selectAll', enabled: f.canSelectAll }]
+      : p.selectionText.trim()
+        ? [{ label: '复制', role: 'copy' }]
+        : /^https?:\/\//.test(p.linkURL)
+          ? [{ label: '复制链接地址', click: () => clipboard.writeText(p.linkURL) }]
+          : [];
+    if (items.length && win) Menu.buildFromTemplate(items).popup({ window: win });
+  });
+  // 后台页面崩溃（很少见，比如电脑内存不够）：自动重新打开，并告诉主播已经恢复；特效不受影响（由后台服务负责）
+  win.webContents.on('render-process-gone', (_e, d) => {
+    log('后台页面崩溃', d.reason);
+    if (quitting || d.reason === 'clean-exit') return;
+    const now = Date.now();
+    pageCrashes = [...pageCrashes.filter((t) => now - t < 60_000), now];
+    if (pageCrashes.length >= 3) {
+      log('后台页面一分钟里崩溃 3 次，不再自动重新打开');
+      void win?.loadURL(messagePage('后台页面反复出问题', '直播画面上的特效照常播放。可以点下面重新打开后台；还不行的话请退出星临再打开。', `${base()}/`, '重新打开后台'));
+      return;
+    }
+    setTimeout(() => openAdmin('recovered=1'), 300);
+  });
+  // 页面卡住不动：窗口开着时问一下要不要重新加载（藏在托盘里时不打扰）
+  win.on('unresponsive', () => {
+    log('后台页面没有响应');
+    if (!win?.isVisible()) return;
+    void ask({ type: 'warning', title: NAME, message: '后台页面没有响应', detail: '可能是电脑太忙。直播画面上的特效不受影响。可以再等一等，或者重新加载后台页面（没保存的修改会丢掉）。', buttons: ['重新加载', '再等一等'], defaultId: 1, cancelId: 1 }).then((r) => {
+      // 结束卡住的页面：上面的「崩溃后自动重新打开」会接着打开后台
+      if (r.response === 0) win?.webContents.forcefullyCrashRenderer();
+    });
+  });
+  // 打开后台失败（服务正好在重启）：过一会儿再打开
+  win.webContents.on('did-fail-load', (_e, code, _desc, url, isMain) => {
+    if (!isMain || code === -3 || quitting || !isAdminUrl(url)) return;
+    log('后台页面没打开', code);
+    setTimeout(() => server && openAdmin(), 2000);
+  });
+  void win.loadURL(splashPage());
+}
+
+const isAdminUrl = (url: string) => url === base() || url.startsWith(`${base()}/`);
+/** 打开后台页面；query 例如 recovered=1（后台会说一句「已经恢复」） */
+function openAdmin(query = ''): void {
+  if (!win || win.isDestroyed()) return;
+  const hash = (() => {
+    try {
+      const u = new URL(win.webContents.getURL());
+      return isAdminUrl(u.href) ? u.hash : '';
+    } catch {
+      return '';
+    }
+  })();
+  void win.loadURL(`${base()}/${query ? `?${query}` : ''}${hash}`);
+}
+
+function setZoom(level: number): void {
+  const z = Math.max(-3, Math.min(3, Math.round(level * 2) / 2));
+  win?.webContents.setZoomLevel(z);
+  writeState({ zoom: z });
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+function saveWindowSoon(): void {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveWindow, 600);
+}
+function saveWindow(): void {
+  clearTimeout(saveTimer);
+  if (!win || win.isDestroyed() || win.isMinimized() || !shownOnce) return;
+  const b: Rectangle = win.getNormalBounds();
+  writeState({ win: { x: b.x, y: b.y, width: b.width, height: b.height, maximized: win.isMaximized() } });
 }
 
 function showWindow(): void {
   if (!win) return;
   if (win.isMinimized()) win.restore();
+  if (!shownOnce && maxOnShow) win.maximize();
+  shownOnce = true;
   win.show();
   win.focus();
+}
+
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+/** 启动画面、出错说明：不依赖服务的小页面，颜色跟着亮色 / 暗色 */
+function plainPage(body: string): string {
+  const dark = nativeTheme.shouldUseDarkColors;
+  const fg = dark ? '#F2EDE6' : '#201B16';
+  const sub = dark ? '#8D8479' : '#766C62';
+  const accent = dark ? '#8D8BFF' : '#5451D6';
+  let icon = '';
+  try {
+    icon = `<img src="data:image/x-icon;base64,${fs.readFileSync(ICON).toString('base64')}" alt="">`;
+  } catch {
+    /* 没有图标也能显示 */
+  }
+  const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${NAME}</title><style>
+html,body{margin:0;height:100%;background:${bgColor()};color:${fg};font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC",sans-serif;user-select:none;cursor:default}
+body{display:grid;place-items:center}
+.c{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;max-width:420px;padding:24px;animation:in .4s ease-out both}
+img{width:64px;height:64px}
+b{font-size:22px;font-weight:600;letter-spacing:.12em}
+p{margin:0;font-size:13px;line-height:1.7;color:${sub}}
+i{display:block;width:120px;height:3px;margin-top:6px;border-radius:2px;background:${dark ? 'rgba(255,240,220,.1)' : 'rgba(70,50,30,.1)'};overflow:hidden;position:relative}
+i::after{content:"";position:absolute;inset:0;width:40%;border-radius:2px;background:${accent};animation:run 1.1s ease-in-out infinite}
+a{margin-top:8px;padding:8px 18px;border-radius:999px;background:${accent};color:#fff;text-decoration:none;font-size:13px;font-weight:600}
+@keyframes run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){*,*::after{animation:none!important}}
+</style></head><body><div class="c">${icon}${body}</div></body></html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+const splashPage = () => plainPage(`<b>${NAME}</b><p>正在启动…</p><i></i>`);
+const messagePage = (title: string, text: string, href: string, label: string) => plainPage(`<b>${esc(title)}</b><p>${esc(text)}</p><a href="${esc(href)}">${esc(label)}</a>`);
+
+/** 系统对话框：窗口开着时挂在窗口上（不单独占任务栏、不跑到别的屏幕） */
+function ask(opts: MessageBoxOptions): Promise<MessageBoxReturnValue> {
+  return win && win.isVisible() ? dialog.showMessageBox(win, opts) : dialog.showMessageBox(opts);
 }
 
 // ---------- 托盘 ----------
 
 function createTray(): void {
   tray = new Tray(ICON);
-  tray.setToolTip(NAME);
+  tray.setToolTip(`${NAME} · 正在启动…`);
   tray.on('click', showWindow);
+  tray.on('balloon-click', showWindow);
   tray.on('right-click', () => {
     void trayMenu().then((m) => tray?.popUpContextMenu(m));
   });
@@ -519,6 +674,38 @@ async function trayMenu(): Promise<Menu> {
   ]);
 }
 
+// ---------- 藏在托盘里时也看得出状态 ----------
+// 鼠标放在托盘图标上，用一句话说现在怎么样；出了问题、没在直播时提醒一次，正在直播时只改文字、不弹东西
+// （直播时用「显示器采集」，系统通知会出现在直播画面上）。托盘图标上的小记号等新 logo 定了再画
+
+/** 最近一次读到的状态 */
+let lastStatus: StatusLite | null = null;
+/** 已经提醒过的问题（问题没了再出现会重新提醒） */
+let warned: string | null = null;
+const isLive = () => lastStatus?.live?.live === true;
+
+function showStatus(s: StatusLite | null): void {
+  lastStatus = s;
+  const t = trayStatus(s, Date.now());
+  // 下载新版本时托盘显示下载进度
+  if (updateState.phase !== 'downloading') tray?.setToolTip(t.text);
+  if (!t.problem) {
+    warned = null;
+    return;
+  }
+  if (warned === t.problem.key) return;
+  warned = t.problem.key;
+  // 窗口开着：后台页面顶部已经说了
+  if (win?.isVisible()) return;
+  notify({ iconType: 'warning', title: t.problem.title, content: t.problem.text });
+}
+
+/** 托盘通知：正在直播时不弹 */
+function notify(o: Electron.DisplayBalloonOptions): void {
+  if (isLive()) return log('正在直播，不弹通知：', o.title, o.content);
+  tray?.displayBalloon(o);
+}
+
 function copyUrl(url: string): void {
   clipboard.writeText(url);
   tray?.displayBalloon({ iconType: 'info', title: '已复制', content: url });
@@ -534,13 +721,13 @@ let allowUnload = false;
 async function confirmExit(action: '退出星临' | '重启并安装'): Promise<boolean> {
   const unsaved = await (win?.webContents.executeJavaScript('Boolean(window.__starfallUnsaved && window.__starfallUnsaved())') ?? Promise.resolve(false)).catch(() => false);
   if (unsaved) {
-    const r = await dialog.showMessageBox({ type: 'warning', title: NAME, message: '后台还有没保存的修改', detail: `${action}后这些修改会丢掉。`, buttons: [`仍要${action}`, '取消'], defaultId: 1, cancelId: 1 });
+    const r = await ask({ type: 'warning', title: NAME, message: '后台还有没保存的修改', detail: `${action}后这些修改会丢掉。`, buttons: [`仍要${action}`, '取消'], defaultId: 1, cancelId: 1 });
     if (r.response !== 0) return false;
   }
   const live = await api<{ live?: { live?: boolean } }>('/api/status').then((s) => s.live?.live === true, () => false);
   if (live) {
     const detail = action === '退出星临' ? '退出后直播画面上的特效和弹幕列表都会停止。' : '安装大约要半分钟，这期间直播画面上的特效和弹幕列表都会停止，建议下播后再装。';
-    const r = await dialog.showMessageBox({ type: 'warning', title: NAME, message: `正在直播，确定${action}吗？`, detail, buttons: [action, '取消'], defaultId: 1, cancelId: 1 });
+    const r = await ask({ type: 'warning', title: NAME, message: `正在直播，确定${action}吗？`, detail, buttons: [action, '取消'], defaultId: 1, cancelId: 1 });
     if (r.response !== 0) return false;
   }
   allowUnload = true;
@@ -629,7 +816,8 @@ let declined: string | null = null;
 
 /** 下载新版本的进度：推给后台页面，在窗口顶部显示（任务栏图标和托盘提示也会显示） */
 interface UpdateState {
-  phase: 'idle' | 'downloading' | 'downloaded' | 'error';
+  /** available：有新版本，还没下载（后台顶部问要不要下载） */
+  phase: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
   version: string | null;
   percent: number;
   transferred: number;
@@ -670,16 +858,13 @@ function setupUpdates(): void {
     win?.setProgressBar(p.percent / 100);
     tray?.setToolTip(`${NAME} · 正在下载新版本 ${Math.floor(p.percent)}%`);
   });
+  // 下载好了：不弹系统对话框，在后台顶部说（正在直播时后台也先不说，等下播）；窗口藏着、没在直播时托盘提醒一次
   autoUpdater.on('update-downloaded', (info) => {
     downloaded = info.version;
     setUpdateState({ phase: 'downloaded', version: info.version, percent: 100 });
     win?.setProgressBar(-1);
-    tray?.setToolTip(NAME);
-    void dialog
-      .showMessageBox({ type: 'info', title: NAME, message: `新版本 ${info.version} 已下载好`, detail: '现在重启就会安装（大约半分钟），Windows 会问一次是否允许更改，点「是」。正在直播的话，建议下播后再装；选「以后」会在你退出星临时自动安装。', buttons: ['现在重启并安装', '以后'], defaultId: 0, cancelId: 1 })
-      .then((r) => {
-        if (r.response === 0) void installNow();
-      });
+    showStatus(lastStatus);
+    if (!win?.isVisible()) notify({ iconType: 'info', title: `新版本 ${info.version} 已下载好`, content: '退出星临时会自动安装；也可以打开星临，在顶部点「现在重启并安装」。' });
   });
   setTimeout(() => void checkUpdate(false), 10_000);
   setInterval(() => void checkUpdate(false), 6 * 3600_000);
@@ -688,7 +873,7 @@ function setupUpdates(): void {
 /** manual：用户点了「检查更新」，没有新版本或出错也要告诉他 */
 async function checkUpdate(manual: boolean): Promise<void> {
   if (updateBusy) {
-    if (manual) void dialog.showMessageBox({ type: 'info', title: NAME, message: '正在检查或下载更新，请稍等' });
+    if (manual) void ask({ type: 'info', title: NAME, message: '正在检查或下载更新，请稍等' });
     return;
   }
   updateBusy = true;
@@ -696,30 +881,44 @@ async function checkUpdate(manual: boolean): Promise<void> {
     const r = await autoUpdater.checkForUpdates();
     const next = r?.isUpdateAvailable ? r.updateInfo.version : null;
     if (!next) {
-      if (manual) await dialog.showMessageBox({ type: 'info', title: NAME, message: '已经是最新版本', detail: `当前版本 ${app.getVersion()}` });
+      if (manual) await ask({ type: 'info', title: NAME, message: '已经是最新版本', detail: `当前版本 ${app.getVersion()}` });
       return;
     }
     if (next === downloaded) {
-      if (manual) await dialog.showMessageBox({ type: 'info', title: NAME, message: `新版本 ${next} 已经下载好了`, detail: '退出星临时会自动安装（Windows 会问一次是否允许更改，点「是」）；也可以现在退出再打开。' });
+      if (manual) await ask({ type: 'info', title: NAME, message: `新版本 ${next} 已经下载好了`, detail: '退出星临时会自动安装（Windows 会问一次是否允许更改，点「是」）；也可以在后台顶部点「现在重启并安装」。' });
       return;
     }
-    // 后台检查：问过、选了以后再说的同一个版本不再弹窗打扰
+    // 后台检查：选了「以后再说」的同一个版本不再提
     if (!manual && next === declined) return;
-    const a = await dialog.showMessageBox({ type: 'info', title: NAME, message: `星临有新版本 ${next}`, detail: `当前版本 ${app.getVersion()}。现在下载吗？在后台下载，不影响直播。`, buttons: ['下载', '以后再说'], defaultId: 0, cancelId: 1 });
-    if (a.response === 0) {
-      setUpdateState({ phase: 'downloading', version: next, percent: 0, transferred: 0, total: r?.updateInfo.files[0]?.size ?? 0, speed: 0, error: null, source: null, note: null });
-      try {
-        await downloadWithFallback();
-      } catch (e) {
-        setUpdateState({ phase: 'error', error: (e as Error).message });
-        throw e;
-      }
-    } else declined = next;
+    // 不弹系统对话框：在后台顶部问要不要下载（正在直播时后台先不说，等下播）。手动检查的把窗口叫出来
+    nextVersion = { version: next, size: r?.updateInfo.files[0]?.size ?? 0 };
+    setUpdateState({ phase: 'available', version: next, percent: 0, transferred: 0, total: nextVersion.size, speed: 0, error: null, source: null, note: null });
+    if (manual) showWindow();
   } catch (e) {
     log('检查更新失败', e);
     win?.setProgressBar(-1);
-    tray?.setToolTip(NAME);
-    if (manual) await dialog.showMessageBox({ type: 'error', title: NAME, message: '检查更新失败', detail: `${(e as Error).message}\n\n可以稍后再试，或者到 GitHub 发布页手动下载。` });
+    showStatus(lastStatus);
+    if (manual) await ask({ type: 'error', title: NAME, message: '检查更新失败', detail: `${(e as Error).message}\n\n可以稍后再试，或者到 GitHub 发布页手动下载。` });
+  } finally {
+    updateBusy = false;
+  }
+}
+
+/** 查到、还没下载的新版本 */
+let nextVersion: { version: string; size: number } | null = null;
+
+/** 后台顶部点了「下载」 */
+async function startDownload(): Promise<void> {
+  if (!nextVersion || updateBusy || updateState.phase === 'downloading') return;
+  updateBusy = true;
+  setUpdateState({ phase: 'downloading', version: nextVersion.version, percent: 0, transferred: 0, total: nextVersion.size, speed: 0, error: null, source: null, note: null });
+  try {
+    await downloadWithFallback();
+  } catch (e) {
+    log('下载新版本失败', e);
+    win?.setProgressBar(-1);
+    setUpdateState({ phase: 'error', error: (e as Error).message });
+    showStatus(lastStatus);
   } finally {
     updateBusy = false;
   }
@@ -802,6 +1001,20 @@ function setupIpc(): void {
   handle('sf:fx-hint', () => fxHint);
   handle('sf:install-update', () => {
     if (updateState.phase === 'downloaded') void installNow();
+  });
+  // 后台顶部的新版本提示：下载 / 以后再说（以后再说的这个版本，定时检查时不再提）
+  handle('sf:download-update', () => void startDownload());
+  handle('sf:dismiss-update', () => {
+    if (updateState.phase !== 'available') return;
+    declined = updateState.version;
+    setUpdateState({ phase: 'idle' });
+  });
+  // 后台换了亮色 / 暗色：标题栏、窗口底色跟着变，下次打开的启动画面也用这个
+  handle('sf:set-theme', (t: string) => {
+    const choice: ThemeChoice = t === 'light' || t === 'dark' ? t : 'system';
+    nativeTheme.themeSource = choice;
+    win?.setBackgroundColor(bgColor());
+    if (readState().theme !== choice) writeState({ theme: choice });
   });
   handle('sf:reload-hotkeys', () => registerHotkeys(true));
   handle('sf:pause-hotkeys', () => pauseHotkeys());

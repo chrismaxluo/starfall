@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 总览右侧面板「礼物榜」：这段时间（本场 / 今天，跟着总览的数据范围）每人花的钱：付费礼物 + 上舰 + 醒目留言
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import Empty from './Empty.vue';
 import PersonRow from './PersonRow.vue';
 import { get } from '../lib/api.ts';
 import { pageVisible } from '../lib/audience.ts';
@@ -60,7 +61,7 @@ function sub(r: GiftRankDto['rows'][number]): string {
 </script>
 
 <template>
-  <div v-if="!state.status?.room" class="ov-qempty"><b>还没设置直播间</b>在设置里填好直播间号后显示</div>
+  <Empty v-if="!state.status?.room" compact icon="i-screen" title="还没设置直播间" desc="在设置里填好直播间号后显示" />
   <template v-else>
     <div class="phead">
       <span v-if="data">{{ scope === 'live' ? '本场' : '今天' }}送礼 <b class="num">{{ data.people }}</b> 人 · 合计 <b class="num">{{ battery(data.gold) }}</b>（{{ yuan(data.gold) }}）</span>
@@ -69,7 +70,7 @@ function sub(r: GiftRankDto['rows'][number]): string {
     </div>
     <div class="plist">
       <PersonRow v-for="(r, i) in rows" :key="r.uid" :viewer="r.viewer" :rank="i + 1" :sub="sub(r)" :value="battery(r.gold)" :unit="yuan(r.gold)" @pick="(v, px, py) => emit('pick', v, px, py)" />
-      <div v-if="data && !rows.length" class="pempty">{{ scope === 'live' ? '这场' : '今天' }}还没有人送付费礼物、上舰或发醒目留言</div>
+      <Empty v-if="data && !rows.length" compact icon="i-trophy" :title="`${scope === 'live' ? '这场' : '今天'}还没有礼物`" desc="送付费礼物、上舰、醒目留言的观众会排在这里" />
     </div>
     <div class="pfoot"><span>付费礼物（盲盒按开出的礼物算）+ 上舰（实付价格）+ 醒目留言，10 电池 = 1 元</span><span class="sp" /><span>本场 / 今天跟着上面的数据范围</span></div>
   </template>

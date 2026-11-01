@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 素材快捷播放的按钮：big 为「素材快捷播放」页面的大按钮，否则是总览上的一排小按钮
+// 素材快捷播放的按钮：big 为「素材快捷播放」页面的大按钮，否则是总览上的一排小按钮；noWarn：不提示播不出来的原因（总览的状态卡片里已经有）
 import { computed } from 'vue';
 import { pressed, playQuick, quickName } from '../lib/quick.ts';
 import { effectById, state } from '../lib/store.ts';
@@ -7,7 +7,7 @@ import type { QuickButton } from '../lib/types.ts';
 import EffThumb from './EffThumb.vue';
 import Icon from './Icon.vue';
 
-defineProps<{ big?: boolean }>();
+defineProps<{ big?: boolean; noWarn?: boolean }>();
 const playing = computed(() => (state.queue.playing?.quick ? state.queue.playing.effectName : null));
 const isOn = (b: QuickButton) => playing.value !== null && effectById(b.effectId)?.name === playing.value;
 /** 现在按了也播不出来的原因 */
@@ -16,7 +16,7 @@ const tip = (b: QuickButton) => `播放「${effectById(b.effectId)?.name ?? '素
 </script>
 
 <template>
-  <div v-if="blocked" class="qp-warn"><Icon name="i-info" />{{ blocked }}<a v-if="!state.status?.paused" class="linkish" href="#obs">去看看 →</a></div>
+  <div v-if="blocked && !noWarn" class="qp-warn"><Icon name="i-info" />{{ blocked }}<a v-if="!state.status?.paused" class="linkish" href="#obs">去看看 →</a></div>
   <div class="qp" :class="{ big }">
     <button v-for="b in state.quick" :key="b.id" type="button" class="qp-btn" :class="{ on: isOn(b), hit: pressed === b.id }" :title="tip(b)" @click="playQuick(b)">
       <EffThumb :effect="effectById(b.effectId)" />

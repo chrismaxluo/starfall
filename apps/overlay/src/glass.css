@@ -48,6 +48,12 @@
 .gx-card .nm { font-size: 32px; max-width: 10em; }
 .gx-card .say { font-size: 23px; }
 
+/* ---- 弹幕回应：头像在左，昵称和内容排成一行（10-07 改礼物卡片时这段被误删，特效变成头像在上、文字掉到胶囊外） ---- */
+.gx-dm { display: flex; align-items: center; gap: 14px; padding: 10px 30px 10px 10px; --as: 52px; max-width: 900px; }
+.gx-dm .honor { height: 22px; margin-right: 8px; }
+.gx-dm .nm { font-size: 26px; color: #BFE3FF; color: color-mix(in srgb, var(--acc) 55%, #fff); flex: none; max-width: 8em; margin-right: -14px; }
+.gx-dm .say { font-size: 26px; color: #fff; overflow: hidden; text-overflow: ellipsis; }
+
 /* ---- 省资源模式：不做毛玻璃（直播软件关了硬件加速时很卡），改成更实的深色底；礼物不循环浮动 ---- */
 .lite .g { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 45%), rgba(16,18,28,.86); }
 

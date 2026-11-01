@@ -4,14 +4,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { POSITION_NAMES } from '@starfall/shared/labels';
 import { FADE_MAX_MS, FADE_MIN_MS, FEATHER_MAX, OFFSET_MAX, SIZE_MAX, SIZE_MIN } from '@starfall/shared';
 import type { EffectTexts, FeatherMode, Position, SvgaRole } from '@starfall/shared';
-import { del, post, put, upload } from '../lib/api.ts';
+import { post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { placeWarnings } from '../lib/place.ts';
 import { SAMPLES, STYLES } from '../lib/identity.ts';
 import type { Identity, SampleViewer } from '../lib/identity.ts';
 import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
 import { builtinThumb, svgaLayerImages } from '../lib/thumbs.ts';
-import { effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
+import { deleteEffect, effectById, output, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { unloadGuards } from '../lib/route.ts';
 import { attempt, toast } from '../lib/toast.ts';
 import { checkFile } from '../lib/upload-check.ts';
@@ -21,6 +21,7 @@ import Icon from './Icon.vue';
 import PreviewStage from './PreviewStage.vue';
 import Seg from './Seg.vue';
 import Switch from './Switch.vue';
+import Tip from './Tip.vue';
 
 const props = defineProps<{ effectId: number }>();
 const emit = defineEmits<{ close: [] }>();
@@ -317,12 +318,11 @@ async function copy(force = false): Promise<void> {
   ui.editorId = r.id;
 }
 
-async function remove(): Promise<void> {
+/** 删除：马上关掉、从素材库拿掉，右下角 8 秒内可以撤销 */
+function remove(): void {
   if (!eff.value) return;
   if (eff.value.usedBy.length) return toast(`「${eff.value.name}」正在用于 ${eff.value.usedBy.map((u) => u.label).join('、')}，请先在触发规则里换成其他素材`, 'err');
-  if (!(await attempt(() => del(`/api/effects/${eff.value!.id}`), `已删除素材：${eff.value.name}`))) return;
-  await refreshEffects();
-  emit('close');
+  deleteEffect(eff.value, () => emit('close'));
 }
 
 async function replaceFile(): Promise<void> {
@@ -483,15 +483,15 @@ onBeforeUnmount(() => {
             <button class="btn" @click="replay(true)"><Icon name="i-replay" />重播（带声音）</button>
             <ConfirmButton label="发送到直播测试" confirm-label="确认？观众会看到" cls="btn live-send" armed-cls="btn live-send" :title="dirty ? '发送的是现在预览里的样子（包括还没保存的修改）' : ''" @confirm="sendLive" />
           </div>
-          <span v-if="a && !ro" class="hint" style="font-size: 12px; color: var(--t3)">在预览里按住素材可以直接拖到想要的位置</span>
+          <span v-if="a && !ro" class="hint" style="font-size: var(--fs-cap); color: var(--t3)">按住素材可以直接拖动位置</span>
           <div class="pv-opts">
             <div class="pv-opt"><span>按</span><Seg v-model="pvKind" label="按哪类事件预览" :options="KIND_OPTIONS" /><span>预览</span></div>
             <div class="pv-opt"><span>示例观众</span><Seg v-model="who" label="示例观众" :options="WHO_OPTIONS" /></div>
           </div>
-          <span class="hint" style="font-size: 12px; color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
+          <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">示例观众：{{ sample.name }}{{ dirty ? ' · 预览的是还没保存的修改' : '' }}</span>
         </div>
         <div class="ed-set" :class="{ readonly: ro }">
-          <div v-if="ro" class="ro-banner" style="pointer-events: auto; opacity: 1"><Icon name="i-lock" />内置素材不能直接修改。点右下角「复制并编辑」，就能在副本上自由调整。</div>
+          <div v-if="ro" class="ro-banner" style="pointer-events: auto; opacity: 1"><Icon name="i-lock" />内置素材不能直接修改，点右下角「复制并编辑」在副本上调整。</div>
 
           <div class="ed-sec">
             <h3><span class="n">1</span>画面</h3>
@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
                 <span class="vt" :class="{ alpha: a.hasAlpha }">
                   <video v-if="a.kind === 'video'" :src="a.url" muted loop autoplay playsinline />
                   <img v-else-if="a.kind === 'image'" :src="a.url" alt="" />
-                  <span v-else class="thumb-icon" style="position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.6); font-size: 11px">{{ a.ext.toUpperCase() }}</span>
+                  <span v-else class="thumb-icon" style="position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.6); font-size: var(--fs-badge)">{{ a.ext.toUpperCase() }}</span>
                 </span>
                 <span><b>{{ a.filename }}</b><span>{{ meta }}</span></span>
                 <ConfirmButton v-if="eff.usedBy.length" label="替换文件" confirm-label="确认替换？马上生效、旧文件删除" cls="btn" armed-cls="btn live-send" :disabled="busy" :title="`正在用于 ${eff.usedBy.map((u) => u.label).join('、')}：替换后马上生效，不用点保存，也撤不回`" @confirm="repIn?.click()"><Icon name="i-replay" />替换文件</ConfirmButton>
@@ -508,7 +508,7 @@ onBeforeUnmount(() => {
               </div>
               <input ref="repIn" type="file" hidden accept=".webm,.mp4,.svga,.json,.gif,.png,.apng,.webp,.jpg,.jpeg" @change="replaceFile" />
               <template v-if="slots.length">
-                <div class="toggle-line">动态图层 <span class="hint">SVGA 里预留的图层，播放时换成这位观众的头像、昵称等</span></div>
+                <div class="toggle-line">动态图层<Tip text="SVGA 里预留的图层，播放时换成这位观众的头像、昵称等。头像框、身份图标只给大航海观众显示；荣耀等级勋章按观众的等级换图，没有等级时不显示。图层名字写得明白的（avatar、nickname 这类）已经自动对应好。" /></div>
                 <div class="svga-slots">
                   <label v-for="s in slots" :key="s.key" class="svga-slot">
                     <span class="sthumb"><img v-if="slotImgs[s.key]" :src="slotImgs[s.key]" alt="" /></span>
@@ -518,13 +518,13 @@ onBeforeUnmount(() => {
                     </select>
                   </label>
                 </div>
-                <span class="hint" style="font-size: 12px; color: var(--t3)">头像框、身份图标只给大航海观众显示，其他观众这一层会藏起来；荣耀等级勋章按观众的等级换图，没有等级时藏起来。图层名字写得明白的（avatar、nickname 这类）已经自动对应好了。</span>
+                
               </template>
               <details class="ed-more">
                 <summary><Icon name="i-chev" />边缘慢慢变透明（上下羽化）<span class="hint">{{ featherOptions.find((x) => x.value === d!.feather)?.label }}</span></summary>
                 <div class="toggle-line fe-line">上下羽化 <Seg v-model="d.feather" label="上下羽化" :options="featherOptions" /></div>
                 <div v-if="d.feather === 'custom'" class="slider-row off"><label for="edFe">羽化宽度</label><input id="edFe" v-model.number="d.featherPct" type="range" min="0" :max="FEATHER_MAX" step="1" /><output>{{ d.featherPct }}%</output></div>
-                <span class="hint" style="font-size: 12px; color: var(--t3)">{{ featherHint }}</span>
+                <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">{{ featherHint }}</span>
               </details>
               <div v-if="a.warnings.includes('no_alpha')" class="warnbox">这个文件没有透明通道，在直播软件里会带背景色，挡住直播画面。建议导出成带透明通道的 WebM（VP9）。</div>
               <div v-if="a.warnings.includes('large')" class="warnbox">文件超过 10 MB，首次加载可能会慢一点，建议压缩。</div>
@@ -543,22 +543,22 @@ onBeforeUnmount(() => {
               <div class="slider-row off"><label for="edOffX">左右挪动</label><input id="edOffX" v-model.number="d.offsetX" type="range" :min="-OFFSET_MAX" :max="OFFSET_MAX" step="0.5" /><output>{{ offText(d.offsetX, '往左', '往右') }}</output></div>
               <div class="slider-row off"><label for="edSize">大小</label><input id="edSize" v-model.number="d.sizePct" type="range" :min="SIZE_MIN" :max="SIZE_MAX" step="1" /><output>{{ clampSize(d.sizePct) }}%</output></div>
               <div class="toggle-line">
-                <span class="hint">也可以在左边预览里按住素材直接拖。在「{{ POSITION_NAMES[d.position] }}」的基础上挪，按画面宽、高的百分比算；大小 100% 是自动算出的大小</span>
+                <span class="hint">在「{{ POSITION_NAMES[d.position] }}」的基础上挪动，按画面宽、高的百分比算</span>
                 <button class="btn" type="button" style="margin-left: auto; flex: none" :disabled="!adjusted" @click="resetOffset">回到原位</button>
               </div>
               <div v-if="adjusted && intoSafe" class="warnbox">素材有一部分盖住了{{ intoSafe }}，直播时可能挡住 B站的信息、弹幕，或者被挡住。</div>
               <div v-if="adjusted && outOfStage" class="warnbox">素材有一部分超出了画面，超出的部分直播时看不到。</div>
             </template>
-            <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: 12px; color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
+            <span v-if="o?.orient === 'portrait' && !(a && adjusted)" class="hint" style="font-size: var(--fs-cap); color: var(--t3)">竖屏下会自动避开顶部信息栏和底部弹幕区</span>
           </div>
 
           <div class="ed-sec">
             <h3><span class="n">3</span>头像和欢迎语</h3>
             <div v-if="a" class="toggle-line">在素材上叠加头像和欢迎语 <span class="hint">{{ svgaHasPerson ? 'SVGA 里已经放了头像或昵称，一般不用再叠加' : '素材里已经画好文字的话可以关掉' }}</span><Switch v-model="d.showText" label="叠加头像和欢迎语" /></div>
-            <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督的头像套上 B站的头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
-            <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前面放上 B站的荣耀等级勋章（和弹幕里的一样），没有荣耀等级的观众不显示</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
+            <div v-if="a && d.showText" class="toggle-line">大航海头像框 <span class="hint">舰长、提督、总督套上 B站头像框</span><Switch v-model="d.guardFrame" label="大航海头像框" /></div>
+            <div v-if="!a || d.showText" class="toggle-line">荣耀等级勋章 <span class="hint">昵称前显示 B站荣耀等级勋章</span><Switch v-model="d.honorBadge" label="荣耀等级勋章" /></div>
             <template v-if="!a || d.showText">
-              <span class="hint" style="font-size: 12px; color: var(--t3)">每行一句，随机选一句；不同事件可以写不同的话，没写的用「通用」</span>
+              <span class="hint" style="font-size: var(--fs-cap); color: var(--t3)">每行一句，随机选一句；没单独写的事件用「通用」</span>
               <Seg v-model="txTab" label="欢迎语事件" :options="TEXT_TABS.map((t) => ({ value: t.value, label: t.label + (t.value !== 'enter' && lines(d!.texts[t.value]).length ? ' ·' : '') }))" />
               <textarea ref="ta" v-model="d.texts[txTab]" class="ta" :placeholder="txTab === 'enter' ? '例如：欢迎 {name} 大驾光临' : '留空就用「通用」那几句'" />
               <div class="vars"><span class="vars-l">插入</span><button v-for="v in VARS_OF[txTab]" :key="v.key" type="button" :title="`插入 {${v.key}}`" @click="insertVar(`{${v.key}}`)">{{ v.label }}</button></div>
@@ -567,7 +567,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="ed-sec">
-            <h3><span class="n">4</span>音效 <span class="hint">音效在素材库的「音效」里管理，可以被多个素材共用</span></h3>
+            <h3><span class="n">4</span>音效<Tip text="音效在素材库的「音效」里管理，可以被多个素材共用。" /></h3>
             <div class="snd">
               <select class="sel" :value="d.soundAssetId ?? ''" aria-label="音效" @change="onSound">
                 <option value="">无音效</option>
@@ -583,8 +583,8 @@ onBeforeUnmount(() => {
 
           <div class="ed-sec">
             <h3><span class="n">5</span>时长和渐入渐出</h3>
-            <span v-if="timed && !d.durationCustom" class="hint" style="font-size: 13px; color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
-            <div v-else class="row2"><span class="hint" style="font-size: 13px; color: var(--t2)">显示多久</span><div class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div></div>
+            <span v-if="timed && !d.durationCustom" class="hint" style="font-size: var(--fs-sec); color: var(--t2)" title="按素材本身的时长完整播放">时长跟随素材 · {{ ((a?.durationMs ?? 0) / 1000).toFixed(1) }} 秒</span>
+            <div v-else class="row2"><span class="hint" style="font-size: var(--fs-sec); color: var(--t2)">显示多久</span><div class="suffix"><input v-model.number="d.seconds" class="inp num" type="number" min="0.5" :max="maxSeconds" step="0.1" aria-label="时长" /><span>秒</span></div></div>
             <template v-if="a">
               <div v-if="timed" class="toggle-line">手动设置时长 <span class="hint">{{ d.durationCustom ? `最长 ${maxSeconds} 秒，到时间就结束` : '关着时按素材完整播放' }}</span><Switch v-model="d.durationCustom" label="手动设置时长" /></div>
               <div class="toggle-line">
@@ -614,7 +614,7 @@ onBeforeUnmount(() => {
           <template v-else>还没有规则使用这个素材</template>
         </span>
         <template v-if="!ro">
-          <ConfirmButton label="删除" cls="btn" style="color: #d64545" @confirm="remove" />
+          <button class="btn" type="button" style="color: #d64545" @click="remove"><Icon name="i-trash" />删除</button>
           <button class="btn" @click="copy()"><Icon name="i-dup" />复制</button>
           <button class="btn" @click="close()">{{ dirty ? '取消' : '关闭' }}</button>
           <button class="btn primary" :disabled="busy || !dirty" :title="dirty ? '保存后留在这里，可以接着调（Ctrl + S）' : '没有要保存的修改'" @click="save()">{{ dirty ? '保存' : '已保存' }}</button>

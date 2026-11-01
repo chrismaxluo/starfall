@@ -1,13 +1,18 @@
 <script setup lang="ts">
-// 桌面版下载新版本时显示进度；下载好后可以直接「现在重启并安装」。放在窗口顶部，「关于」页里也放一份（inline）。用浏览器打开后台时不显示
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+// 桌面版的新版本：有新版本时问要不要下载，下载时显示进度，下载好后可以直接「现在重启并安装」。
+// 放在窗口顶部，「关于」页里也放一份（inline）。不再弹系统对话框；正在直播时顶部先不问，等下播再说（关于页里照常显示）。
+// 用浏览器打开后台时不显示
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { desktop } from '../lib/desktop.ts';
 import type { UpdateState } from '../lib/desktop.ts';
 import { fileSize } from '../lib/format.ts';
+import { state } from '../lib/store.ts';
 import Icon from './Icon.vue';
 
-defineProps<{ inline?: boolean }>();
+const props = defineProps<{ inline?: boolean }>();
 const s = ref<UpdateState | null>(null);
+/** 问要不要下载、要不要重启安装：直播时窗口顶部先不说（窗口可能在直播画面里） */
+const quietNow = computed(() => !props.inline && Boolean(state.status?.live.live));
 /** 下载失败的提示点了关闭 */
 const hideError = ref(false);
 let off: (() => void) | undefined;
@@ -23,14 +28,19 @@ onBeforeUnmount(() => off?.());
 </script>
 
 <template>
-  <div v-if="s?.phase === 'downloading'" class="verbar updbar" :class="{ inline }" role="status">
+  <div v-if="s?.phase === 'available' && !quietNow" class="verbar" :class="{ inline }" role="status">
+    <Icon name="i-update" /><b>星临有新版本 {{ s.version }}</b>
+    <span>在后台下载，不影响直播；下载好后再决定什么时候安装。</span>
+    <div class="updbar-act"><button class="btn" @click="desktop?.dismissUpdate?.()">以后再说</button><button class="btn primary" @click="desktop?.downloadUpdate?.()">下载</button></div>
+  </div>
+  <div v-else-if="s?.phase === 'downloading'" class="verbar updbar" :class="{ inline }" role="status">
     <Icon name="i-update" /><b>正在下载新版本 {{ s.version }}</b>
     <span class="updbar-n">{{ Math.floor(s.percent) }}%<template v-if="s.total"> · {{ fileSize(s.transferred) }} / {{ fileSize(s.total) }}</template><template v-if="s.speed"> · {{ fileSize(s.speed) }}/秒</template></span>
     <span v-if="s.note || s.source">{{ s.note ?? `来源：${s.source}` }}</span>
     <span>在后台下载，不影响直播</span>
     <div class="updbar-track" role="progressbar" aria-label="下载进度" :aria-valuenow="Math.floor(s.percent)" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: `${s.percent}%` }" /></div>
   </div>
-  <div v-else-if="s?.phase === 'downloaded'" class="verbar" :class="{ inline }" role="status">
+  <div v-else-if="s?.phase === 'downloaded' && !quietNow" class="verbar" :class="{ inline }" role="status">
     <Icon name="i-update" /><b>新版本 {{ s.version }} 已下载好</b>
     <span>重启后安装（大约半分钟），Windows 会问一次是否允许更改，点「是」。正在直播的话建议下播后再装；不装的话，退出星临时会自动安装。</span>
     <button class="btn primary" @click="desktop?.installUpdate()">现在重启并安装</button>
@@ -42,7 +52,7 @@ onBeforeUnmount(() => off?.());
 </template>
 
 <style scoped>
-.verbar.inline { margin-top: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.verbar.inline { margin-top: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .updbar-n { font-variant-numeric: tabular-nums; }
 .updbar-act { display: flex; gap: 8px; margin-left: auto; }
 .updbar-track { flex-basis: 100%; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }

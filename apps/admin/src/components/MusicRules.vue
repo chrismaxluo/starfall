@@ -95,7 +95,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
   <div v-if="music.settings" class="mr-grid">
     <div class="mr-col">
       <div class="card">
-        <div class="card-h"><h2>弹幕指令</h2><span class="aside">改了立即保存</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-chat" /></span>弹幕指令</h2></div>
         <div class="mr-cmds">
           <label v-for="(name, k) in CMD_NAMES" :key="k" class="field">
             <span class="flabel">{{ name }}</span>
@@ -109,7 +109,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>点歌规则</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-wand" /></span>点歌规则</h2></div>
         <div class="srows">
           <div class="srow">
             <span class="lb">谁能点歌</span>
@@ -155,7 +155,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
             <span class="lb">同一首歌</span>
             <div class="ctl"><div class="line">
               <select class="sel" aria-label="同一首歌放过之后多久才能再点" :value="s.repeatMin" @change="set({ repeatMin: Number(($event.target as HTMLSelectElement).value) }, '已保存')"><option v-for="v in REPEAT_OPTIONS" :key="v" :value="v">{{ repeatText(v) }}</option></select>
-              <span class="hint">放过之后隔多久才能再点（防止同一首被反复点；主播不受限制）</span>
+              <span class="hint">放过之后隔多久才能再点（主播不受限制）</span>
             </div></div>
           </div>
           <div class="srow">
@@ -181,7 +181,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
 
     <div class="mr-col">
       <div class="card">
-        <div class="card-h"><h2>歌从哪里找</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-search" /></span>歌从哪里找</h2></div>
         <div class="srows">
           <div class="srow">
             <span class="lb">网易云音乐</span>
@@ -215,11 +215,11 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>不收的歌</h2><span class="aside">歌名或歌手里有这些字的不收</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-x" /></span>不收的歌</h2><span class="aside">歌名或歌手里有这些字的不收</span></div>
         <div class="mr-add"><input v-model="wordIn" class="inp" maxlength="30" placeholder="例如 DJ、伴奏、某个歌名，回车添加" aria-label="不收的字" @keydown.enter="addWord" /><button class="btn" @click="addWord">添加</button></div>
         <div class="mr-chips">
           <span v-for="w in s.blockWords" :key="w" class="mr-chip">{{ w }}<button type="button" :aria-label="`去掉 ${w}`" @click="set({ blockWords: s.blockWords.filter((x) => x !== w) }, `「${w}」去掉了`)"><Icon name="i-x" /></button></span>
-          <span v-if="!s.blockWords.length" class="inline-hint">还没有。</span>
+          <span v-if="!s.blockWords.length" class="inline-hint">还没有添加</span>
         </div>
         <template v-if="s.blockSongs.length">
           <div class="mr-sub">在列表、历史里点了「这首歌以后不收」的（只拦这一首，别的版本照常）</div>
@@ -230,7 +230,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>不让点歌的观众</h2><span class="aside">{{ s.bannedUids.length }} 人</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-ban" /></span>不让点歌的观众</h2><span class="aside">{{ s.bannedUids.length }} 人</span></div>
         <div class="mr-add"><input v-model="uidIn" class="inp num" placeholder="输入 UID，回车添加" inputmode="numeric" aria-label="不让点歌的观众 UID" @keydown.enter="addBan" /><button class="btn" @click="addBan">添加</button></div>
         <div class="mr-people">
           <div v-for="uid in s.bannedUids" :key="uid" class="mr-person">
@@ -238,7 +238,7 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
             <span class="pn">{{ person(uid).name || '（昵称未知）' }}</span><span class="uid num">{{ uid }}</span>
             <button type="button" class="icon-btn" :aria-label="`让 ${person(uid).name || uid} 能点歌`" @click="set({ bannedUids: s.bannedUids.filter((x) => x !== uid) }, '已移出')"><Icon name="i-x" /></button>
           </div>
-          <span v-if="!s.bannedUids.length" class="inline-hint">还没有。</span>
+          <span v-if="!s.bannedUids.length" class="inline-hint">还没有添加</span>
         </div>
       </div>
     </div>
@@ -254,8 +254,8 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
 .mr-ex { margin: 12px 0 0; line-height: 1.7; }
 .mr-ex b { color: var(--t1); font-weight: 600; }
 .srow .line .gap { width: 12px; }
-.srow .line > span:not(.seg):not(.hint):not(.gap):not(.stepper) { font-size: 13px; color: var(--t2); }
-.mr-acc { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 12px; border-radius: 10px; background: var(--hover); font-size: 12.5px; color: var(--t2); }
+.srow .line > span:not(.seg):not(.hint):not(.gap):not(.stepper) { font-size: var(--fs-sec); color: var(--t2); }
+.mr-acc { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 12px; border-radius: var(--r-sm); background: var(--hover); font-size: var(--fs-sec); color: var(--t2); }
 .mr-acc b { color: var(--t1); font-weight: 600; white-space: nowrap; flex: none; }
 .mr-acc > span:not(.avatar) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mr-acc .linkish { margin-left: auto; flex: none; }
@@ -264,14 +264,14 @@ const set = (patch: Partial<MusicSettings>, msg?: string) => void saveMusic(patc
 .mr-add { display: flex; gap: 8px; }
 .mr-add .inp { flex: 1; min-width: 0; }
 .mr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.mr-sub { margin-top: 14px; font-size: 12px; color: var(--t3); }
-.mr-chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: 8px; background: var(--hover); font-size: 13px; }
-.mr-chip button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 6px; background: transparent; color: var(--t3); }
+.mr-sub { margin-top: 14px; font-size: var(--fs-cap); color: var(--t3); }
+.mr-chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: var(--r-sm); background: var(--hover); font-size: var(--fs-sec); }
+.mr-chip button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: var(--r-xs); background: transparent; color: var(--t3); }
 .mr-chip button:hover { background: var(--press); color: var(--t1); }
 .mr-chip svg { width: 12px; height: 12px; }
 .mr-people { display: flex; flex-direction: column; margin-top: 10px; }
-.mr-person { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+.mr-person { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: var(--fs-sec); }
 .mr-person + .mr-person { border-top: 1px solid var(--line); }
-.mr-person .uid { color: var(--t3); font-size: 12px; }
+.mr-person .uid { color: var(--t3); font-size: var(--fs-cap); }
 .mr-person .icon-btn { margin-left: auto; }
 </style>

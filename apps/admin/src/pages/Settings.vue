@@ -4,14 +4,17 @@ import Avatar from '../components/Avatar.vue';
 import ConfirmButton from '../components/ConfirmButton.vue';
 import DataCard from '../components/DataCard.vue';
 import DesktopCard from '../components/DesktopCard.vue';
+import Empty from '../components/Empty.vue';
 import FeatherCard from '../components/FeatherCard.vue';
 import Icon from '../components/Icon.vue';
 import QrLogin from '../components/QrLogin.vue';
 import Seg from '../components/Seg.vue';
 import Switch from '../components/Switch.vue';
+import Tip from '../components/Tip.vue';
 import { del, get, post, put } from '../lib/api.ts';
 import { refreshSettings, refreshStatus, state, ui } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 import type { BlacklistEntry, RoomRecord, Settings } from '../lib/types.ts';
 
 const qr = ref(false);
@@ -76,8 +79,16 @@ async function addBl(): Promise<void> {
   blIn.value = '';
   await loadBl();
 }
+// 移出的那一个收起来，撤销时展开
+const listMotion = useListMotion();
+/** 移出黑名单：8 秒内可以撤销 */
 async function removeBl(x: BlacklistEntry): Promise<void> {
-  if (await attempt(() => del(`/api/blacklist/${x.uid}`), `已移出黑名单：${x.name || x.uid}`)) await loadBl();
+  if (!(await attempt(() => del(`/api/blacklist/${x.uid}`)))) return;
+  await loadBl();
+  undoable(`已移出黑名单：${x.name || x.uid}`, async () => {
+    await post('/api/blacklist', { uid: x.uid, ...(x.name ? { name: x.name } : {}), ...(x.note ? { note: x.note } : {}) });
+    await loadBl();
+  });
 }
 
 const pw = ref({ current: '', next: '' });
@@ -99,14 +110,14 @@ onMounted(() => {
 <template>
   <section class="page">
     <div class="page-head">
-      <div><h1>设置</h1><p>账号、直播间、播放方式和数据。</p></div>
+      <div><h1>设置</h1></div>
       <div class="actions"><button class="btn" @click="ui.wizard = true"><Icon name="i-star" />重新打开新手引导</button></div>
     </div>
     <!-- 两列各自往下排（不按行对齐，右边不会空出一块）：左边账号、直播间、播放、后台密码；右边黑名单、素材显示、数据 -->
     <div class="set-cols">
       <div>
       <div class="card">
-        <div class="card-h"><h2>B站账号</h2><span class="aside">用来读取直播间消息（昵称、UID）</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-user" /></span>B站账号<Tip text="用来读取直播间消息里的昵称和 UID，特效按身份播放需要它。建议用小号扫码。" /></h2></div>
         <template v-if="acct?.loggedIn">
           <div class="acct" style="background: none; border: 0; box-shadow: none; padding: 0">
             <Avatar :name="acct.name" :face="acct.face" :size="44" />
@@ -121,13 +132,13 @@ onMounted(() => {
           </div>
         </template>
         <template v-else>
-          <p style="margin: 0 0 12px; font-size: 13px; color: var(--t2)">还没有登录。不登录的话 B站会隐藏观众昵称和 UID，特效无法按身份播放。建议用 <b>小号</b> 扫码。</p>
+          <p style="margin: 0 0 12px; font-size: var(--fs-sec); color: var(--t2)">还没有登录：B站会隐藏观众昵称和 UID，特效无法按身份播放。</p>
           <button class="btn primary" @click="qr = true"><Icon name="i-qr" />扫码登录</button>
         </template>
       </div>
 
       <div class="card">
-        <div class="card-h"><h2>直播间</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-screen" /></span>直播间</h2></div>
         <div class="field">
           <label for="roomIn">房间号 <span class="hint">短号、长号都可以</span></label>
           <div class="url"><input id="roomIn" v-model="roomIn" class="inp num" :placeholder="room ? String(room.shortId || room.roomId) : '例如 21452505'" inputmode="numeric" @keydown.enter="setRoom" /><button class="btn" :disabled="roomBusy" @click="setRoom">{{ room ? '更换' : '连接' }}</button></div>
@@ -136,22 +147,22 @@ onMounted(() => {
       </div>
 
       <div v-if="state.settings" class="card">
-        <div class="card-h"><h2>播放</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-play" /></span>播放</h2></div>
         <div class="field">
           <span class="flabel">未开播时</span>
           <Seg :model-value="state.settings.offlinePolicy" label="未开播时" :options="[{ value: 'mute', label: '不播放' }, { value: 'play', label: '照常播放（排练用）' }]" @change="(v) => saveSetting({ offlinePolicy: v }, v === 'play' ? '未开播时也会播放（排练模式）' : '未开播时不播放')" />
-          <span class="hint" style="font-size: 12px; color: var(--t3)">默认只在开播时播放。打开「照常播放」后，没开播也会连接直播间、播放特效，用来排练。</span>
+          <span class="hint">{{ state.settings.offlinePolicy === 'play' ? '没开播也会连接直播间、播放特效' : '只在开播时播放' }}</span>
         </div>
         <div class="field" style="margin-top: 14px">
           <span class="flabel">连接直播间</span>
           <Seg :model-value="state.settings.connectMode" label="连接时机" :options="[{ value: 'live_only', label: '只在开播时（推荐）' }, { value: 'always', label: '一直连接' }]" @change="(v) => saveSetting({ connectMode: v }, v === 'always' ? '会一直连接直播间' : '只在开播时连接直播间')" />
-          <span class="hint" style="font-size: 12px; color: var(--t3)">{{ state.settings.offlinePolicy === 'play' ? '现在开着排练模式：会一直连接，这里的选择暂时不起作用。' : state.settings.connectMode === 'live_only' ? '开播后 1 分钟内自动连上；没开播时不连接、也不记录，账号不在线，更安全。' : '没开播时也一直连着直播间，进场、弹幕照常记录（但不播放特效）。' }}</span>
+          <span class="hint">{{ state.settings.offlinePolicy === 'play' ? '排练模式下一直连接，这里的选择暂不生效' : state.settings.connectMode === 'live_only' ? '开播后 1 分钟内自动连上；没开播时账号不在线' : '没开播时也一直连着，事件照常记录（不播放特效）' }}</span>
         </div>
       </div>
 
       <DesktopCard v-if="state.desktop" />
       <div v-else class="card">
-        <div class="card-h"><h2>管理后台</h2></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-lock" /></span>管理后台</h2></div>
         <div class="field">
           <label for="pw1">修改登录密码</label>
           <div class="row2"><input id="pw1" v-model="pw.current" class="inp" type="password" placeholder="当前密码" autocomplete="current-password" /><input v-model="pw.next" class="inp" type="password" placeholder="新密码（至少 8 位）" autocomplete="new-password" /></div>
@@ -162,19 +173,19 @@ onMounted(() => {
       </div>
       <div>
       <div class="card">
-        <div class="card-h"><h2>黑名单</h2><span class="aside">这些人不会触发任何特效，事件照常记录</span></div>
+        <div class="card-h"><h2><span class="hicon"><Icon name="i-ban" /></span>黑名单<Tip text="黑名单里的人不会触发任何特效，事件照常记录。" /></h2></div>
         <template v-if="state.settings">
           <div class="toggle-line">主播本人不触发 <Switch v-model="state.settings.blockAnchor" label="主播本人不触发" @change="(v) => saveSetting({ blockAnchor: v }, v ? '主播本人不会触发特效' : '主播本人也会触发特效')" /></div>
           <div class="toggle-line" style="margin-top: 8px">登录的 B站账号不触发 <span class="hint">通常是小号</span><Switch v-model="state.settings.blockAccount" label="登录的账号不触发" @change="(v) => saveSetting({ blockAccount: v }, v ? '登录的账号不会触发特效' : '登录的账号也会触发特效')" /></div>
         </template>
         <div class="add-user" style="margin-top: 12px"><input v-model="blIn" class="inp num" placeholder="输入 UID，回车添加" inputmode="numeric" aria-label="黑名单 UID" @keydown.enter="addBl" /><button class="btn" @click="addBl">添加</button></div>
-        <div class="bl-list">
+        <TransitionGroup tag="div" class="bl-list lst-box" :name="listMotion()" @before-leave="pinLeaving">
           <div v-for="x in bl" :key="x.uid" class="bl-item">
             <Avatar :name="x.name || String(x.uid)" :size="24" />{{ x.name || '（昵称未知）' }}<span class="uid">{{ x.uid }}</span><span class="note">{{ x.note }}</span>
-            <ConfirmButton label="" confirm-label="移出" cls="mvb" :aria-label="`移出 ${x.name || x.uid}`" @confirm="removeBl(x)"><Icon name="i-x" /></ConfirmButton>
+            <button class="mvb" type="button" :aria-label="`移出 ${x.name || x.uid}`" title="移出黑名单" @click="removeBl(x)"><Icon name="i-x" /></button>
           </div>
-          <span v-if="!bl.length" class="inline-hint">还没有。事件记录、实时动态里点观众也可以直接加入黑名单。</span>
-        </div>
+          <Empty v-if="!bl.length" key="empty" compact icon="i-ban" title="黑名单是空的" desc="事件记录、实时动态里点观众，也可以直接加入黑名单" />
+        </TransitionGroup>
       </div>
 
       <FeatherCard />

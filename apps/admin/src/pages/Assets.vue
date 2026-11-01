@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
-import ConfirmButton from '../components/ConfirmButton.vue';
+import { computed, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue';
+import Empty from '../components/Empty.vue';
 import Icon from '../components/Icon.vue';
-import { del, post, put, upload } from '../lib/api.ts';
+import { post, put, upload } from '../lib/api.ts';
 import { fileSize, seconds } from '../lib/format.ts';
 import { go, route, unloadGuards } from '../lib/route.ts';
 import { checkFile } from '../lib/upload-check.ts';
 import { PREVIEW_BY_KIND, usualKind } from '../lib/preview.ts';
 import { builtinThumb, thumbOf } from '../lib/thumbs.ts';
-import { refreshEffects, state, ui } from '../lib/store.ts';
+import { deleteEffect, deleteSound, refreshEffects, state, ui } from '../lib/store.ts';
 import { attempt, toast } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 import type { AssetDto, EffectDto, SoundDto } from '../lib/types.ts';
 
 // #assets/sound 直接打开音效（命令面板）
@@ -152,9 +153,9 @@ function playSound(s: SoundDto): void {
   audio.onended = () => (playing.value = null);
   void audio.play().catch(() => (playing.value = null));
 }
-async function removeSound(s: SoundDto): Promise<void> {
+function removeSound(s: SoundDto): void {
   if (s.usedBy.length) return toast(`「${baseName(s.filename)}」正在被 ${s.usedBy.map((u) => u.name).join('、')} 使用，请先在素材设置里换掉`, 'err');
-  if (await attempt(() => del(`/api/assets/${s.id}`), `已删除音效：${baseName(s.filename)}`)) await refreshEffects();
+  deleteSound(s, baseName(s.filename));
 }
 // 卡片上的操作：改名（同一时间只改一个）、复制、删除
 const renameKey = ref('');
@@ -182,9 +183,9 @@ async function copyEffect(e: EffectDto): Promise<void> {
   await refreshEffects();
   toast(`已复制为「${r.name}」`);
 }
-async function removeEffect(e: EffectDto): Promise<void> {
+function removeEffect(e: EffectDto): void {
   if (e.usedBy.length) return toast(`「${e.name}」正在用于 ${e.usedBy.map((u) => u.label).join('、')}，请先在触发规则里换成其他素材`, 'err');
-  if (await attempt(() => del(`/api/effects/${e.id}`), `已删除素材：${e.name}`)) await refreshEffects();
+  deleteEffect(e);
 }
 function openEditor(id: number): void {
   if (!renameKey.value) ui.editorId = id;
@@ -193,7 +194,10 @@ const bars = (id: number) => Array.from({ length: 28 }, (_, i) => 20 + Math.abs(
 // 还有文件在传、在排队时刷新或关闭页面：先问一下（换到别的页面不影响，会接着传）
 const uploadGuard = () => uploads.some((u) => !u.err);
 unloadGuards.add(uploadGuard);
-// 离开素材库时停掉正在试听的音效
+// 删掉的卡片收起来，其他的滑过去；撤销时展开
+const listMotion = useListMotion();
+// 离开素材库时停掉正在试听的音效（换到别的页时这一页留着，也要停）
+onDeactivated(() => audio?.pause());
 onBeforeUnmount(() => {
   unloadGuards.delete(uploadGuard);
   audio?.pause();
@@ -211,7 +215,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
     <div class="page-head">
       <div>
         <h1>素材库</h1>
-        <p>上传的动画和图片就是进场特效，在触发规则里直接选用。音效单独管理，可以被多个素材共用。</p>
+        <p>上传的动画和图片可以在触发规则里选用；音效可以被多个素材共用。</p>
       </div>
       <div class="actions">
         <span class="usage"><span class="num">已用 {{ fileSize(totalSize) }}</span></span>
@@ -249,9 +253,11 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
     </div>
 
     <div v-if="tab === 'anim'">
+      <!-- 一个自己的素材都没有时，上面的大拖放框就是入口，这里不再放一张空的「上传素材」卡片 -->
+      <template v-if="!empty">
       <div class="a-sec" style="margin-top: 4px"><h2>我的素材</h2><span>{{ mine.length }} 个</span></div>
-      <div class="ecards">
-        <button class="ecard new" @click="fileIn?.click()"><div><Icon name="i-upload" />上传素材</div></button>
+      <TransitionGroup tag="div" class="ecards lst-box" :name="listMotion()" @before-leave="pinLeaving">
+        <button key="new" class="ecard new" @click="fileIn?.click()"><div><Icon name="i-upload" />上传素材</div></button>
         <div v-for="u in uploads" :key="`u${u.id}`" class="ecard uploading" :class="{ failed: u.err }">
           <div class="ethumb">
             <div v-if="u.err" class="up-err"><Icon name="i-ban" /><span>{{ u.err }}</span></div>
@@ -285,11 +291,12 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
             <button type="button" :aria-label="`重命名 ${e.name}`" @click="startRename(`e:${e.id}`, e.name)"><Icon name="i-pen" />重命名</button>
             <button type="button" :aria-label="`复制 ${e.name}`" @click="copyEffect(e)"><Icon name="i-dup" />复制</button>
             <button v-if="e.usedBy.length" type="button" class="off" :title="`正在用于 ${e.usedBy.map((u) => u.label).join('、')}，先在触发规则里换掉才能删除`" @click="removeEffect(e)"><Icon name="i-trash" />删除</button>
-            <ConfirmButton v-else label="删除" confirm-label="确认删除？" cls="danger" armed-cls="delb" @confirm="removeEffect(e)"><Icon name="i-trash" />删除</ConfirmButton>
+            <button v-else type="button" class="danger" :aria-label="`删除 ${e.name}`" @click="removeEffect(e)"><Icon name="i-trash" />删除</button>
           </div>
         </div>
-      </div>
-      <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span></div>
+      </TransitionGroup>
+      </template>
+      <div class="a-sec"><h2>内置素材</h2><span>随软件提供，不能直接修改，复制一份就能自由调整</span><a class="linkish a-demo" href="/overlay/?demo=1" target="_blank" rel="noopener" title="在新标签里轮流播放所有内置特效（示例）">轮流播放全部<Icon name="i-ext" /></a></div>
       <div class="ecards">
         <div v-for="e in builtin" :key="e.id" class="ecard" role="button" tabindex="0" :aria-label="`${e.name} 的设置`" @click="openEditor(e.id)" @keydown.enter.self="openEditor(e.id)" @keydown.space.self.prevent="openEditor(e.id)">
           <div class="ethumb">
@@ -307,7 +314,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
       </div>
     </div>
 
-    <div v-else class="agrid">
+    <TransitionGroup v-else tag="div" class="agrid lst-box" :name="listMotion()" @before-leave="pinLeaving">
       <div v-for="s in sounds" :key="s.id" class="acard" style="cursor: default">
         <div class="thumb">
           <div class="wave"><i v-for="(h, i) in bars(s.id)" :key="i" :class="{ on: playing === s.id }" :style="{ height: `${h}%` }" /></div>
@@ -323,10 +330,10 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
         <div class="card-acts">
           <button type="button" :aria-label="`重命名 ${baseName(s.filename)}`" @click="startRename(`s:${s.id}`, baseName(s.filename))"><Icon name="i-pen" />重命名</button>
           <button v-if="s.usedBy.length" type="button" class="off" :title="`正在被 ${s.usedBy.map((u) => u.name).join('、')} 使用，先在素材设置里换掉才能删除`" @click="removeSound(s)"><Icon name="i-trash" />删除</button>
-          <ConfirmButton v-else label="删除" confirm-label="确认删除？" cls="danger" armed-cls="delb" @confirm="removeSound(s)"><Icon name="i-trash" />删除</ConfirmButton>
+          <button v-else type="button" class="danger" :aria-label="`删除 ${baseName(s.filename)}`" @click="removeSound(s)"><Icon name="i-trash" />删除</button>
         </div>
       </div>
-      <div v-if="!sounds.length" class="soon-box" style="grid-column: 1 / -1"><b>还没有音效</b>把 MP3 / WAV / OGG 拖到上面就能添加，然后在素材设置的「音效」里选用</div>
-    </div>
+      <Empty v-if="!sounds.length" key="empty" style="grid-column: 1 / -1" icon="i-music" title="还没有音效" desc="把 MP3、WAV、OGG 拖到这个页面就能添加，然后在素材设置的「音效」里选用" />
+    </TransitionGroup>
   </section>
 </template>

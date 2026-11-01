@@ -40,14 +40,22 @@ const winInfo = (app) => app.evaluate(({ BrowserWindow }) => {
   return w ? { bounds: w.getBounds(), max: w.isMaximized(), visible: w.isVisible(), url: w.webContents.getURL().slice(0, 40), zoom: w.webContents.getZoomLevel() } : null;
 });
 
-async function launch() {
+/** 刚打开的两秒连着截几张（启动画面一闪而过，等窗口出来再截就晚了） */
+function burst(name) {
+  const files = Array.from({ length: 8 }, (_, i) => path.resolve(out, `${name}-${i}.png`).replace(/'/g, "''"));
+  const ps = `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; $b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; foreach ($f in @('${files.join("','")}')) { $i=New-Object System.Drawing.Bitmap $b.Width,$b.Height; $g=[System.Drawing.Graphics]::FromImage($i); $g.CopyFromScreen($b.Location,[System.Drawing.Point]::Empty,$b.Size); $i.Save($f); Start-Sleep -Milliseconds 120 }`;
+  return import('node:child_process').then(({ spawn }) => spawn('powershell', ['-NoProfile', '-Command', ps], { stdio: 'ignore' }));
+}
+
+async function launch(shots) {
+  if (shots) await burst(shots);
   const app = await _electron.launch({ executablePath: exe, timeout: 60_000 });
   app.process().stdout?.on('data', () => undefined);
   return app;
 }
 
 // ---------- 第一次打开 ----------
-let app = await launch();
+let app = await launch('open');
 await step('启动画面', async () => {
   const page = await app.firstWindow();
   await sleep(300);
@@ -61,6 +69,13 @@ await step('启动画面', async () => {
 
 let page = await app.firstWindow();
 page.on('pageerror', (e) => note('页面出错', e.message));
+// 新装的会自动打开新手引导：先关掉（按 Esc = 稍后再说）
+await step('关掉新手引导', async () => {
+  await page.waitForSelector('.wiz', { timeout: 8000 });
+  await page.keyboard.press('Escape');
+  await sleep(800);
+  note('新手引导还在', await page.locator('.wiz:not(.mv-out)').count());
+});
 
 await step('标题栏跟着暗色', async () => {
   await page.click('button[aria-label="切换亮色 / 暗色"]');
@@ -99,7 +114,7 @@ await step('服务重启不刷新', async () => {
   const pid = await app.evaluate(({ app: a }) => a.getAppMetrics().find((m) => m.type === 'Utility' && /星临服务|Starfall/.test(m.name ?? m.serviceName ?? ''))?.pid ?? a.getAppMetrics().filter((m) => m.type === 'Utility').map((m) => m.pid).at(-1));
   note('服务进程', pid);
   process.kill(pid);
-  await sleep(700);
+  await sleep(300);
   screen('server-restarting');
   await sleep(8000);
   note('重启后页面没刷新', await page.evaluate(() => (window).__mark ?? '刷新过了'));
@@ -138,7 +153,7 @@ await step('关窗口缩到托盘', async () => {
 await step('记住窗口', async () => {
   await app.evaluate(({ app: a }) => a.exit(0));
   await sleep(2000);
-  app = await launch();
+  app = await launch('reopen');
   await app.firstWindow();
   await sleep(1500);
   note('再打开', await winInfo(app));

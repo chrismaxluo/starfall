@@ -60,7 +60,8 @@
 .lst-move { transition: transform var(--m-slow) var(--ease-out); }
 .lst-enter-active { transition: opacity var(--m-slow) var(--ease-out), transform var(--m-slow) var(--ease-out); }
 .lst-enter-from { opacity: 0; transform: translateY(-8px); }
-.lst-leave-active { position: absolute !important; z-index: 0; transition: opacity var(--m-base) var(--ease-in), transform var(--m-base) var(--ease-in); }
+/* 离开的那一项很快淡掉（下面的滑上来时不和它叠在一起） */
+.lst-leave-active { position: absolute !important; z-index: 0; transition: opacity 130ms var(--ease-in), transform 130ms var(--ease-in); }
 .lst-leave-to { opacity: 0; transform: scale(.97); }
 /* 实时动态：最下面那条淡出 */
 .feed .lst-leave-to { transform: none; }

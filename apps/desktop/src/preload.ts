@@ -23,6 +23,17 @@ contextBridge.exposeInMainWorld('starfallDesktop', {
   },
   /** 新版本下载好后：现在重启并安装 */
   installUpdate: () => ipcRenderer.invoke('sf:install-update'),
+  /** 有新版本时：下载 / 以后再说 */
+  downloadUpdate: () => ipcRenderer.invoke('sf:download-update'),
+  dismissUpdate: () => ipcRenderer.invoke('sf:dismiss-update'),
+  /** 后台的亮色 / 暗色（light、dark，跟随系统为 system）：标题栏跟着变 */
+  setTheme: (t: string) => ipcRenderer.invoke('sf:set-theme', t),
+  /** 本机服务出问题自动重启（restarting → ok；多次失败为 stopped）；返回取消监听的函数 */
+  onServer: (cb: (s: unknown) => void) => {
+    const l = (_e: unknown, s: unknown) => cb(s);
+    ipcRenderer.on('sf:server', l);
+    return () => void ipcRenderer.removeListener('sf:server', l);
+  },
   /** 素材快捷播放的按钮保存后，重新注册全局快捷键；返回被别的软件占用的 */
   reloadHotkeys: () => ipcRenderer.invoke('sf:reload-hotkeys'),
   /** 编辑快捷播放按钮时先注销全局快捷键（录快捷键时不会被系统拦走） */

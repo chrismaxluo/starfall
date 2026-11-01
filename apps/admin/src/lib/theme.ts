@@ -1,4 +1,17 @@
 // 亮色 / 暗色：默认跟随系统；手动切换时从按钮位置圆形扩散（F-UI-08）
+import { desktop } from './desktop.ts';
+
+/** 电脑版：窗口的标题栏跟着后台的亮色 / 暗色（没手动选过时跟随系统） */
+export function syncDesktopTheme(): void {
+  let t: string | null = null;
+  try {
+    t = localStorage.getItem('sf-theme');
+  } catch {
+    /* 隐私模式 */
+  }
+  void desktop?.setTheme?.(t === 'light' || t === 'dark' ? t : 'system')?.catch(() => undefined);
+}
+
 export function currentTheme(): 'light' | 'dark' {
   return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
 }
@@ -10,6 +23,7 @@ function setTheme(t: 'light' | 'dark'): void {
   } catch {
     /* 隐私模式 */
   }
+  void desktop?.setTheme?.(t)?.catch(() => undefined);
 }
 
 export function toggleTheme(x: number, y: number): void {

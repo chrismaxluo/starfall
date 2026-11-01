@@ -1,0 +1,43 @@
+# 产品体验第一轮的检查：在 GitHub 的电脑上开演示服务，用浏览器走一遍每条动效、细节并截图（服务器内存不够同时开演示服务和浏览器）。
+# 只在 design/** 分支上运行，这个分支不合并进 dev。
+name: 体验检查
+
+on:
+  push:
+    branches: ['design/ux-check']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 后台动效截图
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @starfall/admin --filter @starfall/overlay build
+      - name: 启动演示服务
+        run: |
+          mkdir -p "$RUNNER_TEMP/demo"
+          STARFALL_DATA="$RUNNER_TEMP/demo" STARFALL_PORT=17601 nohup node apps/server/src/cli/demo.ts > "$RUNNER_TEMP/demo.log" 2>&1 &
+          for i in $(seq 1 60); do grep -q 后台密码 "$RUNNER_TEMP/demo.log" && break; sleep 1; done
+          grep -q 后台密码 "$RUNNER_TEMP/demo.log"
+      - name: 走一遍并截图
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw" && npm init -y > /dev/null && npm i playwright-core@1.63.0 > /dev/null
+          cd "$GITHUB_WORKSPACE"
+          PW_DIR="$RUNNER_TEMP/pw" node design/tools/ux-check.mjs "$RUNNER_TEMP/demo.log" "$RUNNER_TEMP/shots"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ux-shots
+          path: ${{ runner.temp }}/shots
+          retention-days: 7

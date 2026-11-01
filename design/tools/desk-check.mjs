@@ -93,7 +93,9 @@ await step('右键菜单', async () => {
   await inp.click({ button: 'right' });
   await sleep(800);
   screen('context-menu');
-  await page.keyboard.press('Escape');
+  // 系统菜单要用系统按键关
+  execFileSync('powershell', ['-NoProfile', '-Command', "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{ESC}')"], { stdio: 'pipe' });
+  await sleep(400);
 });
 
 await step('缩放', async () => {

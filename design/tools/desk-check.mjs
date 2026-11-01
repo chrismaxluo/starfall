@@ -99,13 +99,22 @@ await step('右键菜单', async () => {
 await step('缩放', async () => {
   await page.click('.side a[href="#overview"]');
   await sleep(800);
-  await page.keyboard.press('Control+Equal');
-  await page.keyboard.press('Control+Equal');
+  // 用系统按键（Playwright 发的按键不经过窗口的快捷键处理）
+  const keys = (k) => execFileSync('powershell', ['-NoProfile', '-Command', `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${k}')`], { stdio: 'pipe' });
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    w.show();
+    w.focus();
+  });
+  await sleep(500);
+  keys('^=');
+  await sleep(300);
+  keys('^=');
   await sleep(600);
   note('按两下 Ctrl 加号后', (await winInfo(app))?.zoom);
   screen('zoom-in');
-  await page.keyboard.press('Control+Minus');
-  await sleep(300);
+  keys('^-');
+  await sleep(400);
   note('再按 Ctrl 减号', (await winInfo(app))?.zoom);
 });
 

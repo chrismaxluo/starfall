@@ -375,6 +375,12 @@ describe('播放队列', () => {
     expect(t.p.remove(snap.items[1]!.id)).toBe(true);
     expect(t.p.remove('nope')).toBe(false);
     expect(t.events().find((e) => e.uid === 2)?.status).toBe('cleared');
+    // 撤销移出：放回原来的位置，事件记录改回排队中；只能撤销一次
+    expect(t.p.restore(snap.items[1]!.id)).toBe('ok');
+    expect(t.p.snapshot().items.map((i) => i.detail)).toEqual(['小花花 ×2', '提督进场']);
+    expect(t.events().find((e) => e.uid === 2)?.status).toBe('queued');
+    expect(t.p.restore(snap.items[1]!.id)).toBe('expired');
+    expect(t.p.remove(snap.items[1]!.id)).toBe(true);
     // 跳过正在播的：马上播下一个
     const before = t.plays().length;
     const playingId = t.p.snapshot().playing!.id;
@@ -386,6 +392,9 @@ describe('播放队列', () => {
     expect(t.p.snapshot()).toMatchObject({ playing: { detail: '小花花 ×2' }, items: [] });
     vi.advanceTimersByTime(10_000);
     expect(t.p.skip()).toBe(false);
+    // 移出超过 15 秒：不能再撤销
+    vi.advanceTimersByTime(6000);
+    expect(t.p.restore(snap.items[1]!.id)).toBe('expired');
   });
 
   it('上传的素材：推送文件地址、音效；播放用入队时的快照', async () => {

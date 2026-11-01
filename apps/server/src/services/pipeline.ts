@@ -73,6 +73,8 @@ const honorOf = (level: number, url: string | undefined) => ({ level, ...(url ? 
 /** 两次播放之间的间隔 */
 export const PLAY_GAP_MS = 300;
 const FLUSH_MS = 200;
+/** 移出队列后多久之内还能撤销（后台的「撤销」按钮 8 秒，留出网络慢的余量） */
+const RESTORE_MS = 15_000;
 /** 原始消息在内存中最多保留多久（等待进场合并） */
 const RAW_TTL_MS = 10_000;
 
@@ -172,6 +174,8 @@ export class Pipeline {
   private readonly cooldowns = new Cooldowns();
   private readonly once = new OncePerLive();
   private readonly queue = new PlayQueue<Queued>();
+  /** 刚移出队列的项：撤销时放回去 */
+  private readonly removed = new Map<string, { q: QueueItem<Queued>; at: number }>();
   private readonly raws = new Map<string, { raw: unknown; at: number }>();
   private readonly listeners = new Set<(q: QueueSnapshot) => void>();
   private readonly remembered = new Map<number, string>();
@@ -730,13 +734,35 @@ export class Pipeline {
     return true;
   }
 
-  /** 把排队中的一项移出队列（这次不播） */
+  /** 把排队中的一项移出队列（这次不播）；RESTORE_MS 内可以撤销（restore） */
   remove(id: string): boolean {
     const q = this.queue.remove(id);
     if (!q) return false;
     this.unplayed(q, 'cleared');
+    const now = this.now();
+    for (const [k, r] of this.removed) if (now - r.at > RESTORE_MS) this.removed.delete(k);
+    this.removed.set(id, { q, at: now });
     this.emitQueue();
     return true;
+  }
+
+  /** 撤销移出：放回队列原来的位置（按优先级、先来后到排）；超过 RESTORE_MS、已暂停时放不回去 */
+  restore(id: string): 'ok' | 'expired' | 'paused' {
+    const r = this.removed.get(id);
+    if (!r || this.now() - r.at > RESTORE_MS) return 'expired';
+    if (this.d.settings.get('paused')) return 'paused';
+    this.removed.delete(id);
+    // 冷却在移出时已经退回，放回去不再重复计算
+    const payload = { ...r.q.payload };
+    delete payload.undo;
+    const eventId = payload.eventId;
+    if (eventId) this.guard('更新事件记录', () => this.d.log.setStatus(eventId, 'queued'));
+    this.queue.max = this.d.settings.get('queueMax');
+    const { dropped } = this.queue.enqueue({ ...r.q, payload });
+    if (dropped) this.unplayed(dropped, 'dropped');
+    this.pump();
+    this.emitQueue();
+    return 'ok';
   }
 
   /** 清空待播放的特效（正在播的播完）（F-PL-06） */

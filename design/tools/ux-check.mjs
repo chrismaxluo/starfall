@@ -85,8 +85,34 @@ await step('占位条', async () => {
   await shot(page, 'overview');
 });
 
+// 记下「替身」什么时候加上、什么时候拿掉（截图赶不上 0.25 秒的滑动）
+const ghostLog = async (fn) => {
+  await page.evaluate(() => {
+    window.__g = [];
+    window.__go?.disconnect();
+    window.__go = new MutationObserver((rs) => {
+      for (const r of rs) {
+        for (const n of r.addedNodes) if (n.classList?.contains('mv-ghost')) window.__g.push(['加上', r.target.className, Math.round(performance.now())]);
+        for (const n of r.removedNodes) if (n.classList?.contains('mv-ghost')) window.__g.push(['拿掉', r.target.className, Math.round(performance.now())]);
+      }
+    });
+    window.__go.observe(document.body, { subtree: true, childList: true });
+  });
+  await fn();
+  await wait(page, 700);
+  return page.evaluate(() => window.__g);
+};
+
 // 1 换页：中途、结束；侧栏底色滑动
 await step('换页', async () => {
+  note('换页时的替身', await ghostLog(async () => {
+    await page.click('.side a[href="#logs"]');
+  }));
+  note('标签切换时的替身', await ghostLog(async () => {
+    await page.click('.side a[href="#rules"]');
+    await wait(page, 800);
+    await page.click('.rtabs .rtab:nth-child(2)');
+  }));
   await page.click('.side a[href="#rules"]');
   await wait(page, 60);
   await shot(page, 'page-switch-60ms');

@@ -27,7 +27,7 @@ async function newCtx(opts = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1, colorScheme: 'light', ...opts });
   await ctx.addInitScript(() => {
     try {
-      localStorage.setItem('sf-theme', 'light');
+      if (!localStorage.getItem('sf-theme')) localStorage.setItem('sf-theme', 'light');
     } catch {}
   });
   note('登录', (await ctx.request.post(`${B}/api/auth/login`, { data: { password: pw } })).status());
@@ -101,7 +101,9 @@ await step('换页', async () => {
 // 7 标签页下划线滑动
 await step('标签滑动', async () => {
   await page.click('.rtabs .rtab:nth-child(3)');
-  await wait(page, 110);
+  await page.waitForFunction(() => document.querySelector('.rtabs .rtab:nth-child(3)')?.getAttribute('aria-selected') === 'true');
+  note('标签：切换后马上的替身', await page.locator('.rtabs .mv-ghost').count());
+  await wait(page, 60);
   await shot(page, 'rtabs-slide-mid', { x: 248, y: 0, width: 1192, height: 260 });
   await wait(page, 500);
 });
@@ -217,7 +219,8 @@ await step('删除音效', async () => {
   await page.click('.side a[href="#assets"]');
   await wait(page, 1200);
   await page.click('.seg button:has-text("音效")');
-  await wait(page, 120);
+  note('分段：切换后马上的替身', await page.locator('.seg .mv-ghost').count());
+  await wait(page, 60);
   await shot(page, 'assets-seg-slide');
   await wait(page, 600);
   const n0 = await page.locator('.agrid .acard').count();

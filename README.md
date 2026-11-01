@@ -8,7 +8,7 @@
 
 识别每一位进场的观众，在弹幕、礼物、上舰的时刻，于直播画面上播放专属的动画、欢迎语与音效。
 
-[![Version](https://img.shields.io/badge/version-1.9.0-5451D6?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-5451D6?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-2F6FEB?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-24-3C873A?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -45,7 +45,7 @@
 ## 界面预览
 
 <img src="docs/images/overview.jpg" alt="总览">
-<sub><b>总览</b>：直播间状态、本场数据、实时动态；右侧可以切换播放队列、在线观众、礼物榜、大航海。亮色 / 暗色跟随系统，可随时切换</sub>
+<sub><b>总览</b>：开播时使用的布局。直播间和运行状态、本场数据、实时动态；右侧是素材快捷播放，以及播放队列、在线观众、礼物榜、大航海。亮色 / 暗色跟随系统，可随时切换</sub>
 
 <img src="docs/images/rules.jpg" alt="触发规则">
 <sub><b>触发规则</b>：按身份分组的表格，观众进场时从上往下找第一条符合的；可以「模拟一下」，看某个事件会命中哪条规则</sub>
@@ -252,6 +252,7 @@ pnpm build        # 构建管理后台与特效页
 - [x] **v1.7.0**：弹幕点歌（网易云 + 本地歌库，点歌窗口带滚动歌词，六种样子，音量均衡）；外观设置点「保存」才更新到直播画面；修复旧内核直播软件里彩色底条不显示
 - [x] **v1.8.0**：送礼名单可选时间范围（本场、今天、本周、本月、从某时起）、感谢榜、置顶和标题、七种样式和三种滚法；点歌主页（网易云会员到期提醒、本场点歌数据、歌词）；桌面版直播软件先打开时特效页自动连上
 - [x] **v1.9.0**：弹幕列表五种小八主题外观（果冻玻璃、青花瓷、奶油贴纸、星月夜空、像素小屋），昵称和弹幕完整显示；点歌精简模式、双语歌词；全站礼物搜索；星临自己的备用下载地址
+- [x] **v2.0.0**：管理后台新的界面风格（总览改为开播用的布局、弹幕列表独立页面、侧栏分组、统一保存方式）；换页和弹窗过渡、删除可撤销；桌面版启动画面、记住窗口、缩放、直播时不弹提示
 - [ ] 第二期：醒目留言、关注、点赞触发；直播数据统计；观众档案
 
 ## 声明

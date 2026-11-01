@@ -35,7 +35,7 @@ import { confirmLeave, go, route } from './lib/route.ts';
 import type { Page } from './lib/route.ts';
 import { loadAll, output, refreshStatus, state, ui } from './lib/store.ts';
 import { loadMusic, neteaseIssues } from './lib/music.ts';
-import { toggleTheme } from './lib/theme.ts';
+import { syncDesktopTheme, toggleTheme } from './lib/theme.ts';
 import { canAnimate } from './lib/motion.ts';
 import { checkWhatsNew, seenWhatsNew, whatsNew } from './lib/whatsnew.ts';
 import { attempt, runAction, toast, toasts } from './lib/toast.ts';
@@ -194,6 +194,18 @@ watch(
   { immediate: true },
 );
 
+// 电脑版：窗口标题栏跟着后台的亮色 / 暗色
+syncDesktopTheme();
+// 电脑版：本机服务出问题自动重启时，顶部说一声；连上后页面自己补回数据，不整页刷新
+const serverState = ref<'restarting' | 'ok' | 'stopped'>('ok');
+const offServer = desktop?.onServer?.((s) => (serverState.value = s));
+onBeforeUnmount(() => offServer?.());
+// 电脑版：后台页面出问题被自动重新打开（地址带 ?recovered=1）：说一句，再把地址改回去
+if (new URLSearchParams(location.search).has('recovered')) {
+  history.replaceState(null, '', location.pathname + location.hash);
+  setTimeout(() => toast('刚才后台页面出了点问题，已经自动恢复。直播画面上的特效不受影响。', 'info', 6000), 800);
+}
+
 // 桌面版：直播软件开着但特效页一直没连上、这次端口变了时，桌面版告诉后台怎么办（apps/desktop/src/main.ts watchFx）
 const fxHint = ref<FxHint | null>(null);
 void desktop?.fxHint?.().then((h) => (fxHint.value = h), () => undefined);
@@ -207,6 +219,14 @@ const dismissed = ref<string[]>([]);
 const alerts = computed((): Alert[] => {
   const out: Alert[] = [];
   const s = state.status;
+  if (serverState.value === 'restarting') {
+    out.push({ key: 'ws', level: 'amber', title: '星临服务出了点问题，正在自动重启', text: '马上就好，页面不用刷新，正在填的内容也不会丢。' });
+    return out;
+  }
+  if (serverState.value === 'stopped') {
+    out.push({ key: 'ws', level: 'red', title: '星临服务已停止', text: '多次意外退出，已停止自动重启。直播画面上的特效暂时不会播放，请退出星临再打开。', action: { label: '打开日志文件夹', run: () => void desktop?.openLogs() } });
+    return out;
+  }
   if (wsDownLong.value) {
     out.push({ key: 'ws', level: 'amber', title: '和星临的连接断了', text: '正在自动重连，页面上的状态可能不是最新的。' });
     return out;

@@ -1,19 +1,24 @@
 // 顶栏、暂停提示条和命令面板共用的操作
+import { ref } from 'vue';
 import { post } from './api.ts';
 import { refreshStatus, state } from './store.ts';
 import { attempt, toast } from './toast.ts';
 
-// 请求还没返回时不再发第二次（连点、按住快捷键时不会一下暂停一下又恢复）
-let busy = false;
+// 请求还没返回时不再发第二次（连点、按住快捷键时不会一下暂停一下又恢复）。
+// 一点马上换成新的样子（顶部提示条滑下来），不再另外弹提示；没成功就换回去并说明原因
+export const pauseBusy = ref(false);
 export async function togglePause(): Promise<void> {
-  if (busy) return;
-  busy = true;
+  if (pauseBusy.value) return;
+  pauseBusy.value = true;
+  const s = state.status;
+  const was = s?.paused ?? false;
+  if (s) s.paused = !was;
   try {
-    const paused = state.status?.paused ?? false;
-    await attempt(() => post(paused ? '/api/playback/resume' : '/api/playback/pause'), paused ? '已恢复播放' : '已暂停所有特效');
+    const ok = await attempt(() => post(was ? '/api/playback/resume' : '/api/playback/pause'));
+    if (!ok && s && state.status === s) s.paused = was;
     await refreshStatus().catch(() => undefined);
   } finally {
-    busy = false;
+    pauseBusy.value = false;
   }
 }
 

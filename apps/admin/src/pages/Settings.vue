@@ -13,7 +13,8 @@ import Switch from '../components/Switch.vue';
 import Tip from '../components/Tip.vue';
 import { del, get, post, put } from '../lib/api.ts';
 import { refreshSettings, refreshStatus, state, ui } from '../lib/store.ts';
-import { attempt, toast } from '../lib/toast.ts';
+import { attempt, toast, undoable } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 import type { BlacklistEntry, RoomRecord, Settings } from '../lib/types.ts';
 
 const qr = ref(false);
@@ -78,8 +79,16 @@ async function addBl(): Promise<void> {
   blIn.value = '';
   await loadBl();
 }
+// 移出的那一个收起来，撤销时展开
+const listMotion = useListMotion();
+/** 移出黑名单：8 秒内可以撤销 */
 async function removeBl(x: BlacklistEntry): Promise<void> {
-  if (await attempt(() => del(`/api/blacklist/${x.uid}`), `已移出黑名单：${x.name || x.uid}`)) await loadBl();
+  if (!(await attempt(() => del(`/api/blacklist/${x.uid}`)))) return;
+  await loadBl();
+  undoable(`已移出黑名单：${x.name || x.uid}`, async () => {
+    await post('/api/blacklist', { uid: x.uid, ...(x.name ? { name: x.name } : {}), ...(x.note ? { note: x.note } : {}) });
+    await loadBl();
+  });
 }
 
 const pw = ref({ current: '', next: '' });
@@ -170,13 +179,13 @@ onMounted(() => {
           <div class="toggle-line" style="margin-top: 8px">登录的 B站账号不触发 <span class="hint">通常是小号</span><Switch v-model="state.settings.blockAccount" label="登录的账号不触发" @change="(v) => saveSetting({ blockAccount: v }, v ? '登录的账号不会触发特效' : '登录的账号也会触发特效')" /></div>
         </template>
         <div class="add-user" style="margin-top: 12px"><input v-model="blIn" class="inp num" placeholder="输入 UID，回车添加" inputmode="numeric" aria-label="黑名单 UID" @keydown.enter="addBl" /><button class="btn" @click="addBl">添加</button></div>
-        <div class="bl-list">
+        <TransitionGroup tag="div" class="bl-list lst-box" :name="listMotion()" @before-leave="pinLeaving">
           <div v-for="x in bl" :key="x.uid" class="bl-item">
             <Avatar :name="x.name || String(x.uid)" :size="24" />{{ x.name || '（昵称未知）' }}<span class="uid">{{ x.uid }}</span><span class="note">{{ x.note }}</span>
-            <ConfirmButton label="" confirm-label="移出" cls="mvb" :aria-label="`移出 ${x.name || x.uid}`" @confirm="removeBl(x)"><Icon name="i-x" /></ConfirmButton>
+            <button class="mvb" type="button" :aria-label="`移出 ${x.name || x.uid}`" title="移出黑名单" @click="removeBl(x)"><Icon name="i-x" /></button>
           </div>
-          <Empty v-if="!bl.length" compact icon="i-ban" title="黑名单是空的" desc="事件记录、实时动态里点观众，也可以直接加入黑名单" />
-        </div>
+          <Empty v-if="!bl.length" key="empty" compact icon="i-ban" title="黑名单是空的" desc="事件记录、实时动态里点观众，也可以直接加入黑名单" />
+        </TransitionGroup>
       </div>
 
       <FeatherCard />

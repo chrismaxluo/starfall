@@ -1,0 +1,100 @@
+/* ============ 动效（产品体验第一轮，配合 lib/motion.ts） ============
+   只在操作时动；0.2 秒左右；从哪来回哪去；只动位置和透明度；系统设置了「减少动画」时全部关掉 */
+:root {
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --m-fast: 120ms;
+  --m-base: 200ms;
+  --m-slow: 260ms;
+  --skel: rgba(120, 104, 88, .12);
+  --skel-hi: rgba(255, 255, 255, .5);
+}
+[data-theme="dark"] { --skel: rgba(255, 255, 255, .07); --skel-hi: rgba(255, 255, 255, .08); }
+
+/* ---------- 1 换页：旧页很快淡出，新页淡入、往上升一点 ---------- */
+.pg-leave-active { transition: opacity 90ms var(--ease-in); }
+.pg-leave-to { opacity: 0; }
+.pg-enter-active { transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out); }
+.pg-enter-from { opacity: 0; transform: translateY(10px); }
+
+/* ---------- 7 选中的底色、下划线滑过去（lib/motion.ts 放一个「替身」） ---------- */
+.seg, .ptabs, .rtabs, .side { position: relative; }
+.seg > button, .nav a { position: relative; }
+.mv-ghost { position: absolute; pointer-events: none; }
+.mv-hold { background: transparent !important; box-shadow: none !important; }
+.mv-hold::after { opacity: 0 !important; }
+
+/* ---------- 3 打开头一秒：灰色占位条，不说还没确定的话 ---------- */
+.skel { display: block; border-radius: 8px; background: var(--skel); position: relative; overflow: hidden; }
+.skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--skel-hi), transparent); transform: translateX(-100%); animation: skelSweep 1.2s ease-in-out infinite; }
+@keyframes skelSweep { to { transform: translateX(100%); } }
+.skel.line { height: 12px; }
+.skel.round { border-radius: 50%; }
+.skel.pill { border-radius: 999px; }
+.skel-page .skel-card { padding: 20px; border-radius: var(--r-lg); background: var(--l3); box-shadow: var(--shadow-card), inset 0 0 0 1px var(--line); display: flex; flex-direction: column; gap: 14px; }
+.skel-page .skel-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+.skel-page .skel-rows { display: flex; flex-direction: column; gap: 16px; }
+.skel-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 64px; align-items: center; gap: 12px; }
+.skel-row > div { display: flex; flex-direction: column; gap: 8px; }
+.acct.skel-acct { pointer-events: none; }
+/* 数据到了：淡出来 */
+.reveal-enter-active { transition: opacity var(--m-slow) var(--ease-out); }
+.reveal-enter-from { opacity: 0; }
+
+/* ---------- 4 弹出来的东西：关的时候收回去（打开的动画在 app.css） ---------- */
+.mv-out { pointer-events: none !important; }
+:is(.scrim, .drawer-scrim, .ed-scrim, .pv-scrim).mv-out { animation: mvFadeOut var(--m-base) ease forwards !important; }
+.scrim.mv-out .palette, .pv-scrim.mv-out .pv { animation: mvPopOut var(--m-base) var(--ease-in) forwards !important; }
+.drawer.mv-out { animation: drawerOut var(--m-base) var(--ease-in) forwards !important; }
+:is(.editor, .wiz, .qdialog, .dlg).mv-out { animation: mvDlgOut 180ms var(--ease-in) forwards !important; }
+:is(.menu, .rmenu, .pickpop, .cdpop, .datepop, .sheet).mv-out { animation: mvPopOut 130ms var(--ease-in) forwards !important; }
+@keyframes mvFadeOut { to { opacity: 0; } }
+@keyframes mvPopOut { to { opacity: 0; transform: scale(.97) translateY(-4px); } }
+@keyframes mvDlgOut { to { opacity: 0; transform: translate(-50%, -48%) scale(.98); } }
+/* 预览小窗打开也有过渡 */
+.pv { animation: mvPvIn .26s cubic-bezier(.2, .9, .3, 1); }
+@keyframes mvPvIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+
+/* ---------- 5、6 列表：新的一条把下面的推下去，删掉的收起来、下面的滑上去；撤销时展开 ---------- */
+.lst-box { position: relative; }
+.lst-move { transition: transform var(--m-slow) var(--ease-out); }
+.lst-enter-active { transition: opacity var(--m-slow) var(--ease-out), transform var(--m-slow) var(--ease-out); }
+.lst-enter-from { opacity: 0; transform: translateY(-8px); }
+.lst-leave-active { position: absolute !important; z-index: 0; transition: opacity var(--m-base) var(--ease-in), transform var(--m-base) var(--ease-in); }
+.lst-leave-to { opacity: 0; transform: scale(.97); }
+/* 实时动态：最下面那条淡出 */
+.feed .lst-leave-to { transform: none; }
+
+/* 提示条（右下角）：一条走了，其他的滑过去 */
+.toast-move { transition: transform var(--m-slow) var(--ease-out); }
+
+/* ---------- 8 顶部提示条（暂停、提醒、新版本）：滑下来，页面跟着让开 ---------- */
+.bar-wrap { display: grid; grid-template-rows: 1fr; overflow: hidden; }
+.bar-wrap > * { min-height: 0; overflow: hidden; }
+.bar-enter-active, .bar-leave-active { transition: grid-template-rows var(--m-slow) var(--ease-out), opacity var(--m-base) ease; }
+.bar-enter-from, .bar-leave-to { grid-template-rows: 0fr; opacity: 0; }
+/* 暂停按钮：一点马上有反应 */
+.pausebtn.busy { opacity: .75; cursor: progress; }
+.pausebtn.busy svg { animation: mvBlink .7s ease-in-out infinite; }
+@keyframes mvBlink { 50% { opacity: .3; } }
+
+/* ---------- 9 草稿条：从下面滑上来；保存后原地说「已保存」再收起 ---------- */
+.draft-enter-active { transition: opacity var(--m-base) var(--ease-out), transform var(--m-slow) var(--ease-out); }
+.draft-leave-active { transition: opacity var(--m-base) var(--ease-in), transform var(--m-base) var(--ease-in); }
+.draft-enter-from, .draft-leave-to { opacity: 0; transform: translateY(10px); }
+
+/* ---------- 10 开关旁边轻轻说一声「已保存」 ---------- */
+.switch { position: relative; }
+.sw-ok { position: absolute; left: 50%; bottom: calc(100% + 6px); z-index: 5; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  background: var(--l4); color: var(--ok); box-shadow: var(--shadow-pop), inset 0 0 0 1px var(--line); font-family: inherit; font-size: var(--fs-cap); font-weight: 600; line-height: 18px;
+  transform: translateX(-50%); animation: swOk 1.6s ease both; }
+.sw-ok svg { width: 12px; height: 12px; }
+@keyframes swOk { 0% { opacity: 0; transform: translate(-50%, 4px); } 12%, 78% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
+
+/* ---------- 15 减少动画：所有过渡、一直循环的动画都停下 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: .01ms !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
+  .skel::after { display: none; }
+  .sw-ok { animation: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

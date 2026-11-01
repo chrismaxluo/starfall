@@ -28,6 +28,7 @@ import { effectById, refreshEffects, refreshRules, state, ui } from '../lib/stor
 import { attempt, toast, undoable } from '../lib/toast.ts';
 import type { EnterBase, ExclusiveDto, HonorBand, MedalBand, Tier, TierRule, Viewer } from '../lib/types.ts';
 import { pushEsc } from '../lib/esc.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 
 type Ev = 'enter' | 'exclusive' | 'danmu' | 'gift' | 'guard';
 const EVS: Ev[] = ['enter', 'exclusive', 'danmu', 'gift', 'guard'];
@@ -36,6 +37,8 @@ const ev = ref<Ev>(EVS.includes(route.value.sub as Ev) ? (route.value.sub as Ev)
 const help = ref(false);
 watch(ev, () => (help.value = false));
 const simOpen = ref(false);
+// 移除的那一行收起来，撤销时展开
+const listMotion = useListMotion();
 const flashKey = ref<string | null>(null);
 
 const rules = computed(() => state.enter);
@@ -502,8 +505,9 @@ onMounted(() => void refreshRules());
           <button class="btn primary" style="margin-left: auto" @click="addExclusive">添加</button>
         </div>
       </div>
-      <div class="rt">
+      <div class="rt lst-box">
         <div class="rt-h" :style="{ gridTemplateColumns: EX_COLS }"><span>开关</span><span>观众</span><span>身份</span><span>专属特效</span><span>{{ once ? '不重复播放' : '多久内只播一次' }}</span><span>有效期</span><span>操作</span></div>
+        <TransitionGroup :name="listMotion()" @before-leave="pinLeaving">
         <div v-for="x in exList" :key="x.uid" class="rt-r" :class="{ off: !x.enabled, flash: flashUid === x.uid }" :style="{ gridTemplateColumns: EX_COLS }">
           <div class="c-sw"><Switch v-model="x.enabled" :label="`启用 ${x.name ?? x.uid}`" @change="(v) => updateEx(x, { enabled: v }, v ? '已启用' : '已停用，TA 会按身份的规则播放')" /></div>
           <div class="c-who"><Avatar :name="x.name ?? String(x.uid)" :face="x.face" :guard="x.guard" /><span class="nm"><b>{{ x.name ?? '（昵称未知）' }}</b><span class="uid">UID {{ x.uid }}</span></span></div>
@@ -513,6 +517,7 @@ onMounted(() => void refreshRules());
           <div class="c-cd"><button class="untilb" :class="x.until ? (x.until < todayStr ? 'expired' : 'set') : ''" :title="x.until ? '到期后自动停用' : '一直有效'" @click.stop="(e) => openDate(e, x)">{{ x.until ? `${x.until < todayStr ? '已过期 ' : '至 '}${x.until.slice(5)}` : '长期' }}</button></div>
           <div class="c-act"><button class="icon-btn play" aria-label="预览" title="预览" @click="preview(x.effectId, { name: x.name ?? '专属观众', guard: 0, isMod: false, medalLevel: null }, x.name ?? String(x.uid))"><svg><use href="#i-play" /></svg></button><RowMenu :items="exMenu(x)" :label="`${x.name ?? x.uid}：更多操作`" /></div>
         </div>
+        </TransitionGroup>
         <Empty v-if="!exList.length" icon="i-user" :title="state.exclusives.length ? '没有匹配的专属用户' : '还没有专属用户'" :desc="state.exclusives.length ? undefined : '点右上角「添加专属用户」，或者在总览的实时动态里点某个观众'" />
       </div>
     </template>

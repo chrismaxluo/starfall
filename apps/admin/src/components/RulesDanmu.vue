@@ -8,6 +8,7 @@ import { sampleFor } from '../lib/danmu-who.ts';
 import type { PreviewRequest } from '../lib/preview.ts';
 import { effectById, refreshEffects, refreshRules, state, ui } from '../lib/store.ts';
 import { attempt, toast, undoable } from '../lib/toast.ts';
+import { pinLeaving, useListMotion } from '../lib/motion.ts';
 import type { DanmuRule, DanmuRuleDto, DanmuWho } from '../lib/types.ts';
 import CdPick from './CdPick.vue';
 import EffectPicker from './EffectPicker.vue';
@@ -24,6 +25,8 @@ const help = defineModel<boolean>('help', { default: false });
 const COLS = '34px 44px minmax(200px, 1.4fr) minmax(120px, 190px) minmax(170px, 250px) 150px 68px';
 const flash = ref<number | null>(null);
 const list = ref<HTMLElement | null>(null);
+// 删掉的那一条收起来，撤销时展开；调整顺序时滑到新位置
+const listMotion = useListMotion();
 
 /** 同一条规则的修改按顺序一个一个发（快速连删两个关键词时，后一个不会把前一个的改动盖回去） */
 const chains = new Map<number, Promise<void>>();
@@ -196,8 +199,9 @@ const clashes = computed(() => {
       <b>冷却</b>：「全体」是这条规则播放后，任何人再触发都要等多久；「每人」是同一个人再触发要等多久。按住左边的编号拖动，可以调整先后顺序。
     </div>
 
-    <div v-if="state.danmu.length || draft" ref="list" class="rt">
+    <div v-if="state.danmu.length || draft" ref="list" class="rt lst-box">
       <div class="rt-h" :style="{ gridTemplateColumns: COLS }"><span /><span>开关</span><span>关键词</span><span>谁发的才算</span><span>播放的特效</span><span>冷却</span><span>操作</span></div>
+      <TransitionGroup :name="listMotion()" @before-leave="pinLeaving">
       <div v-for="(r, i) in state.danmu" :key="r.id" class="rt-r" :class="{ off: !r.enabled, flash: flash === r.id, dragging: dragFrom === i, dropto: dragOver === i && dragFrom !== i }" :style="{ gridTemplateColumns: COLS }" @dragover.prevent="dragFrom !== null && (dragOver = i)" @dragleave="dragOver === i && (dragOver = null)" @drop.prevent="onDrop(i)">
         <div class="c-grip" draggable="true" :title="`${i === 0 ? '排在最上面，最先匹配' : `第 ${i + 1} 条：上面的规则都没对上时才看这条`}；按住拖动可以调整顺序`" @dragstart="(e) => onDragStart(e, i)" @dragend="(dragFrom = null), (dragOver = null)"><Icon name="i-grip" />{{ i + 1 }}</div>
         <div class="c-sw"><Switch v-model="r.enabled" :label="`弹幕规则 ${i + 1}`" @change="(v) => patch(r, { enabled: v }, v ? '已打开这条弹幕规则' : '已关闭这条弹幕规则')" /></div>
@@ -221,6 +225,7 @@ const clashes = computed(() => {
           <span v-for="x in shadows[i]" :key="x.word" class="shadownote"><Icon name="i-info" />「{{ x.word }}」会先被第 {{ x.by + 1 }} 条的「{{ x.byWord }}」接走，这条不会因为它触发；需要的话把这条往上挪</span>
         </div>
       </div>
+      </TransitionGroup>
       <div v-if="draft" class="rt-r" :style="{ gridTemplateColumns: '34px minmax(0, 1fr) auto' }">
         <div class="c-grip" style="cursor: default">新</div>
         <div class="c-kw"><input ref="draftIn" class="inp kwdraft" placeholder="输入关键词，多个用逗号隔开，例如：晚安，好梦" aria-label="新规则的关键词" maxlength="400" @keydown.enter.prevent="saveDraft" @keydown.esc="draft = false" /><span class="inline-hint">填好关键词才会保存；保存后再改特效、谁发的才算、冷却</span></div>

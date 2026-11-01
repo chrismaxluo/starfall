@@ -2,7 +2,7 @@
 // 总览（开播时看的驾驶舱）：上面是直播间和「状态」（一切正常还是哪里有问题，问题旁边直接给修复按钮），
 // 然后是本场 / 今天的数据；下面左边实时动态，右边快捷播放、点歌、切换面板（播放队列、在线观众、礼物榜、大航海）和身份构成
 import EvIcon from '../components/EvIcon.vue';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import Avatar from '../components/Avatar.vue';
 import Icon from '../components/Icon.vue';
 import HonorMedal from '../components/HonorMedal.vue';
@@ -21,6 +21,7 @@ import { battery } from '../lib/preview.ts';
 import { IDENTITY } from '../lib/identity.ts';
 import type { Identity } from '../lib/identity.ts';
 import { onLiveEvent } from '../lib/live.ts';
+import { pinLeaving, useListMotion, useTick } from '../lib/motion.ts';
 import { useQuickHotkeys } from '../lib/quick.ts';
 import { go } from '../lib/route.ts';
 import { effectById, state, ui } from '../lib/store.ts';
@@ -34,7 +35,8 @@ const menu = ref<{ viewer: Viewer; x: number; y: number } | null>(null);
 const now = ref(Date.now());
 const coverFailed = ref(false);
 let timer: ReturnType<typeof setTimeout> | null = null;
-let tick: ReturnType<typeof setInterval> | null = null;
+/** 这一页正在显示（换到别的页时留着，但不再刷新统计） */
+let shown = true;
 
 const s = computed(() => state.status);
 const info = computed(() => state.roomInfo);
@@ -60,17 +62,20 @@ watch(() => s.value?.room?.roomId, () => (noSession.value = false));
 watch([scope, live, () => s.value?.room?.roomId, () => s.value?.live.liveSince], () => void loadStats());
 // 有新事件时稍后刷新统计（避免每条都请求）
 const off = onLiveEvent(() => {
-  if (!timer) timer = setTimeout(() => ((timer = null), void loadStats()), 2000);
+  if (shown && !timer) timer = setTimeout(() => ((timer = null), void loadStats()), 2000);
 });
-onMounted(() => {
-  void loadStats();
-  // 直播时长每秒更新
-  tick = setInterval(() => (now.value = Date.now()), 1000);
+onMounted(() => void loadStats());
+// 换回总览：统计重新读一次（不显示「正在读取」，读到了直接换上）
+onActivated(() => {
+  if (!shown) void loadStats();
+  shown = true;
 });
+onDeactivated(() => (shown = false));
+// 直播时长每秒更新
+useTick(() => (now.value = Date.now()), 1000);
 onBeforeUnmount(() => {
   off();
   if (timer) clearTimeout(timer);
-  if (tick) clearInterval(tick);
 });
 
 // 第 3 步按「连上过一次」算：配好以后先打开星临、还没开直播软件时，不会又冒出来
@@ -79,7 +84,8 @@ const setupSteps = computed(() => [
   { name: '填写直播间号', done: Boolean(s.value?.room), href: '#settings', qr: false },
   { name: '把特效页加到直播软件', done: (s.value?.overlays ?? 0) > 0 || Boolean(state.settings?.overlaySeen), href: '#obs', qr: false },
 ]);
-const needSetup = computed(() => setupSteps.value.some((x) => !x.done));
+// 状态还没读到时不知道，先不显示（不说还没确定的话）
+const needSetup = computed(() => Boolean(s.value) && setupSteps.value.some((x) => !x.done));
 
 // ---------- 直播间 ----------
 const roomId = computed(() => s.value?.room?.roomId ?? null);
@@ -163,7 +169,15 @@ const newWhileFrozen = computed(() => {
   const top = f[0]?.id ?? 0;
   return filtered.value.filter((e) => e.id > top).length;
 });
-watch([kind, onlyGuard], () => frozen.value && (frozen.value = filtered.value.slice(0, FEED_SHOW)));
+// 实时动态：新来一条，把下面的轻轻推下去，最下面那条淡出（不闪光）。换筛选时整批换掉，不播
+const listMotion = useListMotion();
+const bulk = ref(false);
+const feedAnim = () => (bulk.value ? 'lst-off' : listMotion());
+watch([kind, onlyGuard], () => {
+  if (frozen.value) frozen.value = filtered.value.slice(0, FEED_SHOW);
+  bulk.value = true;
+  void nextTick(() => (bulk.value = false));
+});
 /** 播放情况：已播放某特效、排队中、命中规则但没播、黑名单、没触发 */
 function playText(e: EventDto): string {
   if (e.status === 'played' || e.status === 'queued') return `${e.status === 'played' ? '已播放' : '排队中'} ${effectById(e.effectId)?.name ?? ''}`;
@@ -268,7 +282,7 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
           <Seg v-model="kind" label="实时动态筛选" :options="[{ value: 'all', label: '全部' }, { value: 'enter', label: '进场' }, { value: 'danmu', label: '弹幕' }, { value: 'gift', label: '礼物 / SC' }, { value: 'guard', label: '上舰' }]" />
           <label>只看大航海<Switch v-model="onlyGuard" label="只看大航海" /></label>
         </div>
-        <div class="feed" @mouseenter="frozen = feed.slice()" @mouseleave="frozen = null">
+        <TransitionGroup tag="div" class="feed lst-box" :name="feedAnim()" @before-leave="pinLeaving" @mouseenter="frozen = feed.slice()" @mouseleave="frozen = null">
           <div v-for="e in feed" :key="e.id" class="feed-row" :class="rowCls(e)" @click="(ev) => (menu = { viewer: e.viewer, x: ev.clientX, y: ev.clientY })">
             <Avatar :name="e.uname" :face="e.viewer.face" :guard="e.viewer.guard" />
             <span class="who">
@@ -282,11 +296,11 @@ const pick = (viewer: Viewer, x: number, y: number) => (menu.value = { viewer, x
             <time class="num">{{ clock(e.ts) }}</time>
             <span class="rowact" aria-hidden="true"><Icon name="i-more" /></span>
           </div>
-          <div v-if="!feed.length" class="soon-box" style="border: 0; background: none">
+          <div v-if="!feed.length" key="empty" class="soon-box" style="border: 0; background: none">
             <template v-if="kind !== 'all' || onlyGuard"><b>没有符合的动态</b>换个筛选试试（这里只看最近 {{ state.feed.length }} 条，更早的在「事件记录」里查）</template>
             <template v-else><b>还没有动态</b>开播后，观众进场、弹幕、礼物会实时出现在这里</template>
           </div>
-        </div>
+        </TransitionGroup>
       </div>
 
       <div class="ov-col">

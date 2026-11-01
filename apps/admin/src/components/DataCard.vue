@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 设置 → 数据：自动备份（F-DA-03）、事件记录保留期（F-DA-02）、导出 / 导入配置（F-DA-04）
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { get, post, put, upload } from '../lib/api.ts';
 import { fileSize } from '../lib/format.ts';
 import { refreshSettings, state } from '../lib/store.ts';
@@ -17,6 +17,34 @@ const running = ref(false);
 const fileIn = ref<HTMLInputElement | null>(null);
 const uploading = ref<number | null>(null);
 const preview = ref<ImportPreview | null>(null);
+
+// 导出（含素材文件）要打包一会儿：一点按钮马上变成「正在打包…」，开始下载时（服务端发来的 cookie）再说一声
+const packing = ref<string | null>(null);
+let packTimer: ReturnType<typeof setInterval> | null = null;
+const PACK_GIVE_UP_MS = 120_000;
+function stopPacking(): void {
+  if (packTimer) clearInterval(packTimer);
+  packTimer = null;
+  packing.value = null;
+}
+function exportWithFiles(): void {
+  if (packing.value) return;
+  const token = Math.random().toString(36).slice(2, 12);
+  packing.value = token;
+  const started = Date.now();
+  packTimer = setInterval(() => {
+    if (document.cookie.split('; ').includes(`starfall_export=${token}`)) {
+      document.cookie = 'starfall_export=; Path=/; Max-Age=0; SameSite=Strict';
+      stopPacking();
+      toast('打包好了，已经开始下载');
+    } else if (Date.now() - started > PACK_GIVE_UP_MS) stopPacking();
+  }, 400);
+  const a = document.createElement('a');
+  a.href = `/api/backup/export?files=1&t=${token}`;
+  a.download = '';
+  a.click();
+}
+onBeforeUnmount(stopPacking);
 
 async function load(): Promise<void> {
   backups.value = (await get<{ items: BackupItem[] }>('/api/backup/list').catch(() => ({ items: [] }))).items;
@@ -106,7 +134,7 @@ onMounted(load);
       <span class="flabel">导出 / 导入配置<Tip text="配置包括规则、素材设置、输出和播放设置，不含 B站登录信息和后台密码。桌面版和服务器版的文件可以互相导入；换电脑时建议导出含素材文件的 zip。导入或恢复前会自动备份一份现在的配置。" /></span>
       <div class="bk-actions">
         <a class="btn" href="/api/backup/export" download><Icon name="i-upload" />导出配置</a>
-        <a class="btn" href="/api/backup/export?files=1" download>导出（含素材文件）</a>
+        <button class="btn" type="button" :disabled="packing !== null" :aria-busy="packing !== null" @click="exportWithFiles"><span v-if="packing" class="spin" />{{ packing ? '正在打包…' : '导出（含素材文件）' }}</button>
         <button class="btn" :disabled="uploading !== null" @click="fileIn?.click()">{{ uploading !== null ? `正在上传 ${Math.round(uploading * 100)}%` : '导入配置' }}</button>
         <input ref="fileIn" type="file" accept=".json,.zip,application/json,application/zip" hidden @change="pick" />
       </div>

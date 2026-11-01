@@ -1,8 +1,8 @@
 // 全局状态：登录后加载一次，之后由实时连接（/ws/admin）和各页面的修改保持最新
 import { reactive } from 'vue';
-import { get, post } from './api.ts';
+import { del, get, post } from './api.ts';
 import { setTimeZone } from './format.ts';
-import { attempt, toast } from './toast.ts';
+import { attempt, deleteLater, toast } from './toast.ts';
 import type { PreviewRequest } from './preview.ts';
 import type { ChatItem, GiftListItem, GiftRow } from '@starfall/shared/overlay';
 import type { DanmuRuleDto, EffectDto, EnterBase, EventDto, ExclusiveDto, GiftRules, GuardRules, OutputDto, OverlayConfig, OverlayInfo, QueueSnapshot, QuickButton, RoomInfo, Settings, SoundDto, StatusSnapshot, Viewer } from './types.ts';
@@ -13,6 +13,8 @@ export const FEED_KEEP = 150;
 export const state = reactive({
   /** null：还没检查 */
   authed: null as boolean | null,
+  /** 打开后台后第一次读数据有结果了（读到或者没读到）；之前各页面显示灰色占位条，不先说「还没有」 */
+  ready: false,
   /** 桌面版（服务只在本机运行，后台不用密码） */
   desktop: false,
   status: null as StatusSnapshot | null,
@@ -68,10 +70,59 @@ export async function refreshStatus(): Promise<void> {
 export async function refreshSettings(): Promise<void> {
   state.settings = await get<Settings>('/api/settings');
 }
+/** 删了、还在「撤销」时间里的素材和音效（还没真正删掉）：重新读取时也不显示 */
+export const deleting = { effects: new Set<number>(), sounds: new Set<number>() };
 export async function refreshEffects(): Promise<void> {
   const [e, s] = await Promise.all([get<{ effects: EffectDto[] }>('/api/effects'), get<{ sounds: SoundDto[] }>('/api/sounds')]);
-  state.effects = e.effects;
-  state.sounds = s.sounds;
+  state.effects = e.effects.filter((x) => !deleting.effects.has(x.id));
+  state.sounds = s.sounds.filter((x) => !deleting.sounds.has(x.id));
+}
+
+/** 删除素材：马上从界面上拿掉，8 秒内可以撤销，过了才真正删除 */
+export function deleteEffect(e: EffectDto, then?: () => void): void {
+  deleteLater(`已删除素材：${e.name}`, {
+    hide: () => {
+      deleting.effects.add(e.id);
+      state.effects = state.effects.filter((x) => x.id !== e.id);
+      then?.();
+    },
+    restore: () => {
+      deleting.effects.delete(e.id);
+      void refreshEffects().catch(() => undefined);
+    },
+    commit: async () => {
+      try {
+        await del(`/api/effects/${e.id}`);
+      } finally {
+        deleting.effects.delete(e.id);
+      }
+      await refreshEffects().catch(() => undefined);
+    },
+    url: `/api/effects/${e.id}`,
+  });
+}
+
+/** 删除音效：同上 */
+export function deleteSound(s: SoundDto, name: string): void {
+  deleteLater(`已删除音效：${name}`, {
+    hide: () => {
+      deleting.sounds.add(s.id);
+      state.sounds = state.sounds.filter((x) => x.id !== s.id);
+    },
+    restore: () => {
+      deleting.sounds.delete(s.id);
+      void refreshEffects().catch(() => undefined);
+    },
+    commit: async () => {
+      try {
+        await del(`/api/assets/${s.id}`);
+      } finally {
+        deleting.sounds.delete(s.id);
+      }
+      await refreshEffects().catch(() => undefined);
+    },
+    url: `/api/assets/${s.id}`,
+  });
 }
 export async function refreshRules(): Promise<void> {
   const [r, x, d, g, u] = await Promise.all([

@@ -123,7 +123,7 @@ onMounted(load);
     <div class="field" style="margin-top: 14px">
       <div class="slider-row">
         <label for="keep">事件记录保留<Tip text="原始消息只保留 7 天，用于排查问题。" /></label>
-        <select id="keep" class="sel" :value="state.settings.retentionDays" @change="(e) => setRetention(Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'])">
+        <select id="keep" class="sel" style="width: 160px; justify-self: start" :value="state.settings.retentionDays" @change="(e) => setRetention(Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'])">
           <option :value="30">30 天</option><option :value="90">90 天</option><option :value="180">180 天</option><option :value="0">永久</option>
         </select>
         <span />

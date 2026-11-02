@@ -1,0 +1,43 @@
+# 临时：大屏铺满的截图检查（合并前删掉）
+name: 大屏截图
+
+on:
+  push:
+    branches: ['fix/wide-layout']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: 装截图用的浏览器
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null && npm i playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: 启动演示服务并截图
+        run: |
+          export STARFALL_DATA="$RUNNER_TEMP/demo" STARFALL_PORT=17601
+          node apps/server/src/cli/demo.ts > "$RUNNER_TEMP/demo.log" 2>&1 &
+          for i in $(seq 60); do grep -q '后台密码' "$RUNNER_TEMP/demo.log" && break; sleep 1; done
+          cat "$RUNNER_TEMP/demo.log"
+          PW=$(sed -n 's/^后台密码：//p' "$RUNNER_TEMP/demo.log")
+          node design/tools/wide-shots.mjs http://127.0.0.1:17601 "$PW" shots "$RUNNER_TEMP/pw"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wide-shots
+          path: shots

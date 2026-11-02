@@ -203,11 +203,11 @@ svg.i { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: n
 [data-theme="dark"] .theme-dark-only { display: block; }
 [data-theme="dark"] .theme-light-only { display: none; }
 
-.page { flex: 1; overflow: auto; padding: 28px 28px 40px; }
-/* 大屏上内容最宽 1400，居中；笔记本屏幕不受影响 */
-.page > * { max-width: 1400px; margin-left: auto; margin-right: auto; }
+/* 内容跟着屏幕变宽：左右留白随屏幕从 20 到 40 渐变；只有 比 2K 屏（2560）还宽的屏才封顶 2240（再宽一行太长不好读），封顶后居中 */
+.page { --page-max: 2240px; flex: 1; overflow: auto; padding: 28px clamp(20px, 2vw, 40px) 40px; }
+.page > * { max-width: var(--page-max); margin-left: auto; margin-right: auto; }
 /* 直接放在页面里的分段标签（如弹幕点歌的 主页/规则/画面）是行内元素，上面的居中管不到：改成块级，左边和内容列对齐 */
-.page > .seg { display: flex; margin-left: max(0px, calc((100% - 1400px) / 2)); margin-right: auto; }
+.page > .seg { display: flex; margin-left: max(0px, calc((100% - var(--page-max)) / 2)); margin-right: auto; }
 .page[hidden] { display: none; }
 .page-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
 .page-head h1 { margin: 0; font-size: var(--fs-h1); font-weight: 600; letter-spacing: -0.01em; }

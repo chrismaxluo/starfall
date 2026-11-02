@@ -14,13 +14,19 @@ const SIZES = [[1366, 768], [1920, 1080], [2560, 1440]];
 const OLD = '.page{padding:28px 28px 40px!important}.page>*{max-width:1400px!important}.page>.seg{display:inline-flex!important;margin-left:0!important}';
 
 const browser = await chromium.launch();
+// 只登录一次（每张图都登录会被登录次数限制挡住），之后复用登录状态
+const login = await browser.newContext();
+const r = await login.request.post(`${B}/api/auth/login`, { data: { password: PW } });
+if (!r.ok()) throw new Error(`登录失败 ${r.status()}`);
+const storageState = await login.storageState();
+await login.close();
 async function shoot(w, h, route, file, css) {
-  const ctx = await browser.newContext({ viewport: { width: w, height: h }, reducedMotion: 'reduce', colorScheme: 'light' });
-  await ctx.request.post(`${B}/api/auth/login`, { data: { password: PW } });
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, reducedMotion: 'reduce', colorScheme: 'light', storageState });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('PAGEERROR', route, e.message));
   await page.goto(`${B}/#${route}`);
   await page.waitForTimeout(2500);
+  if (await page.locator('input[type=password]').count()) console.log('LOGIN-PAGE', file);
   if (css) await page.addStyleTag({ content: css });
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(OUT, file), type: 'jpeg', quality: 82 });

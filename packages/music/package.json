@@ -1,6 +1,6 @@
 {
   "name": "@starfall/music",
-  "version": "2.0.0",
+  "version": "2.0.1-beta.2",
   "private": true,
   "description": "弹幕点歌：网易云音乐接口、选歌",
   "license": "GPL-3.0-only",

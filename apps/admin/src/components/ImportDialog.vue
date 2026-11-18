@@ -8,7 +8,7 @@ import type { ImportPreview } from '../lib/types.ts';
 import Icon from './Icon.vue';
 import { useEsc } from '../lib/esc.ts';
 
-const props = defineProps<{ preview: ImportPreview }>();
+const props = defineProps<{ preview: ImportPreview; restoring: boolean }>();
 const emit = defineEmits<{ close: []; done: [] }>();
 const busy = ref(false);
 const open = ref<string | null>(null);
@@ -20,20 +20,18 @@ const exported = computed(() => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' });
 });
 
-/** 从备份列表点「恢复到这份」打开的（文件名是备份的名字） */
-const restoring = computed(() => /^starfall-\d{8}-/.test(props.preview.filename));
 async function cancel(): Promise<void> {
   if (busy.value) return;
   void del(`/api/backup/import/${props.preview.token}`).catch(() => undefined);
   emit('close');
 }
 async function confirm(): Promise<void> {
+  if (busy.value) return;
   busy.value = true;
   const r = await attempt(() => post<{ ok: true; savedFiles: number; backup?: string }>(`/api/backup/import/${props.preview.token}`));
-  busy.value = false;
   if (!r) return emit('close');
-  await Promise.all([refreshEffects(), refreshRules(), refreshOutputs(), refreshSettings()]);
-  const done = restoring.value ? '已恢复到这份备份' : '导入完成';
+  await Promise.allSettled([refreshEffects(), refreshRules(), refreshOutputs(), refreshSettings()]);
+  const done = props.restoring ? '已恢复配置' : '导入完成';
   toast(`${done}${r.savedFiles ? `，恢复了 ${r.savedFiles} 个素材文件` : ''}；之前的配置已经自动备份`, 'ok', 5000);
   emit('done');
 }
@@ -44,8 +42,8 @@ useEsc(() => void cancel());
 <template>
   <Teleport to="body">
     <div class="ed-scrim" @click="cancel" />
-    <div class="dlg imp" role="dialog" :aria-label="restoring ? '恢复备份' : '导入配置'">
-      <div class="qh"><b>{{ restoring ? '恢复到这份备份' : '导入配置' }}</b><span class="imp-src">{{ preview.filename }}<template v-if="exported"> · 导出于 {{ exported }}</template></span><button class="icon-btn" aria-label="关闭" @click="cancel"><Icon name="i-x" /></button></div>
+    <div class="dlg imp" role="dialog" aria-modal="true" :aria-label="restoring ? '恢复配置' : '导入配置'">
+      <div class="qh"><b>{{ restoring ? '恢复配置' : '导入配置' }}</b><span class="imp-src">{{ preview.filename }}<template v-if="exported"> · 导出于 {{ exported }}</template></span><button type="button" class="icon-btn" aria-label="关闭" :disabled="busy" @click="cancel"><Icon name="i-x" /></button></div>
       <div class="imp-b">
         <p class="imp-lead">{{ changed.length ? '导入后会有这些变化，确认后才生效：' : '和现在的配置完全一样，不需要导入。' }}</p>
         <ul class="imp-list">
@@ -59,7 +57,7 @@ useEsc(() => void cancel());
         <div v-if="plan.warnings.length" class="imp-warn">
           <b>需要注意</b>
           <ul><li v-for="w in plan.warnings" :key="w">{{ w }}</li></ul>
-          <span v-if="plan.files.missing">缺少的文件可以之后在素材库里重新上传；想一起恢复，请用「导出（含素材文件）」得到的 zip 导入。</span>
+          <span v-if="plan.files.missing">可在素材库重新上传缺少的文件，也可以在原设备选择「导出 → 配置和素材」，再导入 .zip 文件。</span>
         </div>
         <p class="imp-note">规则会整体替换成{{ restoring ? '备份' : '文件' }}里的；本机的素材、黑名单、输出只增加和更新，不会删除；B站账号和后台密码不受影响。确认后会先自动备份一份现在的配置，{{ restoring ? '恢复' : '导入' }}错了还能再恢复回来。</p>
       </div>

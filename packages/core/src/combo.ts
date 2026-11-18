@@ -2,7 +2,7 @@
 import type { GiftEvent, GuardEvent } from '@starfall/shared';
 
 /** 连击最长合并多久（防止一直连击时迟迟不播） */
-const MAX_HOLD_MS = 30_000;
+export const GIFT_COMBO_MAX_HOLD_MS = 30_000;
 
 /**
  * 同一人在 windowMs 内连续送同一种礼物，合并成一次：数量相加，时间和编号取第一次。
@@ -25,7 +25,7 @@ export class GiftComboMerger {
     if (p) {
       p.ev = { ...p.ev, count: p.ev.count + ev.count, viewer: { ...p.ev.viewer, ...ev.viewer } };
       p.last = now;
-      if (now - p.first >= MAX_HOLD_MS) {
+      if (now - p.first >= GIFT_COMBO_MAX_HOLD_MS) {
         this.pending.delete(key);
         return [p.ev];
       }
@@ -38,7 +38,7 @@ export class GiftComboMerger {
   flush(now: number): GiftEvent[] {
     const out: GiftEvent[] = [];
     for (const [key, p] of this.pending) {
-      if (now - p.last >= this.windowMs || now - p.first >= MAX_HOLD_MS) {
+      if (now - p.last >= this.windowMs || now - p.first >= GIFT_COMBO_MAX_HOLD_MS) {
         this.pending.delete(key);
         out.push(p.ev);
       }

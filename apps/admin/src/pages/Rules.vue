@@ -78,7 +78,8 @@ function flash(key: string): void {
 }
 
 /** 各表的列宽：开关 | 条件 | 特效 | 冷却 | 操作 */
-const ENTER_COLS = '44px minmax(140px, 200px) minmax(190px, 300px) minmax(0, 1fr) 68px';
+// 身份、特效、冷却按比例分宽度：大屏上空白均匀分开，不全堆在冷却列后面
+const ENTER_COLS = '44px minmax(140px, 1fr) minmax(190px, 1.5fr) minmax(0, 1.5fr) 68px';
 const EX_COLS = '44px minmax(150px, 1.2fr) minmax(110px, 1fr) minmax(180px, 260px) 120px 96px 68px';
 const GUARDS: Array<{ tier: Tier; cond: string }> = [
   { tier: 'gov', cond: '总督' },

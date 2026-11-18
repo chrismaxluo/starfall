@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// 设置 → 数据：自动备份（F-DA-03）、事件记录保留期（F-DA-02）、导出 / 导入配置（F-DA-04）
-import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { get, post, put, upload } from '../lib/api.ts';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import type { HistoryPreview } from '@starfall/shared';
+import { errMsg, get, post, put, upload } from '../lib/api.ts';
+import { pushEsc } from '../lib/esc.ts';
 import { fileSize } from '../lib/format.ts';
 import { refreshSettings, state } from '../lib/store.ts';
 import { attempt, toast, undoable } from '../lib/toast.ts';
@@ -9,14 +10,32 @@ import type { BackupItem, ImportPreview, Settings } from '../lib/types.ts';
 import Icon from './Icon.vue';
 import Tip from './Tip.vue';
 import ImportDialog from './ImportDialog.vue';
+import HistoryImportDialog from './HistoryImportDialog.vue';
 import Switch from './Switch.vue';
+
+type PendingImport = { kind: 'history'; preview: HistoryPreview } | { kind: 'config'; preview: ImportPreview; restoring: boolean };
 
 const backups = ref<BackupItem[]>([]);
 const showAll = ref(false);
+const showExport = ref(false);
+const exportChoice = ref<HTMLAnchorElement | null>(null);
+const exportButton = ref<HTMLButtonElement | null>(null);
 const running = ref(false);
 const fileIn = ref<HTMLInputElement | null>(null);
 const uploading = ref<number | null>(null);
-const preview = ref<ImportPreview | null>(null);
+const restoring = ref(false);
+const pending = ref<PendingImport | null>(null);
+const importBusy = computed(() => uploading.value !== null || restoring.value || pending.value !== null);
+
+function closeExport(): void {
+  showExport.value = false;
+  exportButton.value?.focus();
+}
+watch(showExport, (open, _before, onCleanup) => {
+  if (!open) return;
+  exportChoice.value?.focus();
+  onCleanup(pushEsc(closeExport));
+}, { flush: 'post' });
 
 // 导出（含素材文件）要打包一会儿：一点按钮马上变成「正在打包…」，开始下载时（服务端发来的 cookie）再说一声
 const packing = ref<string | null>(null);
@@ -29,6 +48,7 @@ function stopPacking(): void {
 }
 function exportWithFiles(): void {
   if (packing.value) return;
+  closeExport();
   const token = Math.random().toString(36).slice(2, 12);
   packing.value = token;
   const started = Date.now();
@@ -72,31 +92,56 @@ async function runNow(): Promise<void> {
   if (await attempt(() => post('/api/backup/run'), '已备份')) await load();
   running.value = false;
 }
-/** 20260926-0400 → 9月26日 04:00；手动备份 20260926-153012-m → 9月26日 15:30 · 手动 */
+/** 20260926-0400 → 9月26日 04:00；手动备份另有标签。 */
 function when(stamp: string): string {
-  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2}-m)?$/.exec(stamp);
-  return m ? `${Number(m[2])}月${Number(m[3])}日 ${m[4]}:${m[5]}${m[6] ? ' · 手动' : ''}` : stamp;
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(?:\d{2}-m)?$/.exec(stamp);
+  return m ? `${Number(m[2])}月${Number(m[3])}日 ${m[4]}:${m[5]}` : stamp;
 }
 
-/** 恢复到某一份备份：先显示会有哪些变化，确认后才生效（恢复前会自动再备份一份现在的） */
+/** 恢复配置与导入配置共用预览和确认。 */
 async function restore(b: BackupItem): Promise<void> {
-  if (!b.config) return;
-  const r = await attempt(() => post<ImportPreview>(`/api/backup/restore/${b.config}`));
-  if (r) preview.value = r;
+  if (!b.config || importBusy.value) return;
+  restoring.value = true;
+  try {
+    const preview = await attempt(() => post<ImportPreview>(`/api/backup/restore/${b.config}`));
+    if (preview) pending.value = { kind: 'config', preview, restoring: true };
+  } finally {
+    restoring.value = false;
+  }
 }
 async function pick(e: Event): Promise<void> {
   const el = e.target as HTMLInputElement;
-  const f = el.files?.[0];
+  const file = el.files?.[0];
   el.value = '';
-  if (!f) return;
+  if (!file || importBusy.value) return;
+  const extension = /\.(db|zip|json)$/i.exec(file.name)?.[1]?.toLowerCase();
+  if (!extension) {
+    toast('请选择星临导出的 .db、.zip 或 .json 文件', 'err', 5000);
+    return;
+  }
   uploading.value = 0;
+  const onProgress = (progress: number) => (uploading.value = progress);
   try {
-    preview.value = await upload<ImportPreview>('/api/backup/import', f, (p) => (uploading.value = p));
+    if (extension === 'db') {
+      const preview = await upload<HistoryPreview>('/api/backup/history/import', file, onProgress);
+      pending.value = { kind: 'history', preview };
+    } else {
+      const preview = await upload<ImportPreview>('/api/backup/import', file, onProgress);
+      pending.value = { kind: 'config', preview, restoring: false };
+    }
   } catch (err) {
-    toast(err instanceof Error ? err.message : String(err), 'err', 5000);
+    toast(errMsg(err), 'err', 5000);
   } finally {
     uploading.value = null;
   }
+}
+
+function closeImport(): void {
+  pending.value = null;
+}
+function finishImport(): void {
+  closeImport();
+  void load();
 }
 
 onMounted(load);
@@ -104,41 +149,95 @@ onMounted(load);
 
 <template>
   <div v-if="state.settings" class="card">
-    <div class="card-h"><h2><span class="hicon"><Icon name="i-upload" /></span>数据</h2><span class="aside"><button class="btn" :disabled="running" title="马上备份一次数据库和配置（另外保留最近 5 份）" @click="runNow"><Icon name="i-check" />{{ running ? '正在备份…' : '立即备份' }}</button></span></div>
+    <div class="card-h"><h2><span class="hicon"><Icon name="i-upload" /></span>数据</h2></div>
     <div class="field">
-      <div class="toggle-line">每天自动备份<Tip text="凌晨备份数据库和配置，保留最近 7 份；手动备份另外保留最近 5 份。" />
-        <Switch v-model="state.settings.autoBackup" label="每天自动备份" @change="(v) => save({ autoBackup: v }, v ? '已开启每天自动备份' : '已关闭自动备份')" />
-      </div>
-      <div class="bk-t">
-        <div v-for="b in showAll ? backups : backups.slice(0, 2)" :key="b.stamp" class="r">
-          <span class="num">{{ when(b.stamp) }}<span v-if="b.manual" class="tag nor" style="margin-left: 6px; font-size: var(--fs-badge)">手动</span></span>
-          <span class="sz">{{ fileSize(b.dbSize + b.configSize) }}</span>
-          <button v-if="b.config" type="button" class="linkish" @click="restore(b)">恢复到这份</button><span v-else />
-          <a v-if="b.config" class="linkish" :href="`/api/backup/files/${b.config}`" download title="下载这份配置文件">下载</a><span v-else />
-        </div>
-        <div v-if="!backups.length" class="r" style="grid-template-columns: 1fr"><span class="inline-hint">还没有备份</span></div>
-        <button v-if="backups.length > 2" type="button" class="more" @click="showAll = !showAll">{{ showAll ? '收起' : `全部 ${backups.length} 份` }}</button>
-      </div>
-    </div>
-    <div class="field" style="margin-top: 14px">
-      <div class="slider-row">
-        <label for="keep">事件记录保留<Tip text="原始消息只保留 7 天，用于排查问题。" /></label>
-        <select id="keep" class="sel" :value="state.settings.retentionDays" @change="(e) => setRetention(Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'])">
-          <option :value="30">30 天</option><option :value="90">90 天</option><option :value="180">180 天</option><option :value="0">永久</option>
-        </select>
-        <span />
-      </div>
-      
-    </div>
-    <div class="field" style="margin-top: 14px">
-      <span class="flabel">导出 / 导入配置<Tip text="配置包括规则、素材设置、输出和播放设置，不含 B站登录信息和后台密码。桌面版和服务器版的文件可以互相导入；换电脑时建议导出含素材文件的 zip。导入或恢复前会自动备份一份现在的配置。" /></span>
       <div class="bk-actions">
-        <a class="btn" href="/api/backup/export" download><Icon name="i-upload" />导出配置</a>
-        <button class="btn" type="button" :disabled="packing !== null" :aria-busy="packing !== null" @click="exportWithFiles"><span v-if="packing" class="spin" />{{ packing ? '正在打包…' : '导出（含素材文件）' }}</button>
-        <button class="btn" :disabled="uploading !== null" @click="fileIn?.click()">{{ uploading !== null ? `正在上传 ${Math.round(uploading * 100)}%` : '导入配置' }}</button>
-        <input ref="fileIn" type="file" accept=".json,.zip,application/json,application/zip" hidden @change="pick" />
+        <button ref="exportButton" type="button" class="btn primary" aria-haspopup="dialog" :disabled="packing !== null || importBusy" :aria-busy="packing !== null" @click="showExport = true">
+          <span v-if="packing" class="spin" />{{ packing ? '正在打包…' : '导出' }}
+        </button>
+        <button type="button" class="btn" :disabled="importBusy || showExport" :aria-busy="uploading !== null" @click="fileIn?.click()">
+          {{ uploading !== null ? (uploading < 1 ? `正在上传 ${Math.round(uploading * 100)}%` : '正在读取文件…') : '导入' }}
+        </button>
+        <input ref="fileIn" type="file" accept=".db,.zip,.json" hidden @change="pick" />
+      </div>
+      <span class="inline-hint">桌面版和服务器版可互相导入直播历史、配置和素材。选文件后先预览。</span>
+    </div>
+    <div class="data-backups">
+      <div class="data-backup-head">
+        <h3>备份管理</h3>
+        <button type="button" class="btn" :disabled="running" title="马上备份一次数据库和配置（另外保留最近 5 份）" @click="runNow"><Icon name="i-check" />{{ running ? '正在备份…' : '立即备份' }}</button>
+      </div>
+      <div class="field">
+        <div class="toggle-line">每天自动备份<Tip text="凌晨备份数据库和配置，保留最近 7 份。手动备份另外保留最近 5 份。" />
+          <Switch v-model="state.settings.autoBackup" label="每天自动备份" @change="(v) => save({ autoBackup: v }, v ? '已开启每天自动备份' : '已关闭自动备份')" />
+        </div>
+        <div class="bk-t">
+          <div v-for="b in showAll ? backups : backups.slice(0, 2)" :key="b.stamp" class="r">
+            <span class="num">{{ when(b.stamp) }}<span v-if="b.manual" class="tag nor" style="margin-left: 6px; font-size: var(--fs-badge)">手动</span></span>
+            <span class="sz">{{ fileSize(b.dbSize + b.configSize) }}</span>
+            <button v-if="b.config" type="button" class="linkish" :disabled="importBusy || showExport" @click="restore(b)">恢复配置</button><span v-else />
+            <a v-if="b.config" class="linkish" :href="`/api/backup/files/${b.config}`" download title="下载这份配置文件">下载配置</a><span v-else />
+          </div>
+          <div v-if="!backups.length" class="r" style="grid-template-columns: 1fr"><span class="inline-hint">还没有备份</span></div>
+          <button v-if="backups.length > 2" type="button" class="more" @click="showAll = !showAll">{{ showAll ? '收起' : `全部 ${backups.length} 份` }}</button>
+        </div>
+      </div>
+      <div class="field" style="margin-top: 14px">
+        <div class="slider-row">
+          <label for="keep">事件记录保留<Tip text="原始消息只保留 7 天，用于排查问题。" /></label>
+          <select id="keep" class="sel" style="width: 160px; justify-self: start" :value="state.settings.retentionDays" @change="(e) => setRetention(Number((e.target as HTMLSelectElement).value) as Settings['retentionDays'])">
+            <option :value="30">30 天</option><option :value="90">90 天</option><option :value="180">180 天</option><option :value="0">永久</option>
+          </select>
+          <span />
+        </div>
       </div>
     </div>
-    <ImportDialog v-if="preview" :preview="preview" @close="preview = null" @done="(preview = null), load()" />
+    <Teleport v-if="showExport" to="body">
+      <div class="ed-scrim" @click="closeExport" />
+      <div class="dlg imp" role="dialog" aria-modal="true" aria-label="导出数据">
+        <div class="qh">
+          <b>导出数据</b>
+          <button type="button" class="icon-btn" aria-label="关闭" @click="closeExport"><Icon name="i-x" /></button>
+        </div>
+        <div class="imp-b">
+          <a ref="exportChoice" class="data-export-choice" href="/api/backup/history/export" download @click="closeExport">
+            <strong>直播历史</strong><span class="data-export-format">.db</span>
+            <span>礼物、弹幕、上舰、醒目留言和直播场次</span>
+          </a>
+          <button type="button" class="data-export-choice" @click="exportWithFiles">
+            <strong>配置和素材</strong><span class="data-export-format">.zip</span>
+            <span>规则、设置和上传的素材文件</span>
+          </button>
+          <a class="linkish data-config-export" href="/api/backup/export" download @click="closeExport">仅配置（.json）</a>
+        </div>
+      </div>
+    </Teleport>
+    <ImportDialog v-if="pending?.kind === 'config'" :preview="pending.preview" :restoring="pending.restoring" @close="closeImport" @done="finishImport" />
+    <HistoryImportDialog v-if="pending?.kind === 'history'" :preview="pending.preview" @close="closeImport" @done="finishImport" />
   </div>
 </template>
+
+<style scoped>
+.data-backups { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.data-backup-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.data-backup-head h3 { margin: 0; font-size: var(--fs-body); font-weight: 600; }
+.data-export-choice {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--l3);
+  color: var(--t1);
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+.data-export-choice:hover { background: var(--hover); }
+.data-export-choice strong { font-size: var(--fs-body); font-weight: 600; }
+.data-export-choice span { color: var(--t2); }
+.data-export-choice .data-export-format { color: var(--t3); }
+.data-config-export { align-self: flex-start; }
+.bk-t .linkish { white-space: nowrap; }
+</style>

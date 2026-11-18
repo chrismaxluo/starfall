@@ -112,8 +112,8 @@ function matches(e: EventDto): boolean {
 const LIVE_MAX = 300;
 function insert(e: EventDto): void {
   if (rows.value.some((x) => x.id === e.id)) return;
-  // 按编号倒序放到正确的位置（晚一点才符合筛选的事件不会跑到更新的事件上面）
-  const i = rows.value.findIndex((x) => x.id < e.id);
+  // 历史记录的编号可能比新事件大，按发生时间放回列表。
+  const i = rows.value.findIndex((x) => x.ts < e.ts || (x.ts === e.ts && x.id < e.id));
   if (i < 0 && cursor.value !== null) return;
   rows.value.splice(i < 0 ? rows.value.length : i, 0, e);
   if (rows.value.length > LIVE_MAX) {

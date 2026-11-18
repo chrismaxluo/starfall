@@ -26,7 +26,7 @@ type Msg =
   | { type: 'event'; event: EventDto }
   | { type: 'event_status'; id: number; status: PlayStatus }
   /** 别的设备（或这台）改了规则、素材、设置、输出 */
-  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'quickplay' | 'music' | 'music_library' | 'all' }
+  | { type: 'changed'; what: 'rules' | 'library' | 'settings' | 'outputs' | 'quickplay' | 'music' | 'music_library' | 'history' | 'all' }
   /** 弹幕点歌：整份状态、新的提示、网易云账号 */
   | { type: 'music' | 'music_notice' | 'music_account'; [k: string]: unknown };
 
@@ -109,6 +109,11 @@ function handle(m: Msg): void {
       onMusicMessage(m);
       break;
     case 'changed': {
+      if (m.what === 'history') {
+        void refreshFeed().catch(() => undefined);
+        for (const fn of resyncListeners) fn();
+        break;
+      }
       if (m.what === 'music' || m.what === 'music_library' || m.what === 'all') {
         if (m.what === 'music_library') music.libraryRev++;
         if (music.loaded) void loadMusic().catch(() => undefined);

@@ -296,7 +296,7 @@ export class LiveService {
       .select()
       .from(liveSessions)
       .where(and(eq(liveSessions.roomId, roomId), isNotNull(liveSessions.endedAt)))
-      .orderBy(desc(liveSessions.id))
+      .orderBy(desc(liveSessions.startedAt), desc(liveSessions.id))
       .limit(1)
       .get();
     return r ? { id: r.id, startedAt: r.startedAt, endedAt: r.endedAt! } : null;

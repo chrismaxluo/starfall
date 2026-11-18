@@ -1,7 +1,7 @@
 // 数据库表结构（方案设计第 6 节）。时间一律存毫秒时间戳；金额存金瓜子（整数）。
 // 修改后运行 pnpm --filter @starfall/server db:generate 生成迁移文件。
 import { sql } from 'drizzle-orm';
-import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { CHAT_CREAM_FRAMES, CHAT_LOOKS, CHAT_MASCOTS, GIFTS_ALPHA_DEFAULT, GIFTS_LOOKS, GIFTS_MOTIONS } from '@starfall/shared';
 import type { DanmuWho, EffectTexts, FeatherMode, GiftListItem, GiftsFilter, MusicSource, Position, SvgaRole, Tier } from '@starfall/shared';
 import type { SvgaSlot } from '../services/probe.ts';
@@ -234,6 +234,13 @@ export const liveSessions = sqliteTable('live_sessions', {
   endedAt: integer('ended_at'),
 });
 
+/** 记住历史导入已确认的时间对应关系，避免场次时间范围扩大后重复导入。 */
+export const historySessionAliases = sqliteTable('history_session_aliases', {
+  roomId: integer('room_id').notNull(),
+  sourceStartedAt: integer('source_started_at').notNull(),
+  sessionId: integer('session_id').notNull().references(() => liveSessions.id, { onDelete: 'cascade' }),
+}, (t) => [primaryKey({ columns: [t.roomId, t.sourceStartedAt] })]);
+
 /** 事件记录：每个事件一行，带判断结果和原因 */
 export const events = sqliteTable(
   'events',
@@ -252,8 +259,11 @@ export const events = sqliteTable(
     effectId: integer('effect_id'),
     status: text('status').notNull(),
     raw: text('raw', { mode: 'json' }),
+    /** 跨设备迁移时保留原记录身份，以及已知的 B 站事件编号摘要。 */
+    historyKey: text('history_key'),
+    platformKey: text('platform_key'),
   },
-  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id), index('events_room_status_id').on(t.roomId, t.status, t.id), index('events_session_kind').on(t.sessionId, t.kind), index('events_room_id_uname').on(t.roomId, t.id, t.uname)],
+  (t) => [index('events_ts').on(t.ts), index('events_uid_ts').on(t.uid, t.ts), index('events_kind_ts').on(t.kind, t.ts), index('events_session').on(t.sessionId), index('events_room_ts').on(t.roomId, t.ts), index('events_room_id').on(t.roomId, t.id), index('events_room_kind_id').on(t.roomId, t.kind, t.id), index('events_room_status_id').on(t.roomId, t.status, t.id), index('events_session_kind').on(t.sessionId, t.kind), index('events_room_id_uname').on(t.roomId, t.id, t.uname), uniqueIndex('events_history_key').on(t.historyKey), index('events_platform_key').on(t.platformKey)],
 );
 
 /**

@@ -12,6 +12,7 @@ import type { AppContext } from './context.ts';
 import { HttpError, sendError } from './http.ts';
 import { authRoutes, SESSION_COOKIE } from './routes/auth.ts';
 import { backupRoutes } from './routes/backup.ts';
+import { historyRoutes } from './routes/history.ts';
 import { giftListRoutes } from './routes/gift-list.ts';
 import { biliRoutes } from './routes/bili.ts';
 import { eventRuleRoutes } from './routes/event-rules.ts';
@@ -136,7 +137,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
       prefix: '/overlay/',
       decorateReply: false,
       cacheControl: false,
-      setHeaders: (reply, file) => reply.header('Cache-Control', file.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'),
+      setHeaders: (reply, file) => reply.header('Cache-Control', file.replaceAll('\\', '/').includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'),
     });
     app.get('/overlay', async (req, reply) => reply.redirect(`/overlay/${req.url.slice('/overlay'.length)}`));
   }
@@ -188,6 +189,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
   aboutRoutes(app, ctx);
   eventRoutes(app, ctx);
   backupRoutes(app, ctx);
+  historyRoutes(app, ctx);
   giftListRoutes(app, ctx);
   musicRoutes(app, ctx);
   await app.register(async (scope) => wsRoutes(scope, ctx));

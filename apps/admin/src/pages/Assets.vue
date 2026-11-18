@@ -287,9 +287,10 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
             <span>{{ meta(e) }}</span>
             <span :class="{ used: e.usedBy.length }">{{ e.usedBy.length ? `用于 ${e.usedBy.map((u) => u.label).join('、')}` : '未使用 · 在触发规则里选它' }}</span>
           </div>
-          <div class="card-acts" @click.stop @keydown.stop>
+          <div class="card-acts" :class="{ 'with-download': e.asset }" @click.stop @keydown.stop>
             <button type="button" :aria-label="`重命名 ${e.name}`" @click="startRename(`e:${e.id}`, e.name)"><Icon name="i-pen" />重命名</button>
             <button type="button" :aria-label="`复制 ${e.name}`" @click="copyEffect(e)"><Icon name="i-dup" />复制</button>
+            <a v-if="e.asset" :href="e.asset.url" :download="e.asset.filename" :aria-label="`下载文件 ${e.name}`"><Icon name="i-download" />下载文件</a>
             <button v-if="e.usedBy.length" type="button" class="off" :title="`正在用于 ${e.usedBy.map((u) => u.label).join('、')}，先在触发规则里换掉才能删除`" @click="removeEffect(e)"><Icon name="i-trash" />删除</button>
             <button v-else type="button" class="danger" :aria-label="`删除 ${e.name}`" @click="removeEffect(e)"><Icon name="i-trash" />删除</button>
           </div>
@@ -329,6 +330,7 @@ const empty = computed(() => !state.effects.some((e) => !e.builtin) && !state.so
         </div>
         <div class="card-acts">
           <button type="button" :aria-label="`重命名 ${baseName(s.filename)}`" @click="startRename(`s:${s.id}`, baseName(s.filename))"><Icon name="i-pen" />重命名</button>
+          <a :href="s.url" :download="s.filename" :aria-label="`下载文件 ${baseName(s.filename)}`"><Icon name="i-download" />下载文件</a>
           <button v-if="s.usedBy.length" type="button" class="off" :title="`正在被 ${s.usedBy.map((u) => u.name).join('、')} 使用，先在素材设置里换掉才能删除`" @click="removeSound(s)"><Icon name="i-trash" />删除</button>
           <button v-else type="button" class="danger" :aria-label="`删除 ${baseName(s.filename)}`" @click="removeSound(s)"><Icon name="i-trash" />删除</button>
         </div>

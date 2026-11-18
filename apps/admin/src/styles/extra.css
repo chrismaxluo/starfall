@@ -639,7 +639,7 @@ body:has(.editor) .toasts { bottom: 92px; }
 .c-who .nm .uid { font-variant-numeric: tabular-nums; font-size: var(--fs-cap); color: var(--t3); }
 .c-who .gico { width: 28px; height: 28px; flex: none; }
 .c-eff { min-width: 0; }
-.c-eff .effbtn { max-width: 280px; }
+.c-eff .effbtn { max-width: 400px; }
 .c-cd { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sec); color: var(--t3); white-space: nowrap; }
 .c-act { display: flex; justify-content: flex-end; align-items: center; gap: 2px; }
 .c-act .icon-btn { width: 30px; height: 30px; border-color: transparent; background: transparent; box-shadow: none; color: var(--t3); }
@@ -775,7 +775,7 @@ body:has(.editor) .toasts { bottom: 92px; }
 .cl-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 2px; border: 0; background: none; color: var(--t1); font: inherit; font-size: var(--fs-body); font-weight: 600; text-align: left; }
 .cl-h svg.i { width: 14px; height: 14px; color: var(--t3); transform: rotate(-90deg); transition: transform .15s; }
 .cl-sec.open .cl-h svg.i { transform: none; }
-.cl-b { padding: 0 2px 14px 24px; font-size: var(--fs-sec); color: var(--t2); line-height: 1.75; }
+.cl-b { max-width: 70em; padding: 0 2px 14px 24px; font-size: var(--fs-sec); color: var(--t2); line-height: 1.75; }
 .cl-b h4 { margin: 12px 0 4px; font-size: var(--fs-sec); color: var(--t1); font-weight: 600; }
 .cl-b h4:first-child { margin-top: 0; }
 .cl-b ul { margin: 0; padding-left: 18px; }

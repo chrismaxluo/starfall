@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GiftComboMerger } from '@starfall/core';
 import type { HistoryPreview } from '@starfall/shared';
-import { eventRaw, events, liveSessions } from '../db/schema.ts';
+import { eventRaw, events, historySessionAliases, liveSessions } from '../db/schema.ts';
 import { formFile, testApp } from '../testing.ts';
 
 const base = '/api/backup/history';
@@ -149,6 +150,140 @@ describe('历史数据迁移', () => {
     expect((await confirm(dest, p)).statusCode).toBe(200);
     expect(dest.ctx.log.query({ roomId }).events).toHaveLength(4);
     expect(dest.ctx.log.giftRank(roomId, 0, null).gold).toBe(40_200);
+  });
+
+  it('不同设备从不同时间开始记录同一段礼物连击，不重复累计金额', async () => {
+    const source = await setup();
+    const dest = await setup();
+    const start = now - day;
+    const sourceCombo = new GiftComboMerger();
+    const destCombo = new GiftComboMerger();
+    for (let seconds = 0; seconds <= 24; seconds += 2) {
+      const ts = start + seconds * 1000;
+      const event = {
+        ...gift, count: 1, id: `g${seconds}`, kind: 'gift' as const, ts,
+        viewer: { uid: 10, name: '观众', guard: 0 as const, isMod: false, mystery: false },
+      };
+      sourceCombo.push(event, ts);
+      if (seconds >= 18) destCombo.push(event, ts);
+    }
+    const [full] = sourceCombo.flush(start + 30_000);
+    const [partial] = destCombo.flush(start + 30_000);
+    expect([full?.count, partial?.count]).toEqual([13, 4]);
+    record(source, full!.ts, 'gift', { ...gift, count: full!.count });
+    record(dest, partial!.ts, 'gift', { ...gift, count: partial!.count });
+    record(source, start + 70_000, 'gift', { ...gift, count: 1 });
+
+    const p = await review(dest, await fileOf(source));
+    expect(p.plan.events.gift).toEqual({ added: 1, duplicate: 0, overlap: 1, expired: 0 });
+    expect((await confirm(dest, p)).statusCode).toBe(200);
+    expect(dest.ctx.log.giftRank(roomId, start, null).gold).toBe(500);
+  });
+
+  it('起播记录稍有偏差时合并唯一重叠的已结束场次，并保留独立场次', async () => {
+    const source = await setup();
+    const dest = await setup();
+    const start = now - day;
+    const end = start + 30 * 60_000;
+    const earlier = session(source, start, roomId, end);
+    const later = session(dest, start + 120_000, roomId, end + 1000);
+    const previous = session(dest, start - 240_000, roomId, start - 15_000);
+    record(source, start + 60_000, 'gift', gift, earlier);
+    record(dest, start + 180_000, 'gift', gift, later);
+
+    const bytes = await fileOf(source);
+    const p = await review(dest, bytes);
+    expect(p.plan.sessions).toEqual({ added: 0, existing: 1 });
+    expect(dest.ctx.live.lastSession(roomId)?.startedAt).toBe(start + 120_000);
+    expect((await confirm(dest, p)).statusCode).toBe(200);
+    expect(dest.ctx.log.sessionList(roomId).map((s) => [s.id, s.gifts])).toEqual([[later, 2], [previous, 0]]);
+    const last = dest.ctx.live.lastSession(roomId)!;
+    expect(last).toMatchObject({ id: later, startedAt: start, endedAt: end + 1000 });
+    expect(dest.ctx.log.giftRank(roomId, last.startedAt, last.endedAt).gold).toBe(400);
+    const repeat = await review(dest, bytes);
+    expect(repeat.plan.sessions).toEqual({ added: 0, existing: 1 });
+    expect(repeat.plan.events.gift.duplicate).toBe(1);
+  });
+
+  it('两场均可能匹配或场次仍在直播时，保留独立历史场次', async () => {
+    const source = await setup();
+    const dest = await setup();
+    const start = now - day;
+    const end = start + 30 * 60_000;
+    session(source, start, roomId, end);
+    const active = session(dest, start + 1000, roomId, null);
+    const first = session(dest, start + 2000, roomId, end);
+    const second = session(dest, start + 3000, roomId, end);
+
+    const p = await review(dest, await fileOf(source));
+    expect(p.plan.sessions).toEqual({ added: 1, existing: 0 });
+    expect((await confirm(dest, p)).statusCode).toBe(200);
+    expect(dest.ctx.log.sessionList(roomId)).toMatchObject([
+      { id: second, startedAt: start + 3000 }, { id: first, startedAt: start + 2000 },
+      { id: active, startedAt: start + 1000, endedAt: null }, { startedAt: start },
+    ]);
+  });
+
+  it('重复导入时，精确匹配的场次不会妨碍其他场次匹配', async () => {
+    const source = await setup();
+    const dest = await setup();
+    const start = now - day;
+    const end = start + 30 * 60_000;
+    const same = session(source, start + 60_000, roomId, end);
+    session(source, start + 360_000, roomId, end);
+    session(dest, start, roomId, end);
+    record(source, start + 100_000, 'gift', gift, same);
+    const file = await fileOf(source);
+    const first = await review(dest, file);
+    expect(first.plan.sessions).toEqual({ added: 1, existing: 1 });
+    expect((await confirm(dest, first)).statusCode).toBe(200);
+    const repeat = await review(dest, file);
+    expect(repeat.plan.sessions).toEqual({ added: 0, existing: 2 });
+    expect(repeat.plan.events.gift.duplicate).toBe(1);
+  });
+
+  it('场次时间扩大产生新的候选时，重导仍沿用上次确认的场次', async () => {
+    const source = await setup();
+    const dest = await setup();
+    const start = now - day;
+    const first = session(source, start + 150_000, roomId, start + 1_800_000);
+    const second = session(source, start + 450_000, roomId, start + 1_720_000);
+    const targetFirst = session(dest, start, roomId, start + 1_770_000);
+    const targetSecond = session(dest, start + 400_000, roomId, start + 1_450_000);
+    record(source, start + 200_000, 'gift', gift, first);
+    record(source, start + 500_000, 'gift', gift, second);
+
+    const file = await fileOf(source);
+    const p = await review(dest, file);
+    expect(p.plan.sessions).toEqual({ added: 0, existing: 2 });
+    expect(dest.ctx.db.select().from(historySessionAliases).all()).toHaveLength(0);
+    expect((await confirm(dest, p)).statusCode).toBe(200);
+    expect(dest.ctx.log.sessionList(roomId)).toMatchObject([
+      { id: targetSecond, endedAt: start + 1_720_000, gifts: 1 },
+      { id: targetFirst, endedAt: start + 1_800_000, gifts: 1 },
+    ]);
+    const repeat = await review(dest, file);
+    expect(repeat.plan.sessions).toEqual({ added: 0, existing: 2 });
+    expect(repeat.plan.events.gift.duplicate).toBe(2);
+  });
+
+  it.each([false, true])('醒目留言小数金额保留精度（完整备份=%s）', async (fullBackup) => {
+    const source = await setup();
+    const dest = await setup();
+    const payload = { text: '小数金额', price: 30.5, scId: 'decimal-sc' };
+    record(source, now - day, 'sc', payload);
+    let file: Buffer;
+    if (fullBackup) {
+      const backup = await source.ctx.backups.run();
+      file = fs.readFileSync(path.join(source.dataDir, 'backups', `starfall-${backup.stamp}.db`));
+    } else {
+      file = await fileOf(source);
+    }
+    const p = await review(dest, file);
+    expect(p.plan.events.sc.added).toBe(1);
+    expect((await confirm(dest, p)).statusCode).toBe(200);
+    expect(dest.ctx.log.query({ roomId }).events[0]?.payload).toEqual(payload);
+    expect(dest.ctx.log.giftRank(roomId, 0, null).gold).toBe(30_500);
   });
 
   it('确认时发现新记录与预览重叠会回滚，并要求重新确认', async () => {

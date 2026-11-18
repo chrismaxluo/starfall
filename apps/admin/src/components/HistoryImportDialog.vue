@@ -1,71 +1,49 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { HISTORY_KINDS } from '@starfall/shared';
 import type { HistoryKind, HistoryPlan, HistoryPreview } from '@starfall/shared';
-import { ApiError, del, errMsg, post, upload } from '../lib/api.ts';
+import { ApiError, del, errMsg, post } from '../lib/api.ts';
 import { refreshFeed } from '../lib/store.ts';
 import { toast } from '../lib/toast.ts';
-import { pushEsc } from '../lib/esc.ts';
+import { useEsc } from '../lib/esc.ts';
 import Icon from './Icon.vue';
-import Tip from './Tip.vue';
 
-const emit = defineEmits<{ done: [] }>();
-const input = ref<HTMLInputElement | null>(null);
-const uploading = ref<number | null>(null);
-const preview = ref<HistoryPreview | null>(null);
+const props = defineProps<{ preview: HistoryPreview }>();
+const emit = defineEmits<{ close: []; done: [] }>();
 const busy = ref(false);
 const message = ref('');
 const kindLabels: Record<HistoryKind, string> = { gift: '礼物', danmu: '弹幕', guard: '上舰', sc: '醒目留言' };
-const plan = computed(() => preview.value?.plan);
+const plan = ref(props.preview.plan);
 const totals = computed(() => ({
-  added: Object.values(plan.value?.events ?? {}).reduce((n, e) => n + e.added, 0),
-  expired: Object.values(plan.value?.events ?? {}).some((e) => e.expired > 0),
-  overlap: Object.values(plan.value?.events ?? {}).some((e) => e.overlap > 0),
+  added: Object.values(plan.value.events).reduce((n, e) => n + e.added, 0),
+  expired: Object.values(plan.value.events).some((e) => e.expired > 0),
+  overlap: Object.values(plan.value.events).some((e) => e.overlap > 0),
 }));
-const canApply = computed(() => totals.value.added > 0 || (plan.value?.sessions.added ?? 0) > 0);
+const canApply = computed(() => totals.value.added > 0 || plan.value.sessions.added > 0);
 const fmt = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' });
 
-async function pick(event: Event): Promise<void> {
-  const el = event.target as HTMLInputElement;
-  const file = el.files?.[0];
-  el.value = '';
-  if (!file) return;
-  uploading.value = 0;
-  message.value = '';
-  try {
-    preview.value = await upload<HistoryPreview>('/api/backup/history/import', file, (p) => (uploading.value = p));
-  } catch (error) {
-    toast(errMsg(error), 'err', 5000);
-  } finally {
-    uploading.value = null;
-  }
-}
-
 function cancel(): void {
-  if (!preview.value || busy.value) return;
-  const token = preview.value.token;
-  preview.value = null;
-  void del('/api/backup/history/import/' + token).catch(() => undefined);
+  if (busy.value) return;
+  void del('/api/backup/history/import/' + props.preview.token).catch(() => undefined);
+  emit('close');
 }
 
 async function confirm(): Promise<void> {
-  if (!preview.value || busy.value || !canApply.value) return;
-  const pending = preview.value;
+  if (busy.value || !canApply.value) return;
   busy.value = true;
   message.value = '';
   try {
-    const result = await post<{ plan: HistoryPlan; backup?: string }>('/api/backup/history/import/' + pending.token);
+    const result = await post<{ plan: HistoryPlan; backup?: string }>('/api/backup/history/import/' + props.preview.token);
     const count = Object.values(result.plan.events).reduce((sum, row) => sum + row.added, 0);
-    preview.value = null;
     void refreshFeed().catch(() => undefined);
     emit('done');
     toast('合并完成，新增 ' + count + ' 条记录、' + result.plan.sessions.added + ' 场直播');
   } catch (error) {
     if (error instanceof ApiError && error.code === 'history_changed') {
-      preview.value = { ...pending, plan: error.details as HistoryPlan };
+      plan.value = error.details as HistoryPlan;
       message.value = error.message;
     } else {
-      preview.value = null;
+      emit('close');
       toast(errMsg(error), 'err', 5000);
     }
   } finally {
@@ -73,23 +51,11 @@ async function confirm(): Promise<void> {
   }
 }
 
-watch(() => Boolean(preview.value), (open, _before, onCleanup) => {
-  if (open) onCleanup(pushEsc(cancel));
-});
+useEsc(cancel);
 </script>
 
 <template>
-  <div class="field" style="margin-top: 14px">
-    <span class="flabel">历史数据迁移<Tip text="桌面版和服务器版互通。历史文件包含礼物、弹幕、上舰、醒目留言与直播场次。合并后保留本机数据。" /></span>
-    <div class="bk-actions">
-      <a class="btn" href="/api/backup/history/export" download><Icon name="i-upload" />导出历史数据</a>
-      <button type="button" class="btn" :disabled="uploading !== null || Boolean(preview)" @click="input?.click()">
-        {{ uploading === null ? '合并历史记录' : '正在上传 ' + Math.round(uploading * 100) + '%' }}
-      </button>
-      <input ref="input" type="file" accept=".db" hidden @change="pick" />
-    </div>
-  </div>
-  <Teleport v-if="preview && plan" to="body">
+  <Teleport to="body">
     <div class="ed-scrim" @click="cancel" />
     <div class="dlg imp" role="dialog" aria-modal="true" aria-label="合并历史记录">
       <div class="qh">
@@ -98,6 +64,7 @@ watch(() => Boolean(preview.value), (open, _before, onCleanup) => {
       </div>
       <div class="imp-b">
         <p v-if="message" class="imp-warn" role="status">{{ message }}</p>
+        <p class="imp-lead">{{ plan.exportedAt === null ? '已识别为星临数据库备份，本次只合并直播历史。' : '此文件中的直播历史会合并到本机。' }}</p>
         <p v-if="plan.exportedAt !== null" class="imp-lead">导出于 {{ fmt.format(plan.exportedAt) }}</p>
         <p v-if="plan.from !== null && plan.to !== null" class="imp-lead">{{ fmt.format(plan.from) }} 至 {{ fmt.format(plan.to) }}</p>
         <div class="history-counts">

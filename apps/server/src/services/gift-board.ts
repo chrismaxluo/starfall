@@ -56,13 +56,13 @@ export class GiftBoards {
   }
 
   /** 服务启动时：「本场」先用上一场的（直播中重启时，接上本场后 sync 会换成本场的）；给每个输出装好名单（这时还没有页面连着） */
-  restore(): void {
+  restore(send = false): void {
     const room = this.d.room.get();
     this.roomId = room?.roomId ?? null;
     this.session = this.d.live.status().sessionId ?? (room ? (this.d.live.lastSession?.(room.roomId)?.id ?? null) : null);
     this.boards.clear();
     this.byOutput.clear();
-    for (const o of this.d.outputs.list()) this.attach(o.id, o.giftsFilter, false);
+    for (const o of this.d.outputs.list()) this.attach(o.id, o.giftsFilter, send);
   }
 
   /** 换了直播间：「本场」先清空，所有名单按新的直播间重新装 */

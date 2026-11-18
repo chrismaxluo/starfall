@@ -9,6 +9,7 @@ import type { BackupItem, ImportPreview, Settings } from '../lib/types.ts';
 import Icon from './Icon.vue';
 import Tip from './Tip.vue';
 import ImportDialog from './ImportDialog.vue';
+import HistoryTransfer from './HistoryTransfer.vue';
 import Switch from './Switch.vue';
 
 const backups = ref<BackupItem[]>([]);
@@ -139,6 +140,7 @@ onMounted(load);
         <input ref="fileIn" type="file" accept=".json,.zip,application/json,application/zip" hidden @change="pick" />
       </div>
     </div>
+    <HistoryTransfer @done="load" />
     <ImportDialog v-if="preview" :preview="preview" @close="preview = null" @done="(preview = null), load()" />
   </div>
 </template>

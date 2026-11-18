@@ -1,4 +1,5 @@
 // 事件记录（需求 F-DA-01 ~ 02、F-UI-04）：每个事件一行，带命中规则和播放状态。
+import { createHash } from 'node:crypto';
 import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { EventKind, PlayStatus, StdEvent } from '@starfall/shared';
@@ -30,6 +31,12 @@ export interface EventDto {
 }
 
 const dto = (r: EventRow): EventDto => ({ id: r.id, ts: r.ts, kind: r.kind, uid: r.uid, uname: r.uname, viewer: r.viewer, payload: r.payload, rule: r.rule, effectId: r.effectId, status: r.status as PlayStatus });
+
+/** 只给有确定上游编号的事件标记。连击批次号不能唯一识别礼物记录。 */
+export function platformEventKey(roomId: number | null, kind: string, id: string | null | undefined): string | null {
+  if (roomId === null || !id || id === '0' || (kind !== 'guard' && kind !== 'sc')) return null;
+  return createHash('sha256').update(JSON.stringify([roomId, kind, id])).digest('hex');
+}
 
 function payloadOf(ev: LoggedEvent): unknown {
   switch (ev.kind) {
@@ -99,9 +106,10 @@ export class EventLog {
   }
 
   record(ev: LoggedEvent, r: { roomId: number | null; sessionId: number | null; rule: string | null; effectId: number | null; status: PlayStatus; raw?: unknown }): EventDto {
+    const platformKey = platformEventKey(r.roomId, ev.kind, ev.kind === 'sc' ? ev.scId : ev.kind === 'guard' ? ev.dedupeKey : null);
     const row = this.db
       .insert(events)
-      .values({ ts: ev.ts, roomId: r.roomId, sessionId: r.sessionId, kind: ev.kind, uid: ev.viewer.uid, uname: ev.viewer.name, viewer: ev.viewer, payload: payloadOf(ev), rule: r.rule, effectId: r.effectId, status: r.status })
+      .values({ ts: ev.ts, roomId: r.roomId, sessionId: r.sessionId, kind: ev.kind, uid: ev.viewer.uid, uname: ev.viewer.name, viewer: ev.viewer, payload: payloadOf(ev), rule: r.rule, effectId: r.effectId, status: r.status, platformKey })
       .returning()
       .get();
     if (r.raw != null) this.db.insert(eventRaw).values({ id: row.id, ts: ev.ts, raw: r.raw }).run();
@@ -122,32 +130,36 @@ export class EventLog {
     if (f.roomId !== undefined) conds.push(eq(events.roomId, f.roomId));
     if (f.kind) conds.push(eq(events.kind, f.kind));
     if (f.status?.length) conds.push(inArray(events.status, f.status));
-    if (f.cursor) conds.push(lt(events.id, f.cursor));
+    if (f.cursor) {
+      const anchor = this.db.select({ ts: events.ts }).from(events).where(eq(events.id, f.cursor)).get();
+      if (!anchor) return { events: [], nextCursor: null };
+      conds.push(sql`(${events.ts}, ${events.id}) < (${anchor.ts}, ${f.cursor})`);
+    }
     if (f.from !== undefined) conds.push(gte(events.ts, f.from));
     if (f.to !== undefined) conds.push(lt(events.ts, f.to));
     const q = f.q?.trim();
-    // 先只取编号（按名字找时走 (room_id, id, uname) 索引，不用把每条记录连原始消息读出来），再按编号取整条。
+    // 先只取编号和时间，再按编号取整条。导入的历史编号比已有记录大，排序以发生时间为准。
     // 数字同时按 UID 和名字找：分成两次查询各走各的索引（写成 or 会整表扫）
     const ids = (extra?: SQL) =>
       this.db
-        .select({ id: events.id })
+        .select({ id: events.id, ts: events.ts })
         .from(events)
         .where(and(...conds, extra))
-        .orderBy(desc(events.id))
+        .orderBy(desc(events.ts), desc(events.id))
         .limit(limit + 1)
-        .all()
-        .map((r) => r.id);
+        .all();
     let picked: number[] | null = null;
     if (q) {
       const pat = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-      picked = ids(sql`${events.uname} like ${pat} escape '\\'`);
-      if (/^\d+$/.test(q)) picked = [...new Set([...picked, ...ids(eq(events.uid, Number(q)))])].sort((a, b) => b - a).slice(0, limit + 1);
+      const matches = ids(sql`${events.uname} like ${pat} escape '\\'`);
+      if (/^\d+$/.test(q)) matches.push(...ids(eq(events.uid, Number(q))));
+      picked = [...new Set(matches.sort((a, b) => b.ts - a.ts || b.id - a.id).map((row) => row.id))].slice(0, limit + 1);
     }
     const rows = this.db
       .select()
       .from(events)
       .where(picked ? inArray(events.id, picked.length ? picked : [0]) : conds.length ? and(...conds) : undefined)
-      .orderBy(desc(events.id))
+      .orderBy(desc(events.ts), desc(events.id))
       .limit(limit + 1)
       .all();
     const page = rows.slice(0, limit).map(dto);
@@ -196,18 +208,20 @@ export class EventLog {
         when 'guard' then coalesce(json_extract(payload, '$.price'), 0)
         when 'sc' then json_extract(payload, '$.price') * 1000
       end`;
-    const base = `select id, uid, kind, viewer, (${value}) v, json_extract(payload, '$.unitPrice') p, json_extract(payload, '$.giftName') name
+    const base = `select id, uid, ts, kind, viewer, (${value}) v, json_extract(payload, '$.unitPrice') p, json_extract(payload, '$.giftName') name
       from events where room_id = ? and ts >= ? and ts < ? and kind in ('gift', 'guard', 'sc')`;
     const sum = db.prepare(`with g as (${base}) select count(distinct uid) people, coalesce(sum(v), 0) gold from g where v > 0`).get(...args) as { people: number; gold: number };
     const rows = db
       .prepare(
         `with g as (${base}),
+              ranked as (select *, first_value(id) over recent lastId, first_value(ts) over recent lastTs
+                         from g where v > 0 window recent as (partition by uid order by ts desc, id desc)),
               top as (select uid, sum(v) gold, sum(kind = 'gift') times, sum(kind = 'guard') guards, sum(case when kind = 'guard' then v else 0 end) guardGold,
-                        sum(kind = 'sc') scs, sum(case when kind = 'sc' then v else 0 end) scGold, max(id) last
-                      from g where v > 0 group by uid order by gold desc, last desc limit ?)
-         select top.*, (select viewer from events where id = top.last) viewer,
-                (select name from g where g.uid = top.uid and g.kind = 'gift' and g.v > 0 order by p desc, id desc limit 1) topGift
-         from top order by top.gold desc, top.last desc`,
+                        sum(kind = 'sc') scs, sum(case when kind = 'sc' then v else 0 end) scGold, lastId, lastTs
+                      from ranked group by uid order by gold desc, lastTs desc, lastId desc limit ?)
+         select top.*, (select viewer from events where id = top.lastId) viewer,
+                (select name from g where g.uid = top.uid and g.kind = 'gift' and g.v > 0 order by p desc, ts desc, id desc limit 1) topGift
+         from top order by top.gold desc, top.lastTs desc, top.lastId desc`,
       )
       .all(...args, limit) as Array<{ uid: number; gold: number; times: number; guards: number; guardGold: number; scs: number; scGold: number; viewer: string; topGift: string | null }>;
     return {
@@ -267,7 +281,7 @@ export class EventLog {
       .prepare(
         `select s.id, s.started_at as startedAt, s.ended_at as endedAt,
            (select count(*) from events e where e.session_id = s.id and e.kind in ('gift', 'guard', 'sc')) as gifts
-         from live_sessions s where s.room_id = ? order by s.id desc limit ?`,
+         from live_sessions s where s.room_id = ? order by s.started_at desc, s.id desc limit ?`,
       )
       .all(roomId, limit) as Array<{ id: number; startedAt: number; endedAt: number | null; gifts: number }>;
   }
@@ -304,7 +318,7 @@ export class EventLog {
     // 按时间范围装时指定走 (room_id, kind, id)：只看礼物、上舰、醒目留言，不然会把这段时间的进场、弹幕全读一遍
     const from = o.sessionId !== undefined ? 'events' : 'events indexed by events_room_kind_id';
     const rows = this.db.$client
-      .prepare(`select id, ts, kind, viewer, payload from ${from} where ${where.join(' and ')} order by id desc limit ?`)
+      .prepare(`select id, ts, kind, viewer, payload from ${from} where ${where.join(' and ')} order by ts desc, id desc limit ?`)
       .all(...args, o.limit ?? 50_000) as Array<{ id: number; ts: number; kind: string; viewer: string; payload: string | null }>;
     return rows.reverse().map((r) => ({ ...r, viewer: JSON.parse(r.viewer), payload: r.payload ? JSON.parse(r.payload) : null }));
   }
@@ -339,7 +353,7 @@ export class EventLog {
     // 找全部场次时指定走 (room_id, kind, id)：不然搜不到时要把整个直播间的记录（大部分是进场、弹幕）全读一遍
     const from = o.sessionId !== null ? 'events' : 'events indexed by events_room_kind_id';
     const rows = this.db.$client
-      .prepare(`select id, ts, kind, viewer, payload, session_id as sessionId from ${from} where ${where.join(' and ')} order by id desc limit ?`)
+      .prepare(`select id, ts, kind, viewer, payload, session_id as sessionId from ${from} where ${where.join(' and ')} order by ts desc, id desc limit ?`)
       .all(...args, o.limit) as Array<{ id: number; ts: number; kind: string; viewer: string; payload: string | null; sessionId: number | null }>;
     return rows.map((r) => ({ ...r, viewer: JSON.parse(r.viewer), payload: r.payload ? JSON.parse(r.payload) : null }));
   }

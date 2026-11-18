@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { z } from 'zod';
+import { GIFT_COMBO_MAX_HOLD_MS } from '@starfall/core';
 import { HISTORY_KINDS, PLAY_STATUS } from '@starfall/shared';
 import type { HistoryCounts, HistoryKind, HistoryOutcome, HistoryPlan } from '@starfall/shared';
 import { HttpError } from '../http.ts';
@@ -30,7 +31,7 @@ const payloadSchema = {
     .refine((p) => p.unitPrice * p.count <= 1_000_000_000_000),
   danmu: z.object({ text: z.string().max(16384) }),
   guard: z.object({ level: z.int().min(1).max(3), months: positive, op: z.enum(['open', 'renew']), price: money.optional() }),
-  sc: z.object({ text: z.string().max(16384), price: money.max(1_000_000_000), scId: z.string().max(512) }),
+  sc: z.object({ text: z.string().max(16384), price: z.number().min(0).max(1_000_000_000), scId: z.string().max(512) }),
 };
 const sessionSchema = z.object({
   id: positive, room_id: positive.nullable(), started_at: timestamp, ended_at: timestamp.nullable(), last_event: timestamp.nullable(),
@@ -41,6 +42,7 @@ const eventSchema = z.object({
   rule: z.string().max(512).nullable(), status, history_key: key.nullable(), platform_key: key.nullable(), guard_key: z.string().nullable(),
 });
 type Session = z.infer<typeof sessionSchema>;
+type ExistingSession = Pick<Session, 'id' | 'started_at' | 'ended_at'>;
 
 const eventFields = 'id, ts, room_id, session_id, kind, uid, uname, viewer, payload, rule, status';
 const sessionFields = 'id, room_id, started_at, ended_at';
@@ -165,8 +167,8 @@ function withHistory<T>(file: string, fn: (db: Conn, exportedAt: number | null) 
   }
 }
 
-/** 时间相近的同一用户、同一礼物（连击合并窗口最多 15 秒）、同一上舰或相同弹幕内容只能判为疑似重复。 */
-const overlapWindow: Record<HistoryKind, number> = { gift: 15_000, danmu: 1_000, guard: 10_000, sc: 1_000 };
+// 连击保留各设备收到的第一笔时间，按最长聚合时长加一秒时间戳余量检查疑似重复。
+const overlapWindow: Record<HistoryKind, number> = { gift: GIFT_COMBO_MAX_HOLD_MS + 1_000, danmu: 1_000, guard: 10_000, sc: 1_000 };
 function matchingField(kind: HistoryKind, text: string): number | string {
   const p = JSON.parse(text) as Record<string, number | string>;
   return kind === 'gift' ? p.giftId! : kind === 'guard' ? p.level! : p.text!;
@@ -183,6 +185,61 @@ function knownKey(e: KnownEvent): string | null {
   return platformEventKey(e.room_id, e.kind, id);
 }
 
+const SESSION_TIME_TOLERANCE_MS = 5 * 60_000;
+const SESSION_MIN_OVERLAP_RATIO = 0.8;
+const sessionKey = (s: Session) => JSON.stringify([s.room_id, s.started_at]);
+
+/** 起播时间可能来自不同设备。只归并互为唯一候选、且起止时间接近的已结束场次。 */
+function matchSessions(dst: Conn, sessions: Session[]): Map<number, ExistingSession> {
+  const alias = dst.prepare(
+    'select s.id, s.started_at, s.ended_at from history_session_aliases a' +
+    ' join live_sessions s on s.id = a.session_id and s.room_id = a.room_id' +
+    ' where a.room_id = ? and a.source_started_at = ?',
+  );
+  const exact = dst.prepare('select id, started_at, ended_at from live_sessions where room_id is ? and started_at = ? order by id limit 1');
+  const nearby = dst.prepare(
+    'select id, started_at, ended_at from live_sessions where room_id = ? and started_at between ? and ?' +
+    ' and ended_at between ? and ? and ended_at > started_at',
+  );
+  const matches = new Map<number, ExistingSession>();
+  const claimed = new Set<number>();
+  const checked = new Set<string>();
+  const unmatched: Session[] = [];
+  const possible = new Map<number, ExistingSession>();
+  const candidateCounts = new Map<number, number>();
+  const tolerance = SESSION_TIME_TOLERANCE_MS;
+  for (const s of sessions) {
+    const key = sessionKey(s);
+    if (checked.has(key)) continue;
+    checked.add(key);
+    const same = (alias.get(s.room_id, s.started_at) ?? exact.get(s.room_id, s.started_at)) as ExistingSession | undefined;
+    if (same) {
+      matches.set(s.id, same);
+      claimed.add(same.id);
+    } else {
+      unmatched.push(s);
+    }
+  }
+  // 已确认的对应关系和精确时间优先，剩下的场次才按时间范围匹配。
+  for (const s of unmatched) {
+    const start = s.started_at;
+    const end = s.ended_at;
+    if (s.room_id === null || end === null || end <= start) continue;
+    const candidates = (nearby.all(s.room_id, start - tolerance, start + tolerance, end - tolerance, end + tolerance) as Array<ExistingSession & { ended_at: number }>).filter((previous) => {
+      if (claimed.has(previous.id)) return false;
+      const overlap = Math.min(end, previous.ended_at) - Math.max(start, previous.started_at);
+      const shorter = Math.min(end - start, previous.ended_at - previous.started_at);
+      return overlap >= shorter * SESSION_MIN_OVERLAP_RATIO;
+    });
+    for (const candidate of candidates) candidateCounts.set(candidate.id, (candidateCounts.get(candidate.id) ?? 0) + 1);
+    if (candidates.length === 1) possible.set(s.id, candidates[0]!);
+  }
+  for (const [id, target] of possible) {
+    if (candidateCounts.get(target.id) === 1) matches.set(id, target);
+  }
+  return matches;
+}
+
 function inspect(dst: Conn, src: Conn, exportedAt: number | null, days: number, now: number, apply: boolean): HistoryReview {
   const plan: HistoryPlan = {
     events: { gift: zero(), danmu: zero(), guard: zero(), sc: zero() }, sessions: { added: 0, existing: 0 },
@@ -193,10 +250,13 @@ function inspect(dst: Conn, src: Conn, exportedAt: number | null, days: number, 
   const captureBoundary = (dst.prepare('select coalesce(max(id),0) as id from events').get() as { id: number }).id;
   const sessionIds = new Map<number, { id: number | null; room: number | null }>();
   const sessionsByStart = new Map<string, { id: number | null; originalId: number | null }>();
-  const existingSession = dst.prepare('select id from live_sessions where room_id is ? and started_at = ? order by id limit 1');
+  const sourceSessions = readSessions(src, cutoff);
+  const matches = matchSessions(dst, sourceSessions);
   const addSession = dst.prepare('insert into live_sessions (room_id,started_at,ended_at) values (?,?,?) returning id');
-  for (const s of readSessions(src, cutoff)) {
-    const key = JSON.stringify([s.room_id, s.started_at]);
+  const rememberSession = dst.prepare('insert or ignore into history_session_aliases (room_id,source_started_at,session_id) values (?,?,?)');
+  const widenSession = dst.prepare('update live_sessions set started_at = min(started_at, ?), ended_at = max(ended_at, ?) where id = ?');
+  for (const s of sourceSessions) {
+    const key = sessionKey(s);
     const mapped = sessionsByStart.get(key);
     if (mapped) {
       plan.sessions.existing++;
@@ -204,10 +264,16 @@ function inspect(dst: Conn, src: Conn, exportedAt: number | null, days: number, 
       sessionIds.set(s.id, { id: mapped.id, room: s.room_id });
       continue;
     }
-    const existing = existingSession.get(s.room_id, s.started_at) as { id: number } | undefined;
-    digest.update(JSON.stringify(['session', s.id, existing?.id ?? null]));
+    const existing = matches.get(s.id);
+    const adjusted = existing !== undefined && existing.started_at !== s.started_at;
+    digest.update(JSON.stringify(['session', s.id, existing?.id ?? null, adjusted ? existing : null]));
     plan.sessions[existing ? 'existing' : 'added']++;
     const endedAt = s.ended_at ?? Math.max(s.started_at, (s.last_event ?? s.started_at) + 1);
+    if (apply && adjusted && s.room_id !== null) {
+      rememberSession.run(s.room_id, s.started_at, existing.id);
+      rememberSession.run(s.room_id, existing.started_at, existing.id);
+      widenSession.run(s.started_at, endedAt, existing.id);
+    }
     const id = existing?.id ?? (apply ? (addSession.get(s.room_id, s.started_at, endedAt) as { id: number }).id : null);
     sessionIds.set(s.id, { id, room: s.room_id });
     sessionsByStart.set(key, { id, originalId: existing?.id ?? null });

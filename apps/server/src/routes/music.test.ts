@@ -212,7 +212,7 @@ describe('点歌接口', () => {
     expect(list.songs.map((x: { title: string; artist: string; hasLyric: boolean; folder: boolean }) => `${x.title}|${x.artist}|${x.hasLyric}|${x.folder}`).sort()).toEqual(['第一首|歌手乙|true|true', '第二首||false|true']);
     // 文件夹里的歌不能在后台删
     expect((await req({ method: 'DELETE', url: `/api/music/local/${list.songs[0].id}` })).statusCode).toBe(409);
-    fs.rmSync(path.join(dir, '子文件夹'), { recursive: true });
+    fs.unlinkSync(path.join(dir, '子文件夹', '第二首.ogg'));
     expect((await req({ method: 'POST', url: '/api/music/local/rescan' })).json()).toMatchObject({ total: 1, removed: 1 });
     expect((await req({ method: 'PUT', url: '/api/music/local/folder', payload: { dir: null } })).json()).toMatchObject({ total: 0 });
     expect((await req({ method: 'GET', url: '/api/music/local' })).json()).toEqual({ songs: [], folder: null });

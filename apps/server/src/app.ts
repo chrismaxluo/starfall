@@ -137,7 +137,7 @@ export async function buildApp(ctx: AppContext, opts: AppOptions = {}) {
       prefix: '/overlay/',
       decorateReply: false,
       cacheControl: false,
-      setHeaders: (reply, file) => reply.header('Cache-Control', file.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'),
+      setHeaders: (reply, file) => reply.header('Cache-Control', file.replaceAll('\\', '/').includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'),
     });
     app.get('/overlay', async (req, reply) => reply.redirect(`/overlay/${req.url.slice('/overlay'.length)}`));
   }
